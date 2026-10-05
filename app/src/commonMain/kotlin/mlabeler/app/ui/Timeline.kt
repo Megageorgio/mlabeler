@@ -865,14 +865,17 @@ private fun DrawScope.drawIntervalTier(
         if (conf != null && p?.kind != Problem.Kind.LowConfidence) {
             drawRect(c.ok.copy(alpha = 0.5f), Offset(a + px, bottom - 2 * px), Size(max(0f, (b - a - 2 * px) * conf), px))
         }
-        val width = b - a - 6 * px
+        // when zoomed in an interval can be far wider than the screen: centre the text in its visible part
+        val va = max(a, 0f)
+        val vb = min(b, size.width)
+        val width = vb - va - 6 * px
         if (text.isNotEmpty() && width > 6 * px) {
             val layout = measurer.measure(
                 text, style, overflow = TextOverflow.Clip, maxLines = 1, softWrap = false,
-                constraints = Constraints(maxWidth = max(1, width.toInt())),
+                constraints = Constraints(maxWidth = width.toInt().coerceIn(1, 100_000)),
             )
-            val tx = a + (b - a - layout.size.width) / 2
-            drawText(layout, topLeft = Offset(max(a + 3 * px, tx), top + (h - layout.size.height) / 2 - 2 * px))
+            val tx = va + (vb - va - layout.size.width) / 2
+            drawText(layout, topLeft = Offset(max(va + 3 * px, tx), top + (h - layout.size.height) / 2 - 2 * px))
         }
     }
     // boundaries
@@ -1129,10 +1132,12 @@ private fun DrawScope.drawReferences(
                 val b = x(ref.endOf(i))
                 if (mism != null && mism[i]) drawRect(c.danger.copy(alpha = 0.16f), Offset(a, top), Size(b - a, g.tierH))
                 val t = ref.texts[i]
-                if (t.isNotEmpty() && b - a > 8 * px) {
+                val va = max(a, 0f)
+                val vb = min(b, size.width)
+                if (t.isNotEmpty() && vb - va > 8 * px) {
                     val layout = measurer.measure(t, style.copy(color = c.muted), maxLines = 1, softWrap = false,
-                        constraints = Constraints(maxWidth = max(1, (b - a - 6 * px).toInt())))
-                    drawText(layout, topLeft = Offset(a + (b - a - layout.size.width) / 2, top + (g.tierH - layout.size.height) / 2 - 2 * px))
+                        constraints = Constraints(maxWidth = (vb - va - 6 * px).toInt().coerceIn(1, 100_000)))
+                    drawText(layout, topLeft = Offset(va + (vb - va - layout.size.width) / 2, top + (g.tierH - layout.size.height) / 2 - 2 * px))
                 }
             }
             for (bi in first..ref.size) {
