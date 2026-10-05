@@ -93,6 +93,14 @@ data class AppSettings(
     val layoutPresets: Map<String, LayoutSettings> = emptyMap(),
     /** The short guide was shown once. */
     val seenHelp: Boolean = false,
+    /** Phones: "landscape", "portrait" or "auto". */
+    val orientation: String = "landscape",
+    /** Phones: hide the status and navigation bars. */
+    val fullscreen: Boolean = true,
+    /** Phones: keep content away from the camera cutout. */
+    val avoidCutout: Boolean = false,
+    /** The user picked the interface size (else phones get a smaller default). */
+    val scaleChosen: Boolean = false,
     /** Plugins on the quick slots (Ctrl+1 … Ctrl+4). */
     val pluginSlots: List<String> = emptyList(),
 ) {

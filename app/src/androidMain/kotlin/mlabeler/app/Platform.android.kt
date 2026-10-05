@@ -57,6 +57,9 @@ object AndroidContext {
         context = c
     }
 
+    /** The running activity (for orientation and full screen). */
+    var activity: android.app.Activity? = null
+
     /** Set by the activity: asks for the microphone permission. */
     var askMic: ((callback: (Boolean) -> Unit) -> Unit)? = null
 }
@@ -91,6 +94,24 @@ actual object Platform {
     actual fun decodeAudio(path: String): Audio? = MediaDecoder.decode(path)
 
     actual fun openInFileManager(path: String) = Unit
+
+    actual fun applyScreen(orientation: String, fullscreen: Boolean) {
+        val a = AndroidContext.activity ?: return
+        a.runOnUiThread {
+            a.requestedOrientation = when (orientation) {
+                "landscape" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                "portrait" -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_FULL_USER
+            }
+            val ctl = androidx.core.view.WindowCompat.getInsetsController(a.window, a.window.decorView)
+            if (fullscreen) {
+                ctl.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                ctl.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            } else {
+                ctl.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
 }
 
 actual fun imageFromArgb(width: Int, height: Int, pixels: IntArray): ImageBitmap =

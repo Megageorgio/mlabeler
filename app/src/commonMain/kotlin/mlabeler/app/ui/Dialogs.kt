@@ -72,7 +72,7 @@ fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable () 
     BoxWithConstraints(
         Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.6f))
             .clickable(remember { MutableInteractionSource() }, null) { onDismiss() }
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .onPreviewKeyEvent { if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) { onDismiss(); true } else false },
         contentAlignment = Alignment.TopCenter,
     ) {
@@ -202,6 +202,14 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SectionTitle(S.language())
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for ((code, name) in Lang.available) Chip(name, Lang.current == code) { app.update { it.copy(language = code) } }
+                }
+                if (mlabeler.app.Platform.isMobile) {
+                    SectionTitle(S.screen())
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for ((v, t) in listOf("landscape" to S.landscape(), "portrait" to S.portrait(), "auto" to S.autoRotate())) Chip(t, s.orientation == v) { app.update { it.copy(orientation = v) } }
+                    }
+                    SwitchRow(S.fullscreen(), s.fullscreen) { v -> app.update { it.copy(fullscreen = v) } }
+                    if (s.fullscreen) SwitchRow(S.avoidCutout(), s.avoidCutout) { v -> app.update { it.copy(avoidCutout = v) } }
                 }
                 SectionTitle(S.files())
                 SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }

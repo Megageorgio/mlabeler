@@ -94,6 +94,7 @@ actual object Platform {
     actual fun openInFileManager(path: String) {
         runCatching { Desktop.getDesktop().open(File(path)) }
     }
+    actual fun applyScreen(orientation: String, fullscreen: Boolean) = Unit
 }
 
 actual val resizeHorizontalIcon: PointerIcon = PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR))

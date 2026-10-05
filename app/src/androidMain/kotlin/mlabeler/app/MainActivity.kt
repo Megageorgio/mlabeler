@@ -15,8 +15,18 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AndroidContext.init(applicationContext)
+        AndroidContext.activity = this
+        // draw under the camera cutout too: the whole screen is used
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            window.attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
         AndroidContext.askMic = { cb -> micCallback = cb; micLauncher.launch(android.Manifest.permission.RECORD_AUDIO) }
         enableEdgeToEdge()
         setContent { App() }
+    }
+
+    override fun onDestroy() {
+        if (AndroidContext.activity === this) AndroidContext.activity = null
+        super.onDestroy()
     }
 }

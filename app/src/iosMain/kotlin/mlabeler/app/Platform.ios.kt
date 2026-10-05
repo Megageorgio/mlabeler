@@ -46,6 +46,7 @@ actual object Platform {
     actual fun pickFolderNative(title: String): String? = null
     actual fun decodeAudio(path: String): Audio? = null
     actual fun openInFileManager(path: String) = Unit
+    actual fun applyScreen(orientation: String, fullscreen: Boolean) = Unit
 }
 
 actual val resizeHorizontalIcon: PointerIcon = PointerIcon.Hand

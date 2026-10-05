@@ -24,6 +24,8 @@ expect object Platform {
     /** Decodes audio formats other than WAV; null if not supported here. */
     fun decodeAudio(path: String): Audio?
     fun openInFileManager(path: String)
+    /** Phones: screen orientation ("auto", "landscape", "portrait") and full screen without system bars. */
+    fun applyScreen(orientation: String, fullscreen: Boolean)
 }
 
 /** Creates an image from ARGB pixels. */

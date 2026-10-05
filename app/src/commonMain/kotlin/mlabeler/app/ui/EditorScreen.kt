@@ -6,6 +6,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -87,7 +88,7 @@ fun EditorScreen(app: AppState, ed: EditorState) {
     }
     BoxWithConstraints(
         Modifier.fillMaxSize().background(c.bg)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .focusRequester(focus)
             .focusable()
             .onKeyEvent { e ->
@@ -170,20 +171,20 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
     val c = T.c
     val s = app.settings
     val item = ed.item
+    // left: files and the title; middle: tools, scrolling when they do not fit; right: always visible
     Row(
-        Modifier.fillMaxWidth().height(46.dp).background(c.panel).padding(horizontal = 6.dp),
+        Modifier.fillMaxWidth().height(if (Platform.isMobile) 44.dp else 46.dp).background(c.panel).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         IconBtn(Icons.panelLeft, S.toggleFiles(), Commands.files.keyLabel, active = s.layout.showFiles) { Commands.files.run(ed, app) }
         Spacer(Modifier.width(6.dp))
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.widthIn(min = 60.dp, max = 260.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     item?.let { Paths.name(it.audioPath) } ?: Paths.name(ed.workspace.root),
-                    color = c.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = c.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
                 )
-                if (ed.dirty) Text("  •", color = c.accent, fontSize = 14.sp)
+                if (ed.dirty) Text(" •", color = c.accent, fontSize = 14.sp)
             }
             // folder name and what is labelled there; a click opens the folder settings
             Text(
@@ -192,37 +193,46 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
                 modifier = Modifier.clickable { app.showWorkspace = true },
             )
         }
-        IconBtn(Icons.prevFile, S.prevFile(), Commands.prevFile.keyLabel) { ed.openRelative(-1) }
-        IconBtn(Icons.nextFile, S.nextFile(), Commands.nextFile.keyLabel) { ed.openRelative(1) }
-        Sep()
-        IconBtn(Icons.undo, S.undo(), Commands.undo.keyLabel, enabled = ed.canUndo) { ed.undo() }
-        IconBtn(Icons.redo, S.redo(), Commands.redo.keyLabel, enabled = ed.canRedo) { ed.redo() }
-        IconBtn(Icons.save, S.save(), Commands.save.keyLabel, enabled = ed.dirty || ed.item?.labelPath == null) { ed.save() }
-        Sep()
-        IconBtn(if (ed.playing) Icons.stop else Icons.play, if (ed.playing) S.stop() else S.play(), Commands.togglePlay.keyLabel) { ed.togglePlay() }
-        IconBtn(Icons.loop, S.loop(), Commands.loop.keyLabel, active = s.edit.loop) { Commands.loop.run(ed, app) }
-        SpeedButton(ed, s.edit.speed)
-        Sep()
-        if (ed.mode == Mode.Oto) {
-            IconBtn(Icons.magic, Commands.autoOto.title(), Commands.autoOto.keyLabel) { app.showAutoOto = true }
-            IconBtn(Icons.plus, Commands.otoAdd.title(), Commands.otoAdd.keyLabel) { ed.oto.add() }
-            IconBtn(Icons.merge, Commands.otoDuplicate.title(), Commands.otoDuplicate.keyLabel, enabled = ed.oto.current() != null) { ed.oto.duplicate() }
-            IconBtn(Icons.trash, Commands.otoDelete.title(), Commands.otoDelete.keyLabel, enabled = ed.oto.current() != null) { ed.oto.delete() }
-            IconBtn(Icons.link, Commands.otoLock.title(), Commands.otoLock.keyLabel, active = s.edit.otoLockedDrag) { Commands.otoLock.run(ed, app) }
-        } else {
-        IconBtn(Icons.split, S.split(), Commands.split.keyLabel) { ed.splitAt() }
-        IconBtn(Icons.merge, S.merge(), Commands.merge.keyLabel) { ed.mergeSelected() }
-        IconBtn(Icons.ripple, S.ripple() + " — " + S.rippleHint(), Commands.ripple.keyLabel, active = s.edit.ripple) { Commands.ripple.run(ed, app) }
-            IconBtn(Icons.link, S.linked() + " — " + S.linkedHint(), Commands.linked.keyLabel, active = s.edit.linked) { Commands.linked.run(ed, app) }
+        Spacer(Modifier.width(6.dp))
+        Row(
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
+        ) {
+            IconBtn(Icons.prevFile, S.prevFile(), Commands.prevFile.keyLabel) { ed.openRelative(-1) }
+            IconBtn(Icons.nextFile, S.nextFile(), Commands.nextFile.keyLabel) { ed.openRelative(1) }
+            Sep()
+            IconBtn(Icons.undo, S.undo(), Commands.undo.keyLabel, enabled = ed.canUndo) { ed.undo() }
+            IconBtn(Icons.redo, S.redo(), Commands.redo.keyLabel, enabled = ed.canRedo) { ed.redo() }
+            IconBtn(Icons.save, S.save(), Commands.save.keyLabel, enabled = ed.dirty || ed.item?.labelPath == null) { ed.save() }
+            Sep()
+            IconBtn(if (ed.playing) Icons.stop else Icons.play, if (ed.playing) S.stop() else S.play(), Commands.togglePlay.keyLabel) { ed.togglePlay() }
+            IconBtn(Icons.loop, S.loop(), Commands.loop.keyLabel, active = s.edit.loop) { Commands.loop.run(ed, app) }
+            SpeedButton(ed, s.edit.speed)
+            Sep()
+            if (ed.mode == Mode.Oto) {
+                IconBtn(Icons.magic, Commands.autoOto.title(), Commands.autoOto.keyLabel) { app.showAutoOto = true }
+                IconBtn(Icons.plus, Commands.otoAdd.title(), Commands.otoAdd.keyLabel) { ed.oto.add() }
+                IconBtn(Icons.merge, Commands.otoDuplicate.title(), Commands.otoDuplicate.keyLabel, enabled = ed.oto.current() != null) { ed.oto.duplicate() }
+                IconBtn(Icons.trash, Commands.otoDelete.title(), Commands.otoDelete.keyLabel, enabled = ed.oto.current() != null) { ed.oto.delete() }
+                IconBtn(Icons.link, Commands.otoLock.title(), Commands.otoLock.keyLabel, active = s.edit.otoLockedDrag) { Commands.otoLock.run(ed, app) }
+            } else {
+                IconBtn(Icons.split, S.split(), Commands.split.keyLabel) { ed.splitAt() }
+                IconBtn(Icons.merge, S.merge(), Commands.merge.keyLabel) { ed.mergeSelected() }
+                IconBtn(Icons.ripple, S.ripple() + " — " + S.rippleHint(), Commands.ripple.keyLabel, active = s.edit.ripple) { Commands.ripple.run(ed, app) }
+                IconBtn(Icons.link, S.linked() + " — " + S.linkedHint(), Commands.linked.keyLabel, active = s.edit.linked) { Commands.linked.run(ed, app) }
+            }
+            Sep()
+            IconBtn(Icons.layers, S.overlayShort(), Commands.overlay.keyLabel, active = s.layout.overlay) { Commands.overlay.run(ed, app) }
+            IconBtn(Icons.zoomOut, S.zoomOut(), Commands.zoomOut.keyLabel) { Commands.zoomOut.run(ed, app) }
+            IconBtn(Icons.zoomIn, S.zoomIn(), Commands.zoomIn.keyLabel) { Commands.zoomIn.run(ed, app) }
+            IconBtn(Icons.fit, S.zoomFit(), Commands.zoomFit.keyLabel) { ed.fitAll() }
+            Sep()
+            IconBtn(Icons.plugin, S.pluginsTitle(), Commands.plugins.keyLabel) { Commands.plugins.run(ed, app) }
+            IconBtn(Icons.command, S.commands(), Commands.palette.keyLabel) { app.showCommands = true }
         }
         Sep()
-        IconBtn(Icons.layers, S.overlayShort(), Commands.overlay.keyLabel, active = s.layout.overlay) { Commands.overlay.run(ed, app) }
-        IconBtn(Icons.zoomOut, S.zoomOut(), Commands.zoomOut.keyLabel) { Commands.zoomOut.run(ed, app) }
-        IconBtn(Icons.zoomIn, S.zoomIn(), Commands.zoomIn.keyLabel) { Commands.zoomIn.run(ed, app) }
-        IconBtn(Icons.fit, S.zoomFit(), Commands.zoomFit.keyLabel) { ed.fitAll() }
-        Sep()
-        IconBtn(Icons.plugin, S.pluginsTitle(), Commands.plugins.keyLabel) { Commands.plugins.run(ed, app) }
-        IconBtn(Icons.command, S.commands(), Commands.palette.keyLabel) { app.showCommands = true }
+        IconBtn(Icons.settings, S.settings(), Commands.settings.keyLabel) { app.showSettings = true }
         MainMenu(app, ed)
         if (wc == WidthClass.Medium) {
             IconBtn(Icons.panelRight, S.toggleInspector(), active = overlayDetails) { toggleOverlay() }
@@ -346,7 +356,7 @@ private fun CompactEditor(app: AppState, ed: EditorState) {
         ) {
             Column(
                 Modifier.fillMaxWidth().heightIn(max = 520.dp).clip(RoundedCornerShape(topStart = c.radius * 2, topEnd = c.radius * 2))
-                    .background(c.panel).windowInsetsPadding(WindowInsets.navigationBars),
+                    .background(c.panel).windowInsetsPadding(mlabeler.app.ui.screenInsets()),
             ) {
                 Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
                     Box(Modifier.size(width = 36.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(c.border))
@@ -388,7 +398,7 @@ private fun CompactMenu(app: AppState, ed: EditorState, onDetails: () -> Unit) {
 private fun CompactToolbar(app: AppState, ed: EditorState, onDetails: () -> Unit) {
     val c = T.c
     Row(
-        Modifier.fillMaxWidth().background(c.panel).windowInsetsPadding(WindowInsets.navigationBars)
+        Modifier.fillMaxWidth().background(c.panel).windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -424,7 +434,7 @@ fun SidePanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Un
             for ((k, t) in listOf(S.files(), mlabeler.app.ui.entriesTitle()).withIndex()) {
                 val sel = k == tab
                 Text(
-                    t, fontSize = 13.sp, color = if (sel) c.text else c.muted,
+                    t, fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false,
                     modifier = Modifier.clip(RoundedCornerShape(c.radius)).background(if (sel) c.panelAlt else c.panel)
                         .clickable { tab = k }.padding(horizontal = 12.dp, vertical = 6.dp),
                 )

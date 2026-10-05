@@ -57,7 +57,7 @@ fun StartScreen(app: AppState) {
         )
         return
     }
-    BoxWithConstraints(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(WindowInsets.safeDrawing)) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())) {
         val wide = maxWidth > 760.dp
         Column(
             Modifier.fillMaxSize().padding(horizontal = if (wide) 64.dp else 20.dp, vertical = if (wide) 56.dp else 24.dp),
@@ -116,7 +116,7 @@ fun FolderBrowser(start: String, onPick: (String) -> Unit, onCancel: () -> Unit)
     }
     val folders = remember(entries) { entries.filter { PlatformFs.isDirectory(it) }.sortedWith(compareBy(naturalOrder()) { Paths.name(it).lowercase() }) }
     val audioCount = remember(entries) { entries.count { Paths.ext(it) in AUDIO_EXTENSIONS } }
-    Column(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(WindowInsets.safeDrawing)) {
+    Column(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())) {
         Row(Modifier.fillMaxWidth().height(52.dp).background(c.panel).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBtn(Icons.back, S.cancel()) { onCancel() }
             IconBtn(Icons.up, S.up(), enabled = Paths.parent(dir).isNotEmpty() && Paths.parent(dir) != dir) { dir = Paths.parent(dir).ifEmpty { "/" } }

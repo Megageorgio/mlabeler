@@ -96,13 +96,16 @@ class AppState(private val scope: CoroutineScope) {
     private var counter = 0L
 
     init {
+        // phones start smaller: the same sizes as on a desktop look oversized there
+        if (Platform.isMobile && !settings.scaleChosen) settings = settings.copy(scale = 0.8f)
         runCatching { mlabeler.app.theme.ThemeFiles.load(Platform.dataDir()) }
         mlabeler.app.ui.Keymap.load(settings.keymap)
         Lang.current = settings.language.ifEmpty { Platform.systemLanguage }.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
     }
 
     fun update(transform: (AppSettings) -> AppSettings) {
-        val s = transform(settings)
+        var s = transform(settings)
+        if (s.scale != settings.scale) s = s.copy(scaleChosen = true)
         if (s == settings) return
         settings = s
         if (s.language.isNotEmpty()) Lang.current = s.language

@@ -29,7 +29,12 @@ fun App(app: AppState = rememberAppState()) {
     DisposableEffect(app) { onDispose { app.close() } }
     val base = LocalDensity.current
     val scale = app.settings.scale.coerceIn(0.7f, 2f)
-    CompositionLocalProvider(LocalDensity provides Density(base.density * scale, base.fontScale)) {
+    val st = app.settings
+    androidx.compose.runtime.LaunchedEffect(st.orientation, st.fullscreen) { Platform.applyScreen(st.orientation, st.fullscreen) }
+    CompositionLocalProvider(
+        LocalDensity provides Density(base.density * scale, base.fontScale),
+        mlabeler.app.ui.LocalKeepBarsFree provides (!Platform.isMobile || !st.fullscreen || st.avoidCutout),
+    ) {
         AppTheme(Themes.byId(app.settings.theme)) {
             StorageAccess {
                 Box(Modifier.fillMaxSize()) {

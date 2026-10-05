@@ -103,7 +103,7 @@ fun RecorderScreen(app: AppState, rec: RecorderState) {
         runCatching { focus.requestFocus() }
     }
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(WindowInsets.safeDrawing)
+        Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .focusRequester(focus).focusable()
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown || editing || showSettings) return@onKeyEvent false

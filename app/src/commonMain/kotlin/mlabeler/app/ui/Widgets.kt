@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -55,7 +57,7 @@ import mlabeler.app.resizeHorizontalIcon
 import mlabeler.app.theme.T
 
 /** Touch targets are larger on phones. */
-val targetSize: Dp get() = if (Platform.isMobile) 44.dp else 32.dp
+val targetSize: Dp get() = if (Platform.isMobile) 40.dp else 32.dp
 
 @Composable
 fun Tip(text: String, content: @Composable () -> Unit) {
@@ -290,3 +292,12 @@ fun formatMs(seconds: Double): String {
     val unit = mlabeler.app.i18n.S.msUnit()
     return if (kotlin.math.abs(ms) >= 100) "${kotlin.math.round(ms).toLong()} $unit" else "${kotlin.math.round(ms * 10) / 10.0} $unit"
 }
+
+/** Set from the settings: whether the camera cutout and system bars are kept free. */
+val LocalKeepBarsFree = androidx.compose.runtime.staticCompositionLocalOf { true }
+
+/** Insets screens keep free: everything when the system bars are shown, only the keyboard in full screen. */
+@Composable
+fun screenInsets(): androidx.compose.foundation.layout.WindowInsets =
+    if (LocalKeepBarsFree.current) androidx.compose.foundation.layout.WindowInsets.safeDrawing
+    else androidx.compose.foundation.layout.WindowInsets.ime
