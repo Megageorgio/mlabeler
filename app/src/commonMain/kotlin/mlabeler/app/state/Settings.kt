@@ -52,6 +52,14 @@ data class EditSettings(
 )
 
 @Serializable
+data class ToolkitSettings(
+    val url: String = "http://127.0.0.1:8765",
+    val token: String = "",
+    val lastModel: String = "",
+    val lastLanguage: String = "",
+)
+
+@Serializable
 data class AppSettings(
     val language: String = "",
     val theme: String = "modern-dark",
@@ -61,6 +69,7 @@ data class AppSettings(
     val view: ViewSettings = ViewSettings(),
     val edit: EditSettings = EditSettings(),
     val checks: CheckSettings = CheckSettings(),
+    val toolkit: ToolkitSettings = ToolkitSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")

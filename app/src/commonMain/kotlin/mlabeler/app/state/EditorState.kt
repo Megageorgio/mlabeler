@@ -172,12 +172,77 @@ class EditorState(
     val referenceTiers: List<Pair<Int, IntervalTier>> get() =
         references.withIndex().flatMap { (k, r) -> r.doc.tiers.filterIsInstance<IntervalTier>().map { k to it } }
 
+    /** Results of autolabelled parts kept for comparison (per file, not saved). */
+    private val modelResults = mutableMapOf<String, List<Reference>>()
+
     fun loadReferences() {
         val it = item
         val dur = duration
         references = if (it == null) emptyList() else workspace.state.compareFolders.mapNotNull { dir ->
             workspace.readLabelsIn(dir, it.name, dur)?.let { d -> Reference(Paths.name(dir), dir, d) }
+        } + modelResults[it.id].orEmpty()
+    }
+
+    fun dropModelResult(r: Reference) {
+        val id = item?.id ?: return
+        modelResults[id] = modelResults[id].orEmpty() - r
+        loadReferences()
+    }
+
+    // ---------- autolabel through the toolkit ----------
+
+    var toolkitBusy by mutableStateOf<String?>(null)
+        private set
+    private var toolkitJob: Job? = null
+
+    /**
+     * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown
+     * as a comparison tier named after the model.
+     */
+    fun autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean) {
+        val a = audio ?: return
+        val it = item ?: return
+        val t = app.settings.toolkit
+        toolkitJob?.cancel()
+        toolkitJob = scope.launch {
+            val client = mlabeler.app.toolkit.ToolkitClient(t.url, t.token)
+            try {
+                toolkitBusy = S.uploading()
+                val s0 = (from * a.sampleRate).toInt().coerceIn(0, a.samples.size)
+                val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
+                val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
+                val fileId = client.upload(it.name + "_part.wav", wav)
+                val job = client.align(fileId, model, language, text, phonemes)
+                val result = client.await(job) { p, stage -> toolkitBusy = "${(p * 100).toInt()}%  $stage" }
+                val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate)
+                if (replace) {
+                    updateDoc { d ->
+                        var out = d
+                        for (pt in part.tiers.filterIsInstance<IntervalTier>()) {
+                            val k = out.tierIndex(pt.name).takeIf { k -> k >= 0 } ?: if (pt.name == "phones") out.phonemeTierIndex() else -1
+                            if (k >= 0) out = out.replace(k, mlabeler.core.edit.RangeEdits.replace(out.tiers[k] as IntervalTier, from, to, pt))
+                            else out = out.copy(tiers = listOf(mlabeler.core.edit.RangeEdits.replace(IntervalTier.empty(pt.name, duration), from, to, pt)) + out.tiers)
+                        }
+                        out
+                    }
+                } else {
+                    modelResults[it.id] = modelResults[it.id].orEmpty() + Reference(model, "", part)
+                    loadReferences()
+                }
+                app.message(S.autolabelDone())
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                app.message(e.message ?: e.toString(), error = true)
+            } finally {
+                toolkitBusy = null
+            }
         }
+    }
+
+    fun cancelToolkit() {
+        toolkitJob?.cancel()
+        toolkitBusy = null
     }
 
     fun addCompareFolder(dir: String) {

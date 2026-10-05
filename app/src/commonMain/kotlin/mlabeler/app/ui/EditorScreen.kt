@@ -274,6 +274,10 @@ private fun StatusBar(app: AppState, ed: EditorState) {
         Spacer(Modifier.weight(1f))
         val spec = ed.spectrogram
         if (ed.audio != null && (spec == null || spec.ready < spec.frames)) StatusText(S.analysing())
+        ed.toolkitBusy?.let { b ->
+            StatusText(S.toolkit() + ": " + b, color = c.accent)
+            Text("×", color = c.muted, fontSize = 14.sp, modifier = Modifier.clickable { ed.cancelToolkit() })
+        }
         if (ed.problems.isNotEmpty()) StatusText("⚠ ${ed.problems.size}", color = c.warn)
         StatusText("${(ed.visibleDuration).let { if (it < 10) ((it * 100).toLong() / 100.0).toString() else it.toLong().toString() }} s")
     }

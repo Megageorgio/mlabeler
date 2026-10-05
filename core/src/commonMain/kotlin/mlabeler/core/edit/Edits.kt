@@ -238,3 +238,38 @@ class History<T>(initial: T, private val limit: Int = 500) {
         savedVersion = version
     }
 }
+
+object RangeEdits {
+    /**
+     * Replaces the part [from]..[to] of an interval tier with [part] (a tier covering that range, possibly starting
+     * earlier). Boundaries at [from] and [to] are added when missing; everything between them is replaced.
+     */
+    fun replace(tier: IntervalTier, from: Double, to: Double, part: IntervalTier): IntervalTier {
+        val keepBefore = tier.bounds.indexOfLast { it <= from + Edits.SAME_TIME }.coerceAtLeast(0)
+        val keepAfter = tier.bounds.indexOfFirst { it >= to - Edits.SAME_TIME }.let { if (it < 0) tier.bounds.size - 1 else it }
+        val b = mutableListOf<Double>()
+        val t = mutableListOf<String>()
+        val c = mutableListOf<Float?>()
+        for (i in 0 until keepBefore) {
+            b += tier.bounds[i]; t += tier.texts[i]; c += tier.confidenceOf(i)
+        }
+        if (tier.bounds[keepBefore] < from - Edits.SAME_TIME) {
+            b += tier.bounds[keepBefore]; t += tier.texts[keepBefore]; c += tier.confidenceOf(keepBefore)
+        }
+        // the new part, clipped to the range
+        val pb = part.bounds.map { it.coerceIn(from, to) }
+        for (i in 0 until part.size) {
+            if (pb[i + 1] - pb[i] < 1e-6) continue
+            b += pb[i]; t += part.texts[i]; c += part.confidenceOf(i)
+        }
+        if (tier.bounds[keepAfter] > to + Edits.SAME_TIME) {
+            b += to; t += tier.texts[keepAfter - 1]; c += tier.confidenceOf(keepAfter - 1)
+        }
+        for (i in keepAfter until tier.size) {
+            b += tier.bounds[i]; t += tier.texts[i]; c += tier.confidenceOf(i)
+        }
+        b += tier.bounds.last()
+        val anyConf = c.any { it != null }
+        return IntervalTier(tier.name, b, t, if (anyConf) c else null)
+    }
+}

@@ -27,6 +27,10 @@ kotlin {
                 withJvm()
                 group("ios")
             }
+            group("jvmShared") {
+                withJvm()
+                withAndroidTarget()
+            }
         }
     }
 

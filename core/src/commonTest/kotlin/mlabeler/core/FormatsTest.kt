@@ -214,3 +214,14 @@ class PitchTest {
         assertTrue(p.values[p.values.size / 2] in -10f..-8f, "power ${p.values[p.values.size / 2]}")
     }
 }
+
+class RangeEditsTest {
+    @Test
+    fun replaceMiddle() {
+        val t = IntervalTier("phones", listOf(0.0, 1.0, 2.0, 3.0), listOf("a", "b", "c"))
+        val part = IntervalTier("phones", listOf(0.5, 1.2, 2.5), listOf("x", "y"))
+        val r = mlabeler.core.edit.RangeEdits.replace(t, 0.5, 2.5, part)
+        assertEquals(listOf("a", "x", "y", "c"), r.texts)
+        assertEquals(listOf(0.0, 0.5, 1.2, 2.5, 3.0), r.bounds)
+    }
+}

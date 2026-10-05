@@ -297,17 +297,20 @@ private fun CompareSection(ed: EditorState) {
     SectionTitle(compareTitle()) {
         IconBtn(Icons.plus, addFolder(), size = 26.dp) { ed.app.pickFolder(addFolder()) { ed.addCompareFolder(it) } }
     }
-    val folders = ed.workspace.state.compareFolders
+    val folders = ed.workspace.state.compareFolders + ed.references.filter { it.folder.isEmpty() }.map { "model:" + it.name }
     if (folders.isEmpty()) {
         Text(compareHint(), color = c.muted, fontSize = 12.sp)
         return
     }
     for (dir in folders) {
-        val r = ed.references.firstOrNull { it.folder == dir }
+        val r = if (dir.startsWith("model:")) ed.references.firstOrNull { it.folder.isEmpty() && "model:" + it.name == dir }
+            else ed.references.firstOrNull { it.folder == dir }
         Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(Paths.name(dir), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                IconBtn(Icons.close, S.removeFromList(), size = 24.dp) { ed.removeCompareFolder(dir) }
+                Text(dir.removePrefix("model:").let { if (dir.startsWith("model:")) it else Paths.name(it) }, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                IconBtn(Icons.close, S.removeFromList(), size = 24.dp) {
+                    if (dir.startsWith("model:")) r?.let { ed.dropModelResult(it) } else ed.removeCompareFolder(dir)
+                }
             }
             if (r == null) {
                 Text(noMatch(), color = c.muted, fontSize = 12.sp)

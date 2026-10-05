@@ -58,6 +58,7 @@ import mlabeler.app.theme.T
 import mlabeler.app.theme.Themes
 import mlabeler.core.format.LabelFormat
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 /** Dim background with a centred card; full screen on narrow windows. */
 @Composable
@@ -127,7 +128,7 @@ fun CommandPalette(app: AppState) {
     }
 }
 
-private enum class Section { General, View, Spectrogram, Editing, Checks, Keys, About }
+private enum class Section { General, View, Spectrogram, Editing, Checks, Toolkit, Keys, About }
 
 @Composable
 private fun sectionTitle(s: Section) = when (s) {
@@ -136,6 +137,7 @@ private fun sectionTitle(s: Section) = when (s) {
     Section.Spectrogram -> S.spectrogramSection()
     Section.Editing -> S.editing()
     Section.Checks -> S.checks()
+    Section.Toolkit -> S.toolkit()
     Section.Keys -> S.shortcuts()
     Section.About -> S.about()
 }
@@ -246,6 +248,29 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     phonemes = v
                     app.update { it.copy(checks = it.checks.copy(phonemeSet = v.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }.toSet())) }
                 }, Modifier.fillMaxWidth())
+            }
+            Section.Toolkit -> {
+                SectionTitle(S.toolkit())
+                Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp)
+                var url by remember { mutableStateOf(s.toolkit.url) }
+                var token by remember { mutableStateOf(s.toolkit.token) }
+                var check by remember { mutableStateOf("") }
+                Text(S.toolkitUrl(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                Field(url, { url = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(url = it.trim())) } }, Modifier.fillMaxWidth())
+                Text(S.toolkitToken(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                Field(token, { token = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(token = it.trim())) } }, Modifier.fillMaxWidth())
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Btn(S.toolkitCheck()) {
+                        check = "…"
+                        scope.launch {
+                            check = try {
+                                mlabeler.app.toolkit.ToolkitClient(url, token).health(); S.toolkitOk()
+                            } catch (e: Exception) { e.message ?: "error" }
+                        }
+                    }
+                    Text(check, color = c.muted, fontSize = 12.sp)
+                }
             }
             Section.Keys -> {
                 SectionTitle(S.shortcuts())

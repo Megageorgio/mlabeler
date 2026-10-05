@@ -27,6 +27,7 @@ class AppState(private val scope: CoroutineScope) {
     var showCommands by mutableStateOf(false)
     var showBatchRename by mutableStateOf(false)
     var showWorkspace by mutableStateOf(false)
+    var showAutolabel by mutableStateOf(false)
     /** Set while the in-app folder browser is open for a pick. */
     var folderPick by mutableStateOf<((String) -> Unit)?>(null)
 
