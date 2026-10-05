@@ -40,6 +40,9 @@ private val thisFile = L("This file", "Этот файл")
 private val allFiles = L("All files", "Все файлы")
 private val summary = L("Counts", "Подсчёт")
 private val searchHint = L("text, or name: file: tier:", "текст, или name: file: tier:")
+private val selectT = L("Select", "Выбрать")
+private val allShown = L("All shown", "Все видимые")
+private val mergeLeft = L("Remove (join with the previous one)", "Удалить (присоединить к предыдущему)")
 private val countLine = L("{0} entries", "записей: {0}")
 
 /** One interval somewhere in the folder. */
@@ -66,6 +69,9 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
     var counts by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var everything by remember { mutableStateOf<List<Entry>?>(null) }
+    var picking by remember { mutableStateOf(false) }
+    var picked by remember(ed.index) { mutableStateOf(emptySet<Int>()) }
+    var newText by remember { mutableStateOf("") }
     val doc = ed.doc
     val current: List<Entry> = remember(doc, ed.index, ed.activeTier) {
         val t = doc?.tiers?.getOrNull(ed.activeTier) as? IntervalTier ?: return@remember emptyList()
@@ -91,6 +97,7 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                 Chip(thisFile(), !all) { all = false }
                 Chip(allFiles(), all) { all = true }
                 Chip(summary(), counts) { counts = !counts }
+                if (!all) Chip(selectT(), picking) { picking = !picking; picked = emptySet() }
             }
         }
         if (all && everything == null) Text(S.loading(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
@@ -117,11 +124,18 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = if (Platform.isMobile) 44.dp else 26.dp)
                             .background(if (active) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else c.panel)
-                            .clickable { ed.openInterval(e.item, e.tier, e.index); onOpened() }
+                            .clickable {
+                                if (picking && !all) picked = if (e.index in picked) picked - e.index else picked + e.index
+                                else { ed.openInterval(e.item, e.tier, e.index); onOpened() }
+                            }
                             .padding(horizontal = 12.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val fg = if (active && c.square) c.onAccent else c.text
+                        if (picking && !all) androidx.compose.material3.Icon(
+                            if (e.index in picked) Icons.check else Icons.circle, null,
+                            Modifier.padding(end = 6.dp).width(14.dp), tint = if (e.index in picked) c.accent else c.muted,
+                        )
                         Text(e.text.ifEmpty { "∅" }, color = fg, fontSize = 13.sp, modifier = Modifier.width(70.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             if (all) Paths.stem(e.file) else formatTime(e.start), color = if (active && c.square) c.onAccent else c.muted,
@@ -133,6 +147,33 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
             }
         }
         Divider()
+        if (picking && !all) {
+            // bulk actions on the picked intervals of this file
+            Divider()
+            Column(Modifier.padding(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Chip(allShown(), false) { picked = list.map { it.index }.toSet() }
+                    Chip(S.cancel(), false) { picked = emptySet() }
+                }
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Field(newText, { newText = it }, Modifier.weight(1f), placeholder = S.text())
+                    Btn(S.rename(), enabled = picked.isNotEmpty()) {
+                        val k = ed.activeTier
+                        ed.updateDoc { d -> mlabeler.core.edit.Edits.setTexts(d, picked.map { mlabeler.core.edit.IntervalRef(k, it) }) { newText.trim() } }
+                    }
+                }
+                Btn(mergeLeft(), enabled = picked.isNotEmpty(), modifier = Modifier.padding(top = 6.dp)) {
+                    val k = ed.activeTier
+                    ed.updateDoc { d ->
+                        var out = d
+                        // from the end so indexes stay valid
+                        for (i in picked.sortedDescending()) if (i > 0) out = mlabeler.core.edit.Edits.removeBound(out, mlabeler.core.edit.BoundRef(k, i))
+                        out
+                    }
+                    picked = emptySet()
+                }
+            }
+        }
         Text(countLine.format(list.size), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
     }
 }
