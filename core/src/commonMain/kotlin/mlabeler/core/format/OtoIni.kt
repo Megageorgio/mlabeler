@@ -78,3 +78,40 @@ object OtoIni {
         }
     }
 }
+
+enum class OtoMarker { Left, Overlap, Preutterance, Consonant, Right }
+
+fun OtoAbsolute.get(m: OtoMarker) = when (m) {
+    OtoMarker.Left -> left
+    OtoMarker.Overlap -> overlap
+    OtoMarker.Preutterance -> preutterance
+    OtoMarker.Consonant -> consonant
+    OtoMarker.Right -> right
+}
+
+object OtoEdits {
+    /**
+     * Moves one marker to [valueMs] (absolute). With [locked] all markers move by the same amount
+     * and stay inside the file. Single moves keep left ≤ preutterance, consonant ≤ right and nothing below 0.
+     */
+    fun move(a: OtoAbsolute, m: OtoMarker, valueMs: Double, lengthMs: Double, locked: Boolean): OtoAbsolute {
+        if (locked) {
+            val all = listOf(a.left, a.overlap, a.preutterance, a.consonant, a.right)
+            val d = (valueMs - a.get(m)).coerceIn(-all.min(), lengthMs - all.max())
+            return OtoAbsolute(a.left + d, a.overlap + d, a.preutterance + d, a.consonant + d, a.right + d)
+        }
+        val v = valueMs.coerceIn(0.0, lengthMs)
+        return when (m) {
+            // moving the left edge keeps the other markers where they are on the timeline
+            OtoMarker.Left -> a.copy(left = v.coerceAtMost(minOf(a.preutterance, a.consonant, a.right)))
+            OtoMarker.Overlap -> a.copy(overlap = v)
+            OtoMarker.Preutterance -> a.copy(preutterance = v.coerceAtLeast(a.left))
+            OtoMarker.Consonant -> a.copy(consonant = v.coerceIn(a.left, a.right))
+            OtoMarker.Right -> a.copy(right = v.coerceAtLeast(maxOf(a.left, a.consonant)))
+        }
+    }
+
+    /** Writes absolute positions back; the cutoff keeps its style (negative = length, positive = from the end). */
+    fun set(e: OtoEntry, a: OtoAbsolute, lengthMs: Double): OtoEntry =
+        OtoEntry.fromAbsolute(e.sample, e.alias, a, lengthMs, negativeCutoff = e.cutoff < 0)
+}

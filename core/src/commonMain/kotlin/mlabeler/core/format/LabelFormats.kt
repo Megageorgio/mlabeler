@@ -21,6 +21,8 @@ enum class LabelFormat(val extension: String, val title: String) {
     }
 }
 
+fun formatNumberPublic(value: Double, decimals: Int): String = formatNumber(value, decimals)
+
 internal fun formatNumber(value: Double, decimals: Int): String {
     val neg = value < 0
     var factor = 1L

@@ -85,7 +85,7 @@ fun CommandPalette(app: AppState) {
     var query by remember { mutableStateOf("") }
     var index by remember { mutableIntStateOf(0) }
     val focus = remember { FocusRequester() }
-    val list = Commands.all.filter { query.isBlank() || it.title().contains(query.trim(), ignoreCase = true) }
+    val list = Commands.visible(ed.mode).filter { query.isBlank() || it.title().contains(query.trim(), ignoreCase = true) }
     val state = rememberLazyListState()
     LaunchedEffect(Unit) { focus.requestFocus() }
     LaunchedEffect(index) { if (list.isNotEmpty()) state.scrollToItem(index.coerceIn(0, list.size - 1)) }

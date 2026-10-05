@@ -183,3 +183,21 @@ class FormatsTest {
 }
 
 private object Math { const val PI = kotlin.math.PI }
+
+class OtoEditsTest {
+    @Test
+    fun lockedAndSingleMoves() {
+        val e = mlabeler.core.format.OtoEntry("a.wav", "a", 100.0, 50.0, -300.0, 80.0, 20.0)
+        val a = e.absolute(1000.0)
+        val locked = mlabeler.core.format.OtoEdits.move(a, mlabeler.core.format.OtoMarker.Preutterance, 280.0, 1000.0, true)
+        assertEquals(200.0, locked.left)
+        assertEquals(500.0, locked.right)
+        val back = mlabeler.core.format.OtoEdits.set(e, locked, 1000.0)
+        assertEquals(-300.0, back.cutoff)
+        assertEquals(80.0, back.preutterance)
+        val single = mlabeler.core.format.OtoEdits.move(a, mlabeler.core.format.OtoMarker.Left, 500.0, 1000.0, false)
+        assertEquals(150.0, single.left) // stops at the consonant end
+        val clamped = mlabeler.core.format.OtoEdits.move(a, mlabeler.core.format.OtoMarker.Right, 2000.0, 1000.0, true)
+        assertEquals(1000.0, clamped.right)
+    }
+}

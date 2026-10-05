@@ -70,6 +70,8 @@ import mlabeler.app.imageFromArgb
 import mlabeler.app.resizeHorizontalIcon
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.LayoutSettings
+import mlabeler.app.state.Mode
+import mlabeler.core.format.get
 import mlabeler.app.state.Selection
 import mlabeler.app.state.ViewSettings
 import mlabeler.app.theme.T
@@ -230,7 +232,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
     val density = LocalDensity.current.density
     val measurer = rememberTextMeasurer(cacheSize = 256)
     val doc = ed.doc
-    val tierCount = doc?.tiers?.size ?: 0
+    val tierCount = ed.laneTiers()
     val palette = Themes.palettes[view.palette] ?: c.spectrogram
     val colorLut = remember(palette, view.brightness, view.contrast) { lut(palette, view.brightness, view.contrast) }
     var hoverIcon by remember { mutableStateOf(PointerIcon.Default) }
@@ -262,13 +264,14 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             val ch = e.changes.firstOrNull() ?: continue
                             when (e.type) {
                                 PointerEventType.Move, PointerEventType.Enter -> if (ch.type == PointerType.Mouse && !ch.pressed) {
-                                    val g = geom(this.size, density, layoutState.value, ed.doc?.tiers?.size ?: 0)
+                                    val g = geom(this.size, density, layoutState.value, ed.laneTiers())
                                     val t = ed.viewStart + ch.position.x / ed.pixelsPerSecond
                                     ed.cursor = t
                                     val r = g.region(ch.position.y, 8 * density)
                                     hoverIcon = when {
                                         r == Region.WaveSpecSplit || r == Region.TierSplit -> PointerIcon.Hand
                                         hitBound(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
+                                        hitOto(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
                                         else -> PointerIcon.Default
                                     }
                                 }
@@ -295,7 +298,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                         if (ed.editingText == null) ed.requestFocus()
                         val first = currentEvent
                         val touch = down.type == PointerType.Touch || down.type == PointerType.Stylus
-                        val g = geom(size, density, layoutState.value, ed.doc?.tiers?.size ?: 0)
+                        val g = geom(size, density, layoutState.value, ed.laneTiers())
                         val grab = (if (touch) 20f else 6f) * density
                         val region = g.region(down.position.y, (if (touch) 16f else 8f) * density)
                         val mods = first.keyboardModifiers
@@ -327,7 +330,27 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             return@awaitEachGesture
                         }
 
-                        val bound = hitBound(ed, g, region, down.position.x, grab)
+                        val otoMarker = hitOto(ed, g, region, down.position.x, grab)
+                        if (otoMarker != null && !first.buttons.isTertiaryPressed) {
+                            val e = ed.oto.current()!!
+                            val offset = ed.oto.absolute(e).get(otoMarker) / 1000 - downTime
+                            ed.oto.beginDrag()
+                            var moved = false
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!chg.pressed) break
+                                if (chg.positionChange() != Offset.Zero) {
+                                    moved = true
+                                    ed.oto.dragTo(otoMarker, timeAt(chg.position.x) + offset, ev.keyboardModifiers.isShiftPressed)
+                                    ed.cursor = timeAt(chg.position.x)
+                                    chg.consume()
+                                }
+                            }
+                            if (moved) ed.oto.endDrag() else ed.oto.dragTo(otoMarker, downTime + offset, false).also { ed.oto.endDrag() }
+                            return@awaitEachGesture
+                        }
+                        val bound = if (ed.mode == Mode.Oto) null else hitBound(ed, g, region, down.position.x, grab)
                         val pan = first.buttons.isTertiaryPressed || region == Region.Ruler
 
                         if (bound != null && !pan) {
@@ -457,6 +480,7 @@ private fun hitBound(ed: EditorState, g: Geom, region: Region?, x: Float, grab: 
 }
 
 private fun playUnder(ed: EditorState, region: Region?, time: Double) {
+    if (ed.mode == Mode.Oto) return ed.playOtoEntry()
     val doc = ed.doc ?: return
     val k = if (region is Region.Tier) region.index else ed.guideTier
     val tier = doc.tiers.getOrNull(k) as? IntervalTier ?: return
@@ -484,6 +508,16 @@ private fun onTap(ed: EditorState, region: Region?, time: Double, double: Boolea
         Region.Wave, Region.Spec -> {
             ed.range = null
             ed.cursor = time.coerceIn(0.0, ed.duration)
+            if (ed.mode == Mode.Oto) {
+                if (double) {
+                    // the entry whose preutterance is closest
+                    val best = ed.oto.entriesOfItem().minByOrNull { (_, e) -> abs(ed.oto.absolute(e).preutterance / 1000 - time) }
+                    best?.let { ed.oto.select(it.first); ed.playOtoEntry() }
+                } else if (touch || shift) {
+                    ed.play(time, ed.viewStart + ed.visibleDuration)
+                }
+                return
+            }
             if (double) {
                 val tier = doc.tiers.getOrNull(ed.guideTier) as? IntervalTier ?: return
                 val i = tier.indexAt(time)
@@ -606,7 +640,13 @@ private fun DrawScope.drawTimeline(
         drawRect(c.selectionRange, Offset(x(a), g.ruler), Size(x(b) - x(a), g.tiersTop - g.ruler))
     }
 
-    if (doc == null) return
+    if (ed.mode == Mode.Oto) {
+        drawOto(ed, g, c, measurer, smallStyle, tierStyle, ::x)
+    } else if (doc == null) return
+    if (ed.mode == Mode.Oto || doc == null) {
+        drawCursor(ed, g, c, ::x)
+        return
+    }
     val sel = ed.selection
     val problemsByTier = ed.problems.groupBy { it.ref.tier }
 
@@ -796,4 +836,66 @@ private fun DrawScope.safeText(measurer: androidx.compose.ui.text.TextMeasurer, 
     if (text.isEmpty() || topLeft.x >= size.width || topLeft.y >= size.height) return
     val layout = measurer.measure(text, style, maxLines = 1, softWrap = false)
     drawText(layout, topLeft = topLeft)
+}
+
+private fun EditorState.laneTiers() = if (mode == Mode.Oto) 0 else doc?.tiers?.size ?: 0
+
+private fun DrawScope.drawCursor(ed: EditorState, g: Geom, c: Tokens, x: (Double) -> Float) {
+    val px = density
+    ed.cursor?.let { cur -> val xx = x(cur); if (xx in 0f..size.width) drawLine(c.cursor, Offset(xx, g.ruler), Offset(xx, g.height), px) }
+    ed.playhead?.let { p -> val xx = x(p); if (xx in 0f..size.width) drawLine(c.playhead, Offset(xx, 0f), Offset(xx, g.height), 2 * px) }
+}
+
+/** Marker colours follow the usual oto editor convention. */
+private val otoColors = mapOf(
+    mlabeler.core.format.OtoMarker.Left to Color(0xFF4F8DFF),
+    mlabeler.core.format.OtoMarker.Overlap to Color(0xFF3CC47C),
+    mlabeler.core.format.OtoMarker.Preutterance to Color(0xFFFF4D5E),
+    mlabeler.core.format.OtoMarker.Consonant to Color(0xFFFF8FD0),
+    mlabeler.core.format.OtoMarker.Right to Color(0xFF4F8DFF),
+)
+
+private fun hitOto(ed: EditorState, g: Geom, region: Region?, x: Float, grab: Float): mlabeler.core.format.OtoMarker? {
+    if (ed.mode != Mode.Oto || (region != Region.Wave && region != Region.Spec)) return null
+    val e = ed.oto.current() ?: return null
+    val a = ed.oto.absolute(e)
+    // preutterance first: it is the one people grab most
+    val order = listOf(mlabeler.core.format.OtoMarker.Preutterance, mlabeler.core.format.OtoMarker.Overlap, mlabeler.core.format.OtoMarker.Consonant,
+        mlabeler.core.format.OtoMarker.Left, mlabeler.core.format.OtoMarker.Right)
+    return order.minByOrNull { m -> abs(((a.get(m) / 1000 - ed.viewStart) * ed.pixelsPerSecond).toFloat() - x) }
+        ?.takeIf { m -> abs(((a.get(m) / 1000 - ed.viewStart) * ed.pixelsPerSecond).toFloat() - x) <= grab }
+}
+
+private fun DrawScope.drawOto(
+    ed: EditorState, g: Geom, c: Tokens, measurer: androidx.compose.ui.text.TextMeasurer,
+    small: TextStyle, big: TextStyle, x: (Double) -> Float,
+) {
+    val px = density
+    val top = g.ruler
+    val bottom = g.specBottom
+    val h = bottom - top
+    val sel = ed.oto.selected
+    // other entries of this file: a faint preutterance line with the alias
+    for ((i, e) in ed.oto.entriesOfItem()) {
+        if (i == sel) continue
+        val a = ed.oto.absolute(e)
+        val xx = x(a.preutterance / 1000)
+        if (xx < -50 || xx > size.width + 50) continue
+        drawLine(c.muted.copy(alpha = 0.5f), Offset(xx, top), Offset(xx, bottom), px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * px, 4 * px)))
+        safeText(measurer, e.alias, Offset(xx + 3 * px, bottom - 16 * px), small)
+    }
+    val e = ed.oto.current() ?: return
+    val a = ed.oto.dragPreview ?: ed.oto.absolute(e)
+    val shade = Color.Black.copy(alpha = if (c.dark) 0.5f else 0.25f)
+    val l = x(a.left / 1000)
+    val r = x(a.right / 1000)
+    val k = x(a.consonant / 1000)
+    drawRect(shade, Offset(0f, top), Size(max(0f, l), h))
+    drawRect(shade, Offset(r, top), Size(max(0f, size.width - r), h))
+    drawRect(otoColors.getValue(mlabeler.core.format.OtoMarker.Consonant).copy(alpha = 0.16f), Offset(l, top), Size(max(0f, k - l), h))
+    for ((m, col) in otoColors) {
+        val xx = x(a.get(m) / 1000)
+        drawLine(col, Offset(xx, top), Offset(xx, bottom), if (m == mlabeler.core.format.OtoMarker.Preutterance) 2.5f * px else 1.5f * px)
+    }
+    safeText(measurer, e.alias, Offset(l + 6 * px, top + 6 * px), big.copy(color = c.text))
 }

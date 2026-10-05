@@ -40,6 +40,7 @@ data class EditSettings(
     val minIntervalMs: Float = 1f,
     val saveOnSwitch: Boolean = true,
     val newFormat: LabelFormat = LabelFormat.Lab,
+    val otoLockedDrag: Boolean = true,
 )
 
 @Serializable

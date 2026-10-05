@@ -1,0 +1,139 @@
+package mlabeler.app.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import mlabeler.app.Platform
+import mlabeler.app.i18n.L
+import mlabeler.app.i18n.S
+import mlabeler.app.state.EditorState
+import mlabeler.app.theme.T
+import mlabeler.core.format.OtoMarker
+import mlabeler.core.format.formatNumberPublic
+import mlabeler.core.io.Paths
+
+private val noEntries = L("No oto entries yet. Add one with N or the + button.", "Записей oto пока нет. Добавьте клавишей N или кнопкой +.")
+private val entriesCount = L("{0} entries", "записей: {0}")
+private val alias = L("Alias", "Псевдоним")
+private val otoFile = L("oto.ini", "oto.ini")
+
+/** Search accepts plain text (alias or file) or "alias:", "sample:" prefixes. */
+private fun matches(q: String, alias: String, sample: String): Boolean {
+    if (q.isBlank()) return true
+    return q.split(';').map { it.trim() }.filter { it.isNotEmpty() }.all { part ->
+        when {
+            part.startsWith("alias:") -> alias.contains(part.removePrefix("alias:").trim('"', ' '), ignoreCase = true)
+            part.startsWith("sample:") -> sample.contains(part.removePrefix("sample:").trim('"', ' '), ignoreCase = true)
+            else -> alias.contains(part, ignoreCase = true) || sample.contains(part, ignoreCase = true)
+        }
+    }
+}
+
+@Composable
+fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Unit = {}) {
+    val c = T.c
+    val entries = ed.oto.entries
+    Column(modifier.background(c.panel)) {
+        Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 6.dp)) {
+            Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = S.search())
+        }
+        val list = entries.withIndex().filter { matches(ed.query, it.value.alias, it.value.sample) }
+        val state = rememberLazyListState()
+        LaunchedEffect(ed.oto.selected) {
+            val pos = list.indexOfFirst { it.index == ed.oto.selected }
+            if (pos >= 0 && (pos < state.firstVisibleItemIndex || pos > state.firstVisibleItemIndex + state.layoutInfo.visibleItemsInfo.size - 2)) {
+                state.scrollToItem(maxOf(0, pos - 3))
+            }
+        }
+        if (entries.isEmpty()) Text(noEntries(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state) {
+            items(list, key = { it.index }) { (i, e) ->
+                val sel = i == ed.oto.selected
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = if (Platform.isMobile) 48.dp else 30.dp)
+                        .background(if (sel) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else c.panel)
+                        .clickable { ed.oto.select(i); onOpened() }
+                        .padding(horizontal = 12.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val fg = if (sel && c.square) c.onAccent else c.text
+                    Text(e.alias.ifEmpty { "∅" }, color = fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    Text(Paths.stem(e.sample), color = if (sel && c.square) c.onAccent else c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.8f))
+                }
+            }
+        }
+        Divider()
+        Text(entriesCount.format(entries.size), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+    }
+}
+
+@Composable
+fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
+    val c = T.c
+    val e = ed.oto.current()
+    Column(modifier.background(c.panel).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 4.dp)) {
+        SectionTitle(otoFile())
+        ed.item?.let { Text(ed.workspace.relative(ed.oto.bookPath(it)), color = c.muted, fontSize = 12.sp) }
+        ed.oto.book()?.let { Text(it.charset, color = c.muted, fontSize = 12.sp) }
+        if (e == null) {
+            Spacer(Modifier.height(12.dp))
+            Text(noEntries(), color = c.muted, fontSize = 13.sp)
+            return@Column
+        }
+        SectionTitle(alias())
+        var a by remember(ed.oto.selected, ed.oto.version) { mutableStateOf(e.alias) }
+        Field(a, { a = it }, Modifier.fillMaxWidth(), onDone = { ed.oto.rename(a.trim()) })
+        LaunchedEffect(a) {
+            kotlinx.coroutines.delay(600)
+            if (a.trim() != e.alias) ed.oto.rename(a.trim())
+        }
+        Text(e.sample, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        SectionTitle(S.inspector())
+        val rows = listOf(
+            Triple(OtoMarker.Left, "Offset", e.offset),
+            Triple(OtoMarker.Overlap, "Overlap", e.overlap),
+            Triple(OtoMarker.Preutterance, "Preutterance", e.preutterance),
+            Triple(OtoMarker.Consonant, "Consonant", e.consonant),
+            Triple(OtoMarker.Right, "Cutoff", e.cutoff),
+        )
+        for ((m, name, value) in rows) {
+            var text by remember(ed.oto.selected, ed.oto.version, m) { mutableStateOf(formatNumberPublic(value, 3)) }
+            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(name, color = c.text, fontSize = 13.sp, modifier = Modifier.width(110.dp))
+                Field(text, { text = it }, Modifier.weight(1f), onDone = {
+                    text.replace(',', '.').toDoubleOrNull()?.let { v -> ed.oto.setValue(m, v) }
+                })
+            }
+        }
+        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Btn(Commands.otoDuplicate.title()) { ed.oto.duplicate() }
+            Btn(Commands.otoDelete.title()) { ed.oto.delete() }
+        }
+    }
+}

@@ -44,9 +44,11 @@ sealed interface Selection {
 
 enum class FileFilter { All, NotDone, Starred, NoLabels }
 
+enum class Mode { Labels, Oto }
+
 class EditorState(
     val workspace: Workspace,
-    private val app: AppState,
+    val app: AppState,
     private val scope: CoroutineScope,
 ) {
     var items by mutableStateOf<List<Item>>(emptyList())
@@ -78,9 +80,13 @@ class EditorState(
     private var committed by mutableStateOf<LabelDoc?>(null)
 
     val doc: LabelDoc? get() = dragDoc ?: committed
-    val dirty: Boolean get() { docVersion; return history?.dirty == true }
-    val canUndo: Boolean get() { docVersion; return history?.canUndo == true }
-    val canRedo: Boolean get() { docVersion; return history?.canRedo == true }
+    var mode by mutableStateOf(Mode.Labels)
+    val oto = OtoState(this, app)
+
+    val labelsDirty: Boolean get() { docVersion; return history?.dirty == true }
+    val dirty: Boolean get() = if (mode == Mode.Oto) oto.dirty else labelsDirty
+    val canUndo: Boolean get() { docVersion; return if (mode == Mode.Oto) oto.canUndo else history?.canUndo == true }
+    val canRedo: Boolean get() { docVersion; return if (mode == Mode.Oto) oto.canRedo else history?.canRedo == true }
 
     var selection by mutableStateOf<Selection>(Selection.None)
     var activeTier by mutableIntStateOf(0)
@@ -140,6 +146,8 @@ class EditorState(
 
     fun scan() {
         items = workspace.scan()
+        // folders of UTAU voicebanks open in oto mode
+        if (items.any { oto.hasOto(it) } && items.none { it.labelPath != null }) mode = Mode.Oto
         if (index !in items.indices) {
             val last = workspace.state.lastItem
             open(items.indexOfFirst { it.id == last }.takeIf { it >= 0 } ?: if (items.isNotEmpty()) 0 else -1)
@@ -175,7 +183,7 @@ class EditorState(
             index = -1
             return
         }
-        if (settings.edit.saveOnSwitch && dirty) save(quiet = true)
+        if (settings.edit.saveOnSwitch && labelsDirty) saveLabels(quiet = true)
         rememberView()
         stop()
         index = i
@@ -248,6 +256,7 @@ class EditorState(
             activeTier = doc?.phonemeTierIndex() ?: 0
             loading = false
             docChanged()
+            oto.onItemOpened()
             peaks = withContext(Dispatchers.Default) { Peaks.build(a.samples, a.sampleRate) }
             val hop = if (a.duration <= 120) 0.0025 else 0.005
             val spec = withContext(Dispatchers.Default) {
@@ -279,6 +288,7 @@ class EditorState(
     }
 
     fun undo() {
+        if (mode == Mode.Oto) return oto.undo()
         val h = history ?: return
         if (h.undo()) {
             committed = h.current
@@ -288,6 +298,7 @@ class EditorState(
     }
 
     fun redo() {
+        if (mode == Mode.Oto) return oto.redo()
         val h = history ?: return
         if (h.redo()) {
             committed = h.current
@@ -309,6 +320,11 @@ class EditorState(
     }
 
     fun save(quiet: Boolean = false) {
+        if (mode == Mode.Oto) return oto.save(quiet)
+        saveLabels(quiet)
+    }
+
+    private fun saveLabels(quiet: Boolean) {
         val it = item ?: return
         val d = committed ?: return
         val h = history ?: return
@@ -324,7 +340,8 @@ class EditorState(
     }
 
     fun saveAllOnClose() {
-        if (settings.edit.saveOnSwitch && dirty) save(quiet = true)
+        if (settings.edit.saveOnSwitch && labelsDirty) saveLabels(quiet = true)
+        if (settings.edit.saveOnSwitch && oto.dirty) oto.save(quiet = true)
         rememberView()
         player.release()
         scope.cancel()
@@ -558,8 +575,15 @@ class EditorState(
     // ---------- playback ----------
 
     /** Plays the selection range, else the selected interval, else from the cursor to the end of the view. */
+    fun playOtoEntry() {
+        val e = oto.current() ?: return
+        val a = oto.absolute(e)
+        play(a.left / 1000, a.right / 1000, loop = false)
+    }
+
     fun togglePlay() {
         if (playing) return stop()
+        if (mode == Mode.Oto && range == null && oto.current() != null) return playOtoEntry()
         val r = range
         val s = selectedInterval()
         val t = s?.let { tier(it.tier) }

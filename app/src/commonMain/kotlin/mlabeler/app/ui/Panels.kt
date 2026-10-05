@@ -124,6 +124,7 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
 
 @Composable
 fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
+    if (ed.mode == mlabeler.app.state.Mode.Oto) return OtoInspector(ed, modifier)
     val c = T.c
     val item = ed.item
     val doc = ed.doc

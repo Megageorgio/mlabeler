@@ -12,6 +12,8 @@ import mlabeler.app.i18n.L
 import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
+import mlabeler.app.state.Mode
+import mlabeler.core.format.OtoMarker
 
 /** A key combination. "Ctrl" is Cmd on macOS. */
 data class Chord(val key: Key, val ctrl: Boolean = false, val shift: Boolean = false, val alt: Boolean = false) {
@@ -53,7 +55,7 @@ private fun keyName(k: Key): String = when (k) {
 
 private val letters = mapOf(
     'A' to Key.A, 'B' to Key.B, 'D' to Key.D, 'F' to Key.F, 'G' to Key.G, 'I' to Key.I, 'K' to Key.K, 'L' to Key.L,
-    'M' to Key.M, 'O' to Key.O, 'Q' to Key.Q, 'R' to Key.R, 'S' to Key.S, 'T' to Key.T, 'W' to Key.W, 'Y' to Key.Y,
+    'M' to Key.M, 'N' to Key.N, 'E' to Key.E, 'C' to Key.C, 'H' to Key.H, 'J' to Key.J, 'P' to Key.P, 'U' to Key.U, 'V' to Key.V, 'X' to Key.X, 'O' to Key.O, 'Q' to Key.Q, 'R' to Key.R, 'S' to Key.S, 'T' to Key.T, 'W' to Key.W, 'Y' to Key.Y,
     'Z' to Key.Z,
 )
 
@@ -68,6 +70,10 @@ class Command(
     val run: (EditorState, AppState) -> Unit,
 ) {
     val keyLabel: String get() = keys.firstOrNull()?.label() ?: ""
+    /** Null: works in every mode. */
+    var mode: Mode? = null
+        private set
+    fun only(m: Mode) = also { mode = m }
 }
 
 object Commands {
@@ -115,12 +121,40 @@ object Commands {
     val settings = Command("settings", S.settings, listOf(Chord(Key.Comma, ctrl = true))) { _, a -> a.showSettings = true }
     val openFolder = Command("open", S.openFolder, listOf(ch('O', ctrl = true))) { _, a -> a.closeFolder() }
 
+    private fun otoSet(id: String, title: L, key: Char, m: OtoMarker) =
+        Command(id, title, listOf(ch(key))) { e, _ -> e.oto.setMarker(m, e.editTime()) }.only(Mode.Oto)
+    val otoLeft = otoSet("oto-left", L("Offset to cursor", "Начало (offset) к курсору"), 'Q', OtoMarker.Left)
+    val otoOverlap = otoSet("oto-overlap", L("Overlap to cursor", "Overlap к курсору"), 'W', OtoMarker.Overlap)
+    val otoPreu = otoSet("oto-preutterance", L("Preutterance to cursor", "Preutterance к курсору"), 'E', OtoMarker.Preutterance)
+    val otoCons = otoSet("oto-consonant", L("Consonant to cursor", "Consonant к курсору"), 'R', OtoMarker.Consonant)
+    val otoRight = otoSet("oto-cutoff", L("Cutoff to cursor", "Cutoff к курсору"), 'T', OtoMarker.Right)
+    val nextEntry = Command("next-entry", L("Next entry", "Следующая запись"), listOf(Chord(Key.DirectionDown), Chord(Key.Tab))) { e, _ -> e.oto.step(1) }.only(Mode.Oto)
+    val prevEntry = Command("prev-entry", L("Previous entry", "Предыдущая запись"), listOf(Chord(Key.DirectionUp), Chord(Key.Tab, shift = true))) { e, _ -> e.oto.step(-1) }.only(Mode.Oto)
+    val otoDelete = Command("oto-delete", L("Delete entry", "Удалить запись"), listOf(Chord(Key.Delete))) { e, _ -> e.oto.delete() }.only(Mode.Oto)
+    val otoDuplicate = Command("oto-duplicate", L("Duplicate entry", "Дублировать запись"), listOf(ch('D', ctrl = true))) { e, _ -> e.oto.duplicate() }.only(Mode.Oto)
+    val otoAdd = Command("oto-add", L("New entry at cursor", "Новая запись у курсора"), listOf(Chord(Key.N))) { e, _ -> e.oto.add() }.only(Mode.Oto)
+    val otoLock = Command("oto-lock", L("Preutterance moves all markers", "Preutterance двигает все маркеры"), listOf(ch('G'))) { _, a ->
+        a.update { it.copy(edit = it.edit.copy(otoLockedDrag = !it.edit.otoLockedDrag)) }
+    }.only(Mode.Oto)
+    val switchMode = Command("mode", L("Switch between labels and oto", "Переключить разметку / oto"), listOf(ch('M', ctrl = true))) { e, _ ->
+        e.mode = if (e.mode == Mode.Oto) Mode.Labels else Mode.Oto
+        if (e.mode == Mode.Oto) e.oto.onItemOpened()
+    }
+
+    init {
+        for (c in listOf(ripple, linked, split, merge, delete, rename, setLeft, setRight, nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig,
+            prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown)) c.only(Mode.Labels)
+    }
+
     val all = listOf(
+        switchMode, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram,
         palette, settings, openFolder,
     )
 
-    fun find(e: KeyEvent): Command? = all.firstOrNull { c -> c.keys.any { it.matches(e) } }
+    fun find(e: KeyEvent, mode: Mode): Command? = all.firstOrNull { c -> (c.mode == null || c.mode == mode) && c.keys.any { it.matches(e) } }
+
+    fun visible(mode: Mode) = all.filter { it.mode == null || it.mode == mode }
 }
