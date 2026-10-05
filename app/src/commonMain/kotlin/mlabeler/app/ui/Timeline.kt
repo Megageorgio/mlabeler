@@ -387,6 +387,27 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             if (moved) ed.oto.endDrag() else ed.oto.dragTo(otoMarker, downTime + offset, false).also { ed.oto.endDrag() }
                             return@awaitEachGesture
                         }
+                        // borders of notes in a notes lane
+                        val noteHit = if (region is Region.Tier) hitNote(ed, region.index, down.position.x, grab) else null
+                        if (noteHit != null && !first.buttons.isTertiaryPressed) {
+                            val (k, i, isStart) = noteHit
+                            ed.selectNote(k, i)
+                            ed.beginNoteDrag()
+                            var moved = false
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!chg.pressed) break
+                                if (chg.positionChange() != Offset.Zero) {
+                                    moved = true
+                                    ed.noteDragTo(k, i, isStart, timeAt(chg.position.x))
+                                    ed.cursor = timeAt(chg.position.x)
+                                    chg.consume()
+                                }
+                            }
+                            if (moved) ed.endNoteDrag() else ed.endNoteDrag()
+                            return@awaitEachGesture
+                        }
                         val bound = if (ed.mode == Mode.Oto) null else hitBound(ed, g, region, down.position.x, grab)
                         val pan = first.buttons.isTertiaryPressed || region == Region.Ruler
 
@@ -546,6 +567,12 @@ private fun onTap(ed: EditorState, region: Region?, time: Double, double: Boolea
                     ed.selectInterval(ref, reveal = false)
                     if (double) ed.editingText = ref
                 }
+            } else if (tier is NoteTier) {
+                val i = mlabeler.core.edit.NoteEdits.indexAt(tier, time)
+                if (i >= 0) {
+                    ed.selectNote(region.index, i)
+                    if (double) tier.notes[i].let { n -> ed.play(n.start, n.end, loop = false) }
+                } else ed.activeTier = region.index
             } else {
                 ed.activeTier = region.index
             }
@@ -739,10 +766,12 @@ private fun DrawScope.drawTimeline(
                     drawLine(c.bound, Offset(xx, top), Offset(xx, bottom), px)
                     safeText(measurer, p.text, Offset(xx + 3 * px, top + 4 * px), tierStyle)
                 }
-                is NoteTier -> for (n in tier.notes) {
+                is NoteTier -> for ((ni, n) in tier.notes.withIndex()) {
                     if (n.end < v0 || n.start > tEnd) continue
                     val a = x(n.start)
                     val b = x(n.end)
+                    val selNote = (sel as? Selection.Note)?.let { it.tier == k && it.index == ni } == true
+                    if (selNote) drawRect(c.intervalSelected, Offset(a, top), Size(b - a, g.tierH))
                     drawRect(tierColor.copy(alpha = if (n.pitch == null) 0.08f else 0.25f), Offset(a, top + 3 * px), Size(b - a, g.tierH - 6 * px))
                     drawLine(c.bound.copy(alpha = 0.5f), Offset(a, top), Offset(a, bottom), px)
                     val label = mlabeler.core.format.NoteNames.format(n.pitch) + if (n.slur) " ~" else ""
@@ -999,6 +1028,22 @@ private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: 
             }
             if (over) drawPath(path, Color.Black.copy(alpha = 0.6f), style = Stroke(3.5f * px))
             drawPath(path, pitchColor, style = Stroke(1.8f * px))
+            // notes as bars at their pitch, so they can be checked against the curve
+            val notes = ed.doc?.tiers?.firstOrNull { it is NoteTier } as? NoteTier
+            if (notes != null) {
+                val selNote = ed.selection as? Selection.Note
+                val noteK = ed.doc?.tiers?.indexOf(notes) ?: -1
+                for ((ni, n) in notes.notes.withIndex()) {
+                    val m = n.pitch ?: continue
+                    if (n.end < v0 || n.start > v1) continue
+                    val yy = y(440.0 * kotlin.math.exp((m - 69) / 12.0 * kotlin.math.ln(2.0)))
+                    if (yy < top || yy > bottom) continue
+                    val isSel = selNote != null && selNote.tier == noteK && selNote.index == ni
+                    val col = if (isSel) c.boundSelected else Color(0xFFFFFFFF)
+                    drawRect(col.copy(alpha = if (isSel) 0.9f else 0.55f), Offset(x(n.start), yy - 3 * px), Size(x(n.end) - x(n.start), 6 * px))
+                    safeText(measurer, mlabeler.core.format.NoteNames.format(m), Offset(x(n.start) + 2 * px, yy - 18 * px), small.copy(color = col))
+                }
+            }
         }
     }
     val power = ed.power
@@ -1072,4 +1117,18 @@ private fun DrawScope.drawReferences(
             drawText(lay, topLeft = Offset(7 * px, bottom - lay.size.height - 2 * px))
         }
     }
+}
+
+/** A note border near [x] in the notes tier [k]: (tier, note, is it the start). */
+private fun hitNote(ed: EditorState, k: Int, x: Float, grab: Float): Triple<Int, Int, Boolean>? {
+    val t = ed.doc?.tiers?.getOrNull(k) as? NoteTier ?: return null
+    var best: Triple<Int, Int, Boolean>? = null
+    var bestD = grab
+    for ((i, n) in t.notes.withIndex()) {
+        val xs = ((n.start - ed.viewStart) * ed.pixelsPerSecond).toFloat()
+        val xe = ((n.end - ed.viewStart) * ed.pixelsPerSecond).toFloat()
+        if (abs(xe - x) <= bestD) { bestD = abs(xe - x); best = Triple(k, i, false) }
+        if (i == 0 || abs(t.notes[i - 1].end - n.start) > 1e-6) if (abs(xs - x) < bestD) { bestD = abs(xs - x); best = Triple(k, i, true) }
+    }
+    return best
 }

@@ -148,7 +148,7 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
         }
 
         val sel = ed.selection
-        SectionTitle(if (sel is Selection.Bound) S.boundary() else S.interval())
+        SectionTitle(when (sel) { is Selection.Bound -> S.boundary(); is Selection.Note -> S.note(); else -> S.interval() })
         when {
             doc == null -> Unit
             sel is Selection.Interval -> {
@@ -185,6 +185,33 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
                     KeyValue(S.time(), formatTime(time))
                     val linked = Edits.linkedBounds(doc, sel.ref)
                     if (linked.isNotEmpty()) KeyValue(S.linked(), linked.joinToString { doc.tiers[it.tier].name })
+                }
+            }
+            sel is Selection.Note -> {
+                val t = doc.tiers.getOrNull(sel.tier) as? mlabeler.core.model.NoteTier
+                val n = t?.notes?.getOrNull(sel.index)
+                if (n != null) {
+                    var name by remember(sel, ed.docVersion) { mutableStateOf(mlabeler.core.format.NoteNames.format(n.pitch)) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Field(name, { name = it }, Modifier.weight(1f), onDone = {
+                            val v = name.trim()
+                            if (v.equals("rest", true) || v.isEmpty()) ed.changeNote { tt, i -> mlabeler.core.edit.NoteEdits.setPitch(tt, i, null) }
+                            else mlabeler.core.format.NoteNames.parse(v)?.let { p -> ed.changeNote { tt, i -> mlabeler.core.edit.NoteEdits.setPitch(tt, i, p) } }
+                        })
+                        Spacer(Modifier.width(6.dp))
+                        IconBtn(Icons.down, "-1", size = 30.dp) { ed.nudgePitch(-1.0) }
+                        IconBtn(Icons.up, "+1", size = 30.dp) { ed.nudgePitch(1.0) }
+                    }
+                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Chip(S.slur(), n.slur) { ed.changeNote { tt, i -> mlabeler.core.edit.NoteEdits.setSlur(tt, i, !n.slur) } }
+                    }
+                    KeyValue(S.start(), formatTime(n.start))
+                    KeyValue(S.end(), formatTime(n.end))
+                    KeyValue(S.length(), formatMs(n.end - n.start))
+                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Btn(S.pitchFromAudioOne()) { ed.notePitchFromAudio(all = false) }
+                        Btn(S.pitchFromAudioAll()) { ed.notePitchFromAudio(all = true) }
+                    }
                 }
             }
             else -> Text(S.nothingSelected(), color = c.muted, fontSize = 13.sp)

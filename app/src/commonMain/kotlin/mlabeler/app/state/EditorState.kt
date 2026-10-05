@@ -40,6 +40,8 @@ sealed interface Selection {
     data object None : Selection
     data class Interval(val ref: IntervalRef) : Selection
     data class Bound(val ref: BoundRef) : Selection
+    /** A note of a notes tier. */
+    data class Note(val tier: Int, val index: Int) : Selection
 }
 
 enum class FileFilter { All, NotDone, Starred, NoLabels }
@@ -535,6 +537,7 @@ class EditorState(
             is Selection.Interval -> (d.tiers.getOrNull(sel.ref.tier) as? IntervalTier)?.let { sel.ref.index < it.size } == true
             is Selection.Bound -> (d.tiers.getOrNull(sel.ref.tier) as? IntervalTier)?.let { sel.ref.bound < it.bounds.size } == true
             Selection.None -> true
+            is Selection.Note -> (d.tiers.getOrNull(sel.tier) as? mlabeler.core.model.NoteTier)?.let { sel.index < it.notes.size } == true
         }
         if (!ok) selection = Selection.None
         if (activeTier !in d.tiers.indices) activeTier = 0
@@ -591,7 +594,7 @@ class EditorState(
         val cur = when (val s = selection) {
             is Selection.Interval -> if (s.ref.tier == activeTier) s.ref.index else null
             is Selection.Bound -> if (s.ref.tier == activeTier) (if (delta > 0) s.ref.bound - 1 else s.ref.bound) else null
-            Selection.None -> null
+            else -> null
         }
         val next = when {
             cur == null -> t.indexAt(cursor ?: (viewStart + visibleDuration / 2)).coerceAtLeast(0)
@@ -606,7 +609,7 @@ class EditorState(
         val next = when (val s = selection) {
             is Selection.Interval -> if (delta < 0) s.ref.index else s.ref.index + 1
             is Selection.Bound -> (s.ref.bound + delta).coerceIn(0, t.bounds.size - 1)
-            Selection.None -> t.nearestBound(cursor ?: (viewStart + visibleDuration / 2))
+            else -> t.nearestBound(cursor ?: (viewStart + visibleDuration / 2))
         }
         selectBound(BoundRef(activeTier, next))
     }
@@ -627,7 +630,7 @@ class EditorState(
     private fun selectionTime(): Double? = when (val s = selection) {
         is Selection.Interval -> tier(s.ref.tier)?.let { (it.startOf(s.ref.index) + it.endOf(s.ref.index)) / 2 }
         is Selection.Bound -> tier(s.ref.tier)?.bounds?.get(s.ref.bound)
-        Selection.None -> null
+        else -> null
     }
 
     fun selectedInterval(): IntervalRef? = (selection as? Selection.Interval)?.ref
@@ -672,8 +675,59 @@ class EditorState(
     /** Where edits at "the cursor" happen: the mouse position, else the playhead, else the middle of the view. */
     fun editTime(): Double = cursor ?: playhead ?: (viewStart + visibleDuration / 2)
 
+    private fun noteTier(i: Int) = doc?.tiers?.getOrNull(i) as? mlabeler.core.model.NoteTier
+
+    fun selectNote(tier: Int, index: Int) {
+        selection = Selection.Note(tier, index)
+        activeTier = tier
+    }
+
+    private var noteDragBase: LabelDoc? = null
+
+    fun beginNoteDrag() { noteDragBase = committed }
+
+    /** Drags the start or end border of note [i]. */
+    fun noteDragTo(tier: Int, i: Int, start: Boolean, time: Double) {
+        val base = noteDragBase ?: return
+        val t = base.tiers[tier] as? mlabeler.core.model.NoteTier ?: return
+        val nt = if (start) mlabeler.core.edit.NoteEdits.moveStart(t, i, time) else mlabeler.core.edit.NoteEdits.moveEnd(t, i, time)
+        dragDoc = base.replace(tier, nt)
+    }
+
+    fun endNoteDrag() {
+        val d = dragDoc
+        noteDragBase = null
+        if (d != null) commit(d) else dragDoc = null
+    }
+
+    fun changeNote(transform: (mlabeler.core.model.NoteTier, Int) -> mlabeler.core.model.NoteTier) {
+        val s = selection as? Selection.Note ?: return
+        val t = noteTier(s.tier) ?: return
+        if (s.index >= t.notes.size) return
+        updateDoc { it.replace(s.tier, transform(t, s.index)) }
+    }
+
+    fun nudgePitch(semitones: Double) = changeNote { t, i ->
+        mlabeler.core.edit.NoteEdits.setPitch(t, i, t.notes[i].pitch?.let { it + semitones } ?: 60.0)
+    }
+
+    /** Pitch of the selected note, or of every note when [all], from the analysed f0. */
+    fun notePitchFromAudio(all: Boolean, round: Boolean = true) {
+        val f0 = pitch ?: return app.message(S.pitchNotReady())
+        val s = selection as? Selection.Note
+        val k = s?.tier ?: doc?.tiers?.indexOfFirst { it is mlabeler.core.model.NoteTier } ?: -1
+        val t = noteTier(k) ?: return
+        updateDoc { it.replace(k, mlabeler.core.edit.NoteEdits.pitchFromCurve(t, f0, round, if (all) null else setOfNotNull(s?.index))) }
+    }
+
     fun splitAt(time: Double = editTime()) {
         val d = committed ?: return
+        noteTier(activeTier)?.let { t ->
+            val r = mlabeler.core.edit.NoteEdits.split(t, time) ?: return
+            commit(d.replace(activeTier, r.first))
+            selectNote(activeTier, r.second)
+            return
+        }
         val k = if (tier(activeTier) != null) activeTier else d.phonemeTierIndex()
         val r = Edits.split(d, k, time, "", settings.edit.minIntervalMs / 1000.0) ?: return
         commit(r.first)
@@ -686,6 +740,7 @@ class EditorState(
     fun mergeSelected() {
         val d = committed ?: return
         when (val s = selection) {
+            is Selection.Note -> { noteTier(s.tier)?.let { commit(d.replace(s.tier, mlabeler.core.edit.NoteEdits.mergeNext(it, s.index))) }; return }
             is Selection.Interval -> commit(Edits.mergeWithNext(d, s.ref))
             is Selection.Bound -> {
                 commit(Edits.removeBound(d, s.ref))
@@ -706,6 +761,10 @@ class EditorState(
             is Selection.Interval -> if (s.ref.index > 0) {
                 commit(Edits.removeBound(d, BoundRef(s.ref.tier, s.ref.index)))
                 selectInterval(IntervalRef(s.ref.tier, s.ref.index - 1), reveal = false)
+            }
+            // a note is removed by joining it to the previous one
+            is Selection.Note -> noteTier(s.tier)?.let { t ->
+                if (s.index > 0) { commit(d.replace(s.tier, mlabeler.core.edit.NoteEdits.mergeNext(t, s.index - 1))); selectNote(s.tier, s.index - 1) }
             }
             Selection.None -> Unit
         }

@@ -46,12 +46,13 @@ private val noEntryFiles = L("Not in oto", "Нет в oto")
 private val missingSample = L("No such recording in the folder", "Такой записи в папке нет")
 
 /** Search accepts plain text (alias or file) or "alias:", "sample:" prefixes. */
-private fun matches(q: String, alias: String, sample: String): Boolean {
+private fun matches(q: String, alias: String, sample: String, tag: String = ""): Boolean {
     if (q.isBlank()) return true
     return q.split(';').map { it.trim() }.filter { it.isNotEmpty() }.all { part ->
         when {
             part.startsWith("alias:") -> alias.contains(part.removePrefix("alias:").trim('"', ' '), ignoreCase = true)
             part.startsWith("sample:") -> sample.contains(part.removePrefix("sample:").trim('"', ' '), ignoreCase = true)
+            part.startsWith("tag:") -> tag.contains(part.removePrefix("tag:").trim('"', ' '), ignoreCase = true)
             else -> alias.contains(part, ignoreCase = true) || sample.contains(part, ignoreCase = true)
         }
     }
@@ -99,7 +100,7 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
         }
         val existing = folderFiles.map { Paths.name(it.value.audioPath).lowercase() }.toSet()
         val list = entries.withIndex().filter {
-            matches(ed.query, it.value.alias, it.value.sample) && when (ed.filter) {
+            matches(ed.query, it.value.alias, it.value.sample, ed.oto.marks(it.value).tag) && when (ed.filter) {
                 FileFilter.NotDone -> !ed.oto.marks(it.value).done
                 FileFilter.Starred -> ed.oto.marks(it.value).star
                 else -> true
@@ -169,6 +170,8 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
             Chip(S.done(), marks.done) { ed.oto.setMarks(e) { it.copy(done = !it.done) } }
             Chip(S.star(), marks.star) { ed.oto.setMarks(e) { it.copy(star = !it.star) } }
         }
+        var tag by remember(ed.oto.selected) { mutableStateOf(marks.tag) }
+        Field(tag, { tag = it; ed.oto.setMarks(e) { m -> m.copy(tag = it.trim()) } }, Modifier.fillMaxWidth().padding(top = 6.dp), placeholder = S.tag())
         SectionTitle(S.inspector())
         val rows = listOf(
             Triple(OtoMarker.Left, "Offset", e.offset),

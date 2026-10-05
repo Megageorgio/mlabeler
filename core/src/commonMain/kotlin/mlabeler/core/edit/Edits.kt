@@ -2,6 +2,7 @@ package mlabeler.core.edit
 
 import mlabeler.core.model.IntervalTier
 import mlabeler.core.model.LabelDoc
+import mlabeler.core.model.NoteTier
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -272,4 +273,77 @@ object RangeEdits {
         val anyConf = c.any { it != null }
         return IntervalTier(tier.name, b, t, if (anyConf) c else null)
     }
+}
+
+/** Edits of a notes tier. Notes are kept in time order; neighbouring notes share their border when they touch. */
+object NoteEdits {
+    fun indexAt(t: NoteTier, time: Double) = t.notes.indexOfFirst { time >= it.start && time < it.end }
+
+    /** Moves the border between note [i] and the next one (or the end of the last note). */
+    fun moveEnd(t: NoteTier, i: Int, time: Double, minLen: Double = 0.01): NoteTier {
+        val n = t.notes.toMutableList()
+        val cur = n[i]
+        val next = n.getOrNull(i + 1)
+        val touching = next != null && kotlin.math.abs(next.start - cur.end) < Edits.SAME_TIME
+        val hi = if (next != null) (if (touching) next.end - minLen else next.start) else Double.MAX_VALUE
+        val v = time.coerceIn(cur.start + minLen, hi)
+        n[i] = cur.copy(end = v)
+        if (touching) n[i + 1] = next!!.copy(start = v)
+        return t.copy(notes = n)
+    }
+
+    fun moveStart(t: NoteTier, i: Int, time: Double, minLen: Double = 0.01): NoteTier {
+        if (i > 0) return moveEnd(t, i - 1, time, minLen).let { r ->
+            // a gap before the note: only this note's start moves
+            if (kotlin.math.abs(t.notes[i - 1].end - t.notes[i].start) < Edits.SAME_TIME) r
+            else t.copy(notes = t.notes.toMutableList().also { it[i] = it[i].copy(start = time.coerceIn(t.notes[i - 1].end, t.notes[i].end - minLen)) })
+        }
+        val n = t.notes.toMutableList()
+        n[0] = n[0].copy(start = time.coerceIn(0.0, n[0].end - minLen))
+        return t.copy(notes = n)
+    }
+
+    /** Splits a note at [time]; the second part is a slur of the same pitch. */
+    fun split(t: NoteTier, time: Double, minLen: Double = 0.01): Pair<NoteTier, Int>? {
+        val i = indexAt(t, time)
+        if (i < 0) return null
+        val nt = t.notes[i]
+        if (time - nt.start < minLen || nt.end - time < minLen) return null
+        val n = t.notes.toMutableList()
+        n[i] = nt.copy(end = time)
+        n.add(i + 1, nt.copy(start = time, slur = nt.pitch != null))
+        return t.copy(notes = n) to i + 1
+    }
+
+    /** Joins note [i] with the next one, keeping the first one's pitch. */
+    fun mergeNext(t: NoteTier, i: Int): NoteTier {
+        if (i + 1 >= t.notes.size) return t
+        val n = t.notes.toMutableList()
+        n[i] = n[i].copy(end = n[i + 1].end)
+        n.removeAt(i + 1)
+        return t.copy(notes = n)
+    }
+
+    fun setPitch(t: NoteTier, i: Int, pitch: Double?): NoteTier =
+        t.copy(notes = t.notes.toMutableList().also { it[i] = it[i].copy(pitch = pitch) })
+
+    fun setSlur(t: NoteTier, i: Int, slur: Boolean): NoteTier =
+        t.copy(notes = t.notes.toMutableList().also { it[i] = it[i].copy(slur = slur) })
+
+    /**
+     * Pitch of each note from an f0 curve: the median of voiced frames inside it, rounded to semitones when
+     * [round]. Notes with too few voiced frames become rests only when [restWhenUnvoiced].
+     */
+    fun pitchFromCurve(t: NoteTier, f0: mlabeler.core.dsp.Curve, round: Boolean, only: Set<Int>? = null, restWhenUnvoiced: Boolean = false): NoteTier =
+        t.copy(notes = t.notes.mapIndexed { i, n ->
+            if (only != null && i !in only) return@mapIndexed n
+            val a = (n.start / f0.hop).toInt().coerceAtLeast(0)
+            val b = (n.end / f0.hop).toInt().coerceAtMost(f0.values.size)
+            // the middle part, away from transitions
+            val m = (b - a) / 5
+            val vals = (a + m until b - m).map { f0.values[it] }.filter { it > 0f }.sorted()
+            if (vals.size < 3) return@mapIndexed if (restWhenUnvoiced) n.copy(pitch = null, slur = false) else n
+            val midi = mlabeler.core.dsp.Pitch.hzToMidi(vals[vals.size / 2].toDouble())
+            n.copy(pitch = if (round) kotlin.math.round(midi) else kotlin.math.round(midi * 100) / 100)
+        })
 }
