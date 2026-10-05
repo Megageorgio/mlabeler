@@ -30,10 +30,10 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
     private fun headers(extra: Map<String, String> = emptyMap()) =
         (if (token.isNotEmpty()) mapOf("Authorization" to "Bearer $token") else emptyMap()) + extra
 
-    private suspend fun call(method: String, path: String, body: JsonElement? = null): JsonElement {
+    private suspend fun call(method: String, path: String, body: JsonElement? = null, timeoutMs: Int = 70_000): JsonElement {
         val r = try {
             httpRequest(method, base + path, headers(if (body != null) mapOf("Content-Type" to "application/json") else emptyMap()),
-                body?.toString()?.encodeToByteArray())
+                body?.toString()?.encodeToByteArray(), timeoutMs)
         } catch (e: Exception) {
             throw ToolkitException("Toolkit is not reachable at $base (${e.message})")
         }
@@ -45,7 +45,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         json.parseToJsonElement(r.text).jsonObject["detail"]?.let { (it as? JsonPrimitive)?.content ?: it.toString() }
     }.getOrNull() ?: "HTTP ${r.status}"
 
-    suspend fun health(): JsonElement = call("GET", "/health")
+    suspend fun health(): JsonElement = call("GET", "/health", timeoutMs = 8_000)
 
     suspend fun languages(task: String = "align"): List<ToolkitLanguage> =
         call("GET", "/languages?task=$task").jsonObject["languages"]!!.jsonArray.map { g ->

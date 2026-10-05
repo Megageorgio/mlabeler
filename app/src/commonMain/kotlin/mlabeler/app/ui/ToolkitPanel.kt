@@ -54,7 +54,14 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
     val c = T.c
     val tk = app.toolkit
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { if (checkOnShow && tk.status != Status.Starting && tk.status != Status.Installing) tk.check() }
+    // keep the status fresh while it's on screen (the toolkit may start, finish installing or stop meanwhile)
+    LaunchedEffect(Unit) {
+        if (!checkOnShow) return@LaunchedEffect
+        while (true) {
+            if (tk.status != Status.Starting && tk.status != Status.Installing) tk.check()
+            kotlinx.coroutines.delay(if (tk.status == Status.Ready) 10_000 else 3_000)
+        }
+    }
     var logOpen by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {

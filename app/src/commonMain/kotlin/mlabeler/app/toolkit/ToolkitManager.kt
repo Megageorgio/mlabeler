@@ -58,17 +58,25 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         }
     }
 
-    /** Asks the toolkit whether it answers. */
+    private var checkSeq = 0
+
+    /** Asks the toolkit whether it answers. A slow answer from an older check never overrides a newer one. */
     suspend fun check(): Boolean {
-        if (status != Status.Starting && status != Status.Installing) status = Status.Checking
+        val seq = ++checkSeq
+        if (status != Status.Starting && status != Status.Installing && status != Status.Ready) status = Status.Checking
         return try {
             val h = client().health()
-            version = (h.jsonObject["version"] as? JsonPrimitive)?.content ?: ""
-            status = Status.Ready
+            if (seq == checkSeq || status != Status.Ready) {
+                version = (h.jsonObject["version"] as? JsonPrimitive)?.content ?: ""
+                status = Status.Ready
+            }
             true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
+            if (seq != checkSeq) return false
             lastError = e.message ?: ""
-            if (status == Status.Checking) status = when {
+            if (status == Status.Checking || status == Status.Ready) status = when {
                 !canRunHere -> Status.Off
                 LocalToolkit.findMvt(settings.mvtPath) == null -> Status.Missing
                 else -> Status.Off

@@ -50,6 +50,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
@@ -93,6 +94,11 @@ fun EditorScreen(app: AppState, ed: EditorState) {
             .focusable()
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown || ed.editingText != null) return@onKeyEvent false
+                if (ed.toolkitBusy != null) {
+                    // nothing is edited while autolabel works; Esc stops it
+                    if (e.key == androidx.compose.ui.input.key.Key.Escape) ed.cancelToolkit()
+                    return@onKeyEvent true
+                }
                 val cmd = Commands.find(e, ed.mode) ?: return@onKeyEvent false
                 if (!cmd.enabled(ed)) return@onKeyEvent true
                 cmd.run(ed, app)
@@ -104,6 +110,7 @@ fun EditorScreen(app: AppState, ed: EditorState) {
             WidthClass.Compact -> CompactEditor(app, ed)
             else -> WideEditor(app, ed, wc)
         }
+        AutolabelBusy(ed)
         MessageToast(app, if (wc == WidthClass.Compact) 84.dp else 40.dp)
     }
 }
@@ -158,7 +165,9 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
 @Composable
 private fun EditorBody(app: AppState, ed: EditorState) {
     val c = T.c
-    Box(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
+    if (ed.mode != Mode.Oto) ModelResultsBar(ed)
+    Box(Modifier.weight(1f).fillMaxWidth()) {
         when {
             ed.loadError != null -> EmptyNote(ed.loadError ?: "")
             ed.item == null -> EmptyNote(if (ed.items.isEmpty()) S.noFiles() else "")
@@ -169,6 +178,7 @@ private fun EditorBody(app: AppState, ed: EditorState) {
                 CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 2.dp)
             }
         }
+    }
     }
 }
 

@@ -239,4 +239,6 @@ object S {
     val setupHint = L("Two starting points. Either one can be changed bit by bit below and in the View menu.",
         "Две отправные точки. Любую можно потом подстроить ниже и в меню «Вид».")
     val toolbarHint = L("Button groups on the toolbar and their order:", "Группы кнопок на панели и их порядок:")
+    val autolabelCompareDone = L("Done: the result is under your labels. Keep it or remove it with the buttons above the picture.",
+        "Готово: результат — под вашей разметкой. Принять или убрать — кнопками над картинкой.")
 }

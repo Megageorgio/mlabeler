@@ -232,6 +232,16 @@ class EditorState(
     // ---------- autolabel through the toolkit ----------
 
     var toolkitBusy by mutableStateOf<String?>(null)
+    /** 0..1 while the toolkit works on a job, null when unknown. */
+    var toolkitProgress by mutableStateOf<Double?>(null)
+    /** Model results (comparison tiers) of the open file. */
+    val modelReferences: List<Reference> get() = references.filter { it.folder.isEmpty() }
+
+    /** Puts a model's result into the labels and removes it from the comparison. */
+    fun acceptModelResult(r: Reference) {
+        takeReference(r)
+        dropModelResult(r)
+    }
     var toolkitJob: Job? = null
     /** Coroutine scope of this folder (background work that stops when the folder closes). */
     val workScope: CoroutineScope get() = scope
@@ -246,6 +256,7 @@ class EditorState(
         toolkitJob?.cancel()
         toolkitJob = scope.launch {
             val client = app.toolkit.client()
+            var serverJob: String? = null
             try {
                 toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
                 if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
@@ -255,7 +266,8 @@ class EditorState(
                 val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
                 val fileId = client.upload(it.name + "_part.wav", wav)
                 val job = if (recognize) client.segment(fileId, model) else client.align(fileId, model, language, text, phonemes)
-                val result = client.await(job) { p, stage -> toolkitBusy = "${(p * 100).toInt()}%  $stage" }
+                serverJob = job
+                val result = client.await(job) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
                 val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate)
                 if (replace) {
                     updateDoc { d ->
@@ -271,13 +283,16 @@ class EditorState(
                     modelResults[it.id] = modelResults[it.id].orEmpty() + Reference(model, "", part, from to to)
                     loadReferences()
                 }
-                app.message(S.autolabelDone())
+                app.message(if (replace) S.autolabelDone() else S.autolabelCompareDone())
             } catch (e: kotlinx.coroutines.CancellationException) {
+                // stop the job on the toolkit side too
+                serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
                 throw e
             } catch (e: Exception) {
                 app.message(e.message ?: e.toString(), error = true)
             } finally {
                 toolkitBusy = null
+                toolkitProgress = null
             }
         }
     }
@@ -285,6 +300,7 @@ class EditorState(
     fun cancelToolkit() {
         toolkitJob?.cancel()
         toolkitBusy = null
+        toolkitProgress = null
     }
 
     fun addCompareFolder(dir: String) {
@@ -835,7 +851,7 @@ class EditorState(
     }
 
     fun zoom(factor: Double, anchorTime: Double = viewStart + visibleDuration / 2) {
-        val minPps = if (duration > 0) viewWidthPx / duration / 2 else 1.0
+        val minPps = if (duration > 0) viewWidthPx / duration else 1.0
         val newPps = (pixelsPerSecond * factor).coerceIn(minPps, 20000.0)
         val anchorX = (anchorTime - viewStart) * pixelsPerSecond
         pixelsPerSecond = newPps

@@ -754,11 +754,15 @@ private fun DrawScope.drawTimeline(
     val guide = doc.tiers.getOrNull(ed.guideTier) as? IntervalTier
     if (guide != null && g.audioBottom > g.audioTop) {
         val i0 = max(0, guide.indexAt(v0).let { if (it < 0) 0 else it })
+        // zoomed far out boundaries would fill the picture: draw only those with some room around them
+        var lastX = Float.NEGATIVE_INFINITY
         for (b in i0..guide.size) {
             val bt = guide.bounds[b]
             if (bt > tEnd) break
             val xx = x(bt)
             val selected = sel is Selection.Bound && sel.ref.tier == ed.guideTier && sel.ref.bound == b
+            if (!selected && xx - lastX < 8 * px) continue
+            lastX = xx
             if (g.overlay) {
                 drawLine(Color.Black.copy(alpha = 0.6f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom), (if (selected) 5 else 3) * px)
                 drawLine(if (selected) c.boundSelected else c.bound, Offset(xx, g.audioTop), Offset(xx, g.audioBottom), if (selected) 2.5f * px else 1.3f * px)
@@ -878,13 +882,16 @@ private fun DrawScope.drawIntervalTier(
             drawText(layout, topLeft = Offset(max(va + 3 * px, tx), top + (h - layout.size.height) / 2 - 2 * px))
         }
     }
-    // boundaries
+    // boundaries (dense ones thinned out when zoomed far out)
+    var lastX = Float.NEGATIVE_INFINITY
     val last = tier.bounds.size - 1
     for (bIdx in first..last) {
         val t = tier.bounds[bIdx]
         if (t > tEnd) break
         val xx = x(t)
         val selected = sel is Selection.Bound && sel.ref.tier == k && sel.ref.bound == bIdx
+        if (!selected && xx - lastX < 3 * px) continue
+        lastX = xx
         drawLine(if (selected) c.boundSelected else c.bound, Offset(xx, top), Offset(xx, bottom), if (selected) 3 * px else px)
     }
 }
@@ -1140,9 +1147,12 @@ private fun DrawScope.drawReferences(
                     drawText(layout, topLeft = Offset(va + (vb - va - layout.size.width) / 2, top + (g.tierH - layout.size.height) / 2 - 2 * px))
                 }
             }
+            var lastX = Float.NEGATIVE_INFINITY
             for (bi in first..ref.size) {
                 val t = ref.bounds[bi]
                 if (t > tEnd) break
+                if (x(t) - lastX < 3 * px) continue
+                lastX = x(t)
                 val d = deltas?.getOrNull(bi)?.times(1000) ?: 0.0
                 val col = when {
                     deltas == null -> c.muted
