@@ -1,0 +1,25 @@
+package mlabeler.app
+
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+
+fun main(args: Array<String>) = application {
+    // MLABELER_WINDOW=1280x800 sets the first window size (used for screenshots)
+    val size = System.getenv("MLABELER_WINDOW")?.split('x')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
+    val state = rememberWindowState(size = if (size != null) DpSize(size[0].dp, size[1].dp) else DpSize(1280.dp, 800.dp))
+    val app = rememberAppState()
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        args.firstOrNull()?.let { app.openFolder(it) }
+    }
+    Window(
+        onCloseRequest = { app.close(); exitApplication() },
+        state = state,
+        title = app.editor?.let { e -> e.item?.name?.let { "$it — mLabeler" } } ?: "mLabeler",
+    ) {
+        window.minimumSize = java.awt.Dimension(360, 480)
+        App(app)
+    }
+}

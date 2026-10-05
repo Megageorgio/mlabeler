@@ -1,0 +1,2 @@
+-keep class mlabeler.** { *; }
+-dontwarn org.slf4j.**

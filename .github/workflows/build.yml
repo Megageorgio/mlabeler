@@ -1,0 +1,73 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :core:jvmTest
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :app:assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mLabeler-android
+          path: app/build/outputs/apk/release/*.apk
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, task: packageMsi, out: "app/build/compose/binaries/main/msi/*.msi", name: windows }
+          - { os: macos-latest, task: packageDmg, out: "app/build/compose/binaries/main/dmg/*.dmg", name: macos }
+          - { os: ubuntu-latest, task: packageDeb, out: "app/build/compose/binaries/main/deb/*.deb", name: linux }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :app:${{ matrix.task }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mLabeler-${{ matrix.name }}
+          path: ${{ matrix.out }}
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :app:linkDebugFrameworkIosSimulatorArm64 :core:iosSimulatorArm64Test
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, android, desktop]
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          prerelease: ${{ contains(github.ref, '-') }}
