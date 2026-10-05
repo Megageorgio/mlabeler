@@ -56,6 +56,9 @@ object AndroidContext {
     fun init(c: Context) {
         context = c
     }
+
+    /** Set by the activity: asks for the microphone permission. */
+    var askMic: ((callback: (Boolean) -> Unit) -> Unit)? = null
 }
 
 actual object Platform {

@@ -97,16 +97,7 @@ fun EditorScreen(app: AppState, ed: EditorState) {
             WidthClass.Compact -> CompactEditor(app, ed)
             else -> WideEditor(app, ed, wc)
         }
-        app.message?.let { m ->
-            Box(Modifier.fillMaxSize().padding(bottom = if (wc == WidthClass.Compact) 84.dp else 40.dp), contentAlignment = Alignment.BottomCenter) {
-                Box(
-                    Modifier.clip(RoundedCornerShape(c.radius)).background(if (m.error) c.danger else c.text)
-                        .clickable { app.dismissMessage() }.padding(horizontal = 14.dp, vertical = 9.dp),
-                ) {
-                    Text(m.text, color = c.bg, fontSize = 13.sp)
-                }
-            }
-        }
+        MessageToast(app, if (wc == WidthClass.Compact) 84.dp else 40.dp)
     }
 }
 
@@ -254,6 +245,7 @@ private fun MainMenu(app: AppState, ed: EditorState) {
             DropdownMenuItem({ Text(S.tiersOnTop()) }, onClick = { open = false; Commands.tiersOnTop.run(ed, app) }, trailingIcon = { if (app.settings.layout.tiersOnTop) TextIcon("✓") })
             DropdownMenuItem({ Text(S.power()) }, onClick = { open = false; Commands.powerLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPower) TextIcon("✓") })
             DropdownMenuItem({ Text(Commands.workspace.title()) }, onClick = { open = false; app.showWorkspace = true })
+            DropdownMenuItem({ Text(Commands.record.title()) }, onClick = { open = false; app.openRecorder(ed.workspace.root) })
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true }, trailingIcon = { TextIcon(Commands.settings.keyLabel) })
             DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true }, trailingIcon = { TextIcon("F1") })
         }
@@ -376,6 +368,7 @@ private fun CompactMenu(app: AppState, ed: EditorState, onDetails: () -> Unit) {
             DropdownMenuItem({ Text(S.zoomFit()) }, onClick = { open = false; ed.fitAll() })
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true })
             DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true })
+            DropdownMenuItem({ Text(Commands.record.title()) }, onClick = { open = false; app.openRecorder(ed.workspace.root) })
             DropdownMenuItem({ Text(S.closeFolder()) }, onClick = { open = false; app.closeFolder() })
         }
     }
@@ -441,5 +434,19 @@ private fun SpeedButton(ed: EditorState, speed: Float) {
             color = if (speed < 1f) c.accent else c.muted, fontSize = 12.sp,
             modifier = Modifier.clip(RoundedCornerShape(c.radius)).clickable { ed.cycleSpeed() }.padding(horizontal = 6.dp, vertical = 6.dp),
         )
+    }
+}
+
+@Composable
+fun MessageToast(app: AppState, bottom: Dp) {
+    val c = T.c
+    val m = app.message ?: return
+    Box(Modifier.fillMaxSize().padding(bottom = bottom, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
+        Box(
+            Modifier.clip(RoundedCornerShape(c.radius)).background(if (m.error) c.danger else c.text)
+                .clickable { app.dismissMessage() }.padding(horizontal = 14.dp, vertical = 9.dp),
+        ) {
+            Text(m.text, color = c.bg, fontSize = 13.sp)
+        }
     }
 }

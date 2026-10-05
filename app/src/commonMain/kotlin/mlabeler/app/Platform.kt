@@ -45,3 +45,12 @@ expect class AudioOut() {
 /** Asks for storage access where the platform needs it; shows [content] when access is granted. */
 @Composable
 expect fun StorageAccess(content: @Composable () -> Unit)
+
+/** Microphone input; [onChunk] is called from a background thread with samples in -1..1. */
+expect class AudioIn() {
+    /** Asks for microphone access where needed; [onResult] gets true when recording is allowed. */
+    fun requestPermission(onResult: (Boolean) -> Unit)
+    fun start(sampleRate: Int, onChunk: (FloatArray) -> Unit)
+    fun stop()
+    val isRecording: Boolean
+}

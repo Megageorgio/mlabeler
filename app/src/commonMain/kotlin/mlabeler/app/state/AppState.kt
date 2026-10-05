@@ -30,6 +30,21 @@ class AppState(private val scope: CoroutineScope) {
     var showAutolabel by mutableStateOf(false)
     var showHelp by mutableStateOf(false)
     var showAutoOto by mutableStateOf(false)
+    var recorder by mutableStateOf<mlabeler.app.recorder.RecorderState?>(null)
+        private set
+
+    /** Opens the recorder for [folder] (saving the editor's changes first). */
+    fun openRecorder(folder: String) {
+        if (!PlatformFs.isDirectory(folder)) return
+        editor?.let { if (it.dirty) it.save(quiet = true) }
+        recorder = mlabeler.app.recorder.RecorderState(folder, this, scope)
+    }
+
+    fun closeRecorder() {
+        recorder?.close()
+        recorder = null
+        editor?.rescan()
+    }
     /** Set while the in-app folder browser is open for a pick. */
     var folderPick by mutableStateOf<((String) -> Unit)?>(null)
 

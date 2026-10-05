@@ -34,7 +34,9 @@ fun App(app: AppState = rememberAppState()) {
             StorageAccess {
                 Box(Modifier.fillMaxSize()) {
                     val ed = app.editor
-                    if (ed == null) StartScreen(app) else EditorScreen(app, ed)
+                    val rec = app.recorder
+                    if (rec != null) mlabeler.app.recorder.RecorderScreen(app, rec)
+                    else if (ed == null) StartScreen(app) else EditorScreen(app, ed)
                     if (app.showCommands && ed != null) CommandPalette(app)
                     if (app.showSettings) SettingsDialog(app)
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)

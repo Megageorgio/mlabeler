@@ -33,6 +33,11 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
 - Slow playback with pitch kept (Y: 1×, 0.75×, 0.5×, 0.25×), autosave, reload of labels changed elsewhere.
 - Keys can be rebound in Settings → Shortcuts. F1 shows how to work.
 - Folder settings (click the folder name): what is labelled in the folder, format for new labels, extra label folders.
+- Overlaid view (V): waveform over the spectrogram and labels over both, or separate lanes; labels above or below.
+- Automatic oto (Ctrl+Shift+A in oto folders): entries from file names (kana, romaji, Cyrillic) and the recordings,
+  CV / VCV / CVVC, optional tempo, or syllables placed by an aligner model from mVocalToolkit.
+- Recording samples from a list (reclist.txt): big current line with romaji, level meter, take preview, click track
+  with count-in, guide WAV, previous takes kept in `.mlabeler/takes`.
 - Rename by pattern (Ctrl+H) for oto aliases or the active tier; sound while dragging a boundary.
 
 ## Keys

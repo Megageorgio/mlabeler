@@ -16,6 +16,7 @@ targets:
         CFBundleShortVersionString: "0.1.0"
         UILaunchScreen: {}
         UIFileSharingEnabled: true
+        NSMicrophoneUsageDescription: mLabeler records samples for voicebanks and datasets.
         LSSupportsOpeningDocumentsInPlace: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
