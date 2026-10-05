@@ -35,6 +35,8 @@ data class LayoutSettings(
     val overlayDim: Float = 0.35f,
     /** Overlaid view: fill the waveform instead of drawing only its outline. */
     val overlayWaveFill: Boolean = false,
+    /** Opacity of that fill: 1 = solid. */
+    val overlayWaveFillAlpha: Float = 0.55f,
 )
 
 @Serializable
@@ -63,12 +65,50 @@ data class EditSettings(
     val newFormat: LabelFormat = LabelFormat.Lab,
     val otoLockedDrag: Boolean = true,
     /** Play a short piece around a boundary while it is dragged. */
-    val playOnDrag: Boolean = true,
+    val playOnDrag: Boolean = false,
+    /** Which phoneme a boundary "belongs" to: "end" = the one that ends at it, "start" = the one that starts at it.
+     *  Deleting a selected boundary removes that phoneme; Space plays it. */
+    val boundaryOwner: String = "end",
+    /** Space while playing starts again instead of stopping. */
+    val spaceRestarts: Boolean = false,
+    /** Mouse tool: "cursor" (click selects, drag moves boundaries) or "cut" (click adds a boundary). */
+    val tool: String = "cursor",
+    /** After adding a boundary with the mouse: type the name of the new part right away. */
+    val cutAskName: Boolean = true,
+    /** After adding a boundary with the mouse: play the part before it. */
+    val cutPlay: Boolean = true,
     /** Playback speed, 0.25..1, pitch kept. */
     val speed: Float = 1f,
     /** Save every N seconds when there are changes; 0 = off. */
     val autosaveSeconds: Int = 0,
 )
+
+/** What mouse gestures do, on label lanes and on the waveform/spectrogram. Values are [MouseActions] ids. */
+@Serializable
+data class MouseSettings(
+    val tierDouble: String = MouseActions.RENAME,
+    val tierRight: String = MouseActions.PLAY,
+    val tierMiddle: String = MouseActions.PLAY,
+    val tierCtrl: String = MouseActions.SPLIT,
+    val tierAlt: String = MouseActions.NONE,
+    val audioDouble: String = MouseActions.PLAY,
+    val audioRight: String = MouseActions.PLAY,
+    val audioMiddle: String = MouseActions.PLAY,
+    val audioCtrl: String = MouseActions.SPLIT,
+    val audioAlt: String = MouseActions.NONE,
+)
+
+object MouseActions {
+    const val NONE = "none"
+    const val SELECT = "select"
+    const val PLAY = "play"
+    const val PLAY_FROM = "play-from"
+    const val RENAME = "rename"
+    const val SPLIT = "split"
+    const val SPLIT_NAME = "split-name"
+    const val DELETE = "delete"
+    val all = listOf(NONE, SELECT, PLAY, PLAY_FROM, RENAME, SPLIT, SPLIT_NAME, DELETE)
+}
 
 @Serializable
 data class ToolkitSettings(
@@ -113,7 +153,7 @@ object ToolbarGroups {
     const val MARKS = "marks"
     const val EXTRAS = "extras"
     val all = listOf(FILES, HISTORY, PLAY, EDIT, MODES, AUTO, MARKS, VIEW, ZOOM, EXTRAS)
-    val simple = listOf(FILES, HISTORY, PLAY, EDIT, AUTO)
+    val simple = listOf(FILES, HISTORY, PLAY, EDIT, MODES, AUTO)
 }
 
 @Serializable
@@ -155,6 +195,9 @@ data class AppSettings(
     val otherAudio: Boolean = false,
     /** Id of the chosen work environment (built-in id or "user:<name>"). */
     val environment: String = "basic",
+    val mouse: MouseSettings = MouseSettings(),
+    /** Interface font from the system; empty = the theme's. */
+    val font: String = "",
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")

@@ -414,6 +414,7 @@ class EditorState(
     }
 
     fun open(i: Int) {
+        finishEditing()
         if (i == index && audio != null) return
         if (i !in items.indices) {
             index = -1
@@ -429,6 +430,7 @@ class EditorState(
     }
 
     fun openRelative(delta: Int) {
+        finishEditing()
         val list = filtered()
         if (list.isEmpty()) return
         val pos = list.indexOfFirst { it.first == index }
@@ -652,6 +654,17 @@ class EditorState(
 
     fun selectedInterval(): IntervalRef? = (selection as? Selection.Interval)?.ref
 
+    /** What is typed in the label field right now, and for which interval. */
+    var editingDraft: Pair<IntervalRef, String>? = null
+
+    /** Commits a label being typed, if any (before playing, switching files, running a command): no Enter needed. */
+    fun finishEditing() {
+        val e = editingText ?: return
+        editingText = null
+        val d = editingDraft
+        if (d != null && d.first == e) setText(e, d.second.trim())
+    }
+
     // ---------- edits ----------
 
     private var dragBase: LabelDoc? = null
@@ -759,8 +772,9 @@ class EditorState(
         }
     }
 
-    fun splitAt(time: Double = editTime()) {
+    fun splitAt(time: Double = editTime(), tierIndex: Int? = null, askName: Boolean = !Platform.isMobile, playLeft: Boolean = false) {
         val d = committed ?: return
+        if (tierIndex != null && tier(tierIndex) != null) activeTier = tierIndex
         noteTier(activeTier)?.let { t ->
             val r = mlabeler.core.edit.NoteEdits.split(t, time) ?: return
             commit(d.replace(activeTier, r.first))
@@ -772,8 +786,9 @@ class EditorState(
         commit(r.first)
         val right = IntervalRef(k, r.second.bound)
         selectInterval(right, reveal = false)
+        if (playLeft) tier(k)?.let { t -> val i = r.second.bound - 1; if (i >= 0) play(t.startOf(i), t.endOf(i), loop = false) }
         // with a keyboard, name the new part right away
-        if (!Platform.isMobile) editingText = right
+        if (askName) editingText = right
     }
 
     fun mergeSelected() {
@@ -794,12 +809,17 @@ class EditorState(
         val d = committed ?: return
         when (val s = selection) {
             is Selection.Bound -> {
-                commit(Edits.removeBound(d, s.ref))
+                // the phoneme the boundary belongs to goes away (see EditSettings.boundaryOwner)
+                commit(Edits.removeBound(d, s.ref, keepRight = settings.edit.boundaryOwner == "end"))
                 selectInterval(IntervalRef(s.ref.tier, (s.ref.bound - 1).coerceAtLeast(0)), reveal = false)
             }
+            // the selected phoneme goes away: joined to the one before it (or after it, for the first)
             is Selection.Interval -> if (s.ref.index > 0) {
                 commit(Edits.removeBound(d, BoundRef(s.ref.tier, s.ref.index)))
                 selectInterval(IntervalRef(s.ref.tier, s.ref.index - 1), reveal = false)
+            } else if ((tier(s.ref.tier)?.size ?: 0) > 1) {
+                commit(Edits.removeBound(d, BoundRef(s.ref.tier, 1), keepRight = true))
+                selectInterval(IntervalRef(s.ref.tier, 0), reveal = false)
             }
             // a note is removed by joining it to the previous one
             is Selection.Note -> noteTier(s.tier)?.let { t ->
@@ -901,11 +921,22 @@ class EditorState(
         play(a.left / 1000, a.right / 1000)
     }
 
+    /** The interval a selected boundary belongs to (see EditSettings.boundaryOwner). */
+    fun boundOwnerInterval(b: BoundRef): IntervalRef? {
+        val t = tier(b.tier) ?: return null
+        val i = if (settings.edit.boundaryOwner == "end") b.bound - 1 else b.bound
+        return if (i in 0 until t.size) IntervalRef(b.tier, i) else null
+    }
+
     fun togglePlay() {
-        if (playing) return stop()
+        if (playing) {
+            val lp = lastPlay
+            if (settings.edit.spaceRestarts && lp != null) return play(lp.first, lp.second, lp.third)
+            return stop()
+        }
         if (mode == Mode.Oto && range == null && oto.current() != null) return playOtoEntry()
         val r = range
-        val s = selectedInterval()
+        val s = selectedInterval() ?: (selection as? Selection.Bound)?.let { boundOwnerInterval(it.ref) }
         val t = s?.let { tier(it.tier) }
         when {
             r != null -> play(r.first, r.second)
@@ -937,6 +968,7 @@ class EditorState(
         keepRange: Double? = null,
     ) {
         val a = audio ?: return
+        finishEditing()
         stop()
         lastPlay = Triple(keepRange ?: from, to, loop)
         lastPlayFollowsSettings = speed == settings.edit.speed.toDouble()

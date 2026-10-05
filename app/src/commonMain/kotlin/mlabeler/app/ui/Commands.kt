@@ -196,6 +196,13 @@ object Commands {
     val help = Command("help", L("How it works", "Как с этим работать"), listOf(Chord(Key.F1))) { _, a -> a.showHelp = true }
     val speed = Command("speed", L("Playback speed", "Скорость воспроизведения"), listOf(ch('Y'))) { e, _ -> e.cycleSpeed() }
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
+    val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: клик выбирает, перетаскивание двигает"), listOf(Chord(Key.One))) { _, a ->
+        a.update { it.copy(edit = it.edit.copy(tool = "cursor")) }
+    }.only(Mode.Labels)
+    val toolCut = Command("tool-cut", L("Cut tool: click adds a boundary", "Ножницы: клик ставит границу"), listOf(Chord(Key.Two))) { _, a ->
+        a.update { it.copy(edit = it.edit.copy(tool = if (it.edit.tool == "cut") "cursor" else "cut")) }
+    }.only(Mode.Labels)
+    val playOnDrag = Command("play-on-drag", S.playOnDrag, emptyList()) { _, a -> a.update { it.copy(edit = it.edit.copy(playOnDrag = !it.edit.playOnDrag)) } }
     val workspace = Command("workspace", L("Folder settings…", "Настройки папки…"), listOf(ch('M', ctrl = true))) { _, a -> a.showWorkspace = true }
 
     init {
@@ -204,7 +211,7 @@ object Commands {
     }
 
     val all = listOf(
-        pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        toolCursor, toolCut, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

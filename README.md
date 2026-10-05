@@ -45,6 +45,13 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
   JSON files that can be shared) are chosen on the first start and in View → Work environment. Phones keep the button menus.
 - Themes: built-in ones or editable copies where every colour (with opacity), the spectrogram gradient, tier colours,
   corner rounding, border width and font can be changed; changes show at once.
+- Mouse: cursor tool (1) or scissors (2, a click adds a boundary, names it and plays the part before it);
+  double / right / middle / Ctrl / Alt clicks can each be set to select, play, play from here, rename, add a
+  boundary, or remove the phoneme — separately on label lanes and on the audio. Dragging near a boundary always
+  moves it. A label being typed is kept as soon as you click or play elsewhere, no Enter needed.
+- Deleting a selected boundary removes the phoneme that ends at it (or the one that starts at it — a setting);
+  Space plays that phoneme. Space while playing can start again instead of stopping.
+- Any system font for the interface. Every settings page and every slider can go back to its default.
 - System folder dialog (Explorer with the address bar on Windows). Only WAV files are listed unless other formats are
   turned on in Settings → General.
 - Every slider in the settings has a number field next to it for an exact value.

@@ -69,6 +69,7 @@ import mlabeler.app.Platform
 import mlabeler.app.imageFromArgb
 import mlabeler.app.resizeHorizontalIcon
 import mlabeler.app.state.EditorState
+import mlabeler.app.state.MouseActions
 import mlabeler.app.state.LayoutSettings
 import mlabeler.app.state.Mode
 import mlabeler.core.format.get
@@ -124,7 +125,7 @@ private class Geom(
     val overlay: Boolean = false,
     val tiersOnTop: Boolean = false,
     val dim: Float = 0f,
-    val waveFill: Boolean = false,
+    val waveFill: Float = 0f,
 ) {
     val tiersBottom: Float get() = tiersTop + tierH * tierCount
     val audioTop: Float get() = min(waveTop, specTop)
@@ -193,7 +194,7 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val pitchTop = audioTop + mainH
     val powerTop = pitchTop + pitchH
     return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, tiersTop, tierHeight, tiers,
-        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), layout.overlayWaveFill)
+        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), if (layout.overlayWaveFill) layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f) else 0f)
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -278,6 +279,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
     val layoutState = rememberUpdatedState(layout)
     val onLayoutState = rememberUpdatedState(onLayout)
     val lastTap = remember { mutableStateOf(Triple(0L, Offset.Zero, 0)) }
+    val cutByLastTap = remember { mutableStateOf(false) }
 
     // spectrogram image for the current view
     val spec = ed.spectrogram
@@ -287,8 +289,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
     }
 
     BoxWithConstraints(modifier.background(c.laneBg)) {
-        val tierStyle = TextStyle(fontSize = if (Platform.isMobile) 15.sp else 13.sp, color = c.tierText, fontFamily = if (c.mono) FontFamily.Monospace else FontFamily.Default)
-        val smallStyle = TextStyle(fontSize = 10.sp, color = c.muted, fontFamily = if (c.mono) FontFamily.Monospace else FontFamily.Default)
+        val tierStyle = TextStyle(fontSize = if (Platform.isMobile) 15.sp else 13.sp, color = c.tierText, fontFamily = T.font)
+        val smallStyle = TextStyle(fontSize = 10.sp, color = c.muted, fontFamily = T.font)
 
         Canvas(
             Modifier.fillMaxSize()
@@ -333,7 +335,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                 .pointerInput(ed) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        if (ed.editingText == null) ed.requestFocus()
+                        // a click anywhere on the picture finishes typing a label (focus leaves the field)
+                        ed.requestFocus()
                         val first = currentEvent
                         val touch = down.type == PointerType.Touch || down.type == PointerType.Stylus
                         val g = geom(size, density, layoutState.value, ed.laneTiers())
@@ -362,9 +365,10 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             return@awaitEachGesture
                         }
 
-                        // right click: play the part under the pointer
+                        // right click: what the mouse settings say (plays the part under the pointer by default)
                         if (!touch && first.buttons.isSecondaryPressed) {
-                            playUnder(ed, region, downTime)
+                            if (ed.mode == Mode.Oto) ed.playOtoEntry()
+                            else mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Right))
                             return@awaitEachGesture
                         }
 
@@ -485,7 +489,27 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             val double = down.uptimeMillis - t0 < viewConfiguration.doubleTapTimeoutMillis &&
                                 (down.position - p0).getDistance() < 24 * density
                             lastTap.value = Triple(down.uptimeMillis, down.position, if (double) n0 + 1 else 1)
-                            onTap(ed, region, downTime, double, touch, mods.isShiftPressed)
+                            val ctrl = if (Platform.isMac) mods.isMetaPressed else mods.isCtrlPressed
+                            val labels = ed.mode == Mode.Labels && (region is Region.Tier || region == Region.Wave || region == Region.Spec)
+                            when {
+                                !labels -> onTap(ed, region, downTime, double, touch, mods.isShiftPressed)
+                                first.buttons.isTertiaryPressed -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Middle))
+                                ctrl -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Ctrl))
+                                mods.isAltPressed -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Alt))
+                                double -> {
+                                    // the first click of a double click in the cut tool added a boundary: take it back
+                                    if (ed.app.settings.edit.tool == "cut" && cutByLastTap.value) { ed.undo(); cutByLastTap.value = false }
+                                    mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Double))
+                                }
+                                ed.app.settings.edit.tool == "cut" && !touch && !mods.isShiftPressed && isLabelLane(ed, region) -> {
+                                    val e = ed.app.settings.edit
+                                    ed.splitAt(downTime, laneOf(ed, region), askName = e.cutAskName, playLeft = e.cutPlay)
+                                    cutByLastTap.value = true
+                                    return@awaitEachGesture
+                                }
+                                else -> onTap(ed, region, downTime, false, touch, mods.isShiftPressed)
+                            }
+                            cutByLastTap.value = false
                         }
                     }
                 },
@@ -512,11 +536,15 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                 offset = IntOffset(x.toInt(), g.tierTop(editing.tier).toInt()),
                 widthPx = w.toInt(),
                 heightPx = g.tierH.toInt(),
+                onDraft = { ed.editingDraft = editing to it },
                 onCommit = { text ->
-                    ed.editingText = null
-                    ed.setText(editing, text)
+                    // only if it wasn't already committed elsewhere (playing, another file)
+                    if (ed.editingText == editing) {
+                        ed.editingText = null
+                        ed.setText(editing, text)
+                    }
                 },
-                onCancel = { ed.editingText = null },
+                onCancel = { if (ed.editingText == editing) ed.editingText = null },
             )
         }
     }
@@ -538,6 +566,57 @@ private fun hitBound(ed: EditorState, g: Geom, region: Region?, x: Float, grab: 
     val sel = (ed.selection as? Selection.Bound)?.ref
     if (sel != null && sel.tier == k && abs(((tier.bounds[sel.bound] - ed.viewStart) * ed.pixelsPerSecond).toFloat() - x) <= grab) return sel
     return BoundRef(k, b)
+}
+
+private enum class Gesture { Double, Right, Middle, Ctrl, Alt }
+
+/** The configured action for [g] where the pointer is (label lane or audio). */
+private fun mouseFor(ed: EditorState, region: Region?, g: Gesture): String {
+    val m = ed.app.settings.mouse
+    val tier = region is Region.Tier
+    return when (g) {
+        Gesture.Double -> if (tier) m.tierDouble else m.audioDouble
+        Gesture.Right -> if (tier) m.tierRight else m.audioRight
+        Gesture.Middle -> if (tier) m.tierMiddle else m.audioMiddle
+        Gesture.Ctrl -> if (tier) m.tierCtrl else m.audioCtrl
+        Gesture.Alt -> if (tier) m.tierAlt else m.audioAlt
+    }
+}
+
+/** Interval tier the pointer works on: the lane under it, or the guide tier over the audio. */
+private fun laneOf(ed: EditorState, region: Region?): Int = if (region is Region.Tier) region.index else ed.guideTier
+
+private fun isLabelLane(ed: EditorState, region: Region?): Boolean =
+    ed.doc?.tiers?.getOrNull(laneOf(ed, region)) is IntervalTier
+
+private fun mouseAction(ed: EditorState, region: Region?, time: Double, action: String) {
+    val doc = ed.doc ?: return
+    val k = laneOf(ed, region)
+    if (k >= doc.tiers.size) {
+        // a comparison lane: only listening makes sense there
+        val ref = ed.referenceTiers.getOrNull(k - doc.tiers.size)?.second ?: return
+        val i = ref.indexAt(time)
+        if (i >= 0 && action != MouseActions.NONE) ed.play(ref.startOf(i), ref.endOf(i), loop = false)
+        return
+    }
+    val tier = doc.tiers.getOrNull(k) as? IntervalTier
+    if (tier == null) {
+        // notes and points keep their own simple behaviour
+        if (action == MouseActions.PLAY || action == MouseActions.PLAY_FROM) ed.play(time, ed.viewStart + ed.visibleDuration)
+        return
+    }
+    val i = tier.indexAt(time)
+    val ref = if (i >= 0) IntervalRef(k, i) else null
+    when (action) {
+        MouseActions.NONE -> Unit
+        MouseActions.SELECT -> ref?.let { ed.selectInterval(it, reveal = false) }
+        MouseActions.PLAY -> if (ref != null) ed.play(tier.startOf(i), tier.endOf(i))
+        MouseActions.PLAY_FROM -> ed.play(time, ed.viewStart + ed.visibleDuration)
+        MouseActions.RENAME -> ref?.let { ed.selectInterval(it, reveal = false); ed.editingText = it }
+        MouseActions.SPLIT -> ed.splitAt(time, k, askName = false, playLeft = ed.app.settings.edit.cutPlay)
+        MouseActions.SPLIT_NAME -> ed.splitAt(time, k, askName = true, playLeft = ed.app.settings.edit.cutPlay)
+        MouseActions.DELETE -> ref?.let { ed.selectInterval(it, reveal = false); ed.deleteSelected() }
+    }
 }
 
 private fun playUnder(ed: EditorState, region: Region?, time: Double) {
@@ -709,7 +788,7 @@ private fun DrawScope.drawTimeline(
                     if (!started) { upper.moveTo(xx, mid - hi * amp); lower.moveTo(xx, mid - lo * amp); started = true }
                     else { upper.lineTo(xx, mid - hi * amp); lower.lineTo(xx, mid - lo * amp) }
                 }
-                if (g.waveFill) {
+                if (g.waveFill > 0f) {
                     // filled body, see-through so the spectrogram still shows
                     val body = Path()
                     for (col in max(0, x(0.0).toInt())..cols) {
@@ -720,7 +799,7 @@ private fun DrawScope.drawTimeline(
                         body.moveTo(col + 0.5f, mid - hi * amp)
                         body.lineTo(col + 0.5f, mid - lo * amp + 0.5f)
                     }
-                    drawPath(body, c.wave.copy(alpha = 0.55f), style = Stroke(px))
+                    drawPath(body, c.wave.copy(alpha = c.wave.alpha * g.waveFill), style = Stroke(px))
                 }
                 for (pth in listOf(upper, lower)) {
                     drawPath(pth, Color.Black.copy(alpha = 0.55f), style = Stroke(3.2f * px))
@@ -911,7 +990,7 @@ private fun DrawScope.drawIntervalTier(
 }
 
 @Composable
-private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heightPx: Int, onCommit: (String) -> Unit, onCancel: () -> Unit) {
+private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heightPx: Int, onDraft: (String) -> Unit, onCommit: (String) -> Unit, onCancel: () -> Unit) {
     val c = T.c
     val density = LocalDensity.current
     var value by remember(initial) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(initial, androidx.compose.ui.text.TextRange(0, initial.length))) }
@@ -924,12 +1003,13 @@ private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heigh
         if (commit) onCommit(value.text.trim()) else onCancel()
     }
     LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(Unit) { onDraft(initial) }
     with(density) {
         BasicTextField(
             value = value,
-            onValueChange = { value = it },
+            onValueChange = { value = it; onDraft(it.text) },
             singleLine = true,
-            textStyle = TextStyle(color = c.text, fontSize = 14.sp, fontFamily = if (c.mono) FontFamily.Monospace else FontFamily.Default),
+            textStyle = TextStyle(color = c.text, fontSize = 14.sp, fontFamily = T.font),
             cursorBrush = SolidColor(c.accent),
             keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { finish(true) }),
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done, autoCorrectEnabled = false),

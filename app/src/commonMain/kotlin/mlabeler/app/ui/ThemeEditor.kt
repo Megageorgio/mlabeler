@@ -93,6 +93,7 @@ fun ThemesPage(app: AppState) {
         for (t in Themes.builtIn) ThemeSwatch(t, names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
         for (ct in Themes.custom) ThemeSwatch(ct.tokens, ct.name, s.theme == ct.tokens.id) { app.update { it.copy(theme = ct.tokens.id) } }
     }
+    FontPicker(app)
     val current = Themes.custom.firstOrNull { it.tokens.id == s.theme }
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Btn(makeCopy(), primary = current == null) {
@@ -236,4 +237,41 @@ private fun toHsv(c: Color): FloatArray {
     }.let { if (it < 0) it + 360f else it }
     val s = if (mx == 0f) 0f else d / mx
     return floatArrayOf(h, s, mx)
+}
+
+private val fontT = L("Interface font", "Шрифт интерфейса")
+private val fontTheme = L("As in the theme", "Как в теме")
+private val fontSearch = L("Find a font", "Найти шрифт")
+private val fontSample = L("Sample: a i u e o  ка са на  0:01.250", "Пример: a i u e o  ка са на  0:01.250")
+
+/** Any font installed in the system, with a preview of each. */
+@Composable
+private fun FontPicker(app: AppState) {
+    val c = T.c
+    val names = remember { mlabeler.app.systemFontNames() }
+    var query by remember { mutableStateOf("") }
+    var open by remember { mutableStateOf(false) }
+    val cur = app.settings.font
+    SectionTitle(fontT())
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Btn((cur.ifEmpty { fontTheme() }) + "  ▾") { open = !open }
+        if (cur.isNotEmpty()) Btn(fontTheme()) { app.update { it.copy(font = "") } }
+    }
+    Text(fontSample(), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+    if (!open || names.isEmpty()) return
+    Field(query, { query = it }, Modifier.fillMaxWidth().padding(top = 8.dp), placeholder = fontSearch())
+    val shown = remember(query, names) { names.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) } }
+    androidx.compose.foundation.lazy.LazyColumn(
+        Modifier.padding(top = 6.dp).fillMaxWidth().height(240.dp).border(c.borderWidth, c.border, RoundedCornerShape(c.radius)),
+    ) {
+        items(shown.size) { i ->
+            val n = shown[i]
+            val fam = remember(n) { mlabeler.app.systemFontFamily(n) }
+            Text(
+                n, fontFamily = fam, fontSize = 15.sp, color = if (n == cur) c.accent else c.text, maxLines = 1,
+                modifier = Modifier.fillMaxWidth().background(if (n == cur) c.accent.copy(alpha = 0.12f) else Color.Transparent)
+                    .clickable { app.update { it.copy(font = n) } }.padding(horizontal = 10.dp, vertical = 6.dp),
+            )
+        }
+    }
 }

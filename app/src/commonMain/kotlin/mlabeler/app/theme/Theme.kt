@@ -132,8 +132,13 @@ data class CustomTheme(val tokens: Tokens, val name: String, val path: String)
 
 val LocalTokens = staticCompositionLocalOf { Themes.modernDark }
 
+/** Interface font chosen in the settings (null = the theme's). */
+val LocalUiFont = staticCompositionLocalOf<FontFamily?> { null }
+
 object T {
     val c: Tokens @Composable get() = LocalTokens.current
+    /** Font for everything the app draws itself (labels, fields). */
+    val font: FontFamily @Composable get() = LocalUiFont.current ?: if (LocalTokens.current.mono) FontFamily.Monospace else FontFamily.Default
 }
 
 private fun scheme(t: Tokens): ColorScheme {
@@ -150,10 +155,10 @@ private fun scheme(t: Tokens): ColorScheme {
 }
 
 @Composable
-fun AppTheme(tokens: Tokens, content: @Composable () -> Unit) {
+fun AppTheme(tokens: Tokens, font: FontFamily? = null, content: @Composable () -> Unit) {
     val r = RoundedCornerShape(tokens.radius)
     val shapes = Shapes(extraSmall = r, small = r, medium = r, large = r, extraLarge = r)
-    val family = if (tokens.mono) FontFamily.Monospace else FontFamily.Default
+    val family = font ?: if (tokens.mono) FontFamily.Monospace else FontFamily.Default
     val base = TextStyle(fontFamily = family)
     val typography = Typography(
         bodyLarge = base.copy(fontSize = 15.sp, lineHeight = 21.sp),
@@ -167,7 +172,7 @@ fun AppTheme(tokens: Tokens, content: @Composable () -> Unit) {
         titleSmall = base.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
         headlineSmall = base.copy(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
     )
-    CompositionLocalProvider(LocalTokens provides tokens, androidx.compose.material3.LocalContentColor provides tokens.text) {
+    CompositionLocalProvider(LocalTokens provides tokens, LocalUiFont provides font, androidx.compose.material3.LocalContentColor provides tokens.text) {
         MaterialTheme(colorScheme = scheme(tokens), shapes = shapes, typography = typography, content = content)
     }
 }

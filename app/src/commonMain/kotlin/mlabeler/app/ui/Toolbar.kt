@@ -71,6 +71,7 @@ object ToolLabels {
     val duplicate = L("Copy", "Копия")
     val lock = L("Together", "Вместе")
     val record = L("Record", "Запись")
+    val cut = L("Scissors", "Ножницы")
 
     fun group(id: String): L = when (id) {
         ToolbarGroups.FILES -> L("Files", "Файлы")
@@ -158,7 +159,7 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
     val lab = tb.labels
     val big = tb.big
     @Composable
-    fun B(icon: ImageVector, label: L, cmd: Command?, hint: String = cmd?.title?.invoke() ?: label(), enabled: Boolean = cmd?.enabled?.invoke(ed) ?: true, active: Boolean = false, onClick: () -> Unit = { cmd?.run(ed, app) }) =
+    fun B(icon: ImageVector, label: L, cmd: Command?, hint: String = cmd?.title?.invoke() ?: label(), enabled: Boolean = cmd?.enabled?.invoke(ed) ?: true, active: Boolean = false, onClick: () -> Unit = { ed.finishEditing(); cmd?.run(ed, app) }) =
         ToolBtn(icon, label(), hint, cmd?.keyLabel ?: "", enabled, active, lab, big, onClick)
 
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -194,6 +195,7 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
                 if (ed.mode == Mode.Oto) {
                     B(Icons.link, ToolLabels.lock, Commands.otoLock, active = s.edit.otoLockedDrag)
                 } else {
+                    B(Icons.split, ToolLabels.cut, Commands.toolCut, active = s.edit.tool == "cut")
                     B(Icons.ripple, ToolLabels.ripple, Commands.ripple, hint = S.ripple() + " — " + S.rippleHint(), active = s.edit.ripple)
                     B(Icons.link, ToolLabels.linked, Commands.linked, hint = S.linked() + " — " + S.linkedHint(), active = s.edit.linked)
                 }

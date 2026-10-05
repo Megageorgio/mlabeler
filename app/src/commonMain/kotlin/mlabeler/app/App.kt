@@ -35,7 +35,8 @@ fun App(app: AppState = rememberAppState()) {
         LocalDensity provides Density(base.density * scale, base.fontScale),
         mlabeler.app.ui.LocalKeepBarsFree provides (!Platform.isMobile || !st.fullscreen || st.avoidCutout),
     ) {
-        AppTheme(Themes.byId(app.settings.theme)) {
+        val font = androidx.compose.runtime.remember(st.font) { systemFontFamily(st.font) }
+        AppTheme(Themes.byId(app.settings.theme), font) {
             StorageAccess {
                 Box(Modifier.fillMaxSize()) {
                     val ed = app.editor

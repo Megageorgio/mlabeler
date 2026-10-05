@@ -254,4 +254,7 @@ object S {
     val chooseEnvironment = L("Choose a work environment", "Выберите рабочую среду")
     val chooseEnvironmentHint = L("It can be changed later in View → Work environment.", "Её можно сменить потом: Вид → Рабочая среда.")
     val overlayWaveFill = L("Filled waveform in the overlaid view", "Закрашенная волна в наложенном виде")
+    val overlayWaveFillAlpha = L("Fill opacity (100% = solid)", "Непрозрачность заливки (100% — сплошная)")
+    val resetToDefault = L("Back to default", "Вернуть по умолчанию")
+    val resetPage = L("Reset this page to defaults", "Сбросить эту страницу по умолчанию")
 }

@@ -57,3 +57,9 @@ expect class AudioIn() {
     fun stop()
     val isRecording: Boolean
 }
+
+/** Font families installed in the system (empty where they can't be listed). */
+expect fun systemFontNames(): List<String>
+
+/** A system font by family name, or null. */
+expect fun systemFontFamily(name: String): androidx.compose.ui.text.font.FontFamily?

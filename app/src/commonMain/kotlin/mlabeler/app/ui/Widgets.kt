@@ -180,7 +180,7 @@ fun Field(
         value = value,
         onValueChange = onChange,
         singleLine = true,
-        textStyle = textStyle.copy(color = c.text, fontFamily = if (c.mono) androidx.compose.ui.text.font.FontFamily.Monospace else textStyle.fontFamily),
+        textStyle = textStyle.copy(color = c.text, fontFamily = textStyle.fontFamily ?: T.font),
         cursorBrush = SolidColor(c.accent),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
@@ -315,6 +315,8 @@ fun ValueSlider(
     unit: String = "",
     factor: Float = 1f,
     decimals: Int = 0,
+    /** Default value: a reset button appears when the value differs from it. */
+    default: Float? = null,
     onChange: (Float) -> Unit,
 ) {
     val c = T.c
@@ -344,6 +346,15 @@ fun ValueSlider(
                 textStyle = TextStyle(fontSize = 13.sp),
             )
             if (unit.isNotEmpty()) Text(unit, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp).widthIn(min = 22.dp))
+            if (default != null) {
+                val differs = kotlin.math.abs(value - default) > 1e-4f
+                Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+                    if (differs) Tip(mlabeler.app.i18n.S.resetToDefault() + ": " + shown(default) + (if (unit.isNotEmpty()) " $unit" else "")) {
+                        Text("↺", color = c.accent, fontSize = 16.sp,
+                            modifier = Modifier.clip(RoundedCornerShape(c.radius)).clickable { editing = false; onChange(default) }.padding(horizontal = 4.dp))
+                    }
+                }
+            }
         }
         androidx.compose.material3.Slider(
             value = value.coerceIn(range), onValueChange = { editing = false; onChange(it) }, valueRange = range,

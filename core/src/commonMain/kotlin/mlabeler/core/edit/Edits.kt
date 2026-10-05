@@ -105,7 +105,9 @@ object Edits {
     }
 
     /** Removes an inner boundary, joining its two intervals. The left text is kept unless it is empty. */
-    fun removeBound(doc: LabelDoc, ref: BoundRef): LabelDoc {
+    /** Removes a boundary, joining its two intervals; the joined one keeps the left text, or the right with [keepRight]
+     *  (an empty text never wins over a non-empty one). */
+    fun removeBound(doc: LabelDoc, ref: BoundRef, keepRight: Boolean = false): LabelDoc {
         val tier = doc.tiers[ref.tier] as IntervalTier
         val b = ref.bound
         if (b <= 0 || b >= tier.bounds.size - 1) return doc
@@ -113,7 +115,7 @@ object Edits {
         val right = tier.texts[b]
         val nb = tier.bounds.toMutableList().apply { removeAt(b) }
         val nt = tier.texts.toMutableList().apply {
-            this[b - 1] = left.ifEmpty { right }
+            this[b - 1] = if (keepRight) right.ifEmpty { left } else left.ifEmpty { right }
             removeAt(b)
         }
         val nc = tier.confidence?.toMutableList()?.apply { removeAt(b) }
