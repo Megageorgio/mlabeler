@@ -115,6 +115,10 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
     val l = s.layout
     var overlayDetails by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
+        if (s.menuBar && !Platform.isMobile) {
+            MenuBar(app, ed)
+            Divider()
+        }
         TopBar(app, ed, wc, overlayDetails) { overlayDetails = !overlayDetails }
         Divider()
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -144,8 +148,10 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
                 }
             }
         }
-        Divider()
-        StatusBar(app, ed)
+        if (s.statusBar) {
+            Divider()
+            StatusBar(app, ed)
+        }
     }
 }
 
@@ -173,7 +179,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
     val item = ed.item
     // left: files and the title; middle: tools, scrolling when they do not fit; right: always visible
     Row(
-        Modifier.fillMaxWidth().height(if (Platform.isMobile) 44.dp else 46.dp).background(c.panel).padding(horizontal = 4.dp),
+        Modifier.fillMaxWidth().heightIn(min = if (Platform.isMobile) 44.dp else 46.dp).background(c.panel).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconBtn(Icons.panelLeft, S.toggleFiles(), Commands.files.keyLabel, active = s.layout.showFiles) { Commands.files.run(ed, app) }
@@ -195,45 +201,15 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
         }
         Spacer(Modifier.width(6.dp))
         Row(
-            Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.End),
+            horizontalArrangement = Arrangement.End,
         ) {
-            IconBtn(Icons.prevFile, S.prevFile(), Commands.prevFile.keyLabel) { ed.openRelative(-1) }
-            IconBtn(Icons.nextFile, S.nextFile(), Commands.nextFile.keyLabel) { ed.openRelative(1) }
-            Sep()
-            IconBtn(Icons.undo, S.undo(), Commands.undo.keyLabel, enabled = ed.canUndo) { ed.undo() }
-            IconBtn(Icons.redo, S.redo(), Commands.redo.keyLabel, enabled = ed.canRedo) { ed.redo() }
-            IconBtn(Icons.save, S.save(), Commands.save.keyLabel, enabled = ed.dirty || ed.item?.labelPath == null) { ed.save() }
-            Sep()
-            IconBtn(if (ed.playing) Icons.stop else Icons.play, if (ed.playing) S.stop() else S.play(), Commands.togglePlay.keyLabel) { ed.togglePlay() }
-            IconBtn(Icons.loop, S.loop(), Commands.loop.keyLabel, active = s.edit.loop) { Commands.loop.run(ed, app) }
-            SpeedButton(ed, s.edit.speed)
-            Sep()
-            if (ed.mode == Mode.Oto) {
-                IconBtn(Icons.magic, Commands.autoOto.title(), Commands.autoOto.keyLabel) { app.showAutoOto = true }
-                IconBtn(Icons.plus, Commands.otoAdd.title(), Commands.otoAdd.keyLabel) { ed.oto.add() }
-                IconBtn(Icons.merge, Commands.otoDuplicate.title(), Commands.otoDuplicate.keyLabel, enabled = ed.oto.current() != null) { ed.oto.duplicate() }
-                IconBtn(Icons.trash, Commands.otoDelete.title(), Commands.otoDelete.keyLabel, enabled = ed.oto.current() != null) { ed.oto.delete() }
-                IconBtn(Icons.link, Commands.otoLock.title(), Commands.otoLock.keyLabel, active = s.edit.otoLockedDrag) { Commands.otoLock.run(ed, app) }
-            } else {
-                IconBtn(Icons.split, S.split(), Commands.split.keyLabel) { ed.splitAt() }
-                IconBtn(Icons.merge, S.merge(), Commands.merge.keyLabel) { ed.mergeSelected() }
-                IconBtn(Icons.ripple, S.ripple() + " — " + S.rippleHint(), Commands.ripple.keyLabel, active = s.edit.ripple) { Commands.ripple.run(ed, app) }
-                IconBtn(Icons.link, S.linked() + " — " + S.linkedHint(), Commands.linked.keyLabel, active = s.edit.linked) { Commands.linked.run(ed, app) }
-            }
-            Sep()
-            IconBtn(Icons.layers, S.overlayShort(), Commands.overlay.keyLabel, active = s.layout.overlay) { Commands.overlay.run(ed, app) }
-            IconBtn(Icons.zoomOut, S.zoomOut(), Commands.zoomOut.keyLabel) { Commands.zoomOut.run(ed, app) }
-            IconBtn(Icons.zoomIn, S.zoomIn(), Commands.zoomIn.keyLabel) { Commands.zoomIn.run(ed, app) }
-            IconBtn(Icons.fit, S.zoomFit(), Commands.zoomFit.keyLabel) { ed.fitAll() }
-            Sep()
-            IconBtn(Icons.plugin, S.pluginsTitle(), Commands.plugins.keyLabel) { Commands.plugins.run(ed, app) }
-            IconBtn(Icons.command, S.commands(), Commands.palette.keyLabel) { app.showCommands = true }
+            ToolbarGroupsRow(app, ed)
         }
         Sep()
         IconBtn(Icons.settings, S.settings(), Commands.settings.keyLabel) { app.showSettings = true }
-        MainMenu(app, ed)
+        if (!s.menuBar || Platform.isMobile) MenuButton(app, ed)
         if (wc == WidthClass.Medium) {
             IconBtn(Icons.panelRight, S.toggleInspector(), active = overlayDetails) { toggleOverlay() }
         } else {
@@ -246,28 +222,6 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
 private fun Sep() {
     val c = T.c
     Box(Modifier.padding(horizontal = 4.dp).width(c.borderWidth).height(20.dp).background(c.border))
-}
-
-@Composable
-private fun MainMenu(app: AppState, ed: EditorState) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconBtn(Icons.menu, S.more()) { open = true }
-        DropdownMenu(open, { open = false }) {
-            DropdownMenuItem({ Text(S.openFolder()) }, onClick = { open = false; app.closeFolder() })
-            DropdownMenuItem({ Text(S.showInFolder()) }, onClick = { open = false; Platform.openInFileManager(ed.workspace.root) })
-            DropdownMenuItem({ Text(S.waveform()) }, onClick = { open = false; Commands.wave.run(ed, app) }, trailingIcon = { if (app.settings.layout.showWaveform) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.spectrogram()) }, onClick = { open = false; Commands.spectrogram.run(ed, app) }, trailingIcon = { if (app.settings.layout.showSpectrogram) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.pitch()) }, onClick = { open = false; Commands.pitchLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPitch) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.tiersOnTop()) }, onClick = { open = false; Commands.tiersOnTop.run(ed, app) }, trailingIcon = { if (app.settings.layout.tiersOnTop) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.power()) }, onClick = { open = false; Commands.powerLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPower) TextIcon("✓") })
-            DropdownMenuItem({ Text(Commands.workspace.title()) }, onClick = { open = false; app.showWorkspace = true })
-            DropdownMenuItem({ Text(Commands.record.title()) }, onClick = { open = false; app.openRecorder(ed.workspace.root) })
-            DropdownMenuItem({ Text(Commands.importLbp.title()) }, onClick = { open = false; app.showImport = true })
-            DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true }, trailingIcon = { TextIcon(Commands.settings.keyLabel) })
-            DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true }, trailingIcon = { TextIcon("F1") })
-        }
-    }
 }
 
 @Composable
@@ -373,24 +327,10 @@ private fun CompactEditor(app: AppState, ed: EditorState) {
 
 @Composable
 private fun CompactMenu(app: AppState, ed: EditorState, onDetails: () -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        IconBtn(Icons.more, S.more()) { open = true }
-        DropdownMenu(open, { open = false }) {
-            DropdownMenuItem({ Text(S.inspector()) }, onClick = { open = false; onDetails() })
-            DropdownMenuItem({ Text(S.ripple()) }, onClick = { open = false; Commands.ripple.run(ed, app) }, trailingIcon = { if (app.settings.edit.ripple) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.linked()) }, onClick = { open = false; Commands.linked.run(ed, app) }, trailingIcon = { if (app.settings.edit.linked) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.loop()) }, onClick = { open = false; Commands.loop.run(ed, app) }, trailingIcon = { if (app.settings.edit.loop) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.waveform()) }, onClick = { open = false; Commands.wave.run(ed, app) }, trailingIcon = { if (app.settings.layout.showWaveform) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.spectrogram()) }, onClick = { open = false; Commands.spectrogram.run(ed, app) }, trailingIcon = { if (app.settings.layout.showSpectrogram) TextIcon("✓") })
-            DropdownMenuItem({ Text(S.zoomFit()) }, onClick = { open = false; ed.fitAll() })
-            DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true })
-            DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true })
-            DropdownMenuItem({ Text(Commands.record.title()) }, onClick = { open = false; app.openRecorder(ed.workspace.root) })
-            DropdownMenuItem({ Text(S.pluginsTitle()) }, onClick = { open = false; Commands.plugins.run(ed, app) })
-            DropdownMenuItem({ Text(S.closeFolder()) }, onClick = { open = false; app.closeFolder() })
-        }
-    }
+    MenuButton(app, ed, extra = listOf(
+        MItem(S.inspector()) { onDetails() },
+        MItem(S.closeFolder()) { app.closeFolder() },
+    ))
 }
 
 /** Large targets for one-handed use. Boundary actions act on the selected boundary or the cursor. */
@@ -441,18 +381,6 @@ fun SidePanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Un
             }
         }
         if (tab == 0) FilesPanel(ed, Modifier.weight(1f).fillMaxWidth(), onOpened) else EntriesPanel(ed, Modifier.weight(1f).fillMaxWidth(), onOpened)
-    }
-}
-
-@Composable
-private fun SpeedButton(ed: EditorState, speed: Float) {
-    val c = T.c
-    Tip(Commands.speed.title() + "  ·  " + Commands.speed.keyLabel) {
-        Text(
-            if (speed >= 1f) "1×" else "$speed×".removePrefix("0"),
-            color = if (speed < 1f) c.accent else c.muted, fontSize = 12.sp,
-            modifier = Modifier.clip(RoundedCornerShape(c.radius)).clickable { ed.cycleSpeed() }.padding(horizontal = 6.dp, vertical = 6.dp),
-        )
     }
 }
 

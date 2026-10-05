@@ -176,8 +176,17 @@ object S {
     val toolkitToken = L("Token (for a toolkit on another computer)", "Токен (для тулкита на другом компьютере)")
     val toolkitCheck = L("Check", "Проверить")
     val toolkitOk = L("Toolkit answers", "Тулкит отвечает")
-    val toolkitHint = L("Autolabel uses mVocalToolkit, which runs separately (for example inside bakalabel or with `mvt serve`).",
-        "Авторазметка работает через mVocalToolkit, он запускается отдельно (например, внутри bakalabel или командой `mvt serve`).")
+    val toolkitHint = L("Autolabel and the aligner in auto-oto use mVocalToolkit. On a computer mLabeler installs and starts it by itself; a phone connects to a computer where it runs.",
+        "Авторазметка и выравниватель в авто-ото работают через mVocalToolkit. На компьютере mLabeler сам его установит и запустит; телефон подключается к компьютеру, где он работает.")
+    val toolkitAutoStart = L("Start it when needed (and stop on exit)", "Запускать, когда нужен (и закрывать при выходе)")
+    val toolkitShare = L("Let phones connect (local network)", "Разрешить подключение с телефона (локальная сеть)")
+    val toolkitShareHint = L("On the phone: Settings → Autolabel, enter one of these addresses and the token.",
+        "На телефоне: Настройки → Авторазметка, введите один из этих адресов и токен.")
+    val toolkitShareOwn = L("The running toolkit wasn't started here; restart it from here to open it to the network.",
+        "Работающий тулкит запущен не отсюда; перезапустите его отсюда, чтобы открыть доступ по сети.")
+    val toolkitMvtPath = L("The mvt command (empty = find it)", "Команда mvt (пусто — найти самому)")
+    val toolkitSource = L("Install from (URL or folder)", "Устанавливать из (ссылка или папка)")
+    val toolkitReinstall = L("Install / update", "Установить / обновить")
     val reloaded = L("Labels changed in another program and were reloaded", "Разметка изменилась в другой программе и перечитана")
     val changedOutside = L("Labels changed in another program. Saving here will overwrite them.",
         "Разметку изменили в другой программе. Сохранение здесь их перезапишет.")
@@ -224,4 +233,10 @@ object S {
     val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")
     val aboutText = L("Editor for singing voice labels.", "Редактор разметки певческого голоса.")
+    val hzShort = L("Hz", "Гц")
+    val secondsShort = L("s", "с")
+    val overlayDim = L("Darken the spectrogram under labels", "Затемнять спектрограмму под разметкой")
+    val setupHint = L("Two starting points. Either one can be changed bit by bit below and in the View menu.",
+        "Две отправные точки. Любую можно потом подстроить ниже и в меню «Вид».")
+    val toolbarHint = L("Button groups on the toolbar and their order:", "Группы кнопок на панели и их порядок:")
 }

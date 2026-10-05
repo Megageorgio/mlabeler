@@ -26,7 +26,6 @@ import mlabeler.app.i18n.L
 import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.theme.T
-import mlabeler.app.toolkit.ToolkitClient
 import mlabeler.app.toolkit.ToolkitLanguage
 import mlabeler.core.io.Paths
 import mlabeler.core.oto.AutoOtoSettings
@@ -71,11 +70,8 @@ fun AutoOtoDialog(app: AppState) {
     var model by remember { mutableStateOf(app.settings.toolkit.lastModel) }
     var lang by remember { mutableStateOf(app.settings.toolkit.lastLanguage) }
     var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(useAligner) {
-        if (useAligner && langs == null) {
-            try { langs = ToolkitClient(app.settings.toolkit.url, app.settings.toolkit.token).languages("align") } catch (e: Exception) { error = e.message }
-        }
-    }
+    val loaded = rememberToolkitModels(app, "align", enabled = useAligner)
+    LaunchedEffect(loaded) { langs = loaded.first; error = loaded.second }
     Overlay({ close() }, 620) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
             Text(title(), color = c.text, fontSize = 17.sp)
@@ -97,6 +93,7 @@ fun AutoOtoDialog(app: AppState) {
                 Chip(aligner(), useAligner) { useAligner = true }
             }
             if (useAligner) {
+                Column(Modifier.padding(vertical = 8.dp)) { ToolkitStatus(app) }
                 when {
                     error != null -> Text(error ?: "", color = c.danger, fontSize = 12.sp)
                     langs == null -> Text(S.loading(), color = c.muted, fontSize = 12.sp)
@@ -113,10 +110,8 @@ fun AutoOtoDialog(app: AppState) {
                 Text(bpmT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
                 Field(bpm, { bpm = it }, Modifier.width(120.dp))
             }
-            SectionTitle(leftT() + ": ${left.roundToInt()}")
-            Slider(left, { left = it }, valueRange = 10f..200f, colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent))
-            SectionTitle(fixedT() + ": ${fixed.roundToInt()}")
-            Slider(fixed, { fixed = it }, valueRange = 10f..200f, colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent))
+            ValueSlider(leftT(), left, 10f..200f, S.msUnit()) { left = it }
+            ValueSlider(fixedT(), fixed, 10f..200f, S.msUnit()) { fixed = it }
             SectionTitle(existing())
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(replaceT(), replace) { replace = true }

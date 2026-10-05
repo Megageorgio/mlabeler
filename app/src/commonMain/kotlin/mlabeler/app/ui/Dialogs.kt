@@ -133,11 +133,12 @@ fun CommandPalette(app: AppState) {
     }
 }
 
-private enum class Section { General, View, Spectrogram, Editing, Checks, Toolkit, Keys, About }
+private enum class Section { General, Interface, View, Spectrogram, Editing, Checks, Toolkit, Keys, About }
 
 @Composable
 private fun sectionTitle(s: Section) = when (s) {
     Section.General -> S.general()
+    Section.Interface -> MenuTitles.interfaceSet()
     Section.View -> S.view()
     Section.Spectrogram -> S.spectrogramSection()
     Section.Editing -> S.editing()
@@ -151,7 +152,10 @@ private fun sectionTitle(s: Section) = when (s) {
 @Composable
 fun SettingsDialog(app: AppState) {
     val c = T.c
-    var section by remember { mutableStateOf(Section.General) }
+    var section by remember {
+        mutableStateOf(Section.entries.firstOrNull { it.name.equals(app.settingsPage, ignoreCase = true) } ?: Section.General)
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { app.settingsPage = "" } }
     Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(S.settings(), color = c.text, fontSize = 18.sp, modifier = Modifier.weight(1f))
@@ -213,7 +217,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 SectionTitle(S.files())
                 SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
-                SliderRow(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, "${s.edit.autosaveSeconds}") { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
+                ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
             }
             Section.View -> {
                 SectionTitle(S.theme())
@@ -230,7 +234,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     }
                     Btn(S.themeReload()) { mlabeler.app.theme.ThemeFiles.load(mlabeler.app.Platform.dataDir()) }
                 }
-                SliderRow(S.interfaceScale(), s.scale, 0.8f..1.5f, "${(s.scale * 100).roundToInt()}%") { v -> app.update { it.copy(scale = (v * 20).roundToInt() / 20f) } }
+                ValueSlider(S.interfaceScale(), s.scale, 0.7f..2f, "%", factor = 100f) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
                 SectionTitle(S.view())
                 SectionTitle(S.layoutPresets())
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -250,6 +254,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 SectionTitle(S.view())
                 SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
+                if (s.layout.overlay) ValueSlider(S.overlayDim(), s.layout.overlayDim, 0f..0.8f, "%", factor = 100f) { v -> app.update { it.copy(layout = it.layout.copy(overlayDim = v)) } }
                 SwitchRow(S.tiersOnTop(), s.layout.tiersOnTop) { v -> app.update { it.copy(layout = it.layout.copy(tiersOnTop = v)) } }
                 SwitchRow(S.waveform(), s.layout.showWaveform) { v -> app.update { it.copy(layout = it.layout.copy(showWaveform = v)) } }
                 SwitchRow(S.spectrogram(), s.layout.showSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(showSpectrogram = v)) } }
@@ -265,29 +270,29 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     Chip(S.theme(), s.view.palette.isEmpty()) { app.update { it.copy(view = it.view.copy(palette = "")) } }
                     for (p in Themes.palettes.keys) Chip(p, s.view.palette == p) { app.update { it.copy(view = it.view.copy(palette = p)) } }
                 }
-                SliderRow(S.brightness(), s.view.brightness, -0.5f..0.5f, "${(s.view.brightness * 100).roundToInt()}") { v -> app.update { it.copy(view = it.view.copy(brightness = v)) } }
-                SliderRow(S.contrast(), s.view.contrast, 0.5f..3f, "${(s.view.contrast * 100).roundToInt()}%") { v -> app.update { it.copy(view = it.view.copy(contrast = v)) } }
-                SliderRow(S.windowMs(), s.view.windowMs, 5f..80f, "${s.view.windowMs.roundToInt()}") { v -> app.update { it.copy(view = it.view.copy(windowMs = v.roundToInt().toFloat())) } }
-                SliderRow(S.hopMs(), s.view.hopMs, 0f..20f, if (s.view.hopMs <= 0f) "auto" else "${(s.view.hopMs * 10).roundToInt() / 10f}") { v -> app.update { it.copy(view = it.view.copy(hopMs = (v * 2).roundToInt() / 2f)) } }
-                SliderRow(S.bands(), s.view.bands.toFloat(), 64f..384f, "${s.view.bands}") { v -> app.update { it.copy(view = it.view.copy(bands = (v / 32).roundToInt() * 32)) } }
-                SliderRow(S.dbRange(), s.view.minDb, -140f..-40f, "${s.view.minDb.roundToInt()} … ${s.view.maxDb.roundToInt()} dB") { v -> app.update { it.copy(view = it.view.copy(minDb = v.roundToInt().toFloat())) } }
-                SliderRow(S.dbTop(), s.view.maxDb, -40f..10f, "${s.view.maxDb.roundToInt()} dB") { v -> app.update { it.copy(view = it.view.copy(maxDb = v.roundToInt().toFloat())) } }
-                SliderRow(S.maxFrequency(), s.view.maxFreq, 2000f..16000f, "${s.view.maxFreq.roundToInt()}") { v -> app.update { it.copy(view = it.view.copy(maxFreq = (v / 500).roundToInt() * 500f)) } }
+                ValueSlider(S.brightness(), s.view.brightness, -0.5f..0.5f, factor = 100f) { v -> app.update { it.copy(view = it.view.copy(brightness = v)) } }
+                ValueSlider(S.contrast(), s.view.contrast, 0.5f..3f, "%", factor = 100f) { v -> app.update { it.copy(view = it.view.copy(contrast = v)) } }
+                ValueSlider(S.windowMs(), s.view.windowMs, 5f..80f, S.msUnit()) { v -> app.update { it.copy(view = it.view.copy(windowMs = v.roundToInt().toFloat())) } }
+                ValueSlider(S.hopMs(), s.view.hopMs, 0f..20f, S.msUnit(), decimals = 1) { v -> app.update { it.copy(view = it.view.copy(hopMs = (v * 2).roundToInt() / 2f)) } }
+                ValueSlider(S.bands(), s.view.bands.toFloat(), 64f..384f) { v -> app.update { it.copy(view = it.view.copy(bands = (v / 32).roundToInt() * 32)) } }
+                ValueSlider(S.dbRange(), s.view.minDb, -140f..-40f, "dB") { v -> app.update { it.copy(view = it.view.copy(minDb = v.roundToInt().toFloat())) } }
+                ValueSlider(S.dbTop(), s.view.maxDb, -40f..10f, "dB") { v -> app.update { it.copy(view = it.view.copy(maxDb = v.roundToInt().toFloat())) } }
+                ValueSlider(S.maxFrequency(), s.view.maxFreq, 1000f..24000f, S.hzShort()) { v -> app.update { it.copy(view = it.view.copy(maxFreq = v.roundToInt().toFloat())) } }
             }
             Section.Editing -> {
                 SectionTitle(S.editing())
-                SliderRow(S.nudgeStep(), s.edit.nudgeMs, 1f..50f, "${s.edit.nudgeMs.roundToInt()}") { v -> app.update { it.copy(edit = it.edit.copy(nudgeMs = v.roundToInt().toFloat())) } }
-                SliderRow(S.minInterval(), s.edit.minIntervalMs, 0f..20f, "${s.edit.minIntervalMs.roundToInt()}") { v -> app.update { it.copy(edit = it.edit.copy(minIntervalMs = v.roundToInt().toFloat())) } }
+                ValueSlider(S.nudgeStep(), s.edit.nudgeMs, 1f..50f, S.msUnit()) { v -> app.update { it.copy(edit = it.edit.copy(nudgeMs = v.roundToInt().toFloat())) } }
+                ValueSlider(S.minInterval(), s.edit.minIntervalMs, 0f..20f, S.msUnit()) { v -> app.update { it.copy(edit = it.edit.copy(minIntervalMs = v.roundToInt().toFloat())) } }
                 SwitchRow(S.ripple() + " — " + S.rippleHint(), s.edit.ripple) { v -> app.update { it.copy(edit = it.edit.copy(ripple = v)) } }
                 SwitchRow(S.linked() + " — " + S.linkedHint(), s.edit.linked) { v -> app.update { it.copy(edit = it.edit.copy(linked = v)) } }
                 SwitchRow(S.loop(), s.edit.loop) { v -> app.update { it.copy(edit = it.edit.copy(loop = v)) } }
-                SliderRow(S.speedSetting(), s.edit.speed, 0.25f..1f, "${s.edit.speed}×") { v -> app.update { it.copy(edit = it.edit.copy(speed = (v * 20).roundToInt() / 20f)) } }
+                ValueSlider(S.speedSetting(), s.edit.speed, 0.1f..1f, "×", decimals = 2) { v -> app.update { it.copy(edit = it.edit.copy(speed = (v * 100).roundToInt() / 100f)) } }
                 SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
                 SwitchRow(S.otoLocked(), s.edit.otoLockedDrag) { v -> app.update { it.copy(edit = it.edit.copy(otoLockedDrag = v)) } }
             }
             Section.Checks -> {
                 SectionTitle(S.checks())
-                SliderRow(S.shortThreshold(), s.checks.minDurationMs.toFloat(), 0f..150f, "${s.checks.minDurationMs.roundToInt()}") { v ->
+                ValueSlider(S.shortThreshold(), s.checks.minDurationMs.toFloat(), 0f..150f, S.msUnit()) { v ->
                     app.update { it.copy(checks = it.checks.copy(minDurationMs = v.roundToInt().toDouble())) }
                 }
                 var phonemes by remember { mutableStateOf(s.checks.phonemeSet.joinToString(" ")) }
@@ -297,29 +302,8 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     app.update { it.copy(checks = it.checks.copy(phonemeSet = v.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }.toSet())) }
                 }, Modifier.fillMaxWidth())
             }
-            Section.Toolkit -> {
-                SectionTitle(S.toolkit())
-                Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp)
-                var url by remember { mutableStateOf(s.toolkit.url) }
-                var token by remember { mutableStateOf(s.toolkit.token) }
-                var check by remember { mutableStateOf("") }
-                Text(S.toolkitUrl(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-                Field(url, { url = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(url = it.trim())) } }, Modifier.fillMaxWidth())
-                Text(S.toolkitToken(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-                Field(token, { token = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(token = it.trim())) } }, Modifier.fillMaxWidth())
-                val scope = androidx.compose.runtime.rememberCoroutineScope()
-                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Btn(S.toolkitCheck()) {
-                        check = "…"
-                        scope.launch {
-                            check = try {
-                                mlabeler.app.toolkit.ToolkitClient(url, token).health(); S.toolkitOk()
-                            } catch (e: Exception) { e.message ?: "error" }
-                        }
-                    }
-                    Text(check, color = c.muted, fontSize = 12.sp)
-                }
-            }
+            Section.Toolkit -> ToolkitPage(app)
+            Section.Interface -> InterfacePage(app)
             Section.Keys -> KeymapPage(app)
             Section.About -> {
                 SectionTitle(S.about())
@@ -327,22 +311,6 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
-    }
-}
-
-@Composable
-private fun SliderRow(title: String, value: Float, range: ClosedFloatingPointRange<Float>, label: String, onChange: (Float) -> Unit) {
-    val c = T.c
-    Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
-        Row {
-            Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            Text(label, color = c.muted, fontSize = 13.sp)
-        }
-        Slider(
-            value = value.coerceIn(range), onValueChange = onChange, valueRange = range,
-            colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.border),
-            modifier = Modifier.height(32.dp),
-        )
     }
 }
 
@@ -417,4 +385,104 @@ private fun KeymapPage(app: AppState) {
             }
         }
     }
+}
+
+@Composable
+private fun ToolkitPage(app: AppState) {
+    val c = T.c
+    val s = app.settings
+    val tk = app.toolkit
+    SectionTitle(S.toolkit())
+    Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+    ToolkitStatus(app)
+    var url by remember { mutableStateOf(s.toolkit.url) }
+    var token by remember { mutableStateOf(s.toolkit.token) }
+    Text(S.toolkitUrl(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
+    Field(url, { url = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(url = it.trim())) } }, Modifier.fillMaxWidth())
+    Text(S.toolkitToken(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+    Field(token, { token = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(token = it.trim())) } }, Modifier.fillMaxWidth())
+    if (mlabeler.app.toolkit.LocalToolkit.supported) {
+        SwitchRow(S.toolkitAutoStart(), s.toolkit.autoStart) { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoStart = v)) } }
+        SwitchRow(S.toolkitShare(), s.toolkit.shareOnNetwork) { v ->
+            app.update { it.copy(toolkit = it.toolkit.copy(shareOnNetwork = v)) }
+            if (tk.ownProcess || (v && tk.status != mlabeler.app.toolkit.ToolkitManager.Status.Ready)) tk.restart()
+        }
+        if (s.toolkit.shareOnNetwork) {
+            val ips = remember { mlabeler.app.toolkit.LocalToolkit.lanAddresses() }
+            Column(Modifier.fillMaxWidth().padding(top = 4.dp).background(c.panelAlt).padding(10.dp)) {
+                Text(S.toolkitShareHint(), color = c.muted, fontSize = 12.sp)
+                for (ip in ips.ifEmpty { listOf("?") }) {
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text("http://$ip:${tk.port}", color = c.text, fontSize = 15.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                }
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(S.toolkitToken() + ": " + tk.networkToken.ifEmpty { "…" }, color = c.text, fontSize = 13.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, modifier = Modifier.padding(top = 4.dp))
+                }
+                if (!tk.ownProcess) Text(S.toolkitShareOwn(), color = c.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        var more by remember { mutableStateOf(false) }
+        Row(Modifier.padding(top = 10.dp)) { Chip(S.more(), more) { more = !more } }
+        if (more) {
+            var mvt by remember { mutableStateOf(s.toolkit.mvtPath) }
+            var src by remember { mutableStateOf(s.toolkit.installSource) }
+            Text(S.toolkitMvtPath(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+            Field(mvt, { mvt = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(mvtPath = it.trim())) } }, Modifier.fillMaxWidth(),
+                placeholder = mlabeler.app.toolkit.LocalToolkit.findMvt("") ?: "mvt")
+            Text(S.toolkitSource(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+            Field(src, { src = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(installSource = it.trim())) } }, Modifier.fillMaxWidth())
+            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Btn(S.toolkitReinstall(), enabled = !tk.installing) { tk.stop(); tk.install() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InterfacePage(app: AppState) {
+    val c = T.c
+    val s = app.settings
+    SectionTitle(MenuTitles.interfaceSet())
+    Text(S.setupHint(), color = c.muted, fontSize = 12.sp)
+    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Btn(MenuTitles.simple()) { app.update { mlabeler.app.state.Setups.simple(it) } }
+        Btn(MenuTitles.everything()) { app.update { mlabeler.app.state.Setups.everything(it) } }
+    }
+    SectionTitle(MenuTitles.panels())
+    if (!mlabeler.app.Platform.isMobile) SwitchRow(MenuTitles.menuBar(), s.menuBar) { v -> app.update { it.copy(menuBar = v) } }
+    SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }
+    SwitchRow(MenuTitles.filesPanel(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
+    SwitchRow(MenuTitles.detailsPanel(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
+    SectionTitle(MenuTitles.toolbar())
+    SwitchRow(MenuTitles.buttonLabels(), s.toolbar.labels) { v -> app.update { it.copy(toolbar = it.toolbar.copy(labels = v)) } }
+    SwitchRow(MenuTitles.bigButtons(), s.toolbar.big) { v -> app.update { it.copy(toolbar = it.toolbar.copy(big = v)) } }
+    Text(S.toolbarHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+    // shown groups first, in their order, then the hidden ones
+    val shown = s.toolbar.groups
+    val order = shown + mlabeler.app.state.ToolbarGroups.all.filter { it !in shown }
+    for (g in order) {
+        val on = g in shown
+        val i = shown.indexOf(g)
+        Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Checkbox(on, { v ->
+                app.update { st -> st.copy(toolbar = st.toolbar.copy(groups = if (v) st.toolbar.groups + g else st.toolbar.groups - g)) }
+            }, colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.muted, checkmarkColor = c.onAccent))
+            Text(ToolLabels.group(g)(), color = if (on) c.text else c.muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            if (on) {
+                IconBtn(Icons.up, S.moveUp(), enabled = i > 0, size = 28.dp) {
+                    app.update { st -> st.copy(toolbar = st.toolbar.copy(groups = st.toolbar.groups.toMutableList().also { swapAt(it, i, i - 1) })) }
+                }
+                IconBtn(Icons.down, S.moveDown(), enabled = i < shown.size - 1, size = 28.dp) {
+                    app.update { st -> st.copy(toolbar = st.toolbar.copy(groups = st.toolbar.groups.toMutableList().also { swapAt(it, i, i + 1) })) }
+                }
+            }
+        }
+    }
+}
+
+private fun swapAt(l: MutableList<String>, a: Int, b: Int) {
+    if (a !in l.indices || b !in l.indices) return
+    val t = l[a]; l[a] = l[b]; l[b] = t
 }

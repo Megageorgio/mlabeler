@@ -98,6 +98,21 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return call("POST", "/align", req).jsonObject["id"]!!.jsonPrimitive.content
     }
 
+    /** Starts phoneme recognition without lyrics (WFL-ASR models); returns the job id. */
+    suspend fun segment(fileId: String, model: String): String {
+        val req = buildJsonObject {
+            putJsonObject("input") {
+                put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) })
+            }
+            put("model", model)
+            putJsonObject("output") {
+                put("formats", JsonArray(emptyList()))
+                put("return_labels", true)
+            }
+        }
+        return call("POST", "/segment", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
     /** Waits for a job; [onProgress] gets 0..1 and the stage. Returns the result object. */
     suspend fun await(jobId: String, onProgress: (Double, String) -> Unit): JsonObject {
         while (true) {

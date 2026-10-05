@@ -31,6 +31,8 @@ data class LayoutSettings(
     val overlay: Boolean = false,
     /** Label tiers above the audio instead of below. */
     val tiersOnTop: Boolean = false,
+    /** How much the spectrogram is darkened in the overlaid view so labels and the waveform stay readable (0..0.8). */
+    val overlayDim: Float = 0.35f,
 )
 
 @Serializable
@@ -72,7 +74,62 @@ data class ToolkitSettings(
     val token: String = "",
     val lastModel: String = "",
     val lastLanguage: String = "",
+    /** Model for recognising phonemes without lyrics. */
+    val lastSegmentModel: String = "",
+    /** Start the toolkit on this computer when it's needed and not running. */
+    val autoStart: Boolean = true,
+    /** `mvt` command or the folder it's in; empty = look in the usual places. */
+    val mvtPath: String = "",
+    /** What `uv tool install` installs: a git/zip URL or a local folder. */
+    val installSource: String = ToolkitSettings.DEFAULT_SOURCE,
+    /** Let phones and other computers in the local network use the toolkit started here. */
+    val shareOnNetwork: Boolean = false,
+) {
+    companion object {
+        const val DEFAULT_SOURCE = "https://github.com/Megageorgio/mVocalToolkit/archive/refs/heads/main.zip"
+    }
+}
+
+@Serializable
+data class ToolbarSettings(
+    /** Button groups shown, in order. */
+    val groups: List<String> = ToolbarGroups.simple,
+    /** Text under the buttons. */
+    val labels: Boolean = true,
+    val big: Boolean = true,
 )
+
+object ToolbarGroups {
+    const val FILES = "files"
+    const val HISTORY = "history"
+    const val PLAY = "play"
+    const val EDIT = "edit"
+    const val MODES = "modes"
+    const val VIEW = "view"
+    const val ZOOM = "zoom"
+    const val AUTO = "auto"
+    const val MARKS = "marks"
+    const val EXTRAS = "extras"
+    val all = listOf(FILES, HISTORY, PLAY, EDIT, MODES, AUTO, MARKS, VIEW, ZOOM, EXTRAS)
+    val simple = listOf(FILES, HISTORY, PLAY, EDIT, AUTO)
+}
+
+/** The two starting points offered on first start; everything can be changed later. */
+object Setups {
+    fun simple(s: AppSettings) = s.copy(
+        setupDone = true,
+        menuBar = !Platform.isMobile,
+        toolbar = ToolbarSettings(ToolbarGroups.simple, labels = true, big = true),
+        layout = s.layout.copy(showInspector = false, showPitch = false, showPower = false, overlay = false, showSpectrogram = true, showFiles = true),
+    )
+
+    fun everything(s: AppSettings) = s.copy(
+        setupDone = true,
+        menuBar = !Platform.isMobile,
+        toolbar = ToolbarSettings(ToolbarGroups.all, labels = false, big = false),
+        layout = s.layout.copy(showInspector = true, showPitch = true, showFiles = true),
+    )
+}
 
 @Serializable
 data class AppSettings(
@@ -103,6 +160,12 @@ data class AppSettings(
     val scaleChosen: Boolean = false,
     /** Plugins on the quick slots (Ctrl+1 … Ctrl+4). */
     val pluginSlots: List<String> = emptyList(),
+    /** File / Edit / View … menus at the top (computers). */
+    val menuBar: Boolean = !Platform.isMobile,
+    val statusBar: Boolean = true,
+    val toolbar: ToolbarSettings = ToolbarSettings(),
+    /** The first-start choice (simple or everything) was made. */
+    val setupDone: Boolean = false,
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")

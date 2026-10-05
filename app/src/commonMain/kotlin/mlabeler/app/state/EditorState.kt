@@ -240,20 +240,21 @@ class EditorState(
      * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown
      * as a comparison tier named after the model.
      */
-    fun autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean) {
+    fun autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean, recognize: Boolean = false) {
         val a = audio ?: return
         val it = item ?: return
-        val t = app.settings.toolkit
         toolkitJob?.cancel()
         toolkitJob = scope.launch {
-            val client = mlabeler.app.toolkit.ToolkitClient(t.url, t.token)
+            val client = app.toolkit.client()
             try {
+                toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
+                if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
                 toolkitBusy = S.uploading()
                 val s0 = (from * a.sampleRate).toInt().coerceIn(0, a.samples.size)
                 val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
                 val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
                 val fileId = client.upload(it.name + "_part.wav", wav)
-                val job = client.align(fileId, model, language, text, phonemes)
+                val job = if (recognize) client.segment(fileId, model) else client.align(fileId, model, language, text, phonemes)
                 val result = client.await(job) { p, stage -> toolkitBusy = "${(p * 100).toInt()}%  $stage" }
                 val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate)
                 if (replace) {

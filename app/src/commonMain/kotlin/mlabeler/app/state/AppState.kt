@@ -24,6 +24,8 @@ class AppState(private val scope: CoroutineScope) {
     var message by mutableStateOf<Message?>(null)
         private set
     var showSettings by mutableStateOf(false)
+    /** Settings page to open with ("keys", "about", …); empty = the first. */
+    var settingsPage by mutableStateOf("")
     var showCommands by mutableStateOf(false)
     var showBatchRename by mutableStateOf(false)
     var showWorkspace by mutableStateOf(false)
@@ -32,6 +34,7 @@ class AppState(private val scope: CoroutineScope) {
     var showAutoOto by mutableStateOf(false)
     var showPlugins by mutableStateOf(false)
     var showImport by mutableStateOf(false)
+    val toolkit = mlabeler.app.toolkit.ToolkitManager(this, scope)
     var plugins by mutableStateOf<List<mlabeler.app.plugins.Plugin>>(emptyList())
         private set
 
@@ -151,5 +154,6 @@ class AppState(private val scope: CoroutineScope) {
 
     fun close() {
         editor?.saveAllOnClose()
+        toolkit.stop()
     }
 }

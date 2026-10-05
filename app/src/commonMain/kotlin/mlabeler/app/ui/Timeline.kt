@@ -123,6 +123,7 @@ private class Geom(
     val powerBottom: Float = 0f,
     val overlay: Boolean = false,
     val tiersOnTop: Boolean = false,
+    val dim: Float = 0f,
 ) {
     val tiersBottom: Float get() = tiersTop + tierH * tierCount
     val audioTop: Float get() = min(waveTop, specTop)
@@ -191,7 +192,7 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val pitchTop = audioTop + mainH
     val powerTop = pitchTop + pitchH
     return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, tiersTop, tierHeight, tiers,
-        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop)
+        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f))
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -663,6 +664,10 @@ private fun DrawScope.drawTimeline(
                 filterQuality = FilterQuality.Low,
             )
         }
+        if (g.overlay) {
+            val dim = g.dim
+            if (dim > 0f) drawRect(c.bg.copy(alpha = dim), Offset(0f, g.specTop), Size(w, g.specBottom - g.specTop))
+        }
     }
 
     // waveform
@@ -686,7 +691,27 @@ private fun DrawScope.drawTimeline(
                     val yy = mid - audio.samples[s] * amp
                     if (first) { path.moveTo(xx, yy); first = false } else path.lineTo(xx, yy)
                 }
-                drawPath(path, if (g.overlay) c.wave.copy(alpha = 0.75f) else c.wave, style = Stroke(1.2f * px))
+                if (g.overlay) drawPath(path, Color.Black.copy(alpha = 0.55f), style = Stroke(3f * px))
+                drawPath(path, c.wave, style = Stroke(1.2f * px))
+            } else if (peaks != null && g.overlay) {
+                // over the spectrogram: only the outline, so the picture under it stays visible
+                val cols = min(w.toInt(), max(0, endX.toInt() + 1))
+                val upper = Path()
+                val lower = Path()
+                var started = false
+                for (col in max(0, x(0.0).toInt())..cols) {
+                    val a = ((v0 + col / pps) * sr).toInt()
+                    val b = ((v0 + (col + 1) / pps) * sr).toInt()
+                    if (b <= 0 || a >= audio.samples.size) continue
+                    val (lo, hi) = peaks.range(audio.samples, a, max(b, a + 1))
+                    val xx = col + 0.5f
+                    if (!started) { upper.moveTo(xx, mid - hi * amp); lower.moveTo(xx, mid - lo * amp); started = true }
+                    else { upper.lineTo(xx, mid - hi * amp); lower.lineTo(xx, mid - lo * amp) }
+                }
+                for (pth in listOf(upper, lower)) {
+                    drawPath(pth, Color.Black.copy(alpha = 0.55f), style = Stroke(3.2f * px))
+                    drawPath(pth, c.wave, style = Stroke(1.4f * px))
+                }
             } else if (peaks != null) {
                 val cols = min(w.toInt(), max(0, endX.toInt() + 1))
                 for (col in max(0, x(0.0).toInt())..cols) {
@@ -697,7 +722,7 @@ private fun DrawScope.drawTimeline(
                     path.moveTo(col + 0.5f, mid - hi * amp)
                     path.lineTo(col + 0.5f, mid - lo * amp + 0.5f)
                 }
-                drawPath(path, if (g.overlay) c.wave.copy(alpha = 0.38f) else c.wave, style = Stroke(px))
+                drawPath(path, c.wave, style = Stroke(px))
             }
         }
     }
@@ -734,7 +759,10 @@ private fun DrawScope.drawTimeline(
             if (bt > tEnd) break
             val xx = x(bt)
             val selected = sel is Selection.Bound && sel.ref.tier == ed.guideTier && sel.ref.bound == b
-            drawLine(
+            if (g.overlay) {
+                drawLine(Color.Black.copy(alpha = 0.6f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom), (if (selected) 5 else 3) * px)
+                drawLine(if (selected) c.boundSelected else c.bound, Offset(xx, g.audioTop), Offset(xx, g.audioBottom), if (selected) 2.5f * px else 1.3f * px)
+            } else drawLine(
                 if (selected) c.boundSelected else c.bound.copy(alpha = 0.45f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom),
                 if (selected) 2 * px else px,
                 pathEffect = if (selected) null else PathEffect.dashPathEffect(floatArrayOf(4 * px, 3 * px)),
@@ -753,8 +781,8 @@ private fun DrawScope.drawTimeline(
         val bottom = top + g.tierH
         if (top >= g.height) break
         val active = k == ed.activeTier
-        drawRect((if (active) c.panelAlt else c.panel).copy(alpha = if (g.overlay) 0.62f else 1f), Offset(0f, top), Size(w, g.tierH))
-        drawLine(c.border, Offset(0f, top), Offset(w, top), px)
+        drawRect((if (active) c.panelAlt else c.panel).copy(alpha = if (g.overlay) 0.94f else 1f), Offset(0f, top), Size(w, g.tierH))
+        drawLine(if (g.overlay) c.accent.copy(alpha = 0.6f) else c.border, Offset(0f, top), Offset(w, top), px)
         val tierColor = c.tierColors[k % c.tierColors.size]
         drawRect(tierColor, Offset(0f, top), Size(3 * px, g.tierH))
         clipRect(0f, top, w, bottom) {
@@ -1088,7 +1116,7 @@ private fun DrawScope.drawReferences(
         val top = g.tierTop(k)
         val bottom = top + g.tierH
         if (top >= size.height) break
-        drawRect(c.bg.copy(alpha = if (g.overlay) 0.62f else 1f), Offset(0f, top), Size(w, g.tierH))
+        drawRect(c.bg.copy(alpha = if (g.overlay) 0.94f else 1f), Offset(0f, top), Size(w, g.tierH))
         drawLine(c.border, Offset(0f, top), Offset(w, top), px)
         val main = mlabeler.core.check.Compare.counterpart(doc, ref)
         val deltas = main?.let { mlabeler.core.check.Compare.boundDeltas(it, ref) }

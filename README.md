@@ -29,11 +29,20 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
 - Pitch (over the spectrogram or in its own lane) and loudness lanes.
 - Compare: labels of the same files from other folders shown under yours, boundaries coloured by distance,
   statistics, take them over in one step.
-- Autolabel a selected part with mVocalToolkit (Ctrl+Shift+A): replace it, or run several models and compare.
+- Autolabel with mVocalToolkit (Ctrl+Shift+A): a selected part or the whole recording, by lyrics/phonemes
+  (SOFA, HubertFA) or without lyrics (WFL); put the result into the labels or show it next to them to compare models.
+  On a computer mLabeler installs the toolkit (with uv) and starts it when needed, then stops it on exit;
+  a toolkit that's already running is used as is. Phones and tablets connect to a computer: turn on
+  "Let phones connect" there (Settings → Autolabel) and enter the address and token it shows.
 - Slow playback with pitch kept (Y: 1×, 0.75×, 0.5×, 0.25×), autosave, reload of labels changed elsewhere.
 - Keys can be rebound in Settings → Shortcuts. F1 shows how to work.
 - Folder settings (click the folder name): what is labelled in the folder, format for new labels, extra label folders.
-- Overlaid view (V): waveform over the spectrogram and labels over both, or separate lanes; labels above or below.
+- Overlaid view (V): waveform outline over a darkened spectrogram, solid boundaries with a dark edge and a solid
+  label band, so labels stay readable; or separate lanes; labels above or below.
+- Menu bar (File, Edit, View, Go, Tools, Help) with the shortcut next to every item; View has check boxes for
+  panels, lanes and toolbar groups. Toolbar groups can be shown, hidden and reordered, with names under the
+  buttons or as compact icons. On the first start: "Simple" or "Everything". Phones keep the button menus.
+- Every slider in the settings has a number field next to it for an exact value.
 - Automatic oto (Ctrl+Shift+A in oto folders): entries from file names (kana, romaji, Cyrillic) and the recordings,
   CV / VCV / CVVC, optional tempo, or syllables placed by an aligner model from mVocalToolkit.
 - Recording samples from a list (reclist.txt): big current line with romaji, level meter, take preview, click track

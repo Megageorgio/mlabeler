@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -301,3 +302,53 @@ val LocalKeepBarsFree = androidx.compose.runtime.staticCompositionLocalOf { true
 fun screenInsets(): androidx.compose.foundation.layout.WindowInsets =
     if (LocalKeepBarsFree.current) androidx.compose.foundation.layout.WindowInsets.safeDrawing
     else androidx.compose.foundation.layout.WindowInsets.ime
+
+/**
+ * Slider with a number field next to it: drag for rough values, type for exact ones.
+ * [factor] converts the stored value to the number the user sees (e.g. 100 for percent).
+ */
+@Composable
+fun ValueSlider(
+    title: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    unit: String = "",
+    factor: Float = 1f,
+    decimals: Int = 0,
+    onChange: (Float) -> Unit,
+) {
+    val c = T.c
+    fun shown(v: Float): String {
+        val x = v * factor
+        if (decimals <= 0) return kotlin.math.round(x).toInt().toString()
+        var p = 1f; repeat(decimals) { p *= 10f }
+        val r = kotlin.math.round(x * p) / p
+        return r.toString().trimEnd('0').trimEnd('.')
+    }
+    var text by remember { mutableStateOf(shown(value)) }
+    var editing by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(value) { if (!editing) text = shown(value) }
+    fun commit() {
+        editing = false
+        val v = text.replace(',', '.').trim().toFloatOrNull()
+        if (v != null) onChange((v / factor).coerceIn(range))
+        text = shown(value)
+    }
+    Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Field(
+                text, { text = it; editing = true },
+                Modifier.width(72.dp).onFocusChanged { if (!it.isFocused && editing) commit() },
+                onDone = { commit() },
+                textStyle = TextStyle(fontSize = 13.sp),
+            )
+            if (unit.isNotEmpty()) Text(unit, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(start = 6.dp).widthIn(min = 22.dp))
+        }
+        androidx.compose.material3.Slider(
+            value = value.coerceIn(range), onValueChange = { editing = false; onChange(it) }, valueRange = range,
+            colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.border),
+            modifier = Modifier.height(32.dp),
+        )
+    }
+}

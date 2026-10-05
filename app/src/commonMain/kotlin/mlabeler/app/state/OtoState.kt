@@ -273,8 +273,8 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                         if (mlabeler.core.audio.Wav.isWav(bytes)) mlabeler.core.audio.Wav.decode(bytes) else mlabeler.app.Platform.decodeAudio(it.audioPath)
                     } ?: run { failed++; null } ?: continue
                     val timings = if (aligner != null) {
-                        val t = app.settings.toolkit
-                        val client = mlabeler.app.toolkit.ToolkitClient(t.url, t.token)
+                        if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+                        val client = app.toolkit.client()
                         val id = client.upload(name, mlabeler.core.audio.Wav.encode16(audio))
                         val job = client.align(id, aligner, language, mlabeler.core.oto.AutoOto.phonemesFor(syl).joinToString(" "), phonemes = true)
                         val res = client.await(job) { _, _ -> }
