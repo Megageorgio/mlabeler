@@ -131,6 +131,11 @@ class AppState(private val scope: CoroutineScope) {
         editor = ed
         ed.scan()
         reloadPlugins()
+        // the first folder ever opened: show how things work
+        if (!settings.seenHelp) {
+            showHelp = true
+            update { it.copy(seenHelp = true) }
+        }
         update { it.copy(recent = (listOf(path) + it.recent.filter { r -> r != path }).take(12)) }
     }
 

@@ -91,6 +91,8 @@ data class AppSettings(
     val pluginParams: Map<String, String> = emptyMap(),
     /** Layouts saved by the user, by name. */
     val layoutPresets: Map<String, LayoutSettings> = emptyMap(),
+    /** The short guide was shown once. */
+    val seenHelp: Boolean = false,
     /** Plugins on the quick slots (Ctrl+1 … Ctrl+4). */
     val pluginSlots: List<String> = emptyList(),
 ) {
