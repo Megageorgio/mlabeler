@@ -233,6 +233,11 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 SliderRow(S.brightness(), s.view.brightness, -0.5f..0.5f, "${(s.view.brightness * 100).roundToInt()}") { v -> app.update { it.copy(view = it.view.copy(brightness = v)) } }
                 SliderRow(S.contrast(), s.view.contrast, 0.5f..3f, "${(s.view.contrast * 100).roundToInt()}%") { v -> app.update { it.copy(view = it.view.copy(contrast = v)) } }
+                SliderRow(S.windowMs(), s.view.windowMs, 5f..80f, "${s.view.windowMs.roundToInt()}") { v -> app.update { it.copy(view = it.view.copy(windowMs = v.roundToInt().toFloat())) } }
+                SliderRow(S.hopMs(), s.view.hopMs, 0f..20f, if (s.view.hopMs <= 0f) "auto" else "${(s.view.hopMs * 10).roundToInt() / 10f}") { v -> app.update { it.copy(view = it.view.copy(hopMs = (v * 2).roundToInt() / 2f)) } }
+                SliderRow(S.bands(), s.view.bands.toFloat(), 64f..384f, "${s.view.bands}") { v -> app.update { it.copy(view = it.view.copy(bands = (v / 32).roundToInt() * 32)) } }
+                SliderRow(S.dbRange(), s.view.minDb, -140f..-40f, "${s.view.minDb.roundToInt()} … ${s.view.maxDb.roundToInt()} dB") { v -> app.update { it.copy(view = it.view.copy(minDb = v.roundToInt().toFloat())) } }
+                SliderRow(S.dbTop(), s.view.maxDb, -40f..10f, "${s.view.maxDb.roundToInt()} dB") { v -> app.update { it.copy(view = it.view.copy(maxDb = v.roundToInt().toFloat())) } }
                 SliderRow(S.maxFrequency(), s.view.maxFreq, 2000f..16000f, "${s.view.maxFreq.roundToInt()}") { v -> app.update { it.copy(view = it.view.copy(maxFreq = (v / 500).roundToInt() * 500f)) } }
             }
             Section.Editing -> {

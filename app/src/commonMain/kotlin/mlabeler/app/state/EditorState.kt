@@ -308,6 +308,37 @@ class EditorState(
         }
     }
 
+    private var specJob: Job? = null
+
+    private var specKey: List<Any>? = null
+    private fun currentSpecKey(): List<Any> = settings.view.let { listOf(it.windowMs, it.hopMs, it.bands, it.minDb, it.maxDb) }
+    fun specNeedsUpdate() = specKey != null && specKey != currentSpecKey()
+
+    private suspend fun computeSpectrogram(a: Audio) {
+        val v = settings.view
+        specKey = currentSpecKey()
+        val hop = if (v.hopMs > 0) v.hopMs / 1000.0 else if (a.duration <= 120) 0.0025 else 0.005
+        val spec = withContext(Dispatchers.Default) {
+            Spectrogram.compute(
+                a.samples, a.sampleRate, hopSeconds = hop, windowSeconds = v.windowMs / 1000.0, bands = v.bands,
+                maxFreq = 16000.0, minDb = v.minDb, maxDb = v.maxDb,
+            ) { partial ->
+                ensureActive()
+                if (spectrogram !== partial) spectrogram = partial
+                spectrogramProgress = partial.ready
+            }
+        }
+        spectrogram = spec
+        spectrogramProgress = spec.ready
+    }
+
+    /** Builds the spectrogram again after its settings changed. */
+    fun recomputeSpectrogram() {
+        val a = audio ?: return
+        specJob?.cancel()
+        specJob = scope.launch { computeSpectrogram(a) }
+    }
+
     private var pendingInterval: Pair<String, Int>? = null
 
     /** Opens [itemIndex] and selects interval [i] of the tier called [tierName]. */
@@ -455,16 +486,7 @@ class EditorState(
             peaks = withContext(Dispatchers.Default) { Peaks.build(a.samples, a.sampleRate) }
             power = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.power(a.samples, a.sampleRate) }
             if (settings.layout.showPitch) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
-            val hop = if (a.duration <= 120) 0.0025 else 0.005
-            val spec = withContext(Dispatchers.Default) {
-                Spectrogram.compute(a.samples, a.sampleRate, hopSeconds = hop, maxFreq = 16000.0) { partial ->
-                    ensureActive()
-                    if (spectrogram !== partial) spectrogram = partial
-                    spectrogramProgress = partial.ready
-                }
-            }
-            spectrogram = spec
-            spectrogramProgress = spec.ready
+            computeSpectrogram(a)
             if (pitch == null) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
         }
     }

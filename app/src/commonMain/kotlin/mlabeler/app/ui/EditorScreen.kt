@@ -75,6 +75,12 @@ fun widthClass(width: Dp) = when {
 fun EditorScreen(app: AppState, ed: EditorState) {
     val c = T.c
     val focus = remember { FocusRequester() }
+    val v = app.settings.view
+    LaunchedEffect(v.windowMs, v.hopMs, v.bands, v.minDb, v.maxDb) {
+        // wait until the slider is let go
+        kotlinx.coroutines.delay(400)
+        if (ed.specNeedsUpdate()) ed.recomputeSpectrogram()
+    }
     LaunchedEffect(ed) {
         ed.requestFocus = { runCatching { focus.requestFocus() } }
         focus.requestFocus()

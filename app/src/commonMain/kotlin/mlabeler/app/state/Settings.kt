@@ -39,6 +39,13 @@ data class ViewSettings(
     val brightness: Float = 0f,
     val contrast: Float = 1f,
     val maxFreq: Float = 8000f,
+    /** Analysis window, ms (longer = finer frequencies, blurrier in time). */
+    val windowMs: Float = 25f,
+    /** Step between columns, ms; 0 = by file length. */
+    val hopMs: Float = 0f,
+    val bands: Int = 192,
+    val minDb: Float = -100f,
+    val maxDb: Float = -10f,
 )
 
 @Serializable

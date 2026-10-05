@@ -42,6 +42,8 @@ private val noEntries = L("No oto entries yet. Add one with N or the + button.",
 private val entriesCount = L("{0} entries", "записей: {0}")
 private val alias = L("Alias", "Псевдоним")
 private val otoFile = L("oto.ini", "oto.ini")
+private val noEntryFiles = L("Not in oto", "Нет в oto")
+private val missingSample = L("No such recording in the folder", "Такой записи в папке нет")
 
 /** Search accepts plain text (alias or file) or "alias:", "sample:" prefixes. */
 private fun matches(q: String, alias: String, sample: String): Boolean {
@@ -63,11 +65,39 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 6.dp)) {
             Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = S.search())
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Chip(S.all(), ed.filter == FileFilter.All || ed.filter == FileFilter.NoLabels) { ed.filter = FileFilter.All }
+                Chip(S.all(), ed.filter == FileFilter.All) { ed.filter = FileFilter.All }
                 Chip(S.notDone(), ed.filter == FileFilter.NotDone) { ed.filter = FileFilter.NotDone }
                 Chip(S.starred(), ed.filter == FileFilter.Starred) { ed.filter = FileFilter.Starred }
+                Chip(noEntryFiles(), ed.filter == FileFilter.NoLabels) { ed.filter = FileFilter.NoLabels }
             }
         }
+        val dir = ed.item?.let { Paths.parent(it.audioPath) }
+        val folderFiles = ed.items.withIndex().filter { dir == null || Paths.parent(it.value.audioPath) == dir }
+        if (ed.filter == FileFilter.NoLabels) {
+            // recordings of this folder that oto.ini does not mention
+            val used = entries.map { it.sample.lowercase() }.toSet()
+            val missing = folderFiles.filter { Paths.name(it.value.audioPath).lowercase() !in used }
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                items(missing, key = { it.value.id }) { (i, item) ->
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = if (Platform.isMobile) 48.dp else 30.dp)
+                            .background(if (i == ed.index) c.accent.copy(alpha = 0.16f) else c.panel)
+                            .clickable { ed.open(i); onOpened() }.padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(Paths.name(item.audioPath), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        IconBtn(Icons.plus, Commands.otoAdd.title(), size = 26.dp) { ed.open(i); ed.oto.add() }
+                    }
+                }
+            }
+            Divider()
+            Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(entriesCount.format(missing.size), color = c.muted, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                if (missing.isNotEmpty()) Btn(Commands.autoOto.title()) { ed.app.showAutoOto = true }
+            }
+            return@Column
+        }
+        val existing = folderFiles.map { Paths.name(it.value.audioPath).lowercase() }.toSet()
         val list = entries.withIndex().filter {
             matches(ed.query, it.value.alias, it.value.sample) && when (ed.filter) {
                 FileFilter.NotDone -> !ed.oto.marks(it.value).done
@@ -102,6 +132,8 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                     Text(e.alias.ifEmpty { "∅" }, color = fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(8.dp))
                     if (m.star) androidx.compose.material3.Icon(Icons.starOn, null, Modifier.width(13.dp).height(13.dp), tint = c.warn)
+                    // the recording this entry names is not in the folder
+                    if (e.sample.lowercase() !in existing) androidx.compose.material3.Icon(Icons.warn, missingSample(), Modifier.width(13.dp).height(13.dp), tint = c.danger)
                     Text(Paths.stem(e.sample), color = if (sel && c.square) c.onAccent else c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.8f))
                 }
             }
