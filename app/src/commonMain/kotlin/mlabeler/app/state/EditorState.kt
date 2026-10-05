@@ -163,7 +163,7 @@ class EditorState(
     }
 
     /** A labelling shown next to the edited one for comparison (read-only). */
-    data class Reference(val name: String, val folder: String, val doc: LabelDoc)
+    data class Reference(val name: String, val folder: String, val doc: LabelDoc, val range: Pair<Double, Double>? = null)
 
     var references by mutableStateOf<List<Reference>>(emptyList())
         private set
@@ -226,7 +226,7 @@ class EditorState(
                         out
                     }
                 } else {
-                    modelResults[it.id] = modelResults[it.id].orEmpty() + Reference(model, "", part)
+                    modelResults[it.id] = modelResults[it.id].orEmpty() + Reference(model, "", part, from to to)
                     loadReferences()
                 }
                 app.message(S.autolabelDone())
@@ -261,7 +261,9 @@ class EditorState(
             var out = d
             for (t in r.doc.tiers.filterIsInstance<IntervalTier>()) {
                 val k = out.tierIndex(t.name).takeIf { it >= 0 } ?: out.phonemeTierIndex()
-                out = out.replace(k, t.copy(name = out.tiers[k].let { x -> (x as? IntervalTier)?.name ?: t.name }))
+                val cur = out.tiers[k] as? IntervalTier ?: continue
+                val rg = r.range
+                out = out.replace(k, if (rg != null) mlabeler.core.edit.RangeEdits.replace(cur, rg.first, rg.second, t) else t.copy(name = cur.name))
             }
             out
         }
