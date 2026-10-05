@@ -224,6 +224,23 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 SliderRow(S.interfaceScale(), s.scale, 0.8f..1.5f, "${(s.scale * 100).roundToInt()}%") { v -> app.update { it.copy(scale = (v * 20).roundToInt() / 20f) } }
                 SectionTitle(S.view())
+                SectionTitle(S.layoutPresets())
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((name, p) in mlabeler.app.state.LayoutPresets.builtIn) Chip(name(), false) {
+                        app.update { it.copy(layout = mlabeler.app.state.LayoutPresets.apply(it.layout, p)) }
+                    }
+                    for ((name, p) in s.layoutPresets) Chip(name, false) { app.update { it.copy(layout = mlabeler.app.state.LayoutPresets.apply(it.layout, p)) } }
+                }
+                var presetName by remember { mutableStateOf("") }
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Field(presetName, { presetName = it }, Modifier.weight(1f), placeholder = S.presetName())
+                    Btn(S.save(), enabled = presetName.isNotBlank()) {
+                        val n = presetName.trim()
+                        app.update { it.copy(layoutPresets = it.layoutPresets + (n to it.layout)) }
+                        presetName = ""
+                    }
+                }
+                SectionTitle(S.view())
                 SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
                 SwitchRow(S.tiersOnTop(), s.layout.tiersOnTop) { v -> app.update { it.copy(layout = it.layout.copy(tiersOnTop = v)) } }
                 SwitchRow(S.waveform(), s.layout.showWaveform) { v -> app.update { it.copy(layout = it.layout.copy(showWaveform = v)) } }

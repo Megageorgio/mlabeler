@@ -209,6 +209,8 @@ object S {
         "Например, автоматические записи с ручными. Его маркеры рисуются пунктиром.")
     val otoDiffLine = L("{0} entries in both, {1} only here, {2} only there", "общих записей: {0}, только здесь: {1}, только там: {2}")
     val otoDiffMean = L("average difference, ms", "среднее расхождение, мс")
+    val layoutPresets = L("Layouts", "Раскладки")
+    val presetName = L("Save the current layout as…", "Сохранить текущую раскладку как…")
     val general = L("General", "Общие")
     val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")

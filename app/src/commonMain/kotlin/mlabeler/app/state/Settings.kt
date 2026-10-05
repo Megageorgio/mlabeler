@@ -89,6 +89,8 @@ data class AppSettings(
     val keymap: Map<String, List<String>> = emptyMap(),
     /** Last parameters per plugin, as JSON objects. */
     val pluginParams: Map<String, String> = emptyMap(),
+    /** Layouts saved by the user, by name. */
+    val layoutPresets: Map<String, LayoutSettings> = emptyMap(),
     /** Plugins on the quick slots (Ctrl+1 … Ctrl+4). */
     val pluginSlots: List<String> = emptyList(),
 ) {
@@ -108,4 +110,20 @@ data class AppSettings(
             }
         }
     }
+}
+
+/** Layouts that come with the app. */
+object LayoutPresets {
+    val builtIn: List<Pair<mlabeler.app.i18n.L, LayoutSettings>> = listOf(
+        mlabeler.app.i18n.L("Simple", "Простой") to LayoutSettings(showSpectrogram = false, showPitch = false, showPower = false, overlay = false),
+        mlabeler.app.i18n.L("Waveform and spectrogram", "Волна и спектрограмма") to LayoutSettings(),
+        mlabeler.app.i18n.L("One picture", "Одна картинка") to LayoutSettings(overlay = true, showPitch = true),
+        mlabeler.app.i18n.L("Notes and pitch", "Ноты и высота") to LayoutSettings(showWaveform = false, showPitch = true, pitchOverSpectrogram = true, showPower = true),
+    )
+
+    /** Applies the view parts of [p], keeping panel sizes. */
+    fun apply(current: LayoutSettings, p: LayoutSettings) = p.copy(
+        showFiles = current.showFiles, showInspector = current.showInspector,
+        filesWidth = current.filesWidth, inspectorWidth = current.inspectorWidth,
+    )
 }
