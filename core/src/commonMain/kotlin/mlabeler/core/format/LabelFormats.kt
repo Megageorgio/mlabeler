@@ -14,7 +14,12 @@ enum class LabelFormat(val extension: String, val title: String) {
     Lab("lab", "HTK lab"),
     TextGrid("TextGrid", "Praat TextGrid"),
     Audacity("txt", "Audacity labels"),
+    /** A DiffSinger transcriptions.csv holding the labels of many recordings. */
+    DsCsv("csv", "DiffSinger transcriptions.csv"),
     ;
+
+    /** Formats one file can be saved in on its own. */
+    val standalone: Boolean get() = this != DsCsv
 
     companion object {
         fun byExtension(ext: String) = entries.firstOrNull { it.extension.equals(ext, ignoreCase = true) }

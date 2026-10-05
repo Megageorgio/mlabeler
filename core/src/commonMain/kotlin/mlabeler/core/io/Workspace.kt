@@ -89,6 +89,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             }
         }
         walk(root, 0)
+        loadCsvs()
         items = audio.map { path ->
             val (label, fmt) = findLabels(path)
             Item(relative(path), path, label, fmt)
@@ -111,6 +112,33 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
         return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "txt").map { Paths.join(d, "$stem.$it") } }
     }
 
+    /** transcriptions.csv files of the folder (root and two levels down), parsed. */
+    private val csvRows = mutableMapOf<String, MutableList<mlabeler.core.format.DsCsv.Row>>()
+
+    private fun loadCsvs() {
+        csvRows.clear()
+        fun walk(dir: String, depth: Int) {
+            val children = try { fs.list(dir) } catch (_: Exception) { emptyList() }
+            for (c in children) {
+                if (Paths.name(c).startsWith(".")) continue
+                if (fs.isDirectory(c)) { if (depth < 2) walk(c, depth + 1) }
+                else if (Paths.name(c).equals("transcriptions.csv", ignoreCase = true)) {
+                    runCatching { csvRows[c] = mlabeler.core.format.DsCsv.read(decodeGuess(fs.read(c), "UTF-8").first).toMutableList() }
+                }
+            }
+        }
+        walk(root, 0)
+    }
+
+    /** The csv whose folder (or the folder above the audio's) lists [stem]. */
+    private fun csvFor(audioPath: String, stem: String): String? {
+        val dir = Paths.parent(audioPath)
+        return csvRows.entries.firstOrNull { (path, rows) ->
+            val d = Paths.parent(path)
+            (d == dir || d == Paths.parent(dir)) && rows.any { it.name == stem }
+        }?.key
+    }
+
     private fun findLabels(audioPath: String): Pair<String?, LabelFormat?> {
         for (c in candidates(audioPath)) {
             if (!fs.exists(c)) continue
@@ -126,6 +154,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                 }
             }
         }
+        csvFor(audioPath, Paths.stem(audioPath))?.let { return it to LabelFormat.DsCsv }
         return null to null
     }
 
@@ -137,6 +166,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.TextGrid -> TextGridFormat.read(text)
             LabelFormat.Lab -> if (text.isBlank()) LabelDoc.empty(duration) else HtkLab.read(text, duration = duration)
             LabelFormat.Audacity -> AudacityLabels.read(text, "phones", duration)
+            LabelFormat.DsCsv -> csvRows[path]?.firstOrNull { it.name == item.name }?.doc ?: LabelDoc.empty(duration)
             null -> throw FormatException("Unknown label format")
         }
         return Edits.fitToDuration(doc, duration)
@@ -165,7 +195,9 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
      * The previous file is copied to .mlabeler/backup once per session.
      */
     fun writeLabels(item: Item, doc: LabelDoc, duration: Double, format: LabelFormat? = null): Item {
-        val fmt = format ?: item.labelFormat ?: state.defaultFormat
+        val fmt = (format ?: item.labelFormat ?: state.defaultFormat).let { f ->
+            if (f == LabelFormat.DsCsv && item.labelFormat != LabelFormat.DsCsv) LabelFormat.Lab else f
+        }
         val path = if (item.labelPath != null && fmt == item.labelFormat) item.labelPath else Paths.withExt(item.audioPath, fmt.extension)
         if (fs.exists(path) && path !in backedUp) {
             val stamp = timestamp()
@@ -180,6 +212,14 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.Lab -> HtkLab.write(doc)
             LabelFormat.TextGrid -> TextGridFormat.write(doc, duration)
             LabelFormat.Audacity -> AudacityLabels.write(doc)
+            LabelFormat.DsCsv -> {
+                // replace this recording's row, keep the others as they were
+                val rows = csvRows.getOrPut(path) { mutableListOf() }
+                val k = rows.indexOfFirst { it.name == item.name }
+                val row = mlabeler.core.format.DsCsv.Row(item.name, doc)
+                if (k >= 0) rows[k] = row else rows += row
+                mlabeler.core.format.DsCsv.write(rows)
+            }
         }
         fs.write(path, text.encodeToByteArray())
         val updated = item.copy(labelPath = path, labelFormat = fmt)

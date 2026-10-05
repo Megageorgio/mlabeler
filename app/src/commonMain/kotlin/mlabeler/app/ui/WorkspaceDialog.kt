@@ -72,7 +72,7 @@ fun WorkspaceDialog(app: AppState) {
             if (ed.mode == Mode.Labels) {
                 SectionTitle(S.newFilesFormat())
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (f in LabelFormat.entries) Chip(f.title, ed.workspace.state.defaultFormat == f) {
+                    for (f in LabelFormat.entries.filter { it.standalone }) Chip(f.title, ed.workspace.state.defaultFormat == f) {
                         ed.workspace.updateState { it.copy(defaultFormat = f) }
                         ed.bumpMarks()
                     }
