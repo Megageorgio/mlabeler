@@ -1,6 +1,11 @@
 package mlabeler.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -200,6 +205,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 SectionTitle(S.files())
                 SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
+                SliderRow(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, "${s.edit.autosaveSeconds}") { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
             }
             Section.View -> {
                 SectionTitle(S.theme())
@@ -234,6 +240,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SwitchRow(S.ripple() + " — " + S.rippleHint(), s.edit.ripple) { v -> app.update { it.copy(edit = it.edit.copy(ripple = v)) } }
                 SwitchRow(S.linked() + " — " + S.linkedHint(), s.edit.linked) { v -> app.update { it.copy(edit = it.edit.copy(linked = v)) } }
                 SwitchRow(S.loop(), s.edit.loop) { v -> app.update { it.copy(edit = it.edit.copy(loop = v)) } }
+                SliderRow(S.speedSetting(), s.edit.speed, 0.25f..1f, "${s.edit.speed}×") { v -> app.update { it.copy(edit = it.edit.copy(speed = (v * 20).roundToInt() / 20f)) } }
                 SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
                 SwitchRow(S.otoLocked(), s.edit.otoLockedDrag) { v -> app.update { it.copy(edit = it.edit.copy(otoLockedDrag = v)) } }
             }
@@ -272,16 +279,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     Text(check, color = c.muted, fontSize = 12.sp)
                 }
             }
-            Section.Keys -> {
-                SectionTitle(S.shortcuts())
-                for (cmd in Commands.all) {
-                    if (cmd.keys.isEmpty()) continue
-                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(cmd.title(), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(cmd.keys.joinToString("   ") { it.label() }, color = c.muted, fontSize = 12.sp)
-                    }
-                }
-            }
+            Section.Keys -> KeymapPage(app)
             Section.About -> {
                 SectionTitle(S.about())
                 Text("mLabeler 0.1", color = c.text, fontSize = 15.sp)
@@ -320,3 +318,62 @@ private fun SwitchRow(title: String, value: Boolean, onChange: (Boolean) -> Unit
 @Suppress("unused")
 @Composable
 private fun Gap() = Box(Modifier.height(8.dp))
+
+private val pressKeys = mlabeler.app.i18n.L("Press the keys…", "Нажмите клавиши…")
+private val resetAll = mlabeler.app.i18n.L("Reset all", "Сбросить все")
+private val keysHint = mlabeler.app.i18n.L("Click a command and press new keys. Esc cancels, Backspace removes the binding.",
+    "Нажмите на команду, затем новые клавиши. Esc — отмена, Backspace — убрать сочетание.")
+private val usedBy = mlabeler.app.i18n.L("also used by: {0}", "также у: {0}")
+
+@Composable
+private fun KeymapPage(app: AppState) {
+    val c = T.c
+    var capturing by remember { mutableStateOf<String?>(null) }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    fun save(map: Map<String, List<Chord>>) {
+        Keymap.overrides = map
+        app.update { it.copy(keymap = Keymap.toSettings()) }
+    }
+    androidx.compose.runtime.LaunchedEffect(capturing) { if (capturing != null) runCatching { focus.requestFocus() } }
+    Column(
+        Modifier.focusRequester(focus).focusable().onPreviewKeyEvent { e ->
+            val id = capturing ?: return@onPreviewKeyEvent false
+            if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent true
+            val k = e.key
+            if (k in setOf(Key.ShiftLeft, Key.ShiftRight, Key.CtrlLeft, Key.CtrlRight, Key.AltLeft, Key.AltRight, Key.MetaLeft, Key.MetaRight)) return@onPreviewKeyEvent true
+            when (k) {
+                Key.Escape -> capturing = null
+                Key.Backspace -> { save(Keymap.overrides + (id to emptyList<Chord>())); capturing = null }
+                else -> {
+                    val ctrl = if (mlabeler.app.Platform.isMac) e.isMetaPressed else e.isCtrlPressed
+                    save(Keymap.overrides + (id to listOf<Chord>(Chord(k, ctrl, e.isShiftPressed, e.isAltPressed))))
+                    capturing = null
+                }
+            }
+            true
+        },
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionTitle(S.shortcuts(), Modifier.weight(1f))
+            Btn(resetAll()) { save(emptyMap()) }
+        }
+        Text(keysHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+        for (cmd in Commands.all) {
+            val conflicts = cmd.keys.flatMap { k -> Commands.all.filter { o -> o !== cmd && o.keys.contains(k) && (o.mode == null || cmd.mode == null || o.mode == cmd.mode) } }
+            Column(
+                Modifier.fillMaxWidth().clickable { capturing = cmd.id }
+                    .background(if (capturing == cmd.id) c.accent.copy(alpha = 0.14f) else androidx.compose.ui.graphics.Color.Transparent)
+                    .padding(horizontal = 4.dp, vertical = 5.dp),
+            ) {
+                Row {
+                    Text(cmd.title(), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        if (capturing == cmd.id) pressKeys() else cmd.keys.joinToString("   ") { it.label() }.ifEmpty { "—" },
+                        color = if (capturing == cmd.id) c.accent else if (Keymap.overrides.containsKey(cmd.id)) c.text else c.muted, fontSize = 12.sp,
+                    )
+                }
+                if (conflicts.isNotEmpty()) Text(usedBy.format(conflicts.joinToString { it.title() }), color = c.warn, fontSize = 11.sp)
+            }
+        }
+    }
+}

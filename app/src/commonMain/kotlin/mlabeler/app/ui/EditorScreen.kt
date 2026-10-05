@@ -204,6 +204,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
         Sep()
         IconBtn(if (ed.playing) Icons.stop else Icons.play, if (ed.playing) S.stop() else S.play(), Commands.togglePlay.keyLabel) { ed.togglePlay() }
         IconBtn(Icons.loop, S.loop(), Commands.loop.keyLabel, active = s.edit.loop) { Commands.loop.run(ed, app) }
+        SpeedButton(ed, s.edit.speed)
         Sep()
         if (ed.mode == Mode.Oto) {
             IconBtn(Icons.plus, Commands.otoAdd.title(), Commands.otoAdd.keyLabel) { ed.oto.add() }
@@ -251,6 +252,7 @@ private fun MainMenu(app: AppState, ed: EditorState) {
             DropdownMenuItem({ Text(S.power()) }, onClick = { open = false; Commands.powerLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPower) TextIcon("✓") })
             DropdownMenuItem({ Text(Commands.workspace.title()) }, onClick = { open = false; app.showWorkspace = true })
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true }, trailingIcon = { TextIcon(Commands.settings.keyLabel) })
+            DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true }, trailingIcon = { TextIcon("F1") })
         }
     }
 }
@@ -272,6 +274,7 @@ private fun StatusBar(app: AppState, ed: EditorState) {
         StatusText(cur?.let { formatTime(it) } ?: "–", Modifier.width(80.dp))
         ed.range?.let { (a, b) -> StatusText("${formatTime(a)} – ${formatTime(b)}  (${formatMs(b - a)})") }
         Spacer(Modifier.weight(1f))
+        Text(Commands.help.title() + " · F1", color = c.muted, fontSize = 12.sp, modifier = Modifier.clickable { app.showHelp = true })
         val spec = ed.spectrogram
         if (ed.audio != null && (spec == null || spec.ready < spec.frames)) StatusText(S.analysing())
         ed.toolkitBusy?.let { b ->
@@ -369,6 +372,7 @@ private fun CompactMenu(app: AppState, ed: EditorState, onDetails: () -> Unit) {
             DropdownMenuItem({ Text(S.spectrogram()) }, onClick = { open = false; Commands.spectrogram.run(ed, app) }, trailingIcon = { if (app.settings.layout.showSpectrogram) TextIcon("✓") })
             DropdownMenuItem({ Text(S.zoomFit()) }, onClick = { open = false; ed.fitAll() })
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true })
+            DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true })
             DropdownMenuItem({ Text(S.closeFolder()) }, onClick = { open = false; app.closeFolder() })
         }
     }
@@ -422,5 +426,17 @@ fun SidePanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Un
             }
         }
         if (tab == 0) FilesPanel(ed, Modifier.weight(1f).fillMaxWidth(), onOpened) else EntriesPanel(ed, Modifier.weight(1f).fillMaxWidth(), onOpened)
+    }
+}
+
+@Composable
+private fun SpeedButton(ed: EditorState, speed: Float) {
+    val c = T.c
+    Tip(Commands.speed.title() + "  ·  " + Commands.speed.keyLabel) {
+        Text(
+            if (speed >= 1f) "1×" else "$speed×".removePrefix("0"),
+            color = if (speed < 1f) c.accent else c.muted, fontSize = 12.sp,
+            modifier = Modifier.clip(RoundedCornerShape(c.radius)).clickable { ed.cycleSpeed() }.padding(horizontal = 6.dp, vertical = 6.dp),
+        )
     }
 }

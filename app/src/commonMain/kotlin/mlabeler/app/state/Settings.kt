@@ -49,6 +49,10 @@ data class EditSettings(
     val otoLockedDrag: Boolean = true,
     /** Play a short piece around a boundary while it is dragged. */
     val playOnDrag: Boolean = true,
+    /** Playback speed, 0.25..1, pitch kept. */
+    val speed: Float = 1f,
+    /** Save every N seconds when there are changes; 0 = off. */
+    val autosaveSeconds: Int = 0,
 )
 
 @Serializable
@@ -70,6 +74,8 @@ data class AppSettings(
     val edit: EditSettings = EditSettings(),
     val checks: CheckSettings = CheckSettings(),
     val toolkit: ToolkitSettings = ToolkitSettings(),
+    /** Key bindings changed by the user: command id to chords ("ctrl+shift+<key code>"). */
+    val keymap: Map<String, List<String>> = emptyMap(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")

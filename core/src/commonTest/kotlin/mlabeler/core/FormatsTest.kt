@@ -225,3 +225,16 @@ class RangeEditsTest {
         assertEquals(listOf(0.0, 0.5, 1.2, 2.5, 3.0), r.bounds)
     }
 }
+
+class StretchTest {
+    @Test
+    fun halfSpeedKeepsPitch() {
+        val sr = 44100
+        val x = FloatArray(sr) { (0.5 * kotlin.math.sin(2 * kotlin.math.PI * 220.0 * it / sr)).toFloat() }
+        val y = mlabeler.core.dsp.Stretch.wsola(x, sr, 0.5)
+        assertTrue(y.size in (sr * 19 / 10)..(sr * 21 / 10), "length ${y.size}")
+        val f = mlabeler.core.dsp.Pitch.yin(y, sr)
+        val mid = f.values[f.values.size / 2]
+        assertTrue(mid in 212f..228f, "f0 $mid")
+    }
+}

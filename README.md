@@ -25,6 +25,14 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
   (`alias:`, `sample:`), offset/overlap/preutterance/consonant/cutoff on the waveform, preutterance drags
   the whole set (Shift switches), Q W E R T put a marker at the cursor, numeric fields, new/duplicate/delete
   entries, done/star per entry, Shift_JIS and other encodings kept on save.
+- Entries tab: every label of the file or of the whole folder, search (`name:`, `file:`, `tier:`), counts per label.
+- Pitch (over the spectrogram or in its own lane) and loudness lanes.
+- Compare: labels of the same files from other folders shown under yours, boundaries coloured by distance,
+  statistics, take them over in one step.
+- Autolabel a selected part with mVocalToolkit (Ctrl+Shift+A): replace it, or run several models and compare.
+- Slow playback with pitch kept (Y: 1×, 0.75×, 0.5×, 0.25×), autosave, reload of labels changed elsewhere.
+- Keys can be rebound in Settings → Shortcuts. F1 shows how to work.
+- Folder settings (click the folder name): what is labelled in the folder, format for new labels, extra label folders.
 - Rename by pattern (Ctrl+H) for oto aliases or the active tier; sound while dragging a boundary.
 
 ## Keys

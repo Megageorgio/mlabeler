@@ -50,7 +50,7 @@ private fun keyName(k: Key): String = when (k) {
     Key.Tab -> "Tab"
     Key.F2 -> "F2"
     Key.Zero -> "0"
-    else -> letters.entries.firstOrNull { it.value == k }?.key?.toString() ?: "?"
+    else -> letters.entries.firstOrNull { it.value == k }?.key?.toString() ?: otherKeyName(k)
 }
 
 private val letters = mapOf(
@@ -62,13 +62,41 @@ private val letters = mapOf(
 private fun ch(c: Char, ctrl: Boolean = false, shift: Boolean = false, alt: Boolean = false) =
     Chord(letters.getValue(c), ctrl, shift, alt)
 
+/** User key bindings, by command id; loaded from the settings. */
+object Keymap {
+    private val state = androidx.compose.runtime.mutableStateOf<Map<String, List<Chord>>>(emptyMap())
+    var overrides: Map<String, List<Chord>>
+        get() = state.value
+        set(v) { state.value = v }
+
+    fun encode(c: Chord) = buildString {
+        if (c.ctrl) append("ctrl+")
+        if (c.shift) append("shift+")
+        if (c.alt) append("alt+")
+        append(c.key.keyCode)
+    }
+
+    fun decode(s: String): Chord? {
+        val parts = s.split('+')
+        val code = parts.last().toLongOrNull() ?: return null
+        return Chord(Key(code), "ctrl" in parts, "shift" in parts, "alt" in parts)
+    }
+
+    fun load(map: Map<String, List<String>>) {
+        overrides = map.mapValues { (_, v) -> v.mapNotNull { decode(it) } }
+    }
+
+    fun toSettings(): Map<String, List<String>> = overrides.mapValues { (_, v) -> v.map { encode(it) } }
+}
+
 class Command(
     val id: String,
     val title: L,
-    val keys: List<Chord>,
+    val defaultKeys: List<Chord>,
     val enabled: (EditorState) -> Boolean = { true },
     val run: (EditorState, AppState) -> Unit,
 ) {
+    val keys: List<Chord> get() = Keymap.overrides[id] ?: defaultKeys
     val keyLabel: String get() = keys.firstOrNull()?.label() ?: ""
     /** Null: works in every mode. */
     var mode: Mode? = null
@@ -145,6 +173,8 @@ object Commands {
         a.update { it.copy(edit = it.edit.copy(otoLockedDrag = !it.edit.otoLockedDrag)) }
     }.only(Mode.Oto)
     val batchRename = Command("batch-rename", L("Rename by pattern…", "Переименовать по шаблону…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
+    val help = Command("help", L("How it works", "Как с этим работать"), listOf(Chord(Key.F1))) { _, a -> a.showHelp = true }
+    val speed = Command("speed", L("Playback speed", "Скорость воспроизведения"), listOf(ch('Y'))) { e, _ -> e.cycleSpeed() }
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
     val workspace = Command("workspace", L("Folder settings…", "Настройки папки…"), listOf(ch('M', ctrl = true))) { _, a -> a.showWorkspace = true }
 
@@ -154,7 +184,7 @@ object Commands {
     }
 
     val all = listOf(
-        workspace, autolabel, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,
@@ -164,4 +194,18 @@ object Commands {
     fun find(e: KeyEvent, mode: Mode): Command? = all.firstOrNull { c -> (c.mode == null || c.mode == mode) && c.keys.any { it.matches(e) } }
 
     fun visible(mode: Mode) = all.filter { it.mode == null || it.mode == mode }
+}
+
+private fun otherKeyName(k: Key): String {
+    val named = mapOf(
+        Key.One to "1", Key.Two to "2", Key.Three to "3", Key.Four to "4", Key.Five to "5", Key.Six to "6", Key.Seven to "7",
+        Key.Eight to "8", Key.Nine to "9", Key.F1 to "F1", Key.F3 to "F3", Key.F4 to "F4", Key.F5 to "F5", Key.F6 to "F6",
+        Key.F7 to "F7", Key.F8 to "F8", Key.F9 to "F9", Key.F10 to "F10", Key.F11 to "F11", Key.F12 to "F12", Key.Escape to "Esc",
+        Key.Semicolon to ";", Key.Apostrophe to "'", Key.Slash to "/", Key.Backslash to "\\", Key.LeftBracket to "[", Key.RightBracket to "]",
+        Key.Grave to "`", Key.Insert to "Ins",
+    )
+    named[k]?.let { return it }
+    // letters not in the table above
+    val s = k.toString()
+    return s.substringAfterLast(' ').takeIf { it.length in 1..3 } ?: "#${k.keyCode}"
 }

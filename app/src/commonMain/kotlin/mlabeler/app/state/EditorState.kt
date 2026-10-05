@@ -133,6 +133,44 @@ class EditorState(
     var requestFocus: () -> Unit = {}
 
     private val player = AudioOut()
+    private val labelMtime = mutableMapOf<String, Long>()
+    private var lastEdit = 0L
+    private var warnedExternal = ""
+
+    init {
+        // autosave and reloading labels changed by other programs
+        scope.launch {
+            while (isActive) {
+                delay(2000)
+                runCatching { watch() }
+            }
+        }
+    }
+
+    private fun now() = kotlin.time.Clock.System.now().toEpochMilliseconds()
+
+    private fun watch() {
+        val auto = settings.edit.autosaveSeconds
+        if (auto > 0 && dirty && dragDoc == null && editingText == null && now() - lastEdit > auto * 1000L) save(quiet = true)
+        val it = item ?: return
+        val path = it.labelPath ?: return
+        val known = labelMtime[it.id] ?: return
+        val m = workspace.fs.lastModified(path)
+        if (m <= known) return
+        if (!labelsDirty) {
+            labelMtime[it.id] = m
+            val d = runCatching { workspace.readLabels(it, duration) }.getOrNull() ?: return
+            if (d != committed) {
+                commit(d)
+                history?.markSaved()
+                docVersion++
+                app.message(S.reloaded())
+            }
+        } else if (warnedExternal != "$path$m") {
+            warnedExternal = "$path$m"
+            app.message(S.changedOutside(), error = true)
+        }
+    }
     private var loadJob: Job? = null
     private var playJob: Job? = null
 
@@ -384,7 +422,7 @@ class EditorState(
             }
             if (cached == null) {
                 val d = withContext(Dispatchers.Default) {
-                    runCatching { workspace.readLabels(item, a.duration) }
+                    runCatching { labelMtime[item.id] = item.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L; workspace.readLabels(item, a.duration) }
                 }
                 val docValue = d.getOrElse {
                     app.message(S.labelsUnreadable.format(it.message ?: ""), error = true)
@@ -439,6 +477,7 @@ class EditorState(
     }
 
     fun commit(newDoc: LabelDoc) {
+        lastEdit = now()
         val h = history ?: return
         h.push(newDoc)
         committed = h.current
@@ -491,6 +530,7 @@ class EditorState(
             val updated = workspace.writeLabels(it, d, duration, if (it.labelFormat == null) (workspace.state.defaultFormat) else null)
             items = items.map { x -> if (x.id == it.id) updated else x }
             h.markSaved()
+            labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
             docVersion++
             if (!quiet) app.message(S.saved.format(Paths.name(updated.labelPath ?: "")))
         } catch (e: Exception) {
@@ -758,15 +798,22 @@ class EditorState(
         play(cursor ?: playhead ?: viewStart, duration)
     }
 
-    fun play(from: Double, to: Double, loop: Boolean = settings.edit.loop) {
+    fun play(from: Double, to: Double, loop: Boolean = settings.edit.loop, speed: Double = settings.edit.speed.toDouble()) {
         val a = audio ?: return
         stop()
         val sr = a.sampleRate
         val s = (max(0.0, from) * sr).toInt().coerceIn(0, a.samples.size)
         val e = (min(duration, to) * sr).toInt().coerceIn(s, a.samples.size)
         if (e - s < 16) return
+        val slow = speed < 0.99 && e - s > 4096
         try {
-            player.play(a, s, e, loop)
+            if (slow) {
+                // slowed copy of the part, pitch kept; positions map back through the speed
+                val part = mlabeler.core.dsp.Stretch.wsola(a.samples.copyOfRange(s, e), sr, speed)
+                player.play(Audio(sr, part), 0, part.size, loop)
+            } else {
+                player.play(a, s, e, loop)
+            }
         } catch (ex: Exception) {
             app.message(S.cannotPlay.format(ex.message ?: ex.toString()), error = true)
             return
@@ -776,12 +823,18 @@ class EditorState(
             delay(30)
             while (isActive && player.isPlaying) {
                 val p = player.position()
-                if (p >= 0) playhead = p.toDouble() / sr
+                if (p >= 0) playhead = if (slow) (s + p * speed) / sr else p.toDouble() / sr
                 delay(16)
             }
             playing = false
             playhead = null
         }
+    }
+
+    /** Cycles 1× → 0.75× → 0.5× → 0.25×. */
+    fun cycleSpeed() {
+        val next = when (settings.edit.speed) { 1f -> 0.75f; 0.75f -> 0.5f; 0.5f -> 0.25f; else -> 1f }
+        app.update { it.copy(edit = it.edit.copy(speed = next)) }
     }
 
     private var lastPreview = 0L
@@ -792,7 +845,7 @@ class EditorState(
         val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
         if (now - lastPreview < 80) return
         lastPreview = now
-        play(time - 0.03, time + 0.03, loop = false)
+        play(time - 0.03, time + 0.03, loop = false, speed = 1.0)
     }
 
     fun stop() {

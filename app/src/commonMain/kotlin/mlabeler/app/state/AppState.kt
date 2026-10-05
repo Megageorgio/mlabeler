@@ -28,6 +28,7 @@ class AppState(private val scope: CoroutineScope) {
     var showBatchRename by mutableStateOf(false)
     var showWorkspace by mutableStateOf(false)
     var showAutolabel by mutableStateOf(false)
+    var showHelp by mutableStateOf(false)
     /** Set while the in-app folder browser is open for a pick. */
     var folderPick by mutableStateOf<((String) -> Unit)?>(null)
 
@@ -43,6 +44,7 @@ class AppState(private val scope: CoroutineScope) {
     private var counter = 0L
 
     init {
+        mlabeler.app.ui.Keymap.load(settings.keymap)
         Lang.current = settings.language.ifEmpty { Platform.systemLanguage }.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
     }
 

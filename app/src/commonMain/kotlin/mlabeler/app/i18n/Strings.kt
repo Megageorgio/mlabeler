@@ -178,6 +178,11 @@ object S {
     val toolkitOk = L("Toolkit answers", "Тулкит отвечает")
     val toolkitHint = L("Autolabel uses mVocalToolkit, which runs separately (for example inside bakalabel or with `mvt serve`).",
         "Авторазметка работает через mVocalToolkit, он запускается отдельно (например, внутри bakalabel или командой `mvt serve`).")
+    val reloaded = L("Labels changed in another program and were reloaded", "Разметка изменилась в другой программе и перечитана")
+    val changedOutside = L("Labels changed in another program. Saving here will overwrite them.",
+        "Разметку изменили в другой программе. Сохранение здесь их перезапишет.")
+    val autosave = L("Save automatically after, seconds (0 = off)", "Сохранять автоматически через, секунд (0 — выкл.)")
+    val speedSetting = L("Playback speed", "Скорость воспроизведения")
     val general = L("General", "Общие")
     val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")
