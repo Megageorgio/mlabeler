@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -251,6 +252,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
 
         Canvas(
             Modifier.fillMaxSize()
+                .clipToBounds()
                 .pointerHoverIcon(hoverIcon)
                 .pointerInput(ed) {
                     // hover, wheel
@@ -533,7 +535,7 @@ private fun DrawScope.drawTimeline(
         drawLine(c.muted.copy(alpha = if (major) 0.8f else 0.35f), Offset(xx, g.ruler - (if (major) 8 else 4) * px), Offset(xx, g.ruler), px)
         if (major && t >= 0) {
             val label = if (step < 1) formatTime(t) else formatTime(t, precise = false)
-            drawText(measurer, label, Offset(xx + 3 * px, 2 * px), smallStyle)
+            safeText(measurer, label, Offset(xx + 3 * px, 2 * px), smallStyle)
         }
         t += minor
     }
@@ -647,7 +649,7 @@ private fun DrawScope.drawTimeline(
                     if (p.time < v0 || p.time > tEnd) continue
                     val xx = x(p.time)
                     drawLine(c.bound, Offset(xx, top), Offset(xx, bottom), px)
-                    drawText(measurer, p.text, Offset(xx + 3 * px, top + 4 * px), tierStyle)
+                    safeText(measurer, p.text, Offset(xx + 3 * px, top + 4 * px), tierStyle)
                 }
                 is NoteTier -> for (n in tier.notes) {
                     if (n.end < v0 || n.start > tEnd) continue
@@ -656,7 +658,7 @@ private fun DrawScope.drawTimeline(
                     drawRect(tierColor.copy(alpha = if (n.pitch == null) 0.08f else 0.25f), Offset(a, top + 3 * px), Size(b - a, g.tierH - 6 * px))
                     drawLine(c.bound.copy(alpha = 0.5f), Offset(a, top), Offset(a, bottom), px)
                     val label = mlabeler.core.format.NoteNames.format(n.pitch) + if (n.slur) " ~" else ""
-                    if (b - a > 24 * px) drawText(measurer, label, Offset(a + 4 * px, top + 4 * px), tierStyle.copy(fontSize = 11.sp))
+                    if (b - a > 24 * px) safeText(measurer, label, Offset(a + 4 * px, top + 4 * px), tierStyle.copy(fontSize = 11.sp))
                 }
             }
             // tier name
@@ -785,3 +787,13 @@ private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heigh
 
 @Suppress("unused")
 private fun dbLabel(v: Double) = "${(20 * log10(v)).toInt()} dB"
+
+/**
+ * Draws one line of text at [topLeft]. Measures without width limits first: drawText(measurer, String, …)
+ * derives constraints from the space left in the canvas and throws when the text starts past its right edge.
+ */
+private fun DrawScope.safeText(measurer: androidx.compose.ui.text.TextMeasurer, text: String, topLeft: Offset, style: TextStyle) {
+    if (text.isEmpty() || topLeft.x >= size.width || topLeft.y >= size.height) return
+    val layout = measurer.measure(text, style, maxLines = 1, softWrap = false)
+    drawText(layout, topLeft = topLeft)
+}
