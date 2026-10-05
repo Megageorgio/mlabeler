@@ -507,6 +507,14 @@ private fun onTap(ed: EditorState, region: Region?, time: Double, double: Boolea
     val doc = ed.doc ?: return
     when (region) {
         is Region.Tier -> {
+            if (region.index >= doc.tiers.size) {
+                // a reference tier: double click plays its interval
+                val ref = ed.referenceTiers.getOrNull(region.index - doc.tiers.size)?.second ?: return
+                val i = ref.indexAt(time)
+                if (double && i >= 0) ed.play(ref.startOf(i), ref.endOf(i), loop = false)
+                ed.cursor = time
+                return
+            }
             val tier = doc.tiers.getOrNull(region.index)
             if (tier is IntervalTier) {
                 val i = tier.indexAt(time)
@@ -726,6 +734,7 @@ private fun DrawScope.drawTimeline(
         }
     }
     if (doc.tiers.isNotEmpty()) drawLine(c.border, Offset(0f, g.tiersTop + g.tierH * doc.tiers.size), Offset(w, g.tiersTop + g.tierH * doc.tiers.size), px)
+    drawReferences(ed, g, c, doc, measurer, tierStyle, ::x, tEnd)
 
     // cursor and playhead
     ed.cursor?.let { cur ->
@@ -855,7 +864,7 @@ private fun DrawScope.safeText(measurer: androidx.compose.ui.text.TextMeasurer, 
     drawText(layout, topLeft = topLeft)
 }
 
-private fun EditorState.laneTiers() = if (mode == Mode.Oto) 0 else doc?.tiers?.size ?: 0
+private fun EditorState.laneTiers() = if (mode == Mode.Oto) 0 else (doc?.tiers?.size ?: 0) + referenceTiers.size
 
 private fun DrawScope.drawCursor(ed: EditorState, g: Geom, c: Tokens, x: (Double) -> Float) {
     val px = density
@@ -987,5 +996,57 @@ private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: 
         path.close()
         drawPath(path, c.wave.copy(alpha = 0.45f))
         safeText(measurer, "dB", Offset(4 * px, top + 2 * px), small)
+    }
+}
+
+/** Reference tiers: read-only, boundaries coloured by how far they are from the edited ones. */
+private fun DrawScope.drawReferences(
+    ed: EditorState, g: Geom, c: Tokens, doc: LabelDoc, measurer: androidx.compose.ui.text.TextMeasurer,
+    style: TextStyle, x: (Double) -> Float, tEnd: Double,
+) {
+    val px = density
+    val w = size.width
+    for ((n, pair) in ed.referenceTiers.withIndex()) {
+        val (ri, ref) = pair
+        val k = doc.tiers.size + n
+        val top = g.tierTop(k)
+        val bottom = top + g.tierH
+        if (top >= size.height) break
+        drawRect(c.bg, Offset(0f, top), Size(w, g.tierH))
+        drawLine(c.border, Offset(0f, top), Offset(w, top), px)
+        val main = mlabeler.core.check.Compare.counterpart(doc, ref)
+        val deltas = main?.let { mlabeler.core.check.Compare.boundDeltas(it, ref) }
+        val mism = main?.let { mlabeler.core.check.Compare.textMismatch(it, ref) }
+        clipRect(0f, top, w, bottom) {
+            val first = ref.indexAt(ed.viewStart).let { if (it < 0) 0 else it }
+            for (i in first until ref.size) {
+                if (ref.startOf(i) > tEnd) break
+                val a = x(ref.startOf(i))
+                val b = x(ref.endOf(i))
+                if (mism != null && mism[i]) drawRect(c.danger.copy(alpha = 0.16f), Offset(a, top), Size(b - a, g.tierH))
+                val t = ref.texts[i]
+                if (t.isNotEmpty() && b - a > 8 * px) {
+                    val layout = measurer.measure(t, style.copy(color = c.muted), maxLines = 1, softWrap = false,
+                        constraints = Constraints(maxWidth = max(1, (b - a - 6 * px).toInt())))
+                    drawText(layout, topLeft = Offset(a + (b - a - layout.size.width) / 2, top + (g.tierH - layout.size.height) / 2 - 2 * px))
+                }
+            }
+            for (bi in first..ref.size) {
+                val t = ref.bounds[bi]
+                if (t > tEnd) break
+                val d = deltas?.getOrNull(bi)?.times(1000) ?: 0.0
+                val col = when {
+                    deltas == null -> c.muted
+                    d < 10 -> c.ok
+                    d < 30 -> c.warn
+                    else -> c.danger
+                }
+                drawLine(col, Offset(x(t), top), Offset(x(t), bottom), 1.5f * px)
+            }
+            val label = ed.references[ri].name + " · " + ref.name
+            val lay = measurer.measure(label, style.copy(fontSize = 10.sp, color = c.muted))
+            drawRect(c.bg.copy(alpha = 0.85f), Offset(4 * px, bottom - lay.size.height - 3 * px), Size(lay.size.width + 6 * px, lay.size.height + 2 * px))
+            drawText(lay, topLeft = Offset(7 * px, bottom - lay.size.height - 2 * px))
+        }
     }
 }

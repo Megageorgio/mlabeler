@@ -39,6 +39,13 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showSettings) SettingsDialog(app)
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
                     if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)
+                    app.folderPick?.let { pick ->
+                        mlabeler.app.ui.FolderBrowser(
+                            start = ed?.workspace?.root ?: Platform.homeDir(),
+                            onPick = { app.folderPick = null; pick(it) },
+                            onCancel = { app.folderPick = null },
+                        )
+                    }
                 }
             }
         }

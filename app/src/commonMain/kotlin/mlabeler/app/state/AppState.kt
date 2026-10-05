@@ -27,6 +27,17 @@ class AppState(private val scope: CoroutineScope) {
     var showCommands by mutableStateOf(false)
     var showBatchRename by mutableStateOf(false)
     var showWorkspace by mutableStateOf(false)
+    /** Set while the in-app folder browser is open for a pick. */
+    var folderPick by mutableStateOf<((String) -> Unit)?>(null)
+
+    /** Asks for a folder: the system dialog where there is one, else the built-in browser. */
+    fun pickFolder(title: String, onPick: (String) -> Unit) {
+        if (mlabeler.app.Platform.hasNativeFolderPicker) {
+            mlabeler.app.Platform.pickFolderNative(title)?.let(onPick)
+        } else {
+            folderPick = onPick
+        }
+    }
     private var messageJob: Job? = null
     private var counter = 0L
 

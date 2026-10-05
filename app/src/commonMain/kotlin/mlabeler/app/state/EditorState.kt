@@ -162,6 +162,46 @@ class EditorState(
         }
     }
 
+    /** A labelling shown next to the edited one for comparison (read-only). */
+    data class Reference(val name: String, val folder: String, val doc: LabelDoc)
+
+    var references by mutableStateOf<List<Reference>>(emptyList())
+        private set
+
+    /** Interval tiers drawn below the edited ones: (reference index, tier). */
+    val referenceTiers: List<Pair<Int, IntervalTier>> get() =
+        references.withIndex().flatMap { (k, r) -> r.doc.tiers.filterIsInstance<IntervalTier>().map { k to it } }
+
+    fun loadReferences() {
+        val it = item
+        val dur = duration
+        references = if (it == null) emptyList() else workspace.state.compareFolders.mapNotNull { dir ->
+            workspace.readLabelsIn(dir, it.name, dur)?.let { d -> Reference(Paths.name(dir), dir, d) }
+        }
+    }
+
+    fun addCompareFolder(dir: String) {
+        workspace.updateState { s -> s.copy(compareFolders = (s.compareFolders - dir) + dir) }
+        loadReferences()
+    }
+
+    fun removeCompareFolder(dir: String) {
+        workspace.updateState { s -> s.copy(compareFolders = s.compareFolders - dir) }
+        loadReferences()
+    }
+
+    /** Replaces the matching tier with the reference's (undoable). */
+    fun takeReference(r: Reference) {
+        updateDoc { d ->
+            var out = d
+            for (t in r.doc.tiers.filterIsInstance<IntervalTier>()) {
+                val k = out.tierIndex(t.name).takeIf { it >= 0 } ?: out.phonemeTierIndex()
+                out = out.replace(k, t.copy(name = out.tiers[k].let { x -> (x as? IntervalTier)?.name ?: t.name }))
+            }
+            out
+        }
+    }
+
     private var pendingInterval: Pair<String, Int>? = null
 
     /** Opens [itemIndex] and selects interval [i] of the tier called [tierName]. */
@@ -251,6 +291,7 @@ class EditorState(
         peaks = null
         pitch = null
         power = null
+        references = emptyList()
         spectrogram = null
         loadError = null
         selection = Selection.None
@@ -304,6 +345,7 @@ class EditorState(
             loading = false
             docChanged()
             oto.onItemOpened()
+            loadReferences()
             peaks = withContext(Dispatchers.Default) { Peaks.build(a.samples, a.sampleRate) }
             power = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.power(a.samples, a.sampleRate) }
             if (settings.layout.showPitch) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }

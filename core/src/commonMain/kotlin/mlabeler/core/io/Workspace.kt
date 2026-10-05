@@ -31,6 +31,8 @@ data class WorkspaceState(
     val defaultFormat: LabelFormat = LabelFormat.Lab,
     /** Folders with labels relative to the workspace, searched in addition to the audio folder. */
     val labelFolders: List<String> = emptyList(),
+    /** Folders (absolute) whose labels are shown next to these for comparison. */
+    val compareFolders: List<String> = emptyList(),
     /** What is labelled in this folder: "labels" (lab/TextGrid tiers) or "oto"; null = detect. */
     val kind: String? = null,
 )
@@ -138,6 +140,24 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             null -> throw FormatException("Unknown label format")
         }
         return Edits.fitToDuration(doc, duration)
+    }
+
+    /** Labels for [stem] in [dir] (TextGrid, lab or Audacity txt), or null. */
+    fun readLabelsIn(dir: String, stem: String, duration: Double): LabelDoc? {
+        for (ext in listOf("TextGrid", "textgrid", "lab", "txt")) {
+            val p = Paths.join(dir, "$stem.$ext")
+            if (!fs.exists(p)) continue
+            val text = runCatching { decodeGuess(fs.read(p), "UTF-8").first }.getOrNull() ?: continue
+            val doc = runCatching {
+                when (ext.lowercase()) {
+                    "textgrid" -> TextGridFormat.read(text)
+                    "lab" -> if (HtkLab.isTimed(text)) HtkLab.read(text, duration = duration) else null
+                    else -> if (AudacityLabels.looksLike(text)) AudacityLabels.read(text, "phones", duration) else null
+                }
+            }.getOrNull() ?: continue
+            return Edits.fitToDuration(doc, duration)
+        }
+        return null
     }
 
     /**

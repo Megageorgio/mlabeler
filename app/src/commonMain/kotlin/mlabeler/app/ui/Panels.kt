@@ -199,6 +199,7 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
             for ((k, tier) in doc.tiers.withIndex()) {
                 TierRow(ed, k, tier.name, k == ed.activeTier, k, doc.tiers.size)
             }
+            CompareSection(ed)
             SectionTitle(S.problems())
             if (ed.problems.isEmpty()) {
                 Text(S.noProblems(), color = c.muted, fontSize = 13.sp)
@@ -276,5 +277,54 @@ fun EmptyNote(text: String) {
     val c = T.c
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Text(text, color = c.muted, fontSize = 14.sp)
+    }
+}
+
+private val compareTitle = mlabeler.app.i18n.L("Compare", "Сравнение")
+private val compareHint = mlabeler.app.i18n.L(
+    "Show labels of the same files from another folder (another model, another person) under these, with the differences marked.",
+    "Показать разметку тех же файлов из другой папки (другая модель, другой человек) под этой и отметить различия.")
+private val addFolder = mlabeler.app.i18n.L("Add folder…", "Добавить папку…")
+private val useThese = mlabeler.app.i18n.L("Use these labels", "Взять эту разметку")
+private val noMatch = mlabeler.app.i18n.L("no labels for this file", "для этого файла разметки нет")
+private val statsLine = mlabeler.app.i18n.L("{0} ms average, {1} ms median, {2}% under 20 ms, {3} other texts",
+    "в среднем {0} мс, медиана {1} мс, {2}% ближе 20 мс, другой текст: {3}")
+
+@Composable
+private fun CompareSection(ed: EditorState) {
+    val c = T.c
+    val doc = ed.doc ?: return
+    SectionTitle(compareTitle()) {
+        IconBtn(Icons.plus, addFolder(), size = 26.dp) { ed.app.pickFolder(addFolder()) { ed.addCompareFolder(it) } }
+    }
+    val folders = ed.workspace.state.compareFolders
+    if (folders.isEmpty()) {
+        Text(compareHint(), color = c.muted, fontSize = 12.sp)
+        return
+    }
+    for (dir in folders) {
+        val r = ed.references.firstOrNull { it.folder == dir }
+        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(Paths.name(dir), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                IconBtn(Icons.close, S.removeFromList(), size = 24.dp) { ed.removeCompareFolder(dir) }
+            }
+            if (r == null) {
+                Text(noMatch(), color = c.muted, fontSize = 12.sp)
+            } else {
+                for (t in r.doc.tiers.filterIsInstance<IntervalTier>()) {
+                    val main = mlabeler.core.check.Compare.counterpart(doc, t) ?: continue
+                    val st = mlabeler.core.check.Compare.stats(main, t)
+                    Text(
+                        t.name + ": " + statsLine.format(
+                            kotlin.math.round(st.meanMs * 10) / 10, kotlin.math.round(st.medianMs * 10) / 10,
+                            kotlin.math.round(st.within20 * 100).toInt(), st.textMismatches,
+                        ),
+                        color = c.muted, fontSize = 12.sp,
+                    )
+                }
+                Btn(useThese(), modifier = Modifier.padding(top = 4.dp)) { ed.takeReference(r) }
+            }
+        }
     }
 }
