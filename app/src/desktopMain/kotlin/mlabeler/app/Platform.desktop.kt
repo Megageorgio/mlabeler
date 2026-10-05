@@ -10,7 +10,6 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.util.Locale
-import javax.swing.JFileChooser
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.SourceDataLine
@@ -60,11 +59,13 @@ actual object Platform {
                 System.setProperty("apple.awt.fileDialogForDirectories", "false")
             }
         }
-        val chooser = JFileChooser().apply {
-            fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-            dialogTitle = title
-        }
-        return if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) chooser.selectedFile.path else null
+        // Windows and Linux: the system Open dialog (Explorer / GTK). Any file in the folder opens the folder.
+        val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
+        d.file = "*.wav;*.flac;*.mp3;*.ogg;*.m4a;*.lab;*.TextGrid;*.ini"
+        d.setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in setOf("wav", "flac", "mp3", "ogg", "m4a", "lab", "textgrid", "ini", "txt") }
+        d.isVisible = true
+        val dir = d.directory ?: return null
+        return File(dir).path
     }
 
     private val ffmpeg: String? by lazy {

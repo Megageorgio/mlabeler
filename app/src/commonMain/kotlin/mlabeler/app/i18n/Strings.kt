@@ -25,8 +25,8 @@ object S {
 
     // start
     val openFolder = L("Open folder", "Открыть папку")
-    val openFolderHint = L("A folder with recordings. Labels next to them are found automatically.",
-        "Папка с записями. Разметка рядом с ними найдётся сама.")
+    val openFolderHint = L("Pick any recording in the folder: the whole folder opens, labels next to the recordings are found automatically.",
+        "Выберите любую запись в папке: откроется вся папка, разметка рядом с записями найдётся сама.")
     val recent = L("Recent", "Недавние")
     val noRecent = L("Folders you open appear here.", "Здесь появятся открытые папки.")
     val removeFromList = L("Remove from list", "Убрать из списка")
@@ -164,6 +164,8 @@ object S {
     val checks = L("Checks", "Проверки")
     val shortThreshold = L("Warn about intervals shorter than, ms", "Предупреждать об интервалах короче, мс")
     val phonemeSet = L("Phoneme set (space separated, empty = any)", "Набор фонем (через пробел, пусто — любые)")
+    val general = L("General", "Общие")
+    val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")
     val aboutText = L("Editor for singing voice labels.", "Редактор разметки певческого голоса.")
 }

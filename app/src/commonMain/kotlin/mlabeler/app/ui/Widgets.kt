@@ -62,7 +62,15 @@ fun Tip(text: String, content: @Composable () -> Unit) {
     if (text.isEmpty()) return content()
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text(text, fontSize = 12.sp) } },
+        tooltip = {
+            val c = T.c
+            PlainTooltip(
+                containerColor = c.panelAlt,
+                contentColor = c.text,
+                shape = RoundedCornerShape(if (c.square) 0.dp else c.radius),
+                modifier = Modifier.border(c.borderWidth, c.border, RoundedCornerShape(if (c.square) 0.dp else c.radius)),
+            ) { Text(text, fontSize = 12.sp, color = c.text) }
+        },
         state = rememberTooltipState(),
     ) { content() }
 }

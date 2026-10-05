@@ -144,7 +144,7 @@ fun AppTheme(tokens: Tokens, content: @Composable () -> Unit) {
     val r = RoundedCornerShape(tokens.radius)
     val shapes = Shapes(extraSmall = r, small = r, medium = r, large = r, extraLarge = r)
     val family = if (tokens.mono) FontFamily.Monospace else FontFamily.Default
-    val base = TextStyle(fontFamily = family, color = tokens.text)
+    val base = TextStyle(fontFamily = family)
     val typography = Typography(
         bodyLarge = base.copy(fontSize = 15.sp, lineHeight = 21.sp),
         bodyMedium = base.copy(fontSize = 14.sp, lineHeight = 19.sp),
@@ -157,7 +157,7 @@ fun AppTheme(tokens: Tokens, content: @Composable () -> Unit) {
         titleSmall = base.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
         headlineSmall = base.copy(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
     )
-    CompositionLocalProvider(LocalTokens provides tokens) {
+    CompositionLocalProvider(LocalTokens provides tokens, androidx.compose.material3.LocalContentColor provides tokens.text) {
         MaterialTheme(colorScheme = scheme(tokens), shapes = shapes, typography = typography, content = content)
     }
 }
