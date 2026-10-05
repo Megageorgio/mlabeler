@@ -159,6 +159,8 @@ class EditorState(
         return workspace.itemState(item.id).marks
     }
 
+    fun bumpMarks() { marksVersion++ }
+
     fun setMarks(item: Item, transform: (ItemMarks) -> ItemMarks) {
         workspace.updateItem(item.id) { it.copy(marks = transform(it.marks)) }
         marksVersion++
@@ -623,6 +625,17 @@ class EditorState(
             playing = false
             playhead = null
         }
+    }
+
+    private var lastPreview = 0L
+
+    /** Short sound around [time] while dragging, at most every 80 ms. */
+    fun previewAt(time: Double) {
+        if (!settings.edit.playOnDrag) return
+        val now = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        if (now - lastPreview < 80) return
+        lastPreview = now
+        play(time - 0.03, time + 0.03, loop = false)
     }
 
     fun stop() {

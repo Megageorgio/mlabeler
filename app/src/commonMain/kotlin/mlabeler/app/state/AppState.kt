@@ -25,6 +25,7 @@ class AppState(private val scope: CoroutineScope) {
         private set
     var showSettings by mutableStateOf(false)
     var showCommands by mutableStateOf(false)
+    var showBatchRename by mutableStateOf(false)
     private var messageJob: Job? = null
     private var counter = 0L
 

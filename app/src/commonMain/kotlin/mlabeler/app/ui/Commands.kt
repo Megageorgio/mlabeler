@@ -111,8 +111,14 @@ object Commands {
     val zoomSel = Command("zoom-selection", S.zoomSelection, listOf(ch('Z'))) { e, _ -> e.zoomSelection() }
     val home = Command("home", L("Go to start", "В начало"), listOf(Chord(Key.Home))) { e, _ -> e.viewStart = 0.0; e.clampView() }
     val end = Command("end", L("Go to end", "В конец"), listOf(Chord(Key.MoveEnd))) { e, _ -> e.viewStart = e.duration; e.clampView() }
-    val done = Command("done", S.toggleDone, listOf(ch('D'))) { e, _ -> e.item?.let { i -> e.setMarks(i) { it.copy(done = !it.done) } } }
-    val star = Command("star", S.toggleStar, listOf(ch('B'))) { e, _ -> e.item?.let { i -> e.setMarks(i) { it.copy(star = !it.star) } } }
+    val done = Command("done", S.toggleDone, listOf(ch('D'))) { e, _ ->
+        if (e.mode == Mode.Oto) e.oto.current()?.let { o -> e.oto.setMarks(o) { it.copy(done = !it.done) } }
+        else e.item?.let { i -> e.setMarks(i) { it.copy(done = !it.done) } }
+    }
+    val star = Command("star", S.toggleStar, listOf(ch('B'))) { e, _ ->
+        if (e.mode == Mode.Oto) e.oto.current()?.let { o -> e.oto.setMarks(o) { it.copy(star = !it.star) } }
+        else e.item?.let { i -> e.setMarks(i) { it.copy(star = !it.star) } }
+    }
     val files = Command("files", S.toggleFiles, listOf(ch('B', ctrl = true))) { _, a -> a.update { it.copy(layout = it.layout.copy(showFiles = !it.layout.showFiles)) } }
     val inspector = Command("inspector", S.toggleInspector, listOf(ch('I', ctrl = true))) { _, a -> a.update { it.copy(layout = it.layout.copy(showInspector = !it.layout.showInspector)) } }
     val wave = Command("waveform", S.waveform, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showWaveform = !it.layout.showWaveform)) } }
@@ -136,6 +142,7 @@ object Commands {
     val otoLock = Command("oto-lock", L("Preutterance moves all markers", "Preutterance двигает все маркеры"), listOf(ch('G'))) { _, a ->
         a.update { it.copy(edit = it.edit.copy(otoLockedDrag = !it.edit.otoLockedDrag)) }
     }.only(Mode.Oto)
+    val batchRename = Command("batch-rename", L("Rename by pattern…", "Переименовать по шаблону…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
     val switchMode = Command("mode", L("Switch between labels and oto", "Переключить разметку / oto"), listOf(ch('M', ctrl = true))) { e, _ ->
         e.mode = if (e.mode == Mode.Oto) Mode.Labels else Mode.Oto
         if (e.mode == Mode.Oto) e.oto.onItemOpened()
@@ -147,7 +154,7 @@ object Commands {
     }
 
     val all = listOf(
-        switchMode, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        switchMode, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram,

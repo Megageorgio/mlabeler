@@ -37,6 +37,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (ed == null) StartScreen(app) else EditorScreen(app, ed)
                     if (app.showCommands && ed != null) CommandPalette(app)
                     if (app.showSettings) SettingsDialog(app)
+                    if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
                 }
             }
         }

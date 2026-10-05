@@ -41,6 +41,8 @@ data class EditSettings(
     val saveOnSwitch: Boolean = true,
     val newFormat: LabelFormat = LabelFormat.Lab,
     val otoLockedDrag: Boolean = true,
+    /** Play a short piece around a boundary while it is dragged. */
+    val playOnDrag: Boolean = true,
 )
 
 @Serializable

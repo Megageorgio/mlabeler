@@ -106,6 +106,17 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         current()?.let { e -> val a = absolute(e); ed.reveal(a.left / 1000, a.right / 1000) }
     }
 
+    // ----- marks per entry (done, star, tag), kept in the workspace state -----
+
+    private fun markKey(e: OtoEntry) = "oto:" + Paths.parent(ed.workspace.relative(book()?.path ?: "")) + "/" + e.sample + "|" + e.alias
+
+    fun marks(e: OtoEntry): mlabeler.core.io.ItemMarks { ed.marksVersion; return ed.workspace.itemState(markKey(e)).marks }
+
+    fun setMarks(e: OtoEntry, transform: (mlabeler.core.io.ItemMarks) -> mlabeler.core.io.ItemMarks) {
+        ed.workspace.updateItem(markKey(e)) { it.copy(marks = transform(it.marks)) }
+        ed.bumpMarks()
+    }
+
     fun step(delta: Int) {
         val n = entries.size
         if (n == 0) return
@@ -195,6 +206,19 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         val at = (entriesOfItem().lastOrNull()?.first ?: (entries.size - 1)) + 1
         commit(entries.toMutableList().also { it.add(at, e) })
         selected = at
+    }
+
+    /** Renames aliases with a regex in one undo step; returns how many changed. */
+    fun renameAll(indexes: List<Int>, rename: (String) -> String): Int {
+        var n = 0
+        val list = entries.toMutableList()
+        for (i in indexes) {
+            val e = list.getOrNull(i) ?: continue
+            val a = rename(e.alias)
+            if (a != e.alias) { list[i] = e.copy(alias = a); n++ }
+        }
+        if (n > 0) commit(list)
+        return n
     }
 
     fun undo() { if (book()?.history?.undo() == true) version++ }

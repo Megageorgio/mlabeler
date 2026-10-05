@@ -164,6 +164,8 @@ object S {
     val checks = L("Checks", "Проверки")
     val shortThreshold = L("Warn about intervals shorter than, ms", "Предупреждать об интервалах короче, мс")
     val phonemeSet = L("Phoneme set (space separated, empty = any)", "Набор фонем (через пробел, пусто — любые)")
+    val playOnDrag = L("Play while dragging a boundary", "Звук при перетаскивании границы")
+    val otoLocked = L("oto: preutterance moves all markers (Shift switches)", "oto: preutterance двигает все маркеры (Shift — наоборот)")
     val general = L("General", "Общие")
     val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")

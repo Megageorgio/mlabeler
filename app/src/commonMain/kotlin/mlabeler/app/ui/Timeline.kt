@@ -344,6 +344,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     moved = true
                                     ed.oto.dragTo(otoMarker, timeAt(chg.position.x) + offset, ev.keyboardModifiers.isShiftPressed)
                                     ed.cursor = timeAt(chg.position.x)
+                                    ed.previewAt(timeAt(chg.position.x) + offset)
                                     chg.consume()
                                 }
                             }
@@ -368,6 +369,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     val m = ev.keyboardModifiers
                                     ed.dragTo(bound, timeAt(chg.position.x) + offset, m.isShiftPressed, m.isAltPressed)
                                     ed.cursor = timeAt(chg.position.x)
+                                    ed.previewAt(timeAt(chg.position.x) + offset)
                                     chg.consume()
                                 }
                             }

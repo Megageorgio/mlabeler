@@ -21,6 +21,11 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
 - Command list (Ctrl+K), keyboard shortcuts for everything.
 - Layout adapts to the window: side panels on wide screens, sheets on phones. Panels can be resized and hidden.
 - Themes: dark, light, retro (square), high contrast. Interface size. English and Russian.
+- oto mode (Ctrl+M or the switch in the toolbar; folders with oto.ini open in it): entry list with search
+  (`alias:`, `sample:`), offset/overlap/preutterance/consonant/cutoff on the waveform, preutterance drags
+  the whole set (Shift switches), Q W E R T put a marker at the cursor, numeric fields, new/duplicate/delete
+  entries, done/star per entry, Shift_JIS and other encodings kept on save.
+- Rename by pattern (Ctrl+H) for oto aliases or the active tier; sound while dragging a boundary.
 
 ## Keys
 

@@ -32,6 +32,7 @@ import mlabeler.app.Platform
 import mlabeler.app.i18n.L
 import mlabeler.app.i18n.S
 import mlabeler.app.state.EditorState
+import mlabeler.app.state.FileFilter
 import mlabeler.app.theme.T
 import mlabeler.core.format.OtoMarker
 import mlabeler.core.format.formatNumberPublic
@@ -61,8 +62,19 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 6.dp)) {
             Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = S.search())
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(S.all(), ed.filter == FileFilter.All || ed.filter == FileFilter.NoLabels) { ed.filter = FileFilter.All }
+                Chip(S.notDone(), ed.filter == FileFilter.NotDone) { ed.filter = FileFilter.NotDone }
+                Chip(S.starred(), ed.filter == FileFilter.Starred) { ed.filter = FileFilter.Starred }
+            }
         }
-        val list = entries.withIndex().filter { matches(ed.query, it.value.alias, it.value.sample) }
+        val list = entries.withIndex().filter {
+            matches(ed.query, it.value.alias, it.value.sample) && when (ed.filter) {
+                FileFilter.NotDone -> !ed.oto.marks(it.value).done
+                FileFilter.Starred -> ed.oto.marks(it.value).star
+                else -> true
+            }
+        }
         val state = rememberLazyListState()
         LaunchedEffect(ed.oto.selected) {
             val pos = list.indexOfFirst { it.index == ed.oto.selected }
@@ -82,8 +94,14 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     val fg = if (sel && c.square) c.onAccent else c.text
+                    val m = ed.oto.marks(e)
+                    androidx.compose.foundation.layout.Box(
+                        Modifier.padding(end = 8.dp).width(7.dp).height(7.dp)
+                            .background(if (m.done) c.ok else c.muted.copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape),
+                    )
                     Text(e.alias.ifEmpty { "∅" }, color = fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(8.dp))
+                    if (m.star) androidx.compose.material3.Icon(Icons.starOn, null, Modifier.width(13.dp).height(13.dp), tint = c.warn)
                     Text(Paths.stem(e.sample), color = if (sel && c.square) c.onAccent else c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.8f))
                 }
             }
@@ -114,6 +132,11 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
             if (a.trim() != e.alias) ed.oto.rename(a.trim())
         }
         Text(e.sample, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        val marks = ed.oto.marks(e)
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip(S.done(), marks.done) { ed.oto.setMarks(e) { it.copy(done = !it.done) } }
+            Chip(S.star(), marks.star) { ed.oto.setMarks(e) { it.copy(star = !it.star) } }
+        }
         SectionTitle(S.inspector())
         val rows = listOf(
             Triple(OtoMarker.Left, "Offset", e.offset),
