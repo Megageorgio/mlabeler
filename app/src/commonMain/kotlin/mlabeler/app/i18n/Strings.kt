@@ -188,6 +188,8 @@ object S {
     val tiersOnTop = L("Labels above the audio", "Разметка над звуком")
     val nothingToDo = L("Nothing to do", "Делать нечего")
     val autoOtoDone = L("{0} entries for {1} files; {2} skipped", "записей: {0} для файлов: {1}; пропущено: {2}")
+    val pluginDone = L("Done", "Готово")
+    val pluginsTitle = L("Plugins", "Плагины")
     val general = L("General", "Общие")
     val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")

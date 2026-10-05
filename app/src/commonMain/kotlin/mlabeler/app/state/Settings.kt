@@ -80,6 +80,10 @@ data class AppSettings(
     val toolkit: ToolkitSettings = ToolkitSettings(),
     /** Key bindings changed by the user: command id to chords ("ctrl+shift+<key code>"). */
     val keymap: Map<String, List<String>> = emptyMap(),
+    /** Last parameters per plugin, as JSON objects. */
+    val pluginParams: Map<String, String> = emptyMap(),
+    /** Plugins on the quick slots (Ctrl+1 … Ctrl+4). */
+    val pluginSlots: List<String> = emptyList(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")

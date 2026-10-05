@@ -49,12 +49,16 @@ kotlin {
             implementation(compose.ui)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
+            implementation(libs.quickjs)
         }
         val desktopMain by getting {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.kotlinx.coroutines.swing)
             }
+        }
+        val desktopTest by getting {
+            dependencies { implementation(kotlin("test")) }
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

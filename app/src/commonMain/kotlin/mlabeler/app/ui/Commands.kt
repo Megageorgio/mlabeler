@@ -177,6 +177,16 @@ object Commands {
     val tiersOnTop = Command("tiers-top", S.tiersOnTop, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(tiersOnTop = !it.layout.tiersOnTop)) } }
     val autoOto = Command("auto-oto", L("Automatic oto…", "Автоматическое oto…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutoOto = true }.only(Mode.Oto)
     val record = Command("record", mlabeler.app.recorder.recordTitle, emptyList()) { e, a -> a.openRecorder(e.workspace.root) }
+    val plugins = Command("plugins", S.pluginsTitle, listOf(ch('P', ctrl = true, shift = true))) { _, a -> a.reloadPlugins(); a.showPlugins = true }
+    private fun slotCmd(k: Int, key: Key) = Command("plugin-slot-${k + 1}", L("Quick plugin ${k + 1}", "Быстрый плагин ${k + 1}"), listOf(Chord(key, ctrl = true))) { _, a ->
+        val name = a.settings.pluginSlots.getOrNull(k)?.takeIf { it.isNotEmpty() }
+        val p = a.plugins.firstOrNull { it.info.name == name }
+        if (p == null) { a.reloadPlugins(); a.showPlugins = true } else a.runPlugin(p, a.pluginParams(p))
+    }
+    val slot1 = slotCmd(0, Key.One)
+    val slot2 = slotCmd(1, Key.Two)
+    val slot3 = slotCmd(2, Key.Three)
+    val slot4 = slotCmd(3, Key.Four)
     val help = Command("help", L("How it works", "Как с этим работать"), listOf(Chord(Key.F1))) { _, a -> a.showHelp = true }
     val speed = Command("speed", L("Playback speed", "Скорость воспроизведения"), listOf(ch('Y'))) { e, _ -> e.cycleSpeed() }
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
@@ -188,7 +198,7 @@ object Commands {
     }
 
     val all = listOf(
-        overlay, tiersOnTop, autoOto, record, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        overlay, tiersOnTop, autoOto, record, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

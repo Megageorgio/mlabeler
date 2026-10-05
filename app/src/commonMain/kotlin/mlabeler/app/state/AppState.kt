@@ -30,6 +30,41 @@ class AppState(private val scope: CoroutineScope) {
     var showAutolabel by mutableStateOf(false)
     var showHelp by mutableStateOf(false)
     var showAutoOto by mutableStateOf(false)
+    var showPlugins by mutableStateOf(false)
+    var plugins by mutableStateOf<List<mlabeler.app.plugins.Plugin>>(emptyList())
+        private set
+
+    fun pluginDirs(): List<String> = listOfNotNull(
+        mlabeler.core.io.Paths.join(Platform.dataDir(), "plugins"),
+        editor?.workspace?.metaDir?.let { mlabeler.core.io.Paths.join(it, "plugins") },
+    )
+
+    fun reloadPlugins() {
+        plugins = mlabeler.app.plugins.Plugins.load(pluginDirs())
+    }
+
+    fun pluginParams(p: mlabeler.app.plugins.Plugin): Map<String, kotlinx.serialization.json.JsonElement> {
+        val saved = settings.pluginParams[p.info.name]?.let { runCatching { kotlinx.serialization.json.Json.parseToJsonElement(it) as kotlinx.serialization.json.JsonObject }.getOrNull() }
+        return p.info.parameters.associate { it.name to (saved?.get(it.name) ?: it.default) }
+    }
+
+    /** Runs a plugin on the open file or oto.ini and applies the result as one undo step. */
+    fun runPlugin(p: mlabeler.app.plugins.Plugin, params: Map<String, kotlinx.serialization.json.JsonElement>) {
+        val ed = editor ?: return
+        update { it.copy(pluginParams = it.pluginParams + (p.info.name to kotlinx.serialization.json.JsonObject(params).toString())) }
+        scope.launch {
+            try {
+                val oto = p.info.target == "oto"
+                val r = mlabeler.app.plugins.Plugins.run(p, params, if (oto) null else ed.doc, if (oto) ed.oto.entries else null, ed.item?.name ?: "", ed.duration)
+                r.doc?.let { d -> ed.updateDoc { mlabeler.core.edit.Edits.fitToDuration(d, ed.duration) } }
+                r.entries?.let { ed.oto.replaceAll(it) }
+                val text = listOfNotNull(r.report, r.logs.takeIf { it.isNotEmpty() }?.joinToString("\n")).joinToString("\n")
+                message(text.ifEmpty { mlabeler.app.i18n.S.pluginDone() })
+            } catch (e: Exception) {
+                message(e.message ?: e.toString(), error = true)
+            }
+        }
+    }
     var recorder by mutableStateOf<mlabeler.app.recorder.RecorderState?>(null)
         private set
 
@@ -93,6 +128,7 @@ class AppState(private val scope: CoroutineScope) {
         val ed = EditorState(ws, this, CoroutineScope(SupervisorJob() + Dispatchers.Main))
         editor = ed
         ed.scan()
+        reloadPlugins()
         update { it.copy(recent = (listOf(path) + it.recent.filter { r -> r != path }).take(12)) }
     }
 

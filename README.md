@@ -38,6 +38,10 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
   CV / VCV / CVVC, optional tempo, or syllables placed by an aligner model from mVocalToolkit.
 - Recording samples from a list (reclist.txt): big current line with romaji, level meter, take preview, click track
   with count-in, guide WAV, previous takes kept in `.mlabeler/takes`.
+- Plugins (Ctrl+Shift+P): JavaScript run by QuickJS on every platform, a parameter form made from `plugin.json`,
+  four quick slots (Ctrl+1…4). Built in: replace labels by a table, shift, merge short intervals, name pauses,
+  prefix/suffix; for oto: set a value by expression, sort, duplicates, alias prefix/suffix, remove by pattern.
+  "New plugin…" makes a template in the app's plugin folder.
 - Rename by pattern (Ctrl+H) for oto aliases or the active tier; sound while dragging a boundary.
 
 ## Keys

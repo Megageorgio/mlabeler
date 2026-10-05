@@ -215,6 +215,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
         IconBtn(Icons.zoomIn, S.zoomIn(), Commands.zoomIn.keyLabel) { Commands.zoomIn.run(ed, app) }
         IconBtn(Icons.fit, S.zoomFit(), Commands.zoomFit.keyLabel) { ed.fitAll() }
         Sep()
+        IconBtn(Icons.plugin, S.pluginsTitle(), Commands.plugins.keyLabel) { Commands.plugins.run(ed, app) }
         IconBtn(Icons.command, S.commands(), Commands.palette.keyLabel) { app.showCommands = true }
         MainMenu(app, ed)
         if (wc == WidthClass.Medium) {
@@ -369,6 +370,7 @@ private fun CompactMenu(app: AppState, ed: EditorState, onDetails: () -> Unit) {
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true })
             DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true })
             DropdownMenuItem({ Text(Commands.record.title()) }, onClick = { open = false; app.openRecorder(ed.workspace.root) })
+            DropdownMenuItem({ Text(S.pluginsTitle()) }, onClick = { open = false; Commands.plugins.run(ed, app) })
             DropdownMenuItem({ Text(S.closeFolder()) }, onClick = { open = false; app.closeFolder() })
         }
     }

@@ -295,6 +295,12 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         }
     }
 
+    /** Replaces all entries in one undo step (plugins). */
+    fun replaceAll(list: List<OtoEntry>) {
+        commit(list)
+        if ((selected ?: 0) >= list.size) selected = list.indices.lastOrNull()
+    }
+
     fun undo() { if (book()?.history?.undo() == true) version++ }
     fun redo() { if (book()?.history?.redo() == true) version++ }
 

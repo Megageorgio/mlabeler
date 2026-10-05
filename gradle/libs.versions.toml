@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.2.21"
+kotlin = "2.3.21"
 compose = "1.9.3"
 agp = "8.12.3"
 coroutines = "1.10.2"
@@ -7,6 +7,7 @@ serialization = "1.9.0"
 activity = "1.10.1"
 
 [libraries]
+quickjs = { module = "io.github.dokar3:quickjs-kt", version = "1.0.4" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }

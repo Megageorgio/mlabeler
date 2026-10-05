@@ -22,19 +22,23 @@ import platform.Foundation.dataWithBytes
 import platform.Foundation.timeIntervalSince1970
 import platform.Foundation.writeToFile
 import platform.CoreFoundation.CFStringConvertEncodingToNSStringEncoding
-import platform.CoreFoundation.CFStringConvertIANACharSetNameToEncoding
-import platform.Foundation.CFBridgingRetain
-import platform.CoreFoundation.CFStringRef
 import platform.posix.memcpy
 import kotlinx.cinterop.ObjCObjectVar
 import kotlinx.cinterop.BooleanVar
 
-private fun nsEncoding(charset: String): ULong {
-    if (charset.equals("UTF-8", true)) return NSUTF8StringEncoding
-    @Suppress("UNCHECKED_CAST")
-    val cf = CFBridgingRetain(charset as NSString) as CFStringRef?
-    val enc = CFStringConvertIANACharSetNameToEncoding(cf)
-    return CFStringConvertEncodingToNSStringEncoding(enc)
+/** NSStringEncoding values for the charsets the app offers. */
+private fun nsEncoding(charset: String): ULong = when (charset.uppercase().replace("_", "-")) {
+    "UTF-8" -> NSUTF8StringEncoding
+    "SHIFT-JIS", "SJIS", "WINDOWS-31J", "MS932" -> 8uL
+    "ISO-8859-1" -> 5uL
+    "WINDOWS-1251" -> 11uL
+    "WINDOWS-1252" -> 12uL
+    "UTF-16LE" -> 0x94000100uL
+    "UTF-16BE" -> 0x90000100uL
+    "GBK", "GB18030", "GB2312" -> CFStringConvertEncodingToNSStringEncoding(0x0632u).toULong()
+    "BIG5" -> CFStringConvertEncodingToNSStringEncoding(0x0A03u).toULong()
+    "EUC-KR" -> CFStringConvertEncodingToNSStringEncoding(0x0940u).toULong()
+    else -> NSUTF8StringEncoding
 }
 
 private fun ByteArray.toNSData(): NSData = usePinned { NSData.dataWithBytes(it.addressOf(0), size.toULong()) }
@@ -55,8 +59,7 @@ actual fun decodeText(bytes: ByteArray, charset: String): String {
 
 actual fun encodeText(text: String, charset: String): ByteArray {
     if (charset.equals("UTF-8", true)) return text.encodeToByteArray()
-    @Suppress("CAST_NEVER_SUCCEEDS")
-    val data = (text as NSString).dataUsingEncoding(nsEncoding(charset), allowLossyConversion = true)
+    val data = NSString.create(string = text).dataUsingEncoding(nsEncoding(charset), allowLossyConversion = true)
     return data?.toByteArray() ?: text.encodeToByteArray()
 }
 
