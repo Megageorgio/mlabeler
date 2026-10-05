@@ -238,3 +238,51 @@ class StretchTest {
         assertTrue(mid in 212f..228f, "f0 $mid")
     }
 }
+
+class AutoOtoTest {
+    private fun synth(sr: Int, parts: List<Triple<Double, Double, Int>>): FloatArray {
+        // (duration s, f0 Hz or 0 = noise, -1 = silence)
+        val out = ArrayList<Float>()
+        val rnd = kotlin.random.Random(1)
+        var ph = 0.0
+        for ((dur, f0, kind) in parts.map { Triple(it.first, it.second, it.third) }) {
+            val n = (dur * sr).toInt()
+            for (i in 0 until n) {
+                val t = i.toDouble() / sr
+                val env = min(1.0, min(t / 0.02, (dur - t) / 0.02))
+                out += when (kind) {
+                    -1 -> (rnd.nextDouble() - 0.5).toFloat() * 0.002f
+                    0 -> (rnd.nextDouble() - 0.5).toFloat() * 0.2f
+                    else -> { ph += 2 * kotlin.math.PI * f0 / sr; ((0.5 * kotlin.math.sin(ph) + 0.2 * kotlin.math.sin(2 * ph)) * env).toFloat() }
+                }
+            }
+        }
+        return out.toFloatArray()
+    }
+    private fun min(a: Double, b: Double) = kotlin.math.min(a, b)
+
+    @Test
+    fun namesAndSegments() {
+        val syl = mlabeler.core.oto.Syllables.fromName("_かさなきゃ")
+        assertEquals(listOf("か", "さ", "な", "きゃ"), syl.map { it.text })
+        assertEquals("ky", syl[3].consonant)
+        assertEquals("a", syl[3].vowel)
+        assertEquals(listOf("ma", "mo"), mlabeler.core.oto.Syllables.fromName("ma_mo").map { it.text })
+        val sr = 22050
+        val x = synth(sr, listOf(
+            Triple(0.4, 0.0, -1), Triple(0.08, 0.0, 0), Triple(0.45, 220.0, 1), Triple(0.12, 0.0, 0),
+            Triple(0.5, 247.0, 1), Triple(0.12, 0.0, 0), Triple(0.6, 262.0, 1), Triple(0.5, 0.0, -1),
+        ))
+        val t = mlabeler.core.oto.AutoOto.segment(x, sr, mlabeler.core.oto.Syllables.fromName("_かさな"))
+        assertEquals(3, t.size)
+        val expectC = listOf(0.40, 0.93, 1.55)
+        val expectV = listOf(0.48, 1.05, 1.67)
+        for (k in 0..2) {
+            assertTrue(kotlin.math.abs(t[k].cStart - expectC[k]) < 0.04, "c$k ${t[k].cStart}")
+            assertTrue(kotlin.math.abs(t[k].vStart - expectV[k]) < 0.04, "v$k ${t[k].vStart}")
+        }
+        val e = mlabeler.core.oto.AutoOto.entries("_かさな.wav", t, x.size * 1000.0 / sr, mlabeler.core.oto.AutoOtoSettings())
+        assertEquals(listOf("- か", "a さ", "a な"), e.map { it.alias })
+        assertTrue(e.all { it.preutterance > it.overlap && it.cutoff < 0 })
+    }
+}

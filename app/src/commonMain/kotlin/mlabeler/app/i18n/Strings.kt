@@ -186,6 +186,8 @@ object S {
     val overlay = L("Overlaid view: waveform, spectrogram and labels in one picture", "Наложенный вид: волна, спектрограмма и разметка в одной картинке")
     val overlayShort = L("Overlaid / separate lanes", "Наложить / разнести полосы")
     val tiersOnTop = L("Labels above the audio", "Разметка над звуком")
+    val nothingToDo = L("Nothing to do", "Делать нечего")
+    val autoOtoDone = L("{0} entries for {1} files; {2} skipped", "записей: {0} для файлов: {1}; пропущено: {2}")
     val general = L("General", "Общие")
     val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")

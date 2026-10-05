@@ -207,6 +207,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
         SpeedButton(ed, s.edit.speed)
         Sep()
         if (ed.mode == Mode.Oto) {
+            IconBtn(Icons.magic, Commands.autoOto.title(), Commands.autoOto.keyLabel) { app.showAutoOto = true }
             IconBtn(Icons.plus, Commands.otoAdd.title(), Commands.otoAdd.keyLabel) { ed.oto.add() }
             IconBtn(Icons.merge, Commands.otoDuplicate.title(), Commands.otoDuplicate.keyLabel, enabled = ed.oto.current() != null) { ed.oto.duplicate() }
             IconBtn(Icons.trash, Commands.otoDelete.title(), Commands.otoDelete.keyLabel, enabled = ed.oto.current() != null) { ed.oto.delete() }

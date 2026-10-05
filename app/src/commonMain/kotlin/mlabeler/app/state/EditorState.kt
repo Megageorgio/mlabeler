@@ -230,8 +230,9 @@ class EditorState(
     // ---------- autolabel through the toolkit ----------
 
     var toolkitBusy by mutableStateOf<String?>(null)
-        private set
-    private var toolkitJob: Job? = null
+    var toolkitJob: Job? = null
+    /** Coroutine scope of this folder (background work that stops when the folder closes). */
+    val workScope: CoroutineScope get() = scope
 
     /**
      * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown

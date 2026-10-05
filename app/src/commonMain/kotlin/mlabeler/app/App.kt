@@ -41,6 +41,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)
                     if (app.showAutolabel && ed != null) mlabeler.app.ui.AutolabelDialog(app)
                     if (app.showHelp) mlabeler.app.ui.HelpDialog(app)
+                    if (app.showAutoOto && ed != null) mlabeler.app.ui.AutoOtoDialog(app)
                     app.folderPick?.let { pick ->
                         mlabeler.app.ui.FolderBrowser(
                             start = ed?.workspace?.root ?: Platform.homeDir(),
