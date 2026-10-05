@@ -31,6 +31,7 @@ class AppState(private val scope: CoroutineScope) {
     var showHelp by mutableStateOf(false)
     var showAutoOto by mutableStateOf(false)
     var showPlugins by mutableStateOf(false)
+    var showImport by mutableStateOf(false)
     var plugins by mutableStateOf<List<mlabeler.app.plugins.Plugin>>(emptyList())
         private set
 

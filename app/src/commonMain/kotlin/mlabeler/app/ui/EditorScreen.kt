@@ -253,6 +253,7 @@ private fun MainMenu(app: AppState, ed: EditorState) {
             DropdownMenuItem({ Text(S.power()) }, onClick = { open = false; Commands.powerLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPower) TextIcon("✓") })
             DropdownMenuItem({ Text(Commands.workspace.title()) }, onClick = { open = false; app.showWorkspace = true })
             DropdownMenuItem({ Text(Commands.record.title()) }, onClick = { open = false; app.openRecorder(ed.workspace.root) })
+            DropdownMenuItem({ Text(Commands.importLbp.title()) }, onClick = { open = false; app.showImport = true })
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true }, trailingIcon = { TextIcon(Commands.settings.keyLabel) })
             DropdownMenuItem({ Text(Commands.help.title()) }, onClick = { open = false; app.showHelp = true }, trailingIcon = { TextIcon("F1") })
         }

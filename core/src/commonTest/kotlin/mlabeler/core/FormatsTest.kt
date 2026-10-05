@@ -286,3 +286,21 @@ class AutoOtoTest {
         assertTrue(e.all { it.preutterance > it.overlap && it.cutoff < 0 })
     }
 }
+
+class VLabelerImportTest {
+    @Test
+    fun otoProject() {
+        val text = """{"version":4,"rootSampleDirectory":"/v/bank","labelerConf":{"name":"oto-plus.default","fields":[{"name":"fixed"},{"name":"preu"},{"name":"ovl"},{"name":"left"}]},
+          "modules":[{"name":"","sampleDirectory":"","entries":[
+            {"sample":"_あ.wav","name":"- あ","start":90,"end":700,"points":[300,250,120,100],"extras":[],"notes":{"done":true,"star":false,"tag":"x"}},
+            {"sample":"_あ.wav","name":"a あ","start":500,"end":-100,"points":[800,750,620,600],"extras":[]}
+          ],"currentIndex":0}]}"""
+        val p = mlabeler.core.format.VLabelerProject.read(text)
+        val e = p.oto["/v/bank"]!!
+        assertEquals(100.0, e[0].offset)
+        assertEquals(150.0, e[0].preutterance)
+        assertEquals(-600.0, e[0].cutoff)
+        assertEquals(100.0, e[1].cutoff)
+        assertEquals(true, p.marks["/v/bank|_あ.wav|- あ"]!!.done)
+    }
+}

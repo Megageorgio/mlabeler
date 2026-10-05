@@ -44,6 +44,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showAutolabel && ed != null) mlabeler.app.ui.AutolabelDialog(app)
                     if (app.showHelp) mlabeler.app.ui.HelpDialog(app)
                     if (app.showPlugins && ed != null) mlabeler.app.ui.PluginsDialog(app)
+                    if (app.showImport && ed != null) mlabeler.app.ui.ImportDialog(app)
                     if (app.showAutoOto && ed != null) mlabeler.app.ui.AutoOtoDialog(app)
                     app.folderPick?.let { pick ->
                         mlabeler.app.ui.FolderBrowser(

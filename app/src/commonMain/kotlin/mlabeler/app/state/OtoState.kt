@@ -37,6 +37,13 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     var dragPreview by mutableStateOf<OtoAbsolute?>(null)
         private set
 
+    /** Forgets loaded oto.ini files (after they were written by something else). */
+    fun invalidate() {
+        books.clear()
+        selected = null
+        version++
+    }
+
     fun bookPath(item: Item) = Paths.join(Paths.parent(item.audioPath), "oto.ini")
 
     fun hasOto(item: Item) = ed.workspace.fs.exists(bookPath(item))
