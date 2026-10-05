@@ -68,5 +68,6 @@ object Icons {
     val warn = icon("warn", "M12 4l9 16H3z", "M12 10v4", "M12 17v.01")
     val command = icon("command", "M4 6h16v12H4z", "M7 10l3 2-3 2", "M12 14h5")
     val back = icon("back", "M15 5l-7 7 7 7")
+    val layers = icon("layers", "M12 4l8 4-8 4-8-4z", "M4 12l8 4 8-4", "M4 16l8 4 8-4")
     val home = icon("home", "M4 11l8-7 8 7", "M6 9.5V20h12V9.5")
 }

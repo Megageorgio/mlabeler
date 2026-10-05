@@ -27,6 +27,10 @@ data class LayoutSettings(
     val pitchOverSpectrogram: Boolean = true,
     val pitchShare: Float = 0.3f,
     val powerShare: Float = 0.18f,
+    /** Waveform over the spectrogram and labels over both, instead of separate lanes. */
+    val overlay: Boolean = false,
+    /** Label tiers above the audio instead of below. */
+    val tiersOnTop: Boolean = false,
 )
 
 @Serializable

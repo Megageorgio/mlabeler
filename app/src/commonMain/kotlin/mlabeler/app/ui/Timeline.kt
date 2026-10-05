@@ -121,20 +121,26 @@ private class Geom(
     val pitchBottom: Float = 0f,
     val powerTop: Float = 0f,
     val powerBottom: Float = 0f,
+    val overlay: Boolean = false,
+    val tiersOnTop: Boolean = false,
 ) {
+    val tiersBottom: Float get() = tiersTop + tierH * tierCount
+    val audioTop: Float get() = min(waveTop, specTop)
+    val audioBottom: Float get() = maxOf(waveBottom, specBottom, pitchBottom, powerBottom)
+
     fun region(y: Float, grab: Float): Region? {
         if (y < ruler) return Region.Ruler
-        if (waveBottom > waveTop && specBottom > specTop && abs(y - waveBottom) < grab / 2) return Region.WaveSpecSplit
-        if (tierCount > 0 && specBottom > ruler && abs(y - tiersTop) < grab / 2) return Region.TierSplit
+        if (tierCount > 0 && y >= tiersTop && y < tiersBottom) {
+            if (!overlay && !tiersOnTop && abs(y - tiersTop) < grab / 2) return Region.TierSplit
+            if (!overlay && tiersOnTop && abs(y - tiersBottom) < grab / 2) return Region.TierSplit
+            return Region.Tier(((y - tiersTop) / tierH).toInt().coerceIn(0, tierCount - 1))
+        }
+        if (!overlay && tierCount > 0 && abs(y - (if (tiersOnTop) tiersBottom else tiersTop)) < grab / 2) return Region.TierSplit
+        if (!overlay && waveBottom > waveTop && specBottom > specTop && abs(y - waveBottom) < grab / 2) return Region.WaveSpecSplit
+        if (y in specTop..specBottom && specBottom > specTop) return Region.Spec
         if (y in waveTop..waveBottom) return Region.Wave
-        if (y in specTop..specBottom) return Region.Spec
-        // pitch and power lanes behave like the spectrogram for clicks and drags
         if (y in pitchTop..pitchBottom && pitchBottom > pitchTop) return Region.Spec
         if (y in powerTop..powerBottom && powerBottom > powerTop) return Region.Spec
-        if (y >= tiersTop) {
-            val k = ((y - tiersTop) / tierH).toInt()
-            if (k in 0 until tierCount) return Region.Tier(k)
-        }
         return null
     }
 
@@ -146,29 +152,46 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val h = size.height.toFloat()
     val ruler = 22f * density
     val tierH = layout.tierHeight.coerceIn(28f, 96f) * density * (if (Platform.isMobile) 1.15f else 1f)
-    var tiersH = tierH * tiers
     val minAudio = 48f * density
-    val audioH = max(minAudio, h - ruler - tiersH)
-    tiersH = h - ruler - audioH
+    val overlay = layout.overlay
+    // stacked: tiers take their own space; overlaid: they lie over the audio picture
+    var tiersH = tierH * tiers
+    val audioH = if (overlay) h - ruler else max(minAudio, h - ruler - tiersH)
+    if (!overlay) tiersH = h - ruler - audioH else tiersH = min(tiersH, (h - ruler) * 0.6f)
     val tierHeight = if (tiers > 0) min(tierH, tiersH / tiers) else tierH
-    // separate pitch and power lanes take a share of the audio area from the bottom
+    val audioTop = if (layout.tiersOnTop && !overlay) ruler + tiersH else ruler
+    val tiersTop = when {
+        overlay && layout.tiersOnTop -> ruler
+        overlay -> h - tiersH
+        layout.tiersOnTop -> ruler
+        else -> ruler + audioH
+    }
     val pitchH = if (layout.showPitch && !layout.pitchOverSpectrogram) audioH * layout.pitchShare.coerceIn(0.1f, 0.6f) else 0f
     val powerH = if (layout.showPower) audioH * layout.powerShare.coerceIn(0.08f, 0.5f) else 0f
     val mainH = audioH - pitchH - powerH
     val showW = layout.showWaveform
     val showS = layout.showSpectrogram
-    val waveH = when {
-        showW && showS -> mainH * layout.waveShare.coerceIn(0.1f, 0.9f)
-        showW -> mainH
-        else -> 0f
+    val waveTop: Float
+    val waveBottom: Float
+    val specTop: Float
+    val specBottom: Float
+    if (overlay) {
+        // waveform drawn over the spectrogram in the same place
+        waveTop = audioTop; waveBottom = if (showW) audioTop + mainH else audioTop
+        specTop = audioTop; specBottom = if (showS) audioTop + mainH else audioTop
+    } else {
+        val waveH = when {
+            showW && showS -> mainH * layout.waveShare.coerceIn(0.1f, 0.9f)
+            showW -> mainH
+            else -> 0f
+        }
+        waveTop = audioTop; waveBottom = audioTop + waveH
+        specTop = waveBottom; specBottom = if (showS || !showW) audioTop + mainH else waveBottom
     }
-    val waveTop = ruler
-    val waveBottom = ruler + waveH
-    val specTop = waveBottom
-    val specBottom = if (showS || !showW) ruler + mainH else waveBottom
-    val pitchTop = ruler + mainH
+    val pitchTop = audioTop + mainH
     val powerTop = pitchTop + pitchH
-    return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, ruler + audioH, tierHeight, tiers, pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH)
+    return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, tiersTop, tierHeight, tiers,
+        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop)
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -331,7 +354,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 if (region == Region.WaveSpecSplit) {
                                     onLayoutState.value(l.copy(waveShare = (l.waveShare + dy / audioH).coerceIn(0.1f, 0.9f)))
                                 } else if (g.tierCount > 0) {
-                                    onLayoutState.value(l.copy(tierHeight = (l.tierHeight - dy / density / g.tierCount).coerceIn(28f, 96f)))
+                                    onLayoutState.value(l.copy(tierHeight = (l.tierHeight + (if (g.tiersOnTop) dy else -dy) / density / g.tierCount).coerceIn(28f, 96f)))
                                 }
                             }
                             return@awaitEachGesture
@@ -636,7 +659,7 @@ private fun DrawScope.drawTimeline(
                     val yy = mid - audio.samples[s] * amp
                     if (first) { path.moveTo(xx, yy); first = false } else path.lineTo(xx, yy)
                 }
-                drawPath(path, c.wave, style = Stroke(1.2f * px))
+                drawPath(path, if (g.overlay) c.wave.copy(alpha = 0.75f) else c.wave, style = Stroke(1.2f * px))
             } else if (peaks != null) {
                 val cols = min(w.toInt(), max(0, endX.toInt() + 1))
                 for (col in max(0, x(0.0).toInt())..cols) {
@@ -647,11 +670,11 @@ private fun DrawScope.drawTimeline(
                     path.moveTo(col + 0.5f, mid - hi * amp)
                     path.lineTo(col + 0.5f, mid - lo * amp + 0.5f)
                 }
-                drawPath(path, c.wave, style = Stroke(px))
+                drawPath(path, if (g.overlay) c.wave.copy(alpha = 0.38f) else c.wave, style = Stroke(px))
             }
         }
     }
-    if (g.specBottom > g.specTop && g.waveBottom > g.waveTop) drawLine(c.border, Offset(0f, g.waveBottom), Offset(w, g.waveBottom), px)
+    if (!g.overlay && g.specBottom > g.specTop && g.waveBottom > g.waveTop) drawLine(c.border, Offset(0f, g.waveBottom), Offset(w, g.waveBottom), px)
 
     drawCurves(ed, g, c, measurer, smallStyle, ::x)
 
@@ -662,7 +685,7 @@ private fun DrawScope.drawTimeline(
 
     // range selection
     ed.range?.let { (a, b) ->
-        drawRect(c.selectionRange, Offset(x(a), g.ruler), Size(x(b) - x(a), g.tiersTop - g.ruler))
+        drawRect(c.selectionRange, Offset(x(a), g.audioTop), Size(x(b) - x(a), g.audioBottom - g.audioTop))
     }
 
     if (ed.mode == Mode.Oto) {
@@ -677,7 +700,7 @@ private fun DrawScope.drawTimeline(
 
     // guide lines of the active tier across the audio area
     val guide = doc.tiers.getOrNull(ed.guideTier) as? IntervalTier
-    if (guide != null && g.tiersTop > g.ruler) {
+    if (guide != null && g.audioBottom > g.audioTop) {
         val i0 = max(0, guide.indexAt(v0).let { if (it < 0) 0 else it })
         for (b in i0..guide.size) {
             val bt = guide.bounds[b]
@@ -685,7 +708,7 @@ private fun DrawScope.drawTimeline(
             val xx = x(bt)
             val selected = sel is Selection.Bound && sel.ref.tier == ed.guideTier && sel.ref.bound == b
             drawLine(
-                if (selected) c.boundSelected else c.bound.copy(alpha = 0.45f), Offset(xx, g.ruler), Offset(xx, g.tiersTop),
+                if (selected) c.boundSelected else c.bound.copy(alpha = 0.45f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom),
                 if (selected) 2 * px else px,
                 pathEffect = if (selected) null else PathEffect.dashPathEffect(floatArrayOf(4 * px, 3 * px)),
             )
@@ -693,7 +716,7 @@ private fun DrawScope.drawTimeline(
         if (sel is Selection.Interval && sel.ref.tier == ed.guideTier && sel.ref.index < guide.size) {
             val a = x(guide.startOf(sel.ref.index))
             val b = x(guide.endOf(sel.ref.index))
-            drawRect(c.intervalSelected.copy(alpha = c.intervalSelected.alpha * 0.45f), Offset(a, g.ruler), Size(b - a, g.tiersTop - g.ruler))
+            drawRect(c.intervalSelected.copy(alpha = c.intervalSelected.alpha * 0.45f), Offset(a, g.audioTop), Size(b - a, g.audioBottom - g.audioTop))
         }
     }
 
@@ -703,7 +726,7 @@ private fun DrawScope.drawTimeline(
         val bottom = top + g.tierH
         if (top >= g.height) break
         val active = k == ed.activeTier
-        drawRect(if (active) c.panelAlt else c.panel, Offset(0f, top), Size(w, g.tierH))
+        drawRect((if (active) c.panelAlt else c.panel).copy(alpha = if (g.overlay) 0.62f else 1f), Offset(0f, top), Size(w, g.tierH))
         drawLine(c.border, Offset(0f, top), Offset(w, top), px)
         val tierColor = c.tierColors[k % c.tierColors.size]
         drawRect(tierColor, Offset(0f, top), Size(3 * px, g.tierH))
@@ -1012,7 +1035,7 @@ private fun DrawScope.drawReferences(
         val top = g.tierTop(k)
         val bottom = top + g.tierH
         if (top >= size.height) break
-        drawRect(c.bg, Offset(0f, top), Size(w, g.tierH))
+        drawRect(c.bg.copy(alpha = if (g.overlay) 0.62f else 1f), Offset(0f, top), Size(w, g.tierH))
         drawLine(c.border, Offset(0f, top), Offset(w, top), px)
         val main = mlabeler.core.check.Compare.counterpart(doc, ref)
         val deltas = main?.let { mlabeler.core.check.Compare.boundDeltas(it, ref) }

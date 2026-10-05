@@ -218,6 +218,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
             IconBtn(Icons.link, S.linked() + " — " + S.linkedHint(), Commands.linked.keyLabel, active = s.edit.linked) { Commands.linked.run(ed, app) }
         }
         Sep()
+        IconBtn(Icons.layers, S.overlayShort(), Commands.overlay.keyLabel, active = s.layout.overlay) { Commands.overlay.run(ed, app) }
         IconBtn(Icons.zoomOut, S.zoomOut(), Commands.zoomOut.keyLabel) { Commands.zoomOut.run(ed, app) }
         IconBtn(Icons.zoomIn, S.zoomIn(), Commands.zoomIn.keyLabel) { Commands.zoomIn.run(ed, app) }
         IconBtn(Icons.fit, S.zoomFit(), Commands.zoomFit.keyLabel) { ed.fitAll() }
@@ -249,6 +250,7 @@ private fun MainMenu(app: AppState, ed: EditorState) {
             DropdownMenuItem({ Text(S.waveform()) }, onClick = { open = false; Commands.wave.run(ed, app) }, trailingIcon = { if (app.settings.layout.showWaveform) TextIcon("✓") })
             DropdownMenuItem({ Text(S.spectrogram()) }, onClick = { open = false; Commands.spectrogram.run(ed, app) }, trailingIcon = { if (app.settings.layout.showSpectrogram) TextIcon("✓") })
             DropdownMenuItem({ Text(S.pitch()) }, onClick = { open = false; Commands.pitchLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPitch) TextIcon("✓") })
+            DropdownMenuItem({ Text(S.tiersOnTop()) }, onClick = { open = false; Commands.tiersOnTop.run(ed, app) }, trailingIcon = { if (app.settings.layout.tiersOnTop) TextIcon("✓") })
             DropdownMenuItem({ Text(S.power()) }, onClick = { open = false; Commands.powerLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPower) TextIcon("✓") })
             DropdownMenuItem({ Text(Commands.workspace.title()) }, onClick = { open = false; app.showWorkspace = true })
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true }, trailingIcon = { TextIcon(Commands.settings.keyLabel) })
