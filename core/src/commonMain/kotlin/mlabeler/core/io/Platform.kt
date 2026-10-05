@@ -55,6 +55,8 @@ interface FileSystem {
     fun size(path: String): Long
     fun lastModified(path: String): Long
     fun copy(from: String, to: String) = write(to, read(from))
+    /** Deletes a file; false when it couldn't. */
+    fun delete(path: String): Boolean = false
 }
 
 expect val PlatformFs: FileSystem

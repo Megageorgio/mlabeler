@@ -236,9 +236,22 @@ object S {
     val hzShort = L("Hz", "Гц")
     val secondsShort = L("s", "с")
     val overlayDim = L("Darken the spectrogram under labels", "Затемнять спектрограмму под разметкой")
-    val setupHint = L("Two starting points. Either one can be changed bit by bit below and in the View menu.",
-        "Две отправные точки. Любую можно потом подстроить ниже и в меню «Вид».")
     val toolbarHint = L("Button groups on the toolbar and their order:", "Группы кнопок на панели и их порядок:")
     val autolabelCompareDone = L("Done: the result is under your labels. Keep it or remove it with the buttons above the picture.",
         "Готово: результат — под вашей разметкой. Принять или убрать — кнопками над картинкой.")
+    val otherAudio = L("Also list mp3, flac, ogg and other audio (WAV only otherwise)", "Показывать и mp3, flac, ogg и другой звук (иначе только WAV)")
+    val environment = L("Work environment", "Рабочая среда")
+    val environments = L("Work environments", "Рабочие среды")
+    val environmentChanged = L("changed", "изменена")
+    val environmentSaved = L("Saved environment \"{0}\"", "Среда «{0}» сохранена")
+    val environmentSaveAs = L("Save the current one as…", "Сохранить текущую как…")
+    val environmentName = L("Name of the new environment", "Название новой среды")
+    val environmentHint = L("An environment is a set of panels, lanes and toolbar buttons. Change anything, then save it as your own; environment files can be passed to other people.",
+        "Рабочая среда — это набор панелей, полос и кнопок. Настройте всё под себя и сохраните как свою; файлы сред можно передавать другим.")
+    val environmentsFolder = L("Open the environments folder", "Открыть папку сред")
+    val environmentUpdate = L("Save changes to \"{0}\"", "Сохранить изменения в «{0}»")
+    val reset = L("Reset", "Вернуть как было")
+    val chooseEnvironment = L("Choose a work environment", "Выберите рабочую среду")
+    val chooseEnvironmentHint = L("It can be changed later in View → Work environment.", "Её можно сменить потом: Вид → Рабочая среда.")
+    val overlayWaveFill = L("Filled waveform in the overlaid view", "Закрашенная волна в наложенном виде")
 }

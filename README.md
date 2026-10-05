@@ -41,7 +41,12 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
   label band, so labels stay readable; or separate lanes; labels above or below.
 - Menu bar (File, Edit, View, Go, Tools, Help) with the shortcut next to every item; View has check boxes for
   panels, lanes and toolbar groups. Toolbar groups can be shown, hidden and reordered, with names under the
-  buttons or as compact icons. On the first start: "Simple" or "Everything". Phones keep the button menus.
+  buttons or as compact icons. Work environments (Basic, Labeling, One picture, Full, plus your own saved ones —
+  JSON files that can be shared) are chosen on the first start and in View → Work environment. Phones keep the button menus.
+- Themes: built-in ones or editable copies where every colour (with opacity), the spectrogram gradient, tier colours,
+  corner rounding, border width and font can be changed; changes show at once.
+- System folder dialog (Explorer with the address bar on Windows). Only WAV files are listed unless other formats are
+  turned on in Settings → General.
 - Every slider in the settings has a number field next to it for an exact value.
 - Automatic oto (Ctrl+Shift+A in oto folders): entries from file names (kana, romaji, Cyrillic) and the recordings,
   CV / VCV / CVVC, optional tempo, or syllables placed by an aligner model from mVocalToolkit.

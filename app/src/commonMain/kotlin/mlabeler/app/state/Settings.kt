@@ -33,6 +33,8 @@ data class LayoutSettings(
     val tiersOnTop: Boolean = false,
     /** How much the spectrogram is darkened in the overlaid view so labels and the waveform stay readable (0..0.8). */
     val overlayDim: Float = 0.35f,
+    /** Overlaid view: fill the waveform instead of drawing only its outline. */
+    val overlayWaveFill: Boolean = false,
 )
 
 @Serializable
@@ -114,23 +116,6 @@ object ToolbarGroups {
     val simple = listOf(FILES, HISTORY, PLAY, EDIT, AUTO)
 }
 
-/** The two starting points offered on first start; everything can be changed later. */
-object Setups {
-    fun simple(s: AppSettings) = s.copy(
-        setupDone = true,
-        menuBar = !Platform.isMobile,
-        toolbar = ToolbarSettings(ToolbarGroups.simple, labels = true, big = true),
-        layout = s.layout.copy(showInspector = false, showPitch = false, showPower = false, overlay = false, showSpectrogram = true, showFiles = true),
-    )
-
-    fun everything(s: AppSettings) = s.copy(
-        setupDone = true,
-        menuBar = !Platform.isMobile,
-        toolbar = ToolbarSettings(ToolbarGroups.all, labels = false, big = false),
-        layout = s.layout.copy(showInspector = true, showPitch = true, showFiles = true),
-    )
-}
-
 @Serializable
 data class AppSettings(
     val language: String = "",
@@ -166,6 +151,10 @@ data class AppSettings(
     val toolbar: ToolbarSettings = ToolbarSettings(),
     /** The first-start choice (simple or everything) was made. */
     val setupDone: Boolean = false,
+    /** List mp3, flac, ogg … too (needs ffmpeg on computers); WAV only by default. */
+    val otherAudio: Boolean = false,
+    /** Id of the chosen work environment (built-in id or "user:<name>"). */
+    val environment: String = "basic",
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")

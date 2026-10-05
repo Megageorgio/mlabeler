@@ -24,7 +24,9 @@ func main() {
 		fail(err.Error())
 	}
 	dir := filepath.Dir(exe)
-	java := filepath.Join(dir, "runtime", "bin", "javaw.exe")
+	// java.exe (a console program) started without a window: the app and everything it starts (the toolkit,
+	// its engines, ffmpeg) share one hidden console, so no console windows pop up.
+	java := filepath.Join(dir, "runtime", "bin", "java.exe")
 	args := []string{
 		"-Xss4m",
 		"-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8",
@@ -34,7 +36,7 @@ func main() {
 	args = append(args, os.Args[1:]...)
 	cmd := exec.Command(java, args...)
 	cmd.Dir = dir
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 	if err := cmd.Start(); err != nil {
 		fail("Can't start Java from " + java + ":\n" + err.Error() + "\n\nUnpack the whole folder, not only mLabeler.exe.")
 	}

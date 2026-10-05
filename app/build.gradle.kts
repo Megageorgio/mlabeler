@@ -54,9 +54,17 @@ kotlin {
         val desktopMain by getting {
             dependencies {
                 // -Pdesktop.target=windows builds a Windows portable folder from any OS (see windowsPortableLibs)
-                when (findProperty("desktop.target")) {
-                    "windows" -> implementation(compose.desktop.windows_x64)
-                    else -> implementation(compose.desktop.currentOs)
+                val windowsOnly = findProperty("desktop.target") == "windows"
+                if (windowsOnly) implementation(compose.desktop.windows_x64) else implementation(compose.desktop.currentOs)
+                // system folder dialog (Explorer with the address bar on Windows)
+                val lwjgl = "3.3.6"
+                implementation("org.lwjgl:lwjgl:$lwjgl")
+                implementation("org.lwjgl:lwjgl-nfd:$lwjgl")
+                val natives = if (windowsOnly) listOf("natives-windows")
+                    else listOf("natives-windows", "natives-linux", "natives-macos", "natives-macos-arm64")
+                for (n in natives) {
+                    runtimeOnly("org.lwjgl:lwjgl:$lwjgl:$n")
+                    runtimeOnly("org.lwjgl:lwjgl-nfd:$lwjgl:$n")
                 }
                 implementation(libs.kotlinx.coroutines.swing)
             }
@@ -104,7 +112,7 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "mLabeler"
             packageVersion = appVersion.substringBefore('-').let { if (it.startsWith("0.")) "1." + it.removePrefix("0.") else it }
-            modules("java.desktop")
+            modules("java.desktop", "jdk.unsupported")
             windows { menu = true; perUserInstall = true; upgradeUuid = "6f1d1d7e-2b8e-4c39-9a41-6b2a0c6d0f2e" }
             macOS { bundleID = "io.github.megageorgio.mlabeler" }
         }

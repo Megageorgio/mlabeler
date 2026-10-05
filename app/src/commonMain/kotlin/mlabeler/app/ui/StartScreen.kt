@@ -69,7 +69,7 @@ fun StartScreen(app: AppState) {
             Spacer(Modifier.height(28.dp))
             val open = {
                 if (Platform.hasNativeFolderPicker) {
-                    Platform.pickFolderNative(S.openFolder())?.let { app.openFolder(it) }
+                    app.pickFolder(S.openFolder()) { app.openFolder(it) }
                 } else {
                     browsing = true
                 }

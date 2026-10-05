@@ -43,7 +43,7 @@ actual object Platform {
     actual fun homeDir(): String = dir(NSDocumentDirectory)
     actual fun places(): List<Pair<String, String>> = listOf("Documents" to homeDir())
     actual val hasNativeFolderPicker: Boolean = false
-    actual fun pickFolderNative(title: String): String? = null
+    actual fun pickFolderNative(title: String, start: String?): String? = null
     actual fun decodeAudio(path: String): Audio? = null
     actual fun openInFileManager(path: String) = Unit
     actual fun applyScreen(orientation: String, fullscreen: Boolean) = Unit

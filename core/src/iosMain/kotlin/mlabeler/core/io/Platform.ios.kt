@@ -81,6 +81,7 @@ actual val PlatformFs: FileSystem = object : FileSystem {
     override fun mkdirs(path: String) {
         fm.createDirectoryAtPath(path, true, null, null)
     }
+    override fun delete(path: String): Boolean = fm.removeItemAtPath(path, null)
     override fun size(path: String): Long =
         ((fm.attributesOfItemAtPath(path, null)?.get(NSFileSize)) as? NSNumber)?.longLongValue ?: 0L
     override fun lastModified(path: String): Long =

@@ -28,6 +28,7 @@ actual val PlatformFs: FileSystem = object : FileSystem {
     override fun mkdirs(path: String) {
         File(path).mkdirs()
     }
+    override fun delete(path: String) = File(path).delete()
     override fun size(path: String) = File(path).length()
     override fun lastModified(path: String) = File(path).lastModified()
 }

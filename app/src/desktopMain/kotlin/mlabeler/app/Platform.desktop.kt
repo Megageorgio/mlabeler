@@ -46,11 +46,14 @@ actual object Platform {
 
     actual val hasNativeFolderPicker: Boolean = true
 
-    actual fun pickFolderNative(title: String): String? {
+    actual fun pickFolderNative(title: String, start: String?): String? {
+        // the system folder dialog (Explorer on Windows, with the address bar; GTK/portal on Linux; Finder on macOS)
+        runCatching { return NativeFolderDialog.pick(start) }.onFailure { System.err.println("native folder dialog: $it") }
         if (isMac) {
             System.setProperty("apple.awt.fileDialogForDirectories", "true")
             try {
                 val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
+                if (start != null) d.directory = start
                 d.isVisible = true
                 val dir = d.directory ?: return null
                 val file = d.file ?: return null
@@ -59,10 +62,9 @@ actual object Platform {
                 System.setProperty("apple.awt.fileDialogForDirectories", "false")
             }
         }
-        // Windows and Linux: the system Open dialog (Explorer / GTK). Any file in the folder opens the folder.
+        // last resort: an Open dialog where any file in the folder opens the folder
         val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
-        d.file = "*.wav;*.flac;*.mp3;*.ogg;*.m4a;*.lab;*.TextGrid;*.ini"
-        d.setFilenameFilter { _, name -> name.substringAfterLast('.', "").lowercase() in setOf("wav", "flac", "mp3", "ogg", "m4a", "lab", "textgrid", "ini", "txt") }
+        if (start != null) d.directory = start
         d.isVisible = true
         val dir = d.directory ?: return null
         return File(dir).path

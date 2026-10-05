@@ -1,6 +1,7 @@
 package mlabeler.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -48,7 +49,6 @@ import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.Mode
-import mlabeler.app.state.Setups
 import mlabeler.app.state.ToolbarGroups
 
 sealed interface MenuEntry
@@ -85,8 +85,6 @@ object MenuTitles {
     val bigButtons = L("Big buttons", "Крупные кнопки")
     val audio = L("Audio", "Звук")
     val interfaceSet = L("Interface", "Интерфейс")
-    val simple = L("Simple", "Простой")
-    val everything = L("Everything", "Всё сразу")
     val labelsOnTop = L("Labels above the audio", "Разметка над звуком")
     val overlay = L("Labels over the audio (one picture)", "Разметка поверх звука (одна картинка)")
     val keys = L("Keyboard shortcuts…", "Горячие клавиши…")
@@ -183,6 +181,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.powerLane, ed, app, checked = l.showPower))
         add(MSep)
         add(item(Commands.overlay, ed, app, checked = l.overlay, title = MenuTitles.overlay()))
+        if (l.overlay) add(toggle(S.overlayWaveFill(), l.overlayWaveFill) { it.copy(layout = it.layout.copy(overlayWaveFill = !it.layout.overlayWaveFill)) })
         add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
         add(MSep)
         add(item(Commands.zoomIn, ed, app))
@@ -190,10 +189,11 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.zoomFit, ed, app))
         add(item(Commands.zoomSel, ed, app))
         add(MSep)
-        add(MSub(MenuTitles.interfaceSet(), listOf(
-            MItem(MenuTitles.simple()) { app.update { Setups.simple(it) } },
-            MItem(MenuTitles.everything()) { app.update { Setups.everything(it) } },
-        )))
+        add(MSub(S.environment(), buildList {
+            for (e in mlabeler.app.state.Environments.all()) add(MItem(e.title, checked = e.id == s.environment) { app.applyEnvironment(e.id) })
+            add(MSep)
+            add(MItem(S.environmentSaveAs()) { app.settingsPage = "interface"; app.showSettings = true })
+        }))
     }
     val go = buildList {
         add(item(Commands.togglePlay, ed, app))
@@ -399,6 +399,37 @@ fun MenuButton(app: AppState, ed: EditorState, extra: List<MenuEntry> = emptyLis
         IconBtn(Icons.menu, S.more()) { open = true }
         DropdownMenu(open, { }, properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false)) {
             MenuItems(extra + (if (extra.isEmpty()) emptyList() else listOf(MSep)) + tree.map { (t, e) -> MSub(t, e) }) { open = false }
+        }
+    }
+}
+
+/** Name of the current work environment at the top right; opens the list of environments. */
+@Composable
+fun EnvironmentButton(app: AppState) {
+    val c = mlabeler.app.theme.T.c
+    var open by remember { mutableStateOf(false) }
+    val s = app.settings
+    val version = app.environmentsVersion
+    val all = remember(version) { mlabeler.app.state.Environments.all() }
+    val cur = all.firstOrNull { it.id == s.environment }
+    val changed = cur != null && !mlabeler.app.state.Environments.matches(s, cur)
+    if (open) MenuCatcher({ open = false })
+    Box {
+        Tip(S.environment()) {
+            Text(
+                (cur?.title ?: S.environment()) + if (changed) " •" else "",
+                fontSize = 12.sp, color = c.muted, maxLines = 1,
+                modifier = Modifier.clip(RoundedCornerShape(c.radius)).border(c.borderWidth, c.border, RoundedCornerShape(c.radius))
+                    .clickable { open = true }.padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+        DropdownMenu(open, { }, properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false)) {
+            MenuItems(buildList {
+                for (e in all) add(MItem(e.title, checked = e.id == s.environment) { app.applyEnvironment(e.id) })
+                add(MSep)
+                if (changed && cur != null) add(MItem(S.reset() + " (" + cur.title + ")") { app.applyEnvironment(cur.id) })
+                add(MItem(S.environmentSaveAs()) { app.settingsPage = "interface"; app.showSettings = true })
+            }) { open = false }
         }
     }
 }

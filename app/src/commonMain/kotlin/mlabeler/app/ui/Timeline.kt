@@ -124,6 +124,7 @@ private class Geom(
     val overlay: Boolean = false,
     val tiersOnTop: Boolean = false,
     val dim: Float = 0f,
+    val waveFill: Boolean = false,
 ) {
     val tiersBottom: Float get() = tiersTop + tierH * tierCount
     val audioTop: Float get() = min(waveTop, specTop)
@@ -192,7 +193,7 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val pitchTop = audioTop + mainH
     val powerTop = pitchTop + pitchH
     return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, tiersTop, tierHeight, tiers,
-        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f))
+        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), layout.overlayWaveFill)
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -707,6 +708,19 @@ private fun DrawScope.drawTimeline(
                     val xx = col + 0.5f
                     if (!started) { upper.moveTo(xx, mid - hi * amp); lower.moveTo(xx, mid - lo * amp); started = true }
                     else { upper.lineTo(xx, mid - hi * amp); lower.lineTo(xx, mid - lo * amp) }
+                }
+                if (g.waveFill) {
+                    // filled body, see-through so the spectrogram still shows
+                    val body = Path()
+                    for (col in max(0, x(0.0).toInt())..cols) {
+                        val a = ((v0 + col / pps) * sr).toInt()
+                        val b = ((v0 + (col + 1) / pps) * sr).toInt()
+                        if (b <= 0 || a >= audio.samples.size) continue
+                        val (lo, hi) = peaks.range(audio.samples, a, max(b, a + 1))
+                        body.moveTo(col + 0.5f, mid - hi * amp)
+                        body.lineTo(col + 0.5f, mid - lo * amp + 0.5f)
+                    }
+                    drawPath(body, c.wave.copy(alpha = 0.55f), style = Stroke(px))
                 }
                 for (pth in listOf(upper, lower)) {
                     drawPath(pth, Color.Black.copy(alpha = 0.55f), style = Stroke(3.2f * px))

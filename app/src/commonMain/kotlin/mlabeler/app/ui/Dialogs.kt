@@ -133,12 +133,13 @@ fun CommandPalette(app: AppState) {
     }
 }
 
-private enum class Section { General, Interface, View, Spectrogram, Editing, Checks, Toolkit, Keys, About }
+private enum class Section { General, Interface, Themes, View, Spectrogram, Editing, Checks, Toolkit, Keys, About }
 
 @Composable
 private fun sectionTitle(s: Section) = when (s) {
     Section.General -> S.general()
     Section.Interface -> MenuTitles.interfaceSet()
+    Section.Themes -> S.theme()
     Section.View -> S.view()
     Section.Spectrogram -> S.spectrogramSection()
     Section.Editing -> S.editing()
@@ -217,43 +218,15 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 SectionTitle(S.files())
                 SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
+                SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
                 ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
             }
             Section.View -> {
-                SectionTitle(S.theme())
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(), "contrast" to S.themeContrast())
-                    for (t in Themes.builtIn) Chip(names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
-                    for ((t, name) in Themes.custom) Chip(name, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
-                }
-                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Btn(S.themeCopy()) {
-                        val path = mlabeler.app.theme.ThemeFiles.copy(mlabeler.app.Platform.dataDir(), Themes.byId(s.theme))
-                        app.message(S.themeCopied.format(path))
-                        mlabeler.app.Platform.openInFileManager(mlabeler.core.io.Paths.parent(path))
-                    }
-                    Btn(S.themeReload()) { mlabeler.app.theme.ThemeFiles.load(mlabeler.app.Platform.dataDir()) }
-                }
                 ValueSlider(S.interfaceScale(), s.scale, 0.7f..2f, "%", factor = 100f) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
                 SectionTitle(S.view())
-                SectionTitle(S.layoutPresets())
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for ((name, p) in mlabeler.app.state.LayoutPresets.builtIn) Chip(name(), false) {
-                        app.update { it.copy(layout = mlabeler.app.state.LayoutPresets.apply(it.layout, p)) }
-                    }
-                    for ((name, p) in s.layoutPresets) Chip(name, false) { app.update { it.copy(layout = mlabeler.app.state.LayoutPresets.apply(it.layout, p)) } }
-                }
-                var presetName by remember { mutableStateOf("") }
-                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Field(presetName, { presetName = it }, Modifier.weight(1f), placeholder = S.presetName())
-                    Btn(S.save(), enabled = presetName.isNotBlank()) {
-                        val n = presetName.trim()
-                        app.update { it.copy(layoutPresets = it.layoutPresets + (n to it.layout)) }
-                        presetName = ""
-                    }
-                }
                 SectionTitle(S.view())
                 SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
+                if (s.layout.overlay) SwitchRow(S.overlayWaveFill(), s.layout.overlayWaveFill) { v -> app.update { it.copy(layout = it.layout.copy(overlayWaveFill = v)) } }
                 if (s.layout.overlay) ValueSlider(S.overlayDim(), s.layout.overlayDim, 0f..0.8f, "%", factor = 100f) { v -> app.update { it.copy(layout = it.layout.copy(overlayDim = v)) } }
                 SwitchRow(S.tiersOnTop(), s.layout.tiersOnTop) { v -> app.update { it.copy(layout = it.layout.copy(tiersOnTop = v)) } }
                 SwitchRow(S.waveform(), s.layout.showWaveform) { v -> app.update { it.copy(layout = it.layout.copy(showWaveform = v)) } }
@@ -304,6 +277,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             }
             Section.Toolkit -> ToolkitPage(app)
             Section.Interface -> InterfacePage(app)
+            Section.Themes -> ThemesPage(app)
             Section.Keys -> KeymapPage(app)
             Section.About -> {
                 SectionTitle(S.about())
@@ -444,12 +418,8 @@ private fun ToolkitPage(app: AppState) {
 private fun InterfacePage(app: AppState) {
     val c = T.c
     val s = app.settings
-    SectionTitle(MenuTitles.interfaceSet())
-    Text(S.setupHint(), color = c.muted, fontSize = 12.sp)
-    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Btn(MenuTitles.simple()) { app.update { mlabeler.app.state.Setups.simple(it) } }
-        Btn(MenuTitles.everything()) { app.update { mlabeler.app.state.Setups.everything(it) } }
-    }
+    SectionTitle(S.environments())
+    EnvironmentsSection(app)
     SectionTitle(MenuTitles.panels())
     if (!mlabeler.app.Platform.isMobile) SwitchRow(MenuTitles.menuBar(), s.menuBar) { v -> app.update { it.copy(menuBar = v) } }
     SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }

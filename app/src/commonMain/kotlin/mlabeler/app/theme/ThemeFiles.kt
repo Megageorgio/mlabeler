@@ -21,14 +21,14 @@ import mlabeler.core.io.PlatformFs
 object ThemeFiles {
     private val json = Json { prettyPrint = true; isLenient = true }
 
-    private fun hex(c: Color): String {
+    fun hex(c: Color): String {
         val v = c.toArgb()
         val a = (v ushr 24) and 0xFF
         val rgb = (v and 0xFFFFFF).toString(16).padStart(6, '0')
         return if (a == 0xFF) "#$rgb" else "#" + a.toString(16).padStart(2, '0') + rgb
     }
 
-    private fun color(s: String): Color? {
+    fun color(s: String): Color? {
         val h = s.trim().removePrefix("#")
         val v = h.toLongOrNull(16) ?: return null
         return when (h.length) {
@@ -38,7 +38,7 @@ object ThemeFiles {
         }
     }
 
-    private val colorKeys: List<Pair<String, (Tokens) -> Color>> = listOf(
+    val colorKeys: List<Pair<String, (Tokens) -> Color>> = listOf(
         "bg" to { it.bg }, "panel" to { it.panel }, "panelAlt" to { it.panelAlt }, "border" to { it.border },
         "text" to { it.text }, "muted" to { it.muted }, "accent" to { it.accent }, "onAccent" to { it.onAccent },
         "danger" to { it.danger }, "ok" to { it.ok }, "warn" to { it.warn }, "laneBg" to { it.laneBg },
@@ -92,16 +92,40 @@ object ThemeFiles {
     fun load(dataDir: String) {
         val d = dir(dataDir)
         Themes.custom = if (!PlatformFs.isDirectory(d)) emptyList() else PlatformFs.list(d).filter { Paths.ext(it) == "json" }.sorted()
-            .mapNotNull { p -> runCatching { decode(PlatformFs.read(p).decodeToString()) }.getOrNull() }
+            .mapNotNull { p -> runCatching { decode(PlatformFs.read(p).decodeToString()) }.getOrNull()?.let { CustomTheme(it.first, it.second, p) } }
     }
 
-    /** Writes [t] as a new editable theme file; returns its path. */
-    fun copy(dataDir: String, t: Tokens): String {
+    /** Writes [t] as a new editable theme file named [name]; returns its id. */
+    fun copy(dataDir: String, t: Tokens, name: String): String {
+        PlatformFs.mkdirs(dir(dataDir))
         var k = 1
         while (PlatformFs.exists(Paths.join(dir(dataDir), "my-theme-$k.json"))) k++
-        val path = Paths.join(dir(dataDir), "my-theme-$k.json")
-        PlatformFs.write(path, encode(t, "my-theme-$k", "My theme $k").encodeToByteArray())
+        val id = "my-theme-$k"
+        PlatformFs.write(Paths.join(dir(dataDir), "$id.json"), encode(t, id, name).encodeToByteArray())
         load(dataDir)
-        return path
+        return id
+    }
+
+    /** Saves an edited theme back to its file and reloads. */
+    fun save(dataDir: String, theme: CustomTheme, t: Tokens, name: String) {
+        PlatformFs.write(theme.path, encode(t, theme.tokens.id, name).encodeToByteArray())
+        load(dataDir)
+    }
+
+    fun delete(dataDir: String, theme: CustomTheme) {
+        PlatformFs.delete(theme.path)
+        load(dataDir)
+    }
+
+    /** Replaces one colour by its key in [colorKeys]. */
+    fun withColor(t: Tokens, key: String, c: Color): Tokens = when (key) {
+        "bg" -> t.copy(bg = c); "panel" -> t.copy(panel = c); "panelAlt" -> t.copy(panelAlt = c); "border" -> t.copy(border = c)
+        "text" -> t.copy(text = c); "muted" -> t.copy(muted = c); "accent" -> t.copy(accent = c); "onAccent" -> t.copy(onAccent = c)
+        "danger" -> t.copy(danger = c); "ok" -> t.copy(ok = c); "warn" -> t.copy(warn = c); "laneBg" -> t.copy(laneBg = c)
+        "wave" -> t.copy(wave = c); "waveCenter" -> t.copy(waveCenter = c); "bound" -> t.copy(bound = c)
+        "boundSelected" -> t.copy(boundSelected = c); "intervalSelected" -> t.copy(intervalSelected = c)
+        "intervalHover" -> t.copy(intervalHover = c); "playhead" -> t.copy(playhead = c); "cursor" -> t.copy(cursor = c)
+        "selectionRange" -> t.copy(selectionRange = c); "tierText" -> t.copy(tierText = c)
+        else -> t
     }
 }

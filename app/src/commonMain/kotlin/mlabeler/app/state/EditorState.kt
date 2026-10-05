@@ -898,7 +898,7 @@ class EditorState(
     fun playOtoEntry() {
         val e = oto.current() ?: return
         val a = oto.absolute(e)
-        play(a.left / 1000, a.right / 1000, loop = false)
+        play(a.left / 1000, a.right / 1000)
     }
 
     fun togglePlay() {
@@ -919,9 +919,27 @@ class EditorState(
         play(cursor ?: playhead ?: viewStart, duration)
     }
 
-    fun play(from: Double, to: Double, loop: Boolean = settings.edit.loop, speed: Double = settings.edit.speed.toDouble()) {
+    /** What is playing now, so a change of speed or loop can take effect at once. */
+    private var lastPlay: Triple<Double, Double, Boolean>? = null
+    private var lastPlayFollowsSettings = false
+
+    /** Speed or loop changed: restart what is playing with the new values (from where it is now). */
+    fun playbackSettingsChanged() {
+        val lp = lastPlay ?: return
+        if (!playing || !lastPlayFollowsSettings) return
+        val loop = settings.edit.loop
+        val from = if (loop) lp.first else (playhead ?: lp.first)
+        play(from, lp.second, loop, keepRange = lp.first)
+    }
+
+    fun play(
+        from: Double, to: Double, loop: Boolean = settings.edit.loop, speed: Double = settings.edit.speed.toDouble(),
+        keepRange: Double? = null,
+    ) {
         val a = audio ?: return
         stop()
+        lastPlay = Triple(keepRange ?: from, to, loop)
+        lastPlayFollowsSettings = speed == settings.edit.speed.toDouble()
         val sr = a.sampleRate
         val s = (max(0.0, from) * sr).toInt().coerceIn(0, a.samples.size)
         val e = (min(duration, to) * sr).toInt().coerceIn(s, a.samples.size)

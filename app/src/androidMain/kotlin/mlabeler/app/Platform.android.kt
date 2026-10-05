@@ -89,7 +89,7 @@ actual object Platform {
     }
 
     actual val hasNativeFolderPicker: Boolean = false
-    actual fun pickFolderNative(title: String): String? = null
+    actual fun pickFolderNative(title: String, start: String?): String? = null
 
     actual fun decodeAudio(path: String): Audio? = MediaDecoder.decode(path)
 

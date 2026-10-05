@@ -119,13 +119,16 @@ object Themes {
 
     val builtIn = listOf(modernDark, modernLight, retro, contrast)
 
-    /** Themes from files (see ThemeFiles), with their names. */
-    var custom by androidx.compose.runtime.mutableStateOf<List<Pair<Tokens, String>>>(emptyList())
+    /** Themes from files (see ThemeFiles). */
+    var custom by androidx.compose.runtime.mutableStateOf<List<CustomTheme>>(emptyList())
 
-    val all: List<Tokens> get() = builtIn + custom.map { it.first }
+    val all: List<Tokens> get() = builtIn + custom.map { it.tokens }
 
     fun byId(id: String) = all.firstOrNull { it.id == id } ?: modernDark
 }
+
+/** A theme from a file in the themes folder. */
+data class CustomTheme(val tokens: Tokens, val name: String, val path: String)
 
 val LocalTokens = staticCompositionLocalOf { Themes.modernDark }
 

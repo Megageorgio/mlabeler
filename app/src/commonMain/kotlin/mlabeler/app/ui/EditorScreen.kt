@@ -83,6 +83,8 @@ fun EditorScreen(app: AppState, ed: EditorState) {
         kotlinx.coroutines.delay(400)
         if (ed.specNeedsUpdate()) ed.recomputeSpectrogram()
     }
+    // speed or loop changed while playing: apply at once
+    LaunchedEffect(app.settings.edit.speed, app.settings.edit.loop) { ed.playbackSettingsChanged() }
     LaunchedEffect(ed) {
         ed.requestFocus = { runCatching { focus.requestFocus() } }
         focus.requestFocus()
@@ -218,6 +220,10 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
             ToolbarGroupsRow(app, ed)
         }
         Sep()
+        if (wc == WidthClass.Expanded) {
+            EnvironmentButton(app)
+            Spacer(Modifier.width(4.dp))
+        }
         IconBtn(Icons.settings, S.settings(), Commands.settings.keyLabel) { app.showSettings = true }
         if (!s.menuBar || Platform.isMobile) MenuButton(app, ed)
         if (wc == WidthClass.Medium) {

@@ -10,7 +10,14 @@ import mlabeler.core.format.LabelFormat
 import mlabeler.core.format.TextGridFormat
 import mlabeler.core.model.LabelDoc
 
-val AUDIO_EXTENSIONS = setOf("wav", "flac", "mp3", "ogg", "m4a", "aac", "opus", "aif", "aiff")
+val ALL_AUDIO_EXTENSIONS = setOf("wav", "flac", "mp3", "ogg", "m4a", "aac", "opus", "aif", "aiff")
+
+/** Audio files that are listed; WAV only unless the user turns the others on. */
+object AudioFormats {
+    var accepted: Set<String> = setOf("wav")
+}
+
+val AUDIO_EXTENSIONS: Set<String> get() = AudioFormats.accepted
 
 @Serializable
 data class ItemMarks(val done: Boolean = false, val star: Boolean = false, val tag: String = "")

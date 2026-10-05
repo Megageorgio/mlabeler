@@ -19,7 +19,8 @@ expect object Platform {
     /** Shortcuts to show in the folder browser (name to path). */
     fun places(): List<Pair<String, String>>
     /** Opens the system folder dialog; null when cancelled or not available. */
-    fun pickFolderNative(title: String): String?
+    /** Blocking system folder dialog (call off the UI thread); [start] = folder to open in. */
+    fun pickFolderNative(title: String, start: String? = null): String?
     val hasNativeFolderPicker: Boolean
     /** Decodes audio formats other than WAV; null if not supported here. */
     fun decodeAudio(path: String): Audio?

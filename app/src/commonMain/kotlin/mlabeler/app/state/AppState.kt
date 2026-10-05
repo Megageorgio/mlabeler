@@ -1,5 +1,6 @@
 package mlabeler.app.state
 
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -90,7 +91,12 @@ class AppState(private val scope: CoroutineScope) {
     /** Asks for a folder: the system dialog where there is one, else the built-in browser. */
     fun pickFolder(title: String, onPick: (String) -> Unit) {
         if (mlabeler.app.Platform.hasNativeFolderPicker) {
-            mlabeler.app.Platform.pickFolderNative(title)?.let(onPick)
+            val start = editor?.workspace?.root?.let { mlabeler.core.io.Paths.parent(it) }
+                ?: settings.recent.firstOrNull()?.let { mlabeler.core.io.Paths.parent(it) }
+            scope.launch {
+                val picked = kotlinx.coroutines.withContext(Dispatchers.Default) { mlabeler.app.Platform.pickFolderNative(title, start) }
+                picked?.let(onPick)
+            }
         } else {
             folderPick = onPick
         }
@@ -103,6 +109,7 @@ class AppState(private val scope: CoroutineScope) {
         if (Platform.isMobile && !settings.scaleChosen) settings = settings.copy(scale = 0.8f)
         runCatching { mlabeler.app.theme.ThemeFiles.load(Platform.dataDir()) }
         mlabeler.app.ui.Keymap.load(settings.keymap)
+        applyAudioFormats(settings)
         Lang.current = settings.language.ifEmpty { Platform.systemLanguage }.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
     }
 
@@ -110,9 +117,37 @@ class AppState(private val scope: CoroutineScope) {
         var s = transform(settings)
         if (s.scale != settings.scale) s = s.copy(scaleChosen = true)
         if (s == settings) return
+        val formatsChanged = s.otherAudio != settings.otherAudio
         settings = s
         if (s.language.isNotEmpty()) Lang.current = s.language
+        if (formatsChanged) { applyAudioFormats(s); editor?.rescan() }
         AppSettings.save(s)
+    }
+
+    private fun applyAudioFormats(s: AppSettings) {
+        mlabeler.core.io.AudioFormats.accepted = if (s.otherAudio) mlabeler.core.io.ALL_AUDIO_EXTENSIONS else setOf("wav")
+    }
+
+    /** Bumped when the user's environment files change, so lists reload. */
+    var environmentsVersion by mutableStateOf(0)
+        private set
+
+    fun applyEnvironment(id: String) {
+        val e = Environments.byId(id) ?: return
+        update { Environments.apply(it, e) }
+    }
+
+    fun saveEnvironment(name: String) {
+        val n = name.trim().ifEmpty { return }
+        runCatching { Environments.saveCurrent(settings, n) }
+            .onSuccess { id -> update { it.copy(environment = id) }; environmentsVersion++; message(mlabeler.app.i18n.S.environmentSaved.format(n)) }
+            .onFailure { message(it.message ?: it.toString(), error = true) }
+    }
+
+    fun deleteEnvironment(id: String) {
+        Environments.delete(id)
+        if (settings.environment == id) update { it.copy(environment = "basic") }
+        environmentsVersion++
     }
 
     fun message(text: String, error: Boolean = false) {
