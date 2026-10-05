@@ -14,6 +14,7 @@ enum class LabelFormat(val extension: String, val title: String) {
     Lab("lab", "HTK lab"),
     TextGrid("TextGrid", "Praat TextGrid"),
     Audacity("txt", "Audacity labels"),
+    Ds("ds", "DiffSinger .ds"),
     /** A DiffSinger transcriptions.csv holding the labels of many recordings. */
     DsCsv("csv", "DiffSinger transcriptions.csv"),
     ;

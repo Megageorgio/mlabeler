@@ -287,5 +287,6 @@ fun formatTime(seconds: Double, precise: Boolean = true): String {
 
 fun formatMs(seconds: Double): String {
     val ms = seconds * 1000
-    return if (kotlin.math.abs(ms) >= 100) "${kotlin.math.round(ms).toLong()} ms" else "${kotlin.math.round(ms * 10) / 10.0} ms"
+    val unit = mlabeler.app.i18n.S.msUnit()
+    return if (kotlin.math.abs(ms) >= 100) "${kotlin.math.round(ms).toLong()} $unit" else "${kotlin.math.round(ms * 10) / 10.0} $unit"
 }

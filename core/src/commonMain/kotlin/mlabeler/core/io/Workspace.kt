@@ -109,7 +109,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             for (n in listOf("lab", "labs", "label", "labels", "TextGrid", "textgrid", "textgrids")) dirs += Paths.join(parent, n)
         }
         for (f in state.labelFolders) dirs += Paths.join(root, f)
-        return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "txt").map { Paths.join(d, "$stem.$it") } }
+        return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "ds", "txt").map { Paths.join(d, "$stem.$it") } }
     }
 
     /** transcriptions.csv files of the folder (root and two levels down), parsed. */
@@ -144,6 +144,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             if (!fs.exists(c)) continue
             when (Paths.ext(c)) {
                 "textgrid" -> return c to LabelFormat.TextGrid
+                "ds" -> return c to LabelFormat.Ds
                 "lab" -> {
                     val text = try { decodeGuess(fs.read(c), "UTF-8").first } catch (_: Exception) { "" }
                     if (text.isBlank() || HtkLab.isTimed(text)) return c to LabelFormat.Lab
@@ -166,6 +167,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.TextGrid -> TextGridFormat.read(text)
             LabelFormat.Lab -> if (text.isBlank()) LabelDoc.empty(duration) else HtkLab.read(text, duration = duration)
             LabelFormat.Audacity -> AudacityLabels.read(text, "phones", duration)
+            LabelFormat.Ds -> mlabeler.core.format.DsFile.read(text, duration)
             LabelFormat.DsCsv -> csvRows[path]?.firstOrNull { it.name == item.name }?.doc ?: LabelDoc.empty(duration)
             null -> throw FormatException("Unknown label format")
         }
@@ -212,6 +214,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.Lab -> HtkLab.write(doc)
             LabelFormat.TextGrid -> TextGridFormat.write(doc, duration)
             LabelFormat.Audacity -> AudacityLabels.write(doc)
+            LabelFormat.Ds -> mlabeler.core.format.DsFile.write(doc, if (fs.exists(path)) runCatching { fs.read(path).decodeToString() }.getOrNull() else null)
             LabelFormat.DsCsv -> {
                 // replace this recording's row, keep the others as they were
                 val rows = csvRows.getOrPut(path) { mutableListOf() }

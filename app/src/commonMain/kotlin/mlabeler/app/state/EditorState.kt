@@ -720,6 +720,28 @@ class EditorState(
         updateDoc { it.replace(k, mlabeler.core.edit.NoteEdits.pitchFromCurve(t, f0, round, if (all) null else setOfNotNull(s?.index))) }
     }
 
+    /** Writes the notes tier to <name>.mid next to the recording. */
+    fun exportMidi() {
+        val it = item ?: return
+        val t = doc?.tiers?.filterIsInstance<mlabeler.core.model.NoteTier>()?.firstOrNull() ?: return app.message(S.noNotes(), error = true)
+        val path = Paths.withExt(it.audioPath, "mid")
+        runCatching { workspace.fs.write(path, mlabeler.core.format.Midi.write(t)) }
+            .onSuccess { app.message(S.saved.format(Paths.name(path))) }
+            .onFailure { e -> app.message(S.cannotSave.format(e.message ?: ""), error = true) }
+    }
+
+    /** Reads <name>.mid (or .midi) next to the recording into the notes tier. */
+    fun importMidi() {
+        val it = item ?: return
+        val path = listOf("mid", "midi", "MID").map { e -> Paths.withExt(it.audioPath, e) }.firstOrNull { p -> workspace.fs.exists(p) }
+            ?: return app.message(S.noMidi.format(Paths.stem(it.audioPath) + ".mid"), error = true)
+        val notes = runCatching { mlabeler.core.format.Midi.read(workspace.fs.read(path), duration) }.getOrElse { e -> return app.message(e.message ?: "", error = true) }
+        updateDoc { d ->
+            val k = d.tiers.indexOfFirst { t -> t is mlabeler.core.model.NoteTier }
+            if (k >= 0) d.replace(k, notes) else d.copy(tiers = d.tiers + notes)
+        }
+    }
+
     fun splitAt(time: Double = editTime()) {
         val d = committed ?: return
         noteTier(activeTier)?.let { t ->

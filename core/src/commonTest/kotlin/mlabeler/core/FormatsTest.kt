@@ -304,3 +304,25 @@ class VLabelerImportTest {
         assertEquals(true, p.marks["/v/bank|_あ.wav|- あ"]!!.done)
     }
 }
+
+class DsMidiTest {
+    @Test
+    fun dsRoundTrip() {
+        val text = """[{"offset": 1.0, "text": "a", "ph_seq": "SP k a SP", "ph_dur": "0.1 0.05 0.3 0.2", "ph_num": "1 2 1", "note_seq": "rest C4 rest", "note_dur": "0.1 0.35 0.2", "note_slur": "0 0 0", "f0_seq": "1 2", "f0_timestep": "0.005"}]"""
+        val doc = mlabeler.core.format.DsFile.read(text, 2.0)
+        val ph = doc.tiers[doc.phonemeTierIndex()] as IntervalTier
+        assertEquals(listOf("", "SP", "k", "a", "SP", ""), ph.texts)
+        val out = mlabeler.core.format.DsFile.write(doc, text)
+        assertTrue(out.contains("f0_seq"))
+    }
+
+    @Test
+    fun midiRoundTrip() {
+        val n = mlabeler.core.model.NoteTier("notes", listOf(
+            mlabeler.core.model.Note(0.0, 0.5, null), mlabeler.core.model.Note(0.5, 1.0, 60.0), mlabeler.core.model.Note(1.0, 1.25, 62.0),
+        ))
+        val back = mlabeler.core.format.Midi.read(mlabeler.core.format.Midi.write(n, 120.0, listOf("", "a", "i")), 1.5)
+        assertEquals(listOf(null, 60.0, 62.0, null), back.notes.map { it.pitch })
+        assertTrue(kotlin.math.abs(back.notes[2].start - 1.0) < 0.01)
+    }
+}
