@@ -95,6 +95,7 @@ class AppState(private val scope: CoroutineScope) {
     private var counter = 0L
 
     init {
+        runCatching { mlabeler.app.theme.ThemeFiles.load(Platform.dataDir()) }
         mlabeler.app.ui.Keymap.load(settings.keymap)
         Lang.current = settings.language.ifEmpty { Platform.systemLanguage }.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
     }

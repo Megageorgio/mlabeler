@@ -211,7 +211,16 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SectionTitle(S.theme())
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(), "contrast" to S.themeContrast())
-                    for (t in Themes.all) Chip(names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
+                    for (t in Themes.builtIn) Chip(names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
+                    for ((t, name) in Themes.custom) Chip(name, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
+                }
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Btn(S.themeCopy()) {
+                        val path = mlabeler.app.theme.ThemeFiles.copy(mlabeler.app.Platform.dataDir(), Themes.byId(s.theme))
+                        app.message(S.themeCopied.format(path))
+                        mlabeler.app.Platform.openInFileManager(mlabeler.core.io.Paths.parent(path))
+                    }
+                    Btn(S.themeReload()) { mlabeler.app.theme.ThemeFiles.load(mlabeler.app.Platform.dataDir()) }
                 }
                 SliderRow(S.interfaceScale(), s.scale, 0.8f..1.5f, "${(s.scale * 100).roundToInt()}%") { v -> app.update { it.copy(scale = (v * 20).roundToInt() / 20f) } }
                 SectionTitle(S.view())

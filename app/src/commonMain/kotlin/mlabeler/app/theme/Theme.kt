@@ -10,6 +10,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -115,7 +117,12 @@ object Themes {
         spectrogram = gray, radius = 2.dp, borderWidth = 2.dp, square = false,
     )
 
-    val all = listOf(modernDark, modernLight, retro, contrast)
+    val builtIn = listOf(modernDark, modernLight, retro, contrast)
+
+    /** Themes from files (see ThemeFiles), with their names. */
+    var custom by androidx.compose.runtime.mutableStateOf<List<Pair<Tokens, String>>>(emptyList())
+
+    val all: List<Tokens> get() = builtIn + custom.map { it.first }
 
     fun byId(id: String) = all.firstOrNull { it.id == id } ?: modernDark
 }
