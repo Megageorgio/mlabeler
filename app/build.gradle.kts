@@ -53,7 +53,11 @@ kotlin {
         }
         val desktopMain by getting {
             dependencies {
-                implementation(compose.desktop.currentOs)
+                // -Pdesktop.target=windows builds a Windows portable folder from any OS (see windowsPortableLibs)
+                when (findProperty("desktop.target")) {
+                    "windows" -> implementation(compose.desktop.windows_x64)
+                    else -> implementation(compose.desktop.currentOs)
+                }
                 implementation(libs.kotlinx.coroutines.swing)
             }
         }
@@ -106,4 +110,13 @@ compose.desktop {
         }
         buildTypes.release.proguard { isEnabled.set(false) }
     }
+}
+
+// Jars for a portable Windows build (JRE + launcher are added by tools/windows-portable.sh).
+tasks.register<Copy>("windowsPortableLibs") {
+    val jar = tasks.named("desktopJar")
+    dependsOn(jar)
+    from(jar)
+    from(configurations.named("desktopRuntimeClasspath"))
+    into(layout.buildDirectory.dir("windows-portable/app"))
 }
