@@ -201,3 +201,16 @@ class OtoEditsTest {
         assertEquals(1000.0, clamped.right)
     }
 }
+
+class PitchTest {
+    @Test
+    fun yinFindsSine() {
+        val sr = 44100
+        val x = FloatArray(sr) { (0.5 * kotlin.math.sin(2 * kotlin.math.PI * 220.0 * it / sr)).toFloat() }
+        val c = mlabeler.core.dsp.Pitch.yin(x, sr)
+        val mid = c.values[c.values.size / 2]
+        assertTrue(mid in 215f..225f, "f0 $mid")
+        val p = mlabeler.core.dsp.Pitch.power(x, sr)
+        assertTrue(p.values[p.values.size / 2] in -10f..-8f, "power ${p.values[p.values.size / 2]}")
+    }
+}

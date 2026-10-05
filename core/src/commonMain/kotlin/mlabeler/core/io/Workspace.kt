@@ -31,6 +31,8 @@ data class WorkspaceState(
     val defaultFormat: LabelFormat = LabelFormat.Lab,
     /** Folders with labels relative to the workspace, searched in addition to the audio folder. */
     val labelFolders: List<String> = emptyList(),
+    /** What is labelled in this folder: "labels" (lab/TextGrid tiers) or "oto"; null = detect. */
+    val kind: String? = null,
 )
 
 /** One audio file and where its labels are. [id] is the audio path relative to the workspace root. */

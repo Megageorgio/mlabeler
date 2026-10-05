@@ -123,6 +123,8 @@ object Commands {
     val inspector = Command("inspector", S.toggleInspector, listOf(ch('I', ctrl = true))) { _, a -> a.update { it.copy(layout = it.layout.copy(showInspector = !it.layout.showInspector)) } }
     val wave = Command("waveform", S.waveform, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showWaveform = !it.layout.showWaveform)) } }
     val spectrogram = Command("spectrogram", S.spectrogram, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showSpectrogram = !it.layout.showSpectrogram)) } }
+    val pitchLane = Command("pitch", S.pitch, listOf(ch('P'))) { _, a -> a.update { it.copy(layout = it.layout.copy(showPitch = !it.layout.showPitch)) } }
+    val powerLane = Command("power", S.power, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showPower = !it.layout.showPower)) } }
     val palette = Command("commands", S.commands, listOf(ch('K', ctrl = true))) { _, a -> a.showCommands = true }
     val settings = Command("settings", S.settings, listOf(Chord(Key.Comma, ctrl = true))) { _, a -> a.showSettings = true }
     val openFolder = Command("open", S.openFolder, listOf(ch('O', ctrl = true))) { _, a -> a.closeFolder() }
@@ -143,10 +145,7 @@ object Commands {
         a.update { it.copy(edit = it.edit.copy(otoLockedDrag = !it.edit.otoLockedDrag)) }
     }.only(Mode.Oto)
     val batchRename = Command("batch-rename", L("Rename by pattern…", "Переименовать по шаблону…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
-    val switchMode = Command("mode", L("Switch between labels and oto", "Переключить разметку / oto"), listOf(ch('M', ctrl = true))) { e, _ ->
-        e.mode = if (e.mode == Mode.Oto) Mode.Labels else Mode.Oto
-        if (e.mode == Mode.Oto) e.oto.onItemOpened()
-    }
+    val workspace = Command("workspace", L("Folder settings…", "Настройки папки…"), listOf(ch('M', ctrl = true))) { _, a -> a.showWorkspace = true }
 
     init {
         for (c in listOf(ripple, linked, split, merge, delete, rename, setLeft, setRight, nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig,
@@ -154,10 +153,10 @@ object Commands {
     }
 
     val all = listOf(
-        switchMode, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        workspace, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
-        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram,
+        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,
         palette, settings, openFolder,
     )
 

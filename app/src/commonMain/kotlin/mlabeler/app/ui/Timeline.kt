@@ -117,6 +117,10 @@ private class Geom(
     val tiersTop: Float,
     val tierH: Float,
     val tierCount: Int,
+    val pitchTop: Float = 0f,
+    val pitchBottom: Float = 0f,
+    val powerTop: Float = 0f,
+    val powerBottom: Float = 0f,
 ) {
     fun region(y: Float, grab: Float): Region? {
         if (y < ruler) return Region.Ruler
@@ -124,6 +128,9 @@ private class Geom(
         if (tierCount > 0 && specBottom > ruler && abs(y - tiersTop) < grab / 2) return Region.TierSplit
         if (y in waveTop..waveBottom) return Region.Wave
         if (y in specTop..specBottom) return Region.Spec
+        // pitch and power lanes behave like the spectrogram for clicks and drags
+        if (y in pitchTop..pitchBottom && pitchBottom > pitchTop) return Region.Spec
+        if (y in powerTop..powerBottom && powerBottom > powerTop) return Region.Spec
         if (y >= tiersTop) {
             val k = ((y - tiersTop) / tierH).toInt()
             if (k in 0 until tierCount) return Region.Tier(k)
@@ -144,18 +151,24 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val audioH = max(minAudio, h - ruler - tiersH)
     tiersH = h - ruler - audioH
     val tierHeight = if (tiers > 0) min(tierH, tiersH / tiers) else tierH
+    // separate pitch and power lanes take a share of the audio area from the bottom
+    val pitchH = if (layout.showPitch && !layout.pitchOverSpectrogram) audioH * layout.pitchShare.coerceIn(0.1f, 0.6f) else 0f
+    val powerH = if (layout.showPower) audioH * layout.powerShare.coerceIn(0.08f, 0.5f) else 0f
+    val mainH = audioH - pitchH - powerH
     val showW = layout.showWaveform
     val showS = layout.showSpectrogram
     val waveH = when {
-        showW && showS -> audioH * layout.waveShare.coerceIn(0.1f, 0.9f)
-        showW -> audioH
+        showW && showS -> mainH * layout.waveShare.coerceIn(0.1f, 0.9f)
+        showW -> mainH
         else -> 0f
     }
     val waveTop = ruler
     val waveBottom = ruler + waveH
     val specTop = waveBottom
-    val specBottom = if (showS || !showW) ruler + audioH else waveBottom
-    return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, ruler + audioH, tierHeight, tiers)
+    val specBottom = if (showS || !showW) ruler + mainH else waveBottom
+    val pitchTop = ruler + mainH
+    val powerTop = pitchTop + pitchH
+    return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, ruler + audioH, tierHeight, tiers, pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH)
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -632,6 +645,8 @@ private fun DrawScope.drawTimeline(
     }
     if (g.specBottom > g.specTop && g.waveBottom > g.waveTop) drawLine(c.border, Offset(0f, g.waveBottom), Offset(w, g.waveBottom), px)
 
+    drawCurves(ed, g, c, measurer, smallStyle, ::x)
+
     // shade outside the file
     if (endX < w) drawRect(c.bg.copy(alpha = 0.6f), Offset(max(0f, endX), g.ruler), Size(w - max(0f, endX), g.height - g.ruler))
     val startX = x(0.0)
@@ -900,4 +915,77 @@ private fun DrawScope.drawOto(
         drawLine(col, Offset(xx, top), Offset(xx, bottom), if (m == mlabeler.core.format.OtoMarker.Preutterance) 2.5f * px else 1.5f * px)
     }
     safeText(measurer, e.alias, Offset(l + 6 * px, top + 6 * px), big.copy(color = c.text))
+}
+
+private val pitchColor = Color(0xFF39E1FF)
+
+/** Pitch (own lane or over the spectrogram) and power curves. */
+private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: androidx.compose.ui.text.TextMeasurer, small: TextStyle, x: (Double) -> Float) {
+    val layout = ed.app.settings.layout
+    val px = density
+    val w = size.width
+    val v0 = ed.viewStart
+    val v1 = v0 + w / ed.pixelsPerSecond
+    val pitch = ed.pitch
+    if (layout.showPitch && pitch != null) {
+        val over = layout.pitchOverSpectrogram && g.specBottom > g.specTop
+        val top = if (over) g.specTop else g.pitchTop
+        val bottom = if (over) g.specBottom else g.pitchBottom
+        if (bottom > top) {
+            val y: (Double) -> Float
+            if (over) {
+                val spec = ed.spectrogram
+                val maxF = min(ed.app.settings.view.maxFreq.toDouble(), spec?.maxFreq ?: 8000.0)
+                val melTop = Spectrogram.hzToMel(maxF)
+                y = { hz -> (bottom - Spectrogram.hzToMel(hz) / melTop * (bottom - top)).toFloat() }
+            } else {
+                drawRect(c.laneBg, Offset(0f, top), Size(w, bottom - top))
+                drawLine(c.border, Offset(0f, top), Offset(w, top), px)
+                // semitone grid between C2 and C7, labelled at every C
+                val lo = 36.0
+                val hi = 96.0
+                y = { hz -> (bottom - (mlabeler.core.dsp.Pitch.hzToMidi(hz) - lo) / (hi - lo) * (bottom - top)).toFloat() }
+                for (m in lo.toInt()..hi.toInt()) {
+                    val yy = (bottom - (m - lo) / (hi - lo) * (bottom - top)).toFloat()
+                    val octave = m % 12 == 0
+                    if (!octave && (bottom - top) / (hi - lo) < 4 * px) continue
+                    drawLine(c.text.copy(alpha = if (octave) 0.18f else 0.05f), Offset(0f, yy), Offset(w, yy), px)
+                    if (octave) safeText(measurer, "C${m / 12 - 1}", Offset(4 * px, yy - 13 * px), small)
+                }
+            }
+            val path = Path()
+            var pen = false
+            val i0 = max(0, (v0 / pitch.hop).toInt() - 1)
+            val i1 = min(pitch.values.size - 1, (v1 / pitch.hop).toInt() + 1)
+            for (i in i0..i1) {
+                val f = pitch.values[i]
+                if (f <= 0f || f.isNaN()) { pen = false; continue }
+                val xx = x(i * pitch.hop)
+                val yy = y(f.toDouble()).coerceIn(top, bottom)
+                if (pen) path.lineTo(xx, yy) else path.moveTo(xx, yy)
+                pen = true
+            }
+            if (over) drawPath(path, Color.Black.copy(alpha = 0.6f), style = Stroke(3.5f * px))
+            drawPath(path, pitchColor, style = Stroke(1.8f * px))
+        }
+    }
+    val power = ed.power
+    if (layout.showPower && power != null && g.powerBottom > g.powerTop) {
+        val top = g.powerTop
+        val bottom = g.powerBottom
+        drawRect(c.laneBg, Offset(0f, top), Size(w, bottom - top))
+        drawLine(c.border, Offset(0f, top), Offset(w, top), px)
+        val path = Path()
+        val i0 = max(0, (v0 / power.hop).toInt() - 1)
+        val i1 = min(power.values.size - 1, (v1 / power.hop).toInt() + 1)
+        path.moveTo(x(i0 * power.hop), bottom)
+        for (i in i0..i1) {
+            val db = power.values[i].coerceIn(-60f, 0f)
+            path.lineTo(x(i * power.hop), bottom - (db + 60f) / 60f * (bottom - top))
+        }
+        path.lineTo(x(i1 * power.hop), bottom)
+        path.close()
+        drawPath(path, c.wave.copy(alpha = 0.45f))
+        safeText(measurer, "dB", Offset(4 * px, top + 2 * px), small)
+    }
 }

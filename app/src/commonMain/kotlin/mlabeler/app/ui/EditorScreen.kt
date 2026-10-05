@@ -188,10 +188,13 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
                 )
                 if (ed.dirty) Text("  •", color = c.accent, fontSize = 14.sp)
             }
-            Text(Paths.name(ed.workspace.root), color = c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // folder name and what is labelled there; a click opens the folder settings
+            Text(
+                Paths.name(ed.workspace.root) + "  ·  " + kindTitle(ed.mode),
+                color = c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.clickable { app.showWorkspace = true },
+            )
         }
-        ModeSwitch(ed)
-        Sep()
         IconBtn(Icons.prevFile, S.prevFile(), Commands.prevFile.keyLabel) { ed.openRelative(-1) }
         IconBtn(Icons.nextFile, S.nextFile(), Commands.nextFile.keyLabel) { ed.openRelative(1) }
         Sep()
@@ -244,6 +247,9 @@ private fun MainMenu(app: AppState, ed: EditorState) {
             DropdownMenuItem({ Text(S.showInFolder()) }, onClick = { open = false; Platform.openInFileManager(ed.workspace.root) })
             DropdownMenuItem({ Text(S.waveform()) }, onClick = { open = false; Commands.wave.run(ed, app) }, trailingIcon = { if (app.settings.layout.showWaveform) TextIcon("✓") })
             DropdownMenuItem({ Text(S.spectrogram()) }, onClick = { open = false; Commands.spectrogram.run(ed, app) }, trailingIcon = { if (app.settings.layout.showSpectrogram) TextIcon("✓") })
+            DropdownMenuItem({ Text(S.pitch()) }, onClick = { open = false; Commands.pitchLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPitch) TextIcon("✓") })
+            DropdownMenuItem({ Text(S.power()) }, onClick = { open = false; Commands.powerLane.run(ed, app) }, trailingIcon = { if (app.settings.layout.showPower) TextIcon("✓") })
+            DropdownMenuItem({ Text(Commands.workspace.title()) }, onClick = { open = false; app.showWorkspace = true })
             DropdownMenuItem({ Text(S.settings()) }, onClick = { open = false; app.showSettings = true }, trailingIcon = { TextIcon(Commands.settings.keyLabel) })
         }
     }
@@ -394,27 +400,23 @@ private fun CompactToolbar(app: AppState, ed: EditorState, onDetails: () -> Unit
     }
 }
 
-@Composable
-private fun ModeSwitch(ed: EditorState) {
-    val c = T.c
-    Row(
-        Modifier.padding(horizontal = 6.dp).clip(RoundedCornerShape(c.radius)).border(c.borderWidth, c.border, RoundedCornerShape(c.radius)),
-    ) {
-        for ((m, title) in listOf(Mode.Labels to S.labels(), Mode.Oto to "oto")) {
-            val sel = ed.mode == m
-            Text(
-                title, fontSize = 13.sp,
-                color = if (sel) (if (c.square) c.onAccent else c.accent) else c.muted,
-                modifier = Modifier.background(if (sel) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else androidx.compose.ui.graphics.Color.Transparent)
-                    .clickable { if (!sel) Commands.switchMode.run(ed, ed.app) }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-            )
-        }
-    }
-}
-
 /** Files, or oto entries in oto mode. */
 @Composable
 fun SidePanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Unit = {}) {
-    if (ed.mode == Mode.Oto) OtoEntryList(ed, modifier, onOpened) else FilesPanel(ed, modifier, onOpened)
+    if (ed.mode == Mode.Oto) return OtoEntryList(ed, modifier, onOpened)
+    var tab by remember { mutableStateOf(0) }
+    val c = T.c
+    Column(modifier.background(c.panel)) {
+        Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            for ((k, t) in listOf(S.files(), mlabeler.app.ui.entriesTitle()).withIndex()) {
+                val sel = k == tab
+                Text(
+                    t, fontSize = 13.sp, color = if (sel) c.text else c.muted,
+                    modifier = Modifier.clip(RoundedCornerShape(c.radius)).background(if (sel) c.panelAlt else c.panel)
+                        .clickable { tab = k }.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+            }
+        }
+        if (tab == 0) FilesPanel(ed, Modifier.weight(1f).fillMaxWidth(), onOpened) else EntriesPanel(ed, Modifier.weight(1f).fillMaxWidth(), onOpened)
+    }
 }

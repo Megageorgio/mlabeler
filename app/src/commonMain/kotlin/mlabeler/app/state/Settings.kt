@@ -21,6 +21,12 @@ data class LayoutSettings(
     /** Height of the audio area (waveform + spectrogram) in dp; 0 = fill. */
     val audioHeight: Float = 0f,
     val tierHeight: Float = 40f,
+    val showPitch: Boolean = false,
+    val showPower: Boolean = false,
+    /** Pitch drawn over the spectrogram instead of its own lane. */
+    val pitchOverSpectrogram: Boolean = true,
+    val pitchShare: Float = 0.3f,
+    val powerShare: Float = 0.18f,
 )
 
 @Serializable

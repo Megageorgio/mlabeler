@@ -198,10 +198,6 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 SectionTitle(S.files())
                 SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
-                Text(S.newFilesFormat(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-                FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (f in LabelFormat.entries) Chip(f.title, s.edit.newFormat == f) { app.update { it.copy(edit = it.edit.copy(newFormat = f)) } }
-                }
             }
             Section.View -> {
                 SectionTitle(S.theme())
@@ -213,6 +209,9 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SectionTitle(S.view())
                 SwitchRow(S.waveform(), s.layout.showWaveform) { v -> app.update { it.copy(layout = it.layout.copy(showWaveform = v)) } }
                 SwitchRow(S.spectrogram(), s.layout.showSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(showSpectrogram = v)) } }
+                SwitchRow(S.pitch(), s.layout.showPitch) { v -> app.update { it.copy(layout = it.layout.copy(showPitch = v)) } }
+                if (s.layout.showPitch) SwitchRow(S.pitchOver(), s.layout.pitchOverSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(pitchOverSpectrogram = v)) } }
+                SwitchRow(S.power(), s.layout.showPower) { v -> app.update { it.copy(layout = it.layout.copy(showPower = v)) } }
                 SwitchRow(S.toggleFiles(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
                 SwitchRow(S.toggleInspector(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
             }

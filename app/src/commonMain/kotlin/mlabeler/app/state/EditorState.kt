@@ -66,6 +66,10 @@ class EditorState(
     /** Bumped while the spectrogram is being filled in. */
     var spectrogramProgress by mutableIntStateOf(0)
         private set
+    var pitch by mutableStateOf<mlabeler.core.dsp.Curve?>(null)
+        private set
+    var power by mutableStateOf<mlabeler.core.dsp.Curve?>(null)
+        private set
     var loading by mutableStateOf(false)
         private set
     var loadError by mutableStateOf<String?>(null)
@@ -146,12 +150,37 @@ class EditorState(
 
     fun scan() {
         items = workspace.scan()
-        // folders of UTAU voicebanks open in oto mode
-        if (items.any { oto.hasOto(it) } && items.none { it.labelPath != null }) mode = Mode.Oto
+        mode = when (workspace.state.kind) {
+            "oto" -> Mode.Oto
+            "labels" -> Mode.Labels
+            // folders of UTAU voicebanks are oto work
+            else -> if (items.any { oto.hasOto(it) } && items.none { it.labelPath != null }) Mode.Oto else Mode.Labels
+        }
         if (index !in items.indices) {
             val last = workspace.state.lastItem
             open(items.indexOfFirst { it.id == last }.takeIf { it >= 0 } ?: if (items.isNotEmpty()) 0 else -1)
         }
+    }
+
+    private var pendingInterval: Pair<String, Int>? = null
+
+    /** Opens [itemIndex] and selects interval [i] of the tier called [tierName]. */
+    fun openInterval(itemIndex: Int, tierName: String, i: Int) {
+        if (itemIndex == index && audio != null) {
+            val k = doc?.tierIndex(tierName) ?: -1
+            if (k >= 0) selectInterval(IntervalRef(k, i))
+            return
+        }
+        pendingInterval = tierName to i
+        open(itemIndex)
+    }
+
+    /** Scans the folder again, keeping the open file. */
+    fun rescan() {
+        val id = item?.id
+        items = workspace.scan()
+        index = items.indexOfFirst { it.id == id }
+        if (index < 0 && items.isNotEmpty()) open(0)
     }
 
     fun marks(item: Item): ItemMarks {
@@ -160,6 +189,15 @@ class EditorState(
     }
 
     fun bumpMarks() { marksVersion++ }
+
+    /** Changes what this folder is labelled with; remembered in the folder. */
+    fun setKind(m: Mode) {
+        workspace.updateState { it.copy(kind = if (m == Mode.Oto) "oto" else "labels") }
+        if (mode == m) return
+        mode = m
+        query = ""
+        if (m == Mode.Oto) oto.onItemOpened()
+    }
 
     fun setMarks(item: Item, transform: (ItemMarks) -> ItemMarks) {
         workspace.updateItem(item.id) { it.copy(marks = transform(it.marks)) }
@@ -211,6 +249,8 @@ class EditorState(
         loadJob?.cancel()
         audio = null
         peaks = null
+        pitch = null
+        power = null
         spectrogram = null
         loadError = null
         selection = Selection.None
@@ -256,10 +296,17 @@ class EditorState(
                 fitAll()
             }
             activeTier = doc?.phonemeTierIndex() ?: 0
+            pendingInterval?.let { (tierName, i) ->
+                pendingInterval = null
+                val k = doc?.tierIndex(tierName) ?: -1
+                if (k >= 0) selectInterval(IntervalRef(k, i))
+            }
             loading = false
             docChanged()
             oto.onItemOpened()
             peaks = withContext(Dispatchers.Default) { Peaks.build(a.samples, a.sampleRate) }
+            power = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.power(a.samples, a.sampleRate) }
+            if (settings.layout.showPitch) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
             val hop = if (a.duration <= 120) 0.0025 else 0.005
             val spec = withContext(Dispatchers.Default) {
                 Spectrogram.compute(a.samples, a.sampleRate, hopSeconds = hop, maxFreq = 16000.0) { partial ->
@@ -270,6 +317,7 @@ class EditorState(
             }
             spectrogram = spec
             spectrogramProgress = spec.ready
+            if (pitch == null) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
         }
     }
 
@@ -331,7 +379,7 @@ class EditorState(
         val d = committed ?: return
         val h = history ?: return
         try {
-            val updated = workspace.writeLabels(it, d, duration, if (it.labelFormat == null) settings.edit.newFormat else null)
+            val updated = workspace.writeLabels(it, d, duration, if (it.labelFormat == null) (workspace.state.defaultFormat) else null)
             items = items.map { x -> if (x.id == it.id) updated else x }
             h.markSaved()
             docVersion++

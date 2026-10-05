@@ -38,6 +38,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showCommands && ed != null) CommandPalette(app)
                     if (app.showSettings) SettingsDialog(app)
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
+                    if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)
                 }
             }
         }
