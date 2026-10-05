@@ -189,9 +189,31 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
                 })
             }
         }
+        OtoCompareSection(ed)
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Btn(Commands.otoDuplicate.title()) { ed.oto.duplicate() }
             Btn(Commands.otoDelete.title()) { ed.oto.delete() }
         }
     }
+}
+
+@Composable
+private fun OtoCompareSection(ed: EditorState) {
+    val c = T.c
+    SectionTitle(S.otoCompare()) {
+        IconBtn(Icons.plus, S.otoCompare(), size = 26.dp) { ed.app.pickFolder(S.otoCompare()) { ed.oto.loadReference(it) } }
+    }
+    val ref = ed.oto.reference
+    if (ref == null) {
+        Text(S.otoCompareHint(), color = c.muted, fontSize = 12.sp)
+        return
+    }
+    val d = remember(ref, ed.oto.version) { mlabeler.core.format.OtoCompare.diff(ed.oto.entries, ref.second) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(Paths.name(ref.first), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        IconBtn(Icons.close, S.removeFromList(), size = 24.dp) { ed.oto.reference = null }
+    }
+    Text(S.otoDiffLine.format(d.matched, d.onlyHere, d.onlyThere), color = c.muted, fontSize = 12.sp)
+    Text(S.otoDiffMean() + ": " + d.meanMs.entries.joinToString("  ") { (m, v) -> m.name.take(4).lowercase() + " " + (kotlin.math.round(v * 10) / 10) },
+        color = c.muted, fontSize = 12.sp)
 }

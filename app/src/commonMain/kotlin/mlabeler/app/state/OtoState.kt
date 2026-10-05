@@ -37,6 +37,18 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     var dragPreview by mutableStateOf<OtoAbsolute?>(null)
         private set
 
+    /** Another oto.ini shown for comparison (its entries and where it is). */
+    var reference by mutableStateOf<Pair<String, List<OtoEntry>>?>(null)
+
+    fun loadReference(folder: String) {
+        val path = Paths.join(folder, "oto.ini")
+        if (!ed.workspace.fs.exists(path)) { app.message(S.noOtoThere()); return }
+        reference = folder to OtoIni.read(decodeGuess(ed.workspace.fs.read(path), "Shift_JIS").first)
+        version++
+    }
+
+    fun referenceFor(e: OtoEntry): OtoEntry? = reference?.second?.firstOrNull { it.sample.equals(e.sample, true) && it.alias == e.alias }
+
     /** Forgets loaded oto.ini files (after they were written by something else). */
     fun invalidate() {
         books.clear()

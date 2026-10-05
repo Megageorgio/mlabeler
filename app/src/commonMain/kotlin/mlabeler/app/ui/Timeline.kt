@@ -964,6 +964,14 @@ private fun DrawScope.drawOto(
     }
     val e = ed.oto.current() ?: return
     val a = ed.oto.dragPreview ?: ed.oto.absolute(e)
+    // the same entry from the compared oto.ini, dashed
+    ed.oto.referenceFor(e)?.let { r ->
+        val ra = ed.oto.absolute(r)
+        for ((m, col) in otoColors) {
+            val xx = x(ra.get(m) / 1000)
+            drawLine(col.copy(alpha = 0.8f), Offset(xx, top), Offset(xx, bottom), 1.5f * px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6 * px, 5 * px)))
+        }
+    }
     val shade = Color.Black.copy(alpha = if (c.dark) 0.5f else 0.25f)
     val l = x(a.left / 1000)
     val r = x(a.right / 1000)

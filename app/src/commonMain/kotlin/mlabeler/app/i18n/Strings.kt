@@ -203,6 +203,12 @@ object S {
     val slur = L("Slur", "Распев (slur)")
     val pitchFromAudioOne = L("Pitch from the recording", "Высота по записи")
     val pitchFromAudioAll = L("For all notes", "Для всех нот")
+    val noOtoThere = L("There is no oto.ini in that folder", "В этой папке нет oto.ini")
+    val otoCompare = L("Compare with another oto.ini", "Сравнить с другим oto.ini")
+    val otoCompareHint = L("For example, automatic entries against hand-made ones. Its markers are drawn dashed.",
+        "Например, автоматические записи с ручными. Его маркеры рисуются пунктиром.")
+    val otoDiffLine = L("{0} entries in both, {1} only here, {2} only there", "общих записей: {0}, только здесь: {1}, только там: {2}")
+    val otoDiffMean = L("average difference, ms", "среднее расхождение, мс")
     val general = L("General", "Общие")
     val spectrogramSection = L("Spectrogram", "Спектрограмма")
     val about = L("About", "О программе")

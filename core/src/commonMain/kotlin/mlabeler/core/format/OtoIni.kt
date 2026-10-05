@@ -115,3 +115,35 @@ object OtoEdits {
     fun set(e: OtoEntry, a: OtoAbsolute, lengthMs: Double): OtoEntry =
         OtoEntry.fromAbsolute(e.sample, e.alias, a, lengthMs, negativeCutoff = e.cutoff < 0)
 }
+
+/** How far two oto.ini files are apart, for entries with the same sample and alias (ms, absolute positions). */
+data class OtoDiff(val matched: Int, val onlyHere: Int, val onlyThere: Int, val meanMs: Map<OtoMarker, Double>)
+
+object OtoCompare {
+    fun diff(mine: List<OtoEntry>, other: List<OtoEntry>): OtoDiff {
+        val key = { e: OtoEntry -> e.sample.lowercase() + "|" + e.alias }
+        val theirs = other.associateBy(key)
+        val sums = mutableMapOf<OtoMarker, Double>()
+        val counts = mutableMapOf<OtoMarker, Int>()
+        var matched = 0
+        for (e in mine) {
+            val o = theirs[key(e)] ?: continue
+            matched++
+            // absolute positions; a positive cutoff needs the file length, so the end is compared only when both are lengths
+            val a = e.absolute(0.0)
+            val b = o.absolute(0.0)
+            for (m in OtoMarker.entries) {
+                if (m == OtoMarker.Right && (e.cutoff >= 0 || o.cutoff >= 0)) continue
+                sums[m] = (sums[m] ?: 0.0) + kotlin.math.abs(a.get(m) - b.get(m))
+                counts[m] = (counts[m] ?: 0) + 1
+            }
+        }
+        val keysMine = mine.map(key).toSet()
+        return OtoDiff(
+            matched = matched,
+            onlyHere = mine.count { key(it) !in theirs },
+            onlyThere = other.count { key(it) !in keysMine },
+            meanMs = sums.mapValues { (m, s) -> s / (counts[m] ?: 1) },
+        )
+    }
+}
