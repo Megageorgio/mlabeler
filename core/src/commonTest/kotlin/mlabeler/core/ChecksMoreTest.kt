@@ -27,3 +27,18 @@ class ChecksMoreTest {
         assertEquals(0, Checks.run(d, CheckSettings()).count { it.kind in setOf(Problem.Kind.LongPause, Problem.Kind.LongPhrase, Problem.Kind.Long) })
     }
 }
+
+class DiffSingerChecksTest {
+    @kotlin.test.Test
+    fun clearCasesOnly() {
+        val t = mlabeler.core.model.IntervalTier("phones", listOf(0.0, 0.5, 0.505, 0.505, 0.8, 1.0, 1.5), listOf("SP", "k", "x", "a i", "SP", "SP"))
+        val doc = mlabeler.core.model.LabelDoc(listOf(t))
+        val kinds = mlabeler.core.check.Checks.run(doc, mlabeler.core.check.CheckSettings(minDurationMs = 0.0)).map { it.kind to it.ref.index }
+        kotlin.test.assertTrue((mlabeler.core.check.Problem.Kind.BelowFrame to 1) in kinds)
+        kotlin.test.assertTrue((mlabeler.core.check.Problem.Kind.ZeroLength to 2) in kinds)
+        kotlin.test.assertTrue((mlabeler.core.check.Problem.Kind.SpaceInPhoneme to 3) in kinds)
+        kotlin.test.assertTrue((mlabeler.core.check.Problem.Kind.TwoPauses to 5) in kinds)
+        val off = mlabeler.core.check.Checks.run(doc, mlabeler.core.check.CheckSettings(minDurationMs = 0.0, diffsinger = false)).map { it.kind }
+        kotlin.test.assertTrue(off.none { it == mlabeler.core.check.Problem.Kind.TwoPauses || it == mlabeler.core.check.Problem.Kind.BelowFrame })
+    }
+}

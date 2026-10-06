@@ -89,3 +89,23 @@ class DatasetTest {
         assertTrue(abs(b.samples[i] - expect) < 0.02, "${b.samples[i]} vs $expect")
     }
 }
+
+class DatasetStatsTest {
+    @kotlin.test.Test
+    fun countsPhonemesNotesAndDictionary() {
+        val t1 = mlabeler.core.model.IntervalTier("phones", listOf(0.0, 1.0, 1.5, 2.0, 3.0), listOf("SP", "k", "a", "SP"))
+        val n = mlabeler.core.model.NoteTier("notes", listOf(mlabeler.core.model.Note(1.0, 2.0, 60.2)))
+        val t2 = mlabeler.core.model.IntervalTier("phones", listOf(0.0, 0.5, 1.0), listOf("a", "zz"))
+        val dict = mlabeler.core.ds.PhonemeDict("x", vowels = listOf("a", "i"), consonants = listOf("k"))
+        val s = mlabeler.core.ds.DatasetStats.of(
+            listOf(mlabeler.core.model.LabelDoc(listOf(t1, n)), mlabeler.core.model.LabelDoc(listOf(t2))), setOf("SP", "AP"), dict)
+        kotlin.test.assertEquals(4.0, s.seconds, 1e-9)
+        kotlin.test.assertEquals(2.0, s.singingSeconds, 1e-9)
+        val a = s.phonemes.first { it.name == "a" }
+        kotlin.test.assertEquals(2, a.count); kotlin.test.assertEquals(2, a.files)
+        kotlin.test.assertEquals(listOf("zz"), s.notInDictionary)
+        kotlin.test.assertEquals(listOf("i"), s.unusedFromDictionary)
+        kotlin.test.assertEquals(1, s.notes[60]?.count)
+        kotlin.test.assertEquals(listOf("k", "zz"), s.rare(1).map { it.name }.filter { it != "SP" }.sorted().let { l -> l.filter { it != "a" } })
+    }
+}

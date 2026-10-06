@@ -620,6 +620,19 @@ class EditorState(
         open(itemIndex)
     }
 
+    private var pendingRange: Pair<Double, Double>? = null
+
+    /** Opens [itemIndex] with [from]..[to] selected and in view. */
+    fun openRange(itemIndex: Int, from: Double, to: Double) {
+        if (itemIndex == index && audio != null) {
+            range = from to to
+            reveal(from, to)
+            return
+        }
+        pendingRange = from to to
+        open(itemIndex)
+    }
+
     /** Scans the folder again, keeping the open file. */
     fun rescan() {
         val id = item?.id
@@ -802,6 +815,7 @@ class EditorState(
                 fitAll()
             }
             activeTier = doc?.phonemeTierIndex() ?: 0
+            pendingRange?.let { (a0, b0) -> pendingRange = null; range = a0 to b0; reveal(a0, b0) }
             pendingInterval?.let { (tierName, i) ->
                 pendingInterval = null
                 val k = doc?.tierIndex(tierName) ?: -1

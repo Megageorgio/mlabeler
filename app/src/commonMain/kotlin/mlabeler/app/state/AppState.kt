@@ -48,6 +48,8 @@ class AppState(private val scope: CoroutineScope) {
     var showPlugins by mutableStateOf(false)
     var showImport by mutableStateOf(false)
     var showDsExport by mutableStateOf(false)
+    var showSummary by mutableStateOf(false)
+    var showSoundCheck by mutableStateOf(false)
     val toolkit = mlabeler.app.toolkit.ToolkitManager(this, scope)
     var plugins by mutableStateOf<List<mlabeler.app.plugins.Plugin>>(emptyList())
         private set

@@ -345,7 +345,16 @@ private fun problemTitle(p: Problem) = when (p.kind) {
     Problem.Kind.LongPause -> probLongPause() + " (${p.detail})"
     Problem.Kind.LongPhrase -> probLongPhrase() + " (${p.detail})"
     Problem.Kind.Script -> p.detail
+    Problem.Kind.ZeroLength -> probZero()
+    Problem.Kind.BelowFrame -> probFrame() + " (${p.detail})"
+    Problem.Kind.SpaceInPhoneme -> probSpace() + " «${p.detail}»"
+    Problem.Kind.TwoPauses -> probTwoPauses() + " (${p.detail})"
 }
+
+private val probZero = L("Zero length", "Нулевая длина")
+private val probFrame = L("Shorter than one DiffSinger frame", "Короче одного кадра DiffSinger")
+private val probSpace = L("Space inside the phoneme", "Пробел внутри фонемы")
+private val probTwoPauses = L("Two same pauses in a row", "Две одинаковые паузы подряд")
 
 @Composable
 private fun TierRow(ed: EditorState, k: Int, name: String, active: Boolean, index: Int, count: Int) {

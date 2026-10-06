@@ -245,6 +245,8 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     val tools = buildList {
         if (oto) add(item(Commands.autoOto, ed, app)) else add(item(Commands.autolabel, ed, app))
         add(item(Commands.cleanup, ed, app))
+        add(item(Commands.soundCheck, ed, app))
+        if (!oto) add(item(Commands.summary, ed, app))
         add(MSep)
         add(item(Commands.plugins, ed, app))
         val slots = listOf(Commands.slot1, Commands.slot2, Commands.slot3, Commands.slot4)

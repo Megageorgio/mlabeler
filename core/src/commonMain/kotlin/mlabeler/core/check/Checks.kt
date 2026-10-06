@@ -8,7 +8,7 @@ import mlabeler.core.model.LabelDoc
 enum class Severity { Warning, Error }
 
 data class Problem(val kind: Kind, val ref: IntervalRef, val severity: Severity = Severity.Warning, val detail: String = "") {
-    enum class Kind { Short, Empty, UnknownPhoneme, LowConfidence, NoPauseAtEdge, Long, LongPause, LongPhrase, Script }
+    enum class Kind { Short, Empty, UnknownPhoneme, LowConfidence, NoPauseAtEdge, Long, LongPause, LongPhrase, Script, ZeroLength, SpaceInPhoneme, TwoPauses, BelowFrame }
 }
 
 @Serializable
@@ -26,6 +26,13 @@ data class CheckSettings(
     /** Singing without a pause (at least [phrasePauseMs] long) for longer than this is an error; 0 = not checked. */
     val maxPhraseSeconds: Double = 0.0,
     val phrasePauseMs: Double = 200.0,
+    /**
+     * Checks for DiffSinger datasets, only where there's no doubt: a phoneme shorter than one frame, a label with
+     * a space inside (DiffSinger splits on spaces), two same pauses in a row, an interval of zero length.
+     */
+    val diffsinger: Boolean = true,
+    /** One frame of DiffSinger, ms (hop 512 at 44.1 kHz). */
+    val frameMs: Double = 11.6,
     /** Own checks: JavaScript files run on every change (see the settings page). */
     val scripts: Boolean = true,
 )
@@ -71,6 +78,19 @@ object Checks {
                         if (len > s.maxPhraseSeconds) out += Problem(Problem.Kind.LongPhrase, IntervalRef(k, i), Severity.Error, sec(len))
                         i = j + 1
                     }
+                }
+            }
+            if (k == ph && s.diffsinger) {
+                for (i in 0 until t.size) {
+                    val text = t.texts[i]
+                    val d = t.durationOf(i)
+                    val ref = IntervalRef(k, i)
+                    if (d <= 1e-6) out += Problem(Problem.Kind.ZeroLength, ref, Severity.Error)
+                    else if (text.isNotEmpty() && text !in s.pauses && d * 1000 < s.frameMs) {
+                        out += Problem(Problem.Kind.BelowFrame, ref, Severity.Error, "${(d * 1000).toInt()} ms")
+                    }
+                    if (text.trim().any { it.isWhitespace() }) out += Problem(Problem.Kind.SpaceInPhoneme, ref, Severity.Error, text)
+                    if (i > 0 && text.isNotEmpty() && text in s.pauses && t.texts[i - 1] == text) out += Problem(Problem.Kind.TwoPauses, ref, detail = text)
                 }
             }
             if (k == ph && s.pauseAtEdges && t.size > 0) {
