@@ -257,4 +257,5 @@ object S {
     val overlayWaveFillAlpha = L("Fill opacity (100% = solid)", "Непрозрачность заливки (100% — сплошная)")
     val resetToDefault = L("Back to default", "Вернуть по умолчанию")
     val resetPage = L("Reset this page to defaults", "Сбросить эту страницу по умолчанию")
+    val audioReloaded = L("The recording changed on disk and was read again; labels kept", "Запись изменилась на диске и перечитана, разметка сохранена")
 }

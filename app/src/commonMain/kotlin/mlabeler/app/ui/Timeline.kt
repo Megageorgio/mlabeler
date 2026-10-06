@@ -436,7 +436,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     chg.consume()
                                 }
                             }
-                            if (moved) ed.endDrag() else ed.cancelDrag()
+                            if (moved) ed.endDrag(bound) else ed.cancelDrag()
                             return@awaitEachGesture
                         }
 
@@ -610,6 +610,7 @@ private fun mouseAction(ed: EditorState, region: Region?, time: Double, action: 
     when (action) {
         MouseActions.NONE -> Unit
         MouseActions.SELECT -> ref?.let { ed.selectInterval(it, reveal = false) }
+        MouseActions.DESELECT -> { ed.selection = mlabeler.app.state.Selection.None; ed.range = null }
         MouseActions.PLAY -> if (ref != null) ed.play(tier.startOf(i), tier.endOf(i))
         MouseActions.PLAY_FROM -> ed.play(time, ed.viewStart + ed.visibleDuration)
         MouseActions.RENAME -> ref?.let { ed.selectInterval(it, reveal = false); ed.editingText = it }
@@ -662,6 +663,9 @@ private fun onTap(ed: EditorState, region: Region?, time: Double, double: Boolea
         Region.Wave, Region.Spec -> {
             ed.range = null
             ed.cursor = time.coerceIn(0.0, ed.duration)
+            if (ed.mode == Mode.Labels && ed.app.settings.edit.audioClickDeselects && !double && ed.selection !is mlabeler.app.state.Selection.Note) {
+                ed.selection = mlabeler.app.state.Selection.None
+            }
             if (ed.mode == Mode.Oto) {
                 if (double) {
                     // the entry whose preutterance is closest
@@ -827,6 +831,18 @@ private fun DrawScope.drawTimeline(
     if (endX < w) drawRect(c.bg.copy(alpha = 0.6f), Offset(max(0f, endX), g.ruler), Size(w - max(0f, endX), g.height - g.ruler))
     val startX = x(0.0)
     if (startX > 0) drawRect(c.bg.copy(alpha = 0.6f), Offset(0f, g.ruler), Size(startX, g.height - g.ruler))
+
+    // clicks found by the clean-up, marked across the audio
+    val clicks = ed.cleanup.found
+    if (clicks.isNotEmpty()) ed.audio?.let { au ->
+        for (r in clicks) {
+            val a = x(r.first.toDouble() / au.sampleRate)
+            val b = x((r.last + 1).toDouble() / au.sampleRate)
+            if (b < 0 || a > w) continue
+            drawRect(c.danger.copy(alpha = 0.35f), Offset(a - 2 * px, g.audioTop), Size(max(b - a, 0f) + 4 * px, g.audioBottom - g.audioTop))
+            drawRect(c.danger, Offset(a - 3 * px, g.audioTop), Size(max(b - a, 0f) + 6 * px, 4 * px))
+        }
+    }
 
     // range selection
     ed.range?.let { (a, b) ->

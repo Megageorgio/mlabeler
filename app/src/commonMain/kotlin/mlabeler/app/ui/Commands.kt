@@ -203,6 +203,11 @@ object Commands {
         a.update { it.copy(edit = it.edit.copy(tool = if (it.edit.tool == "cut") "cursor" else "cut")) }
     }.only(Mode.Labels)
     val playOnDrag = Command("play-on-drag", S.playOnDrag, emptyList()) { _, a -> a.update { it.copy(edit = it.edit.copy(playOnDrag = !it.edit.playOnDrag)) } }
+    val cleanup = Command("cleanup", L("Clean the recording…", "Чистка записи…"), listOf(ch('C', ctrl = true, shift = true))) { _, a -> a.showCleanup = true }
+    val reloadAudio = Command("reload-audio", L("Read the recording again", "Перечитать запись"), listOf(Chord(Key.F5))) { e, _ -> e.reloadAudio() }
+    val deselect = Command("deselect", L("Clear the selection", "Снять выделение"), listOf(Chord(Key.Escape))) { e, _ ->
+        e.selection = mlabeler.app.state.Selection.None; e.range = null
+    }
     val workspace = Command("workspace", L("Folder settings…", "Настройки папки…"), listOf(ch('M', ctrl = true))) { _, a -> a.showWorkspace = true }
 
     init {
@@ -211,7 +216,7 @@ object Commands {
     }
 
     val all = listOf(
-        toolCursor, toolCut, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        cleanup, reloadAudio, deselect, toolCursor, toolCut, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

@@ -77,6 +77,10 @@ data class EditSettings(
     val cutAskName: Boolean = true,
     /** After adding a boundary with the mouse: play the part before it. */
     val cutPlay: Boolean = true,
+    /** After moving a boundary, select the phoneme it belongs to (Space then plays it). */
+    val selectAfterDrag: Boolean = true,
+    /** A click on the waveform or spectrogram removes the phoneme selection (Space then plays from the cursor). */
+    val audioClickDeselects: Boolean = true,
     /** Playback speed, 0.25..1, pitch kept. */
     val speed: Float = 1f,
     /** Save every N seconds when there are changes; 0 = off. */
@@ -107,7 +111,8 @@ object MouseActions {
     const val SPLIT = "split"
     const val SPLIT_NAME = "split-name"
     const val DELETE = "delete"
-    val all = listOf(NONE, SELECT, PLAY, PLAY_FROM, RENAME, SPLIT, SPLIT_NAME, DELETE)
+    const val DESELECT = "deselect"
+    val all = listOf(NONE, SELECT, DESELECT, PLAY, PLAY_FROM, RENAME, SPLIT, SPLIT_NAME, DELETE)
 }
 
 @Serializable
@@ -198,6 +203,7 @@ data class AppSettings(
     val mouse: MouseSettings = MouseSettings(),
     /** Interface font from the system; empty = the theme's. */
     val font: String = "",
+    val clean: CleanSettings = CleanSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")

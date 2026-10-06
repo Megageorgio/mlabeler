@@ -49,6 +49,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
                     if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)
                     if (app.showAutolabel && ed != null) mlabeler.app.ui.AutolabelDialog(app)
+                    if (app.showCleanup && ed != null) mlabeler.app.ui.CleanupDialog(app)
                     if (app.showHelp && app.settings.setupDone) mlabeler.app.ui.HelpDialog(app)
                     if (app.showPlugins && ed != null) mlabeler.app.ui.PluginsDialog(app)
                     if (app.showImport && ed != null) mlabeler.app.ui.ImportDialog(app)

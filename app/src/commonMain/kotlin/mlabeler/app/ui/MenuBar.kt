@@ -106,6 +106,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         if (!Platform.isMobile) add(MItem(MenuTitles.showInFolder()) { Platform.openInFileManager(ed.workspace.root) })
         add(MSep)
         add(item(Commands.save, ed, app))
+        add(item(Commands.reloadAudio, ed, app))
         add(MSep)
         add(item(Commands.prevFile, ed, app))
         add(item(Commands.nextFile, ed, app))
@@ -119,6 +120,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     val edit = buildList {
         add(item(Commands.undo, ed, app))
         add(item(Commands.redo, ed, app))
+        add(item(Commands.deselect, ed, app))
         add(MSep)
         if (oto) {
             add(item(Commands.otoAdd, ed, app))
@@ -225,6 +227,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     }
     val tools = buildList {
         if (oto) add(item(Commands.autoOto, ed, app)) else add(item(Commands.autolabel, ed, app))
+        add(item(Commands.cleanup, ed, app))
         add(MSep)
         add(item(Commands.plugins, ed, app))
         val slots = listOf(Commands.slot1, Commands.slot2, Commands.slot3, Commands.slot4)

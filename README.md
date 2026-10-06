@@ -51,6 +51,12 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
   moves it. A label being typed is kept as soon as you click or play elsewhere, no Enter needed.
 - Deleting a selected boundary removes the phoneme that ends at it (or the one that starts at it — a setting);
   Space plays that phoneme. Space while playing can start again instead of stopping.
+- Cleaning a recording (Tools → Clean the recording, Ctrl+Shift+C): clicks found and rebuilt by linear prediction
+  from the sound around them (only those samples change), a selected short part repaired the same way, and an
+  optional noise gate from a noise profile with preview. Sample rate, bit depth, channels and every untouched sample
+  stay exactly the same; the first version is kept in `.mlabeler/backup`, with undo and "put back the original".
+- A recording changed on disk is read again by itself (or F5); labels and undo history stay. After moving a boundary
+  its phoneme is selected (Space plays it); a click on the audio or Esc clears the selection.
 - Any system font for the interface. Every settings page and every slider can go back to its default.
 - System folder dialog (Explorer with the address bar on Windows). Only WAV files are listed unless other formats are
   turned on in Settings → General.

@@ -31,6 +31,7 @@ class AppState(private val scope: CoroutineScope) {
     var showBatchRename by mutableStateOf(false)
     var showWorkspace by mutableStateOf(false)
     var showAutolabel by mutableStateOf(false)
+    var showCleanup by mutableStateOf(false)
     var showHelp by mutableStateOf(false)
     var showAutoOto by mutableStateOf(false)
     var showPlugins by mutableStateOf(false)

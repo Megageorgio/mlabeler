@@ -88,6 +88,7 @@ class EditorState(
     val doc: LabelDoc? get() = dragDoc ?: committed
     var mode by mutableStateOf(Mode.Labels)
     val oto = OtoState(this, app)
+    val cleanup = Cleanup(this, app)
 
     val labelsDirty: Boolean get() { docVersion; return history?.dirty == true }
     val dirty: Boolean get() = if (mode == Mode.Oto) oto.dirty else labelsDirty
@@ -155,6 +156,14 @@ class EditorState(
         val auto = settings.edit.autosaveSeconds
         if (auto > 0 && dirty && dragDoc == null && editingText == null && now() - lastEdit > auto * 1000L) save(quiet = true)
         val it = item ?: return
+        // the recording itself changed (cleaned in another editor): show the new sound, labels stay
+        val am = runCatching { workspace.fs.lastModified(it.audioPath) }.getOrDefault(0L)
+        if (audioMtime > 0 && am > audioMtime && !loading && toolkitBusy == null) {
+            audioMtime = am
+            reloadAudio()
+            app.message(S.audioReloaded())
+            return
+        }
         val path = it.labelPath ?: return
         val known = labelMtime[it.id] ?: return
         val m = workspace.fs.lastModified(path)
@@ -443,8 +452,40 @@ class EditorState(
         workspace.updateItem(it.id) { s -> s.copy(viewStart = viewStart, pixelsPerSecond = pixelsPerSecond) }
     }
 
+    /** Modification time of the open recording when it was read. */
+    private var audioMtime = 0L
+
+    /** Plays a prepared piece of sound (e.g. a cleaning preview). */
+    fun playBuffer(a: Audio) {
+        stop()
+        runCatching { player.play(a, 0, a.samples.size, false) }.onFailure { app.message(S.cannotPlay.format(it.message ?: it.toString()), error = true); return }
+        playing = true
+        playJob = scope.launch {
+            delay(30)
+            while (isActive && player.isPlaying) delay(30)
+            playing = false
+        }
+    }
+
+    /** Reads the open recording again (after it was changed on disk); labels, undo history and view stay. */
+    fun reloadAudio() {
+        val it = item ?: return
+        finishEditing()
+        rememberView()
+        stop()
+        val sel = selection
+        load(it)
+        pendingSelection = sel
+    }
+
+    private var pendingSelection: Selection? = null
+    private var lastLoadedPath = ""
+
     private fun load(item: Item) {
         loadJob?.cancel()
+        audioMtime = runCatching { workspace.fs.lastModified(item.audioPath) }.getOrDefault(0L)
+        if (item.audioPath != lastLoadedPath) cleanup.clearFound()
+        lastLoadedPath = item.audioPath
         audio = null
         peaks = null
         pitch = null
@@ -500,6 +541,7 @@ class EditorState(
                 val k = doc?.tierIndex(tierName) ?: -1
                 if (k >= 0) selectInterval(IntervalRef(k, i))
             }
+            pendingSelection?.let { selection = it; pendingSelection = null }
             loading = false
             docChanged()
             oto.onItemOpened()
@@ -679,10 +721,12 @@ class EditorState(
         dragDoc = Edits.moveBound(base, ref, time.coerceIn(0.0, duration), duration, moveOptions(invertRipple, invertLinked))
     }
 
-    fun endDrag() {
+    fun endDrag(bound: BoundRef? = null) {
         val d = dragDoc
         dragBase = null
         if (d != null) commit(d) else dragDoc = null
+        // the phoneme the boundary belongs to becomes selected, so Space plays it right away
+        if (bound != null && settings.edit.selectAfterDrag) boundOwnerInterval(bound)?.let { selectInterval(it, reveal = false) }
     }
 
     fun cancelDrag() {

@@ -312,7 +312,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             Section.Editing -> { st -> st.copy(edit = dE.copy(tool = st.edit.tool, cutAskName = st.edit.cutAskName, cutPlay = st.edit.cutPlay,
                 playOnDrag = st.edit.playOnDrag, newFormat = st.edit.newFormat)) }
             Section.Mouse -> { st -> st.copy(mouse = mlabeler.app.state.MouseSettings(), edit = st.edit.copy(tool = dE.tool, cutAskName = dE.cutAskName,
-                cutPlay = dE.cutPlay, playOnDrag = dE.playOnDrag)) }
+                cutPlay = dE.cutPlay, playOnDrag = dE.playOnDrag, selectAfterDrag = dE.selectAfterDrag, audioClickDeselects = dE.audioClickDeselects)) }
             Section.Checks -> { st -> st.copy(checks = dC) }
             Section.Toolkit -> { st -> st.copy(toolkit = mlabeler.app.state.ToolkitSettings(lastModel = st.toolkit.lastModel,
                 lastLanguage = st.toolkit.lastLanguage, lastSegmentModel = st.toolkit.lastSegmentModel)) }
@@ -519,6 +519,9 @@ object MouseTitles {
     val middle = L("Middle click (dragging with it scrolls)", "Средний клик (с перетаскиванием — прокрутка)")
     val ctrl = L("Ctrl+click", "Ctrl+клик")
     val alt = L("Alt+click", "Alt+клик")
+    val selectAfterDrag = L("After moving a boundary, select its phoneme (Space plays it)", "После перетаскивания границы выделять её фонему (пробел её проигрывает)")
+    val audioDeselects = L("A click on the waveform or spectrogram clears the selection (Space plays from there)",
+        "Клик по волне или спектрограмме снимает выделение (пробел играет оттуда)")
     val spaceRestarts = L("Space while playing starts again (instead of stopping)", "Пробел во время проигрывания начинает заново (а не останавливает)")
     val owner = L("A boundary belongs to the phoneme…", "Граница относится к фонеме…")
     val ownerHint = L("Delete on a selected boundary removes that phoneme; Space plays it.",
@@ -529,6 +532,7 @@ object MouseTitles {
     fun action(id: String): String = when (id) {
         mlabeler.app.state.MouseActions.NONE -> L("Nothing", "Ничего")()
         mlabeler.app.state.MouseActions.SELECT -> L("Select", "Выбрать")()
+        mlabeler.app.state.MouseActions.DESELECT -> L("Clear the selection", "Снять выделение")()
         mlabeler.app.state.MouseActions.PLAY -> L("Play the phoneme", "Проиграть фонему")()
         mlabeler.app.state.MouseActions.PLAY_FROM -> L("Play from here", "Играть отсюда")()
         mlabeler.app.state.MouseActions.RENAME -> L("Rename", "Переименовать")()
@@ -553,6 +557,8 @@ private fun MousePage(app: AppState) {
     SwitchRow(MouseTitles.askName(), s.edit.cutAskName) { v -> app.update { it.copy(edit = it.edit.copy(cutAskName = v)) } }
     SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
     SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
+    SwitchRow(MouseTitles.selectAfterDrag(), s.edit.selectAfterDrag) { v -> app.update { it.copy(edit = it.edit.copy(selectAfterDrag = v)) } }
+    SwitchRow(MouseTitles.audioDeselects(), s.edit.audioClickDeselects) { v -> app.update { it.copy(edit = it.edit.copy(audioClickDeselects = v)) } }
     val m = s.mouse
     fun set(f: (mlabeler.app.state.MouseSettings) -> mlabeler.app.state.MouseSettings) = app.update { it.copy(mouse = f(it.mouse)) }
     SectionTitle(MouseTitles.onLabels())
