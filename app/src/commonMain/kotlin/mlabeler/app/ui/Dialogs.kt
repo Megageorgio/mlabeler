@@ -175,7 +175,8 @@ fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable and
                 .then(size?.let { Modifier.size(it.width.coerceIn(320.dp, boxW), it.height.coerceIn(200.dp, boxH)) }
                     ?: Modifier.widthIn(max = maxWidth.dp).fillMaxWidth().heightIn(max = boxH - 96.dp)),
         ) {
-            Card(Modifier.fillMaxSize().clickable(remember { MutableInteractionSource() }, null) {}) {
+            // as tall as the content until the corner is dragged, then exactly the dragged size
+            Card((if (size != null) Modifier.fillMaxSize() else Modifier.fillMaxWidth()).clickable(remember { MutableInteractionSource() }, null) {}) {
                 Column {
                     Box(
                         Modifier.fillMaxWidth().height(12.dp)
@@ -212,7 +213,7 @@ fun CommandPalette(app: AppState) {
     var query by remember { mutableStateOf("") }
     var index by remember { mutableIntStateOf(0) }
     val focus = remember { FocusRequester() }
-    val list = Commands.visible(ed.mode).filter { query.isBlank() || it.title().contains(query.trim(), ignoreCase = true) }
+    val list = Commands.forPalette(ed.mode).filter { query.isBlank() || it.title().contains(query.trim(), ignoreCase = true) }
     val state = rememberLazyListState()
     LaunchedEffect(Unit) { focus.requestFocus() }
     LaunchedEffect(index) { if (list.isNotEmpty()) state.scrollToItem(index.coerceIn(0, list.size - 1)) }
@@ -238,7 +239,7 @@ fun CommandPalette(app: AppState) {
             onDone = { runAt(index) },
         )
         Divider()
-        LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 420.dp), state = state) {
+        LazyColumn(Modifier.weight(1f, fill = false), state = state) {
             itemsIndexed(list) { i, cmd ->
                 Row(
                     Modifier.fillMaxWidth().background(if (i == index) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else c.panel)

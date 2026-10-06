@@ -247,6 +247,12 @@ object Commands {
     fun find(e: KeyEvent, mode: Mode): Command? = all.firstOrNull { c -> (c.mode == null || c.mode == mode) && c.keys.any { it.matches(e) } }
 
     fun visible(mode: Mode) = all.filter { it.mode == null || it.mode == mode }
+
+    /** For the command list: everyday commands (playback, saving, editing, moving around) first, the rest after. */
+    fun forPalette(mode: Mode): List<Command> {
+        val main = all.subList(all.indexOf(togglePlay), all.size).toSet()
+        return visible(mode).sortedBy { if (it in main) 0 else 1 }
+    }
 }
 
 private fun otherKeyName(k: Key): String {
