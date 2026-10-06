@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import mlabeler.app.Platform
 import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
+import mlabeler.app.fileDrop
 import mlabeler.app.theme.T
 import mlabeler.core.io.AUDIO_EXTENSIONS
 import mlabeler.core.io.Paths
@@ -57,7 +58,10 @@ fun StartScreen(app: AppState) {
         )
         return
     }
-    BoxWithConstraints(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())) {
+    var dropHover by remember { mutableStateOf(false) }
+    BoxWithConstraints(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())
+        .fileDrop({ dropHover = it }) { app.openDropped(it) }) {
+        if (dropHover) DropHint(dropOpen())
         val wide = maxWidth > 760.dp
         Column(
             Modifier.fillMaxSize().padding(horizontal = if (wide) 64.dp else 20.dp, vertical = if (wide) 56.dp else 24.dp),

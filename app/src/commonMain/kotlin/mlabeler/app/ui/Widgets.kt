@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -392,5 +393,20 @@ fun ValueSlider(
             colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.border),
             modifier = Modifier.height(32.dp),
         )
+    }
+}
+
+val dropOpen = mlabeler.app.i18n.L("Drop to open the recording (or the folder)", "Отпустите — запись (или папка) откроется")
+
+/** Shown over a place while files are dragged over it: what dropping them will do. */
+@Composable
+fun DropHint(text: String) {
+    val c = T.c
+    val shape = RoundedCornerShape(c.radius * 2)
+    Box(
+        Modifier.fillMaxSize().padding(6.dp).clip(shape).background(c.accent.copy(alpha = 0.16f)).border(2.dp, c.accent, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = c.text, fontSize = 15.sp, modifier = Modifier.clip(RoundedCornerShape(c.radius)).background(c.panel).padding(horizontal = 14.dp, vertical = 8.dp))
     }
 }

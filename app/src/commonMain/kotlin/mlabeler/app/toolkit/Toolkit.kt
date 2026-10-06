@@ -72,6 +72,33 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             )
         }
 
+    /** A model on the toolkit's computer. */
+    data class InstalledModel(val id: String, val name: String, val engine: String, val languages: List<String>, val source: String)
+
+    suspend fun installedModels(): List<InstalledModel> = call("GET", "/models/installed").jsonArray.map { m ->
+        val o = m.jsonObject
+        InstalledModel(
+            o["id"]!!.jsonPrimitive.content,
+            (o["name"] as? JsonPrimitive)?.content ?: "",
+            (o["engine"] as? JsonPrimitive)?.content ?: "",
+            (o["languages"] as? JsonArray)?.map { it.jsonPrimitive.content } ?: emptyList(),
+            (o["source"] as? JsonPrimitive)?.content ?: "",
+        )
+    }
+
+    /** Registers a model file, folder or archive at [path] on the toolkit's computer; returns the new model ids. */
+    suspend fun importModel(engine: String, path: String, id: String?, name: String?, languages: List<String>): List<String> {
+        val req = buildJsonObject {
+            put("engine", engine); put("path", path)
+            if (!id.isNullOrBlank()) put("id", id)
+            if (!name.isNullOrBlank()) put("name", name)
+            if (languages.isNotEmpty()) put("languages", buildJsonArray { languages.forEach { add(JsonPrimitive(it)) } })
+        }
+        return call("POST", "/models/import", req, timeoutMs = 600_000).jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
+    }
+
+    suspend fun removeModel(id: String) { call("DELETE", "/models/$id") }
+
     /** Uploads a file, returns its id for input items. */
     suspend fun upload(name: String, bytes: ByteArray): String {
         val boundary = "----mlabeler" + bytes.size + name.hashCode()

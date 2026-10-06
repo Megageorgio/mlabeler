@@ -557,9 +557,10 @@ private fun ToolkitPage(app: AppState) {
     SectionTitle(S.toolkit())
     Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
     ToolkitStatus(app)
+    OwnModelsSection(app)
+    SectionTitle(S.toolkitUrl())
     var url by remember { mutableStateOf(s.toolkit.url) }
     var token by remember { mutableStateOf(s.toolkit.token) }
-    Text(S.toolkitUrl(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
     Field(url, { url = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(url = it.trim())) } }, Modifier.fillMaxWidth())
     Text(S.toolkitToken(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
     Field(token, { token = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(token = it.trim())) } }, Modifier.fillMaxWidth())
@@ -743,6 +744,36 @@ private fun ActionRow(title: String, value: String, onChange: (String) -> Unit) 
                         onClick = { open = false; onChange(a) },
                     )
                 }
+            }
+        }
+    }
+}
+
+private val leaveTitle = mlabeler.app.i18n.L("Save the changes?", "Сохранить изменения?")
+private val leaveText = mlabeler.app.i18n.L("The labels of {0} have changes that are not saved yet.", "В разметке {0} есть несохранённые изменения.")
+private val dontSave = mlabeler.app.i18n.L("Don't save", "Не сохранять")
+
+/** Asked before leaving a folder with unsaved labels (when "save when switching files" is off). */
+@Composable
+fun LeaveDialog(app: AppState) {
+    val action = app.pendingLeave ?: return
+    val c = T.c
+    val ed = app.editor
+    fun done(save: Boolean?) {
+        app.pendingLeave = null
+        if (save == null) return
+        // not saving: leaving the folder with "save when switching" off keeps the files as they are
+        if (save) ed?.save(quiet = true)
+        action()
+    }
+    Overlay({ done(null) }, 440) {
+        Column(Modifier.padding(18.dp)) {
+            Text(leaveTitle(), color = c.text, fontSize = 17.sp)
+            Text(leaveText.format(ed?.item?.name ?: ""), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                Btn(S.cancel()) { done(null) }
+                Btn(dontSave()) { done(false) }
+                Btn(S.save(), primary = true) { done(true) }
             }
         }
     }

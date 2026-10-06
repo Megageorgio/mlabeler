@@ -17,6 +17,9 @@ import mlabeler.core.io.Workspace
 
 data class Message(val text: String, val error: Boolean, val id: Long)
 
+private val dropOnlyAudio = mlabeler.app.i18n.L("Drop a recording or a folder", "Перетащите запись или папку")
+private val dropOtherAudio = mlabeler.app.i18n.L("Turn on other audio formats in Settings → General to open these", "Чтобы открывать такие файлы, включите другие форматы в Настройках → Общие")
+
 class AppState(private val scope: CoroutineScope) {
     var settings by mutableStateOf(AppSettings.load())
         private set
@@ -182,6 +185,41 @@ class AppState(private val scope: CoroutineScope) {
             update { it.copy(seenHelp = true) }
         }
         update { it.copy(recent = (listOf(path) + it.recent.filter { r -> r != path }).take(12)) }
+    }
+
+    /** Something to do after leaving the open folder, waiting for an answer about unsaved changes. */
+    var pendingLeave by mutableStateOf<(() -> Unit)?>(null)
+
+    /** Runs [action] (which leaves the folder); with unsaved changes and "save when switching" off, asks first. */
+    fun leaveFolderThen(action: () -> Unit) {
+        val ed = editor
+        if (ed != null && ed.dirty && !settings.edit.saveOnSwitch) pendingLeave = action else action()
+    }
+
+    /**
+     * Files dropped on the picture or the start screen: the recording (or folder) opens. A recording of another
+     * folder opens that folder with it; one in a "wav"/"wavs" folder opens the folder above (labels may sit beside).
+     */
+    fun openDropped(paths: List<String>): Boolean {
+        val first = paths.firstOrNull() ?: return false
+        val ed = editor
+        if (PlatformFs.isDirectory(first)) {
+            leaveFolderThen { openFolder(first) }
+            return true
+        }
+        val ext = mlabeler.core.io.Paths.ext(first).lowercase()
+        if (ext !in mlabeler.core.io.AUDIO_EXTENSIONS) {
+            message(if (ext in mlabeler.core.io.ALL_AUDIO_EXTENSIONS) dropOtherAudio() else dropOnlyAudio(), error = true)
+            return false
+        }
+        if (ed != null && ed.contains(first)) return ed.openPath(first)
+        var folder = mlabeler.core.io.Paths.parent(first)
+        if (mlabeler.core.io.Paths.name(folder).lowercase() in setOf("wav", "wavs", "audio", "raw")) folder = mlabeler.core.io.Paths.parent(folder)
+        leaveFolderThen {
+            openFolder(folder)
+            editor?.openPath(first)
+        }
+        return true
     }
 
     fun closeFolder() {

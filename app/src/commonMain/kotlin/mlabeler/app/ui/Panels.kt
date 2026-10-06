@@ -39,6 +39,7 @@ import mlabeler.app.Platform
 import mlabeler.app.i18n.S
 import mlabeler.app.i18n.L
 import mlabeler.app.state.EditorState
+import mlabeler.app.fileDrop
 import mlabeler.app.state.FileFilter
 import mlabeler.app.state.Selection
 import mlabeler.app.theme.T
@@ -51,6 +52,17 @@ import mlabeler.core.model.name
 
 @Composable
 fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Unit = {}) {
+    val c = T.c
+    var dropHover by remember { mutableStateOf(false) }
+    // recordings dropped on the list are copied into this folder
+    Box(modifier.fileDrop({ dropHover = it }) { ed.addFiles(it) > 0 }) {
+    FilesList(ed, Modifier.fillMaxSize(), onOpened)
+    if (dropHover) DropHint(dropAdd.format(Paths.name(ed.workspace.root)))
+    }
+}
+
+@Composable
+private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit) {
     val c = T.c
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp)) {
@@ -130,6 +142,7 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
 private val probLong = L("Too long", "Слишком длинная")
 private val probLongPause = L("Pause too long", "Слишком длинная пауза")
 private val probLongPhrase = L("Too long without a pause", "Слишком долго без паузы")
+private val dropAdd = L("Drop to add to the folder {0}", "Отпустите — файлы добавятся в папку {0}")
 private val searchHint = L("Search by name or phonemes", "Поиск по имени или фонемам")
 private val queueTitle = L("Phonemes in advance", "Фонемы наперёд")
 private val queueHint = L("e.g. SP k a sh i SP", "например: SP k a sh i SP")

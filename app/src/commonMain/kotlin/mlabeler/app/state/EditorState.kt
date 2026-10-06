@@ -32,6 +32,8 @@ import mlabeler.core.edit.MoveOptions
 import mlabeler.core.io.Item
 import mlabeler.core.io.ItemMarks
 import mlabeler.core.io.Paths
+import mlabeler.core.io.AUDIO_EXTENSIONS
+import mlabeler.core.io.ALL_AUDIO_EXTENSIONS
 import mlabeler.core.io.Workspace
 import mlabeler.core.model.IntervalTier
 import mlabeler.core.model.LabelDoc
@@ -50,6 +52,9 @@ enum class FileFilter { All, NotDone, Starred, NoLabels }
 
 enum class Mode { Labels, Oto }
 
+private val dropAdded = L("Added to the folder {1}: {0}", "Добавлено в папку {1}: {0}")
+private val dropNoAudio = L("Only recordings can be added here", "Сюда можно добавить только записи")
+private val dropOtherAudio = L("Turn on other audio formats in Settings → General to add these", "Чтобы добавить такие файлы, включите другие форматы в Настройках → Общие")
 private val queueEmpty = L("Type the phonemes first", "Сначала впишите фонемы")
 private val queueNoPlace = L("Select a part or a phoneme to fill", "Выделите кусок или фонему, которую заполнить")
 private val grouped = L("Phonemes are grouped into notes (the words tier)", "Фонемы сгруппированы по нотам (слой words)")
@@ -202,6 +207,72 @@ class EditorState(
     )
 
     // ---------- files ----------
+
+    /** Drive letters: compare paths without case. */
+    private val windowsPaths: Boolean get() = workspace.root.getOrNull(1) == ':'
+
+    private fun samePath(a: String, b: String): Boolean {
+        val x = a.replace('\\', '/').trimEnd('/')
+        val y = b.replace('\\', '/').trimEnd('/')
+        return if (windowsPaths) x.equals(y, ignoreCase = true) else x == y
+    }
+
+    fun contains(path: String): Boolean {
+        val root = workspace.root.replace('\\', '/').trimEnd('/') + "/"
+        val p = path.replace('\\', '/')
+        return if (windowsPaths) p.lowercase().startsWith(root.lowercase()) else p.startsWith(root)
+    }
+
+    /** Opens the recording at [path] if it is in this folder's list. */
+    fun openPath(path: String): Boolean {
+        val i = items.indexOfFirst { samePath(it.audioPath, path) }
+        if (i < 0) return false
+        open(i)
+        return true
+    }
+
+    /**
+     * Copies recordings from elsewhere into this folder (next to the open one), with their labels of the same name;
+     * a name that is taken gets " (2)". Recordings already in the folder are just opened. Returns how many were added.
+     */
+    fun addFiles(paths: List<String>): Int {
+        val fs = workspace.fs
+        val audio = paths.filter { Paths.ext(it).lowercase() in AUDIO_EXTENSIONS }
+        val skipped = paths.filter { !fs.isDirectory(it) && Paths.ext(it).lowercase() !in AUDIO_EXTENSIONS }
+        if (audio.isEmpty()) {
+            app.message(if (skipped.any { Paths.ext(it).lowercase() in ALL_AUDIO_EXTENSIONS }) dropOtherAudio() else dropNoAudio(), error = true)
+            return 0
+        }
+        val dir = item?.let { Paths.parent(it.audioPath) } ?: workspace.root
+        var added = 0
+        var first: String? = null
+        for (src in audio) {
+            if (contains(src)) { if (first == null) first = src; continue }
+            val stem = Paths.stem(src)
+            val ext = Paths.ext(src)
+            var name = stem
+            var n = 2
+            while (fs.exists(Paths.join(dir, "$name.$ext"))) name = "$stem ($n)".also { n++ }
+            val target = Paths.join(dir, "$name.$ext")
+            try {
+                fs.copy(src, target)
+                for (le in listOf("lab", "TextGrid", "ds", "txt")) {
+                    val l = Paths.join(Paths.parent(src), "$stem.$le")
+                    if (fs.exists(l)) fs.copy(l, Paths.join(dir, "$name.$le"))
+                }
+                added++
+                if (first == null) first = target
+            } catch (e: Exception) {
+                app.message(S.cannotSave.format(e.message ?: e.toString()), error = true)
+            }
+        }
+        if (added > 0) {
+            rescan()
+            app.message(dropAdded.format(added, Paths.name(dir)))
+        }
+        first?.let { openPath(it) }
+        return added
+    }
 
     fun scan() {
         items = workspace.scan()

@@ -104,9 +104,9 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     val oto = ed.mode == Mode.Oto
     val file = buildList {
         add(MItem(MenuTitles.openFolder(), Commands.openFolder.keyLabel) {
-            app.pickFolder(S.openFolder()) { app.openFolder(it) }
+            app.pickFolder(S.openFolder()) { app.leaveFolderThen { app.openFolder(it) } }
         })
-        add(MItem(MenuTitles.closeFolder()) { app.closeFolder() })
+        add(MItem(MenuTitles.closeFolder()) { app.leaveFolderThen { app.closeFolder() } })
         if (!Platform.isMobile) add(MItem(MenuTitles.showInFolder()) { Platform.openInFileManager(ed.workspace.root) })
         add(MSep)
         add(item(Commands.save, ed, app))

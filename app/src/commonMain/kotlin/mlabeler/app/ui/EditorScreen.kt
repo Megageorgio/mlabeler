@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import mlabeler.app.Platform
 import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
+import mlabeler.app.fileDrop
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.Mode
 import mlabeler.app.state.panelsOn
@@ -180,14 +181,17 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
 @Composable
 private fun EditorBody(app: AppState, ed: EditorState) {
     val c = T.c
+    var dropHover by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
     if (ed.mode != Mode.Oto) ModelResultsBar(ed)
-    Box(Modifier.weight(1f).fillMaxWidth()) {
+    // a recording dropped on the picture opens (its folder too, when it is from elsewhere)
+    Box(Modifier.weight(1f).fillMaxWidth().fileDrop({ dropHover = it }) { app.openDropped(it) }) {
         when {
             ed.loadError != null -> EmptyNote(ed.loadError ?: "")
             ed.item == null -> EmptyNote(if (ed.items.isEmpty()) S.noFiles() else "")
             else -> Timeline(ed, app.settings.layout, app.settings.view, { nl -> app.update { it.copy(layout = nl) } }, Modifier.fillMaxSize())
         }
+        if (dropHover) DropHint(dropOpen())
         if (ed.loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 2.dp)
@@ -326,7 +330,7 @@ private fun CompactEditor(app: AppState, ed: EditorState) {
                 Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconBtn(Icons.back, S.back()) { showFiles = false }
                     Text(Paths.name(ed.workspace.root), color = c.text, fontSize = 16.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    IconBtn(Icons.home, S.closeFolder()) { app.closeFolder() }
+                    IconBtn(Icons.home, S.closeFolder()) { app.leaveFolderThen { app.closeFolder() } }
                 }
                 Divider()
                 SidePanel(ed, Modifier.weight(1f).fillMaxWidth()) { showFiles = false }
@@ -360,7 +364,7 @@ private fun CompactEditor(app: AppState, ed: EditorState) {
 private fun CompactMenu(app: AppState, ed: EditorState, onDetails: () -> Unit) {
     MenuButton(app, ed, extra = listOf(
         MItem(S.inspector()) { onDetails() },
-        MItem(S.closeFolder()) { app.closeFolder() },
+        MItem(S.closeFolder()) { app.leaveFolderThen { app.closeFolder() } },
     ))
 }
 

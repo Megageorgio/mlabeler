@@ -22,6 +22,8 @@ expect object Platform {
     /** Blocking system folder dialog (call off the UI thread); [start] = folder to open in. */
     fun pickFolderNative(title: String, start: String? = null): String?
     val hasNativeFolderPicker: Boolean
+    /** Blocking system dialog for one file ([extensions] without dots; empty = any); null when cancelled or not available. */
+    fun pickFileNative(title: String, extensions: List<String> = emptyList(), start: String? = null): String?
     /** Decodes audio formats other than WAV; null if not supported here. */
     fun decodeAudio(path: String): Audio?
     fun openInFileManager(path: String)

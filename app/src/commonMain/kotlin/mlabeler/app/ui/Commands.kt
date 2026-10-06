@@ -159,7 +159,7 @@ object Commands {
     val powerLane = Command("power", S.power, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showPower = !it.layout.showPower)) } }
     val palette = Command("commands", S.commands, listOf(ch('K', ctrl = true))) { _, a -> a.showCommands = true }
     val settings = Command("settings", S.settings, listOf(Chord(Key.Comma, ctrl = true))) { _, a -> a.showSettings = true }
-    val openFolder = Command("open", S.openFolder, listOf(ch('O', ctrl = true))) { _, a -> a.closeFolder() }
+    val openFolder = Command("open", S.openFolder, listOf(ch('O', ctrl = true))) { _, a -> a.leaveFolderThen { a.closeFolder() } }
 
     private fun otoSet(id: String, title: L, key: Char, m: OtoMarker) =
         Command(id, title, listOf(ch(key))) { e, _ -> e.oto.setMarker(m, e.editTime()) }.only(Mode.Oto)

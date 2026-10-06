@@ -46,6 +46,17 @@ actual object Platform {
 
     actual val hasNativeFolderPicker: Boolean = true
 
+    actual fun pickFileNative(title: String, extensions: List<String>, start: String?): String? {
+        runCatching { return NativeFolderDialog.pickFile(extensions, start) }.onFailure { System.err.println("native file dialog: $it") }
+        val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
+        if (start != null) d.directory = start
+        if (extensions.isNotEmpty()) d.setFilenameFilter { _, name -> extensions.any { name.endsWith(".$it", ignoreCase = true) } }
+        d.isVisible = true
+        val dir = d.directory ?: return null
+        val file = d.file ?: return null
+        return File(dir, file).path
+    }
+
     actual fun pickFolderNative(title: String, start: String?): String? {
         // the system folder dialog (Explorer on Windows, with the address bar; GTK/portal on Linux; Finder on macOS)
         runCatching { return NativeFolderDialog.pick(start) }.onFailure { System.err.println("native folder dialog: $it") }

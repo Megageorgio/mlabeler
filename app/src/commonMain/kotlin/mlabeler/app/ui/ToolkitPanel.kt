@@ -110,10 +110,11 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
 /** Languages and models of a task, loaded after the toolkit answers (started here if needed). */
 @Composable
 fun rememberToolkitModels(app: AppState, task: String, enabled: Boolean = true): Pair<List<ToolkitLanguage>?, String?> {
-    var langs by remember(task) { mutableStateOf<List<ToolkitLanguage>?>(null) }
-    var error by remember(task) { mutableStateOf<String?>(null) }
+    val version = app.toolkit.modelsVersion
+    var langs by remember(task, version) { mutableStateOf<List<ToolkitLanguage>?>(null) }
+    var error by remember(task, version) { mutableStateOf<String?>(null) }
     val ready = app.toolkit.status == Status.Ready
-    LaunchedEffect(task, enabled, ready) {
+    LaunchedEffect(task, enabled, ready, version) {
         if (!enabled || langs != null) return@LaunchedEffect
         if (!ready) {
             if (!app.toolkit.ensure()) return@LaunchedEffect

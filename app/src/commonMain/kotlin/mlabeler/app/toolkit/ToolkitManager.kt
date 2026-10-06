@@ -43,6 +43,8 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     var lastError by mutableStateOf("")
         private set
     val log = mutableStateListOf<String>()
+    /** Changes when models are added or removed, so the lists of models are read again. */
+    var modelsVersion by androidx.compose.runtime.mutableIntStateOf(0)
     private val lock = Mutex()
     private var installJob: Job? = null
 

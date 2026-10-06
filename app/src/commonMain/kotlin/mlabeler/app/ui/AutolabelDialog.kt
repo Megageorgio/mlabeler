@@ -51,6 +51,8 @@ private val loadingModels = L("Asking the toolkit for models…", "Запраш�
 private val notInstalled = L("downloads on first use", "скачается при первом запуске")
 private val noModels = L("No models for this", "Для этого нет моделей")
 
+private val ownModelLink = L("Add your own model…", "Добавить свою модель…")
+
 @Composable
 fun AutolabelDialog(app: AppState) {
     val ed = app.editor ?: return
@@ -128,6 +130,8 @@ fun AutolabelDialog(app: AppState) {
                     }
                 }
             }
+            Text(ownModelLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
+                .clickable { app.settingsPage = "Toolkit"; app.showAutolabel = false; app.showSettings = true })
             if (!recognizeMode) {
                 SectionTitle(textTitle())
                 Field(text, { text = it }, Modifier.fillMaxWidth(), placeholder = textHint())
