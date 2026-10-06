@@ -124,7 +124,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
             delay(500)
             if (!LocalToolkit.running) {
                 // the toolkit found a newer version of itself: it updates and starts again on its own
-                if (LocalToolkit.lastExitCode() == EXIT_UPDATING) return waitForUpdate()
+                if (LocalToolkit.lastExitCode() == EXIT_UPDATING) return waitForUpdate(cmd)
                 status = Status.Failed
                 lastError = startFailed()
                 ownProcess = false
@@ -141,29 +141,58 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     }
 
     /** The toolkit updates itself (it exited with [EXIT_UPDATING]); wait until it answers again, up to 15 minutes. */
-    private suspend fun waitForUpdate(): Boolean {
+    private suspend fun waitForUpdate(cmd: List<String>): Boolean {
         updatingNow = true
         busy(Status.Installing)
         addLog(updating())
         // the updater writes uv's output to a file (its path is in the toolkit's last words): show it as it grows
         var shown = 0
+        var finishedAt = 0
+        var startedAgain = false
+        val since = kotlin.time.Clock.System.now().toEpochMilliseconds() - 5_000
         try {
-            repeat(15 * 60) {
+            repeat(15 * 60) { second ->
                 delay(1000)
-                // (looked up each time: the toolkit's last lines reach the log a moment after it exits)
+                // (looked up each time: the toolkit's last lines reach the log a moment after it exits);
+                // older toolkits don't name it: their default place, if it changed just now
                 val updateLog = log.lastOrNull { it.startsWith("Update log: ") }?.removePrefix("Update log: ")?.trim()
+                    ?: mlabeler.core.io.Paths.join(mlabeler.app.Platform.homeDir(), "mVocalToolkit/logs/update.log").takeIf { p ->
+                        runCatching { mlabeler.core.io.PlatformFs.lastModified(p) >= since }.getOrDefault(false)
+                    }
+                var lines: List<String> = emptyList()
                 if (updateLog != null) runCatching {
                     val bytes = mlabeler.core.io.PlatformFs.read(updateLog)
                     val text = if (bytes.size > 1 && bytes[1] == 0.toByte()) bytes.decodeUtf16le() else bytes.decodeToString()
-                    val lines = text.lines().map { it.trimEnd('\r', '\uFEFF') }.filter { it.isNotBlank() }
+                    lines = text.lines().map { it.trimEnd('\r', '\uFEFF') }.filter { it.isNotBlank() }
                     if (lines.size < shown) shown = 0
                     for (l in lines.drop(shown)) addLog(l)
                     shown = lines.size
                 }
                 if (runCatching { client().health() }.isSuccess) {
-                    restartedItself = true
+                    // started by the updater: stopped through /shutdown later; started by us: a child as usual
+                    restartedItself = !startedAgain
                     check()
                     return true
+                }
+                // uv is done ("Installed … executable" for older toolkits): if the toolkit doesn't come back by itself
+                // soon (it couldn't find itself to start again), start it here
+                val installed = lines.any { it.startsWith("Installed ") && "executable" in it }
+                val finished = lines.any { it.startsWith("mVocalToolkit update finished") }
+                // uv failed: say so instead of waiting
+                val err = lines.lastOrNull { it.trimStart().startsWith("error:") }
+                if (finished && !installed && err != null) {
+                    status = Status.Failed
+                    lastError = err.trim()
+                    ownProcess = false
+                    return false
+                }
+                val done = installed || finished
+                if (done && finishedAt == 0) finishedAt = second
+                if (done && !startedAgain && second - finishedAt >= 12) {
+                    startedAgain = true
+                    addLog(startingAgain())
+                    addLog("> " + cmd.joinToString(" "))
+                    if (LocalToolkit.start(cmd, ::addLog)) ownProcess = true
                 }
             }
             status = Status.Failed
@@ -276,6 +305,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         val installFailed = L("Installation failed; see the log below", "Установка не удалась, подробности в журнале ниже")
         val installed = L("Installed", "Установлено")
         val updating = L("The toolkit is updating itself to a newer version and will start again…", "Тулкит обновляется до новой версии и запустится снова…")
+        val startingAgain = L("The update is installed; starting the toolkit…", "Обновление установлено, запускаю тулкит…")
         val updateFailed = L("The toolkit didn't come back after updating; see the log", "Тулкит не запустился после обновления, подробности в журнале")
         const val EXIT_UPDATING = 75
     }
