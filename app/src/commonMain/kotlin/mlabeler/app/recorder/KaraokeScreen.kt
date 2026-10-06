@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -67,18 +69,25 @@ import mlabeler.app.ui.TextFocus
 import mlabeler.core.io.Paths
 import kotlin.math.max
 
-val karaokeTitle = L("Karaoke", "Караоке")
-private val noSongs = L("No audio files in this folder. Put a song here (WAV, MP3, FLAC…) and open again.",
-    "В папке нет аудиофайлов. Положите сюда песню (WAV, MP3, FLAC…) и откройте снова.")
-private val songT = L("Song", "Песня")
-private val musicT = L("Music only", "Минус")
-private val voiceT = L("Voice only", "Голос")
-private val separateT = L("Separate the voice", "Отделить голос")
-private val separateHint = L("The toolkit splits the song into the voice and the music; both are kept for the next time.",
-    "Тулкит разделит песню на голос и минус; оба сохранятся на следующий раз.")
+val karaokeTitle = L("Karaoke recording", "Караоке-запись")
+private val noSongs = L("Add a song to sing over (WAV, MP3, FLAC…). Songs, their lyrics and backing tracks are kept in the program's folder, not in the dataset; only your takes go to the dataset.",
+    "Добавьте песню, под которую будете петь (WAV, MP3, FLAC…). Песни, их текст и минусы хранятся в папке программы, а не в датасете; в датасет попадают только ваши дубли.")
+private val addSongT = L("Add a song…", "Добавить песню…")
+private val songPathT = L("Path to a song file", "Путь к файлу песни")
+private val songsFolderT = L("Or put files into: {0}", "Или положите файлы в: {0}")
+private val separateT = L("Make a backing track", "Сделать минус")
+private val separateHint = L("The toolkit removes the voice from the song; the result is kept for the next time.",
+    "Тулкит уберёт голос из песни; результат сохранится на следующий раз.")
 private val recogniseT = L("Recognise the words", "Распознать слова")
-private val recogniseHint = L("Whisper in the toolkit writes the lines with approximate times. Better after separating the voice.",
-    "Whisper в тулките запишет строки с примерным временем. Лучше после отделения голоса.")
+private val recogniseHint = L("Whisper in the toolkit writes the lines with approximate times. Better after making the backing track.",
+    "Whisper в тулките запишет строки с примерным временем. Лучше после того, как сделан минус.")
+private val guideT = L("Original voice in the headphones", "Голос исполнителя в наушниках")
+private val headphonesT = L("Sing in headphones: whatever the speakers play gets into the take.", "Пойте в наушниках: всё, что играет из колонок, попадёт в дубль.")
+private val takeT = L("Take name", "Имя дубля")
+private val intoT = L("Takes go to {0}, with the sung lines next to them as .txt", "Дубли сохраняются в {0}, рядом — спетые строки в .txt")
+private val recordT = L("Record from here (R)", "Записать отсюда (R)")
+private val stopRecT = L("Stop recording", "Остановить запись")
+private val lastTakeT = L("Listen to {0}", "Прослушать {0}")
 private val editT = L("Edit the lines", "Править строки")
 private val doneT = L("Done", "Готово")
 private val pasteT = L("Paste the lyrics", "Вставить текст")
@@ -90,11 +99,10 @@ private val firstWordsT = L("To the first words", "К первым словам"
 private val prevLineT = L("Previous line", "Предыдущая строка")
 private val nextLineT = L("Next line", "Следующая строка")
 private val addHereT = L("Add a line here", "Строка отсюда")
-private val setNowT = L("Starts now (at the playhead)", "Начинается сейчас (по позиции)")
 private val leadT = L("Start before a line, s", "Начинать до строки, с")
 private val languageT = L("Language (empty = detect)", "Язык (пусто — определить)")
-private val keysT = L("Space plays and stops, the Up and Down arrows go by lines, Home goes to the first words.",
-    "Пробел — играть и стоп, стрелки вверх и вниз — по строкам, Home — к первым словам.")
+private val keysT = L("R records from the current place, Space plays and stops, the Up and Down arrows go by lines, Home goes to the first words.",
+    "R — запись с текущего места, пробел — играть и стоп, стрелки вверх и вниз — по строкам, Home — к первым словам.")
 private val inT = L("in {0} s", "через {0} с")
 private val cancelWorkT = L("Stop", "Остановить")
 
@@ -104,18 +112,24 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
     val focus = remember { FocusRequester() }
     var editing by remember { mutableStateOf(false) }
     var pasting by remember { mutableStateOf(false) }
+    var adding by remember { mutableStateOf(false) }
     LaunchedEffect(k) { kotlinx.coroutines.delay(150); runCatching { focus.requestFocus() } }
+    fun addSong() {
+        val picked = if (Platform.hasNativeFolderPicker) Platform.pickFileNative(addSongT(), listOf("wav", "mp3", "flac", "ogg", "m4a", "opus", "aiff")) else null
+        if (picked != null) k.addSong(picked) else if (!Platform.hasNativeFolderPicker) adding = true
+    }
     Box(
         Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .focusRequester(focus).focusable()
             .onKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown || pasting || TextFocus.active) return@onKeyEvent false
+                if (e.type != KeyEventType.KeyDown || pasting || adding || TextFocus.active) return@onKeyEvent false
                 when (e.key) {
+                    Key.R -> { if (k.recording) k.stopRecording() else k.record(); true }
                     Key.Spacebar -> { k.toggle(); true }
                     Key.DirectionDown, Key.DirectionRight -> { k.stepLine(1); true }
                     Key.DirectionUp, Key.DirectionLeft -> { k.stepLine(-1); true }
                     Key.MoveHome -> { k.toFirstWords(); true }
-                    Key.Escape -> { k.stop(); true }
+                    Key.Escape -> { if (k.recording) k.stopRecording() else k.stop(); true }
                     else -> false
                 }
             },
@@ -125,27 +139,41 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 IconBtn(Icons.back, S.back()) { app.closeKaraoke() }
                 Column(Modifier.weight(1f).padding(horizontal = 6.dp)) {
                     Text(karaokeTitle(), color = c.text, fontSize = 15.sp)
-                    Text(k.song ?: Paths.name(k.folder), color = c.muted, fontSize = 11.sp, maxLines = 1)
+                    Text(k.song ?: "", color = c.muted, fontSize = 11.sp, maxLines = 1)
                 }
-                if (k.dirty) Btn(S.save()) { k.save() }
+                if (k.dirty) { Btn(S.save()) { k.save() }; Spacer(Modifier.width(6.dp)) }
+                Btn(addSongT(), icon = Icons.plus) { addSong() }
             }
             Divider()
             if (k.songs.isEmpty()) {
-                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) { Text(noSongs(), color = c.muted, fontSize = 14.sp) }
+                Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(noSongs(), color = c.text, fontSize = 14.sp, textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(12.dp))
+                        Btn(addSongT(), primary = true, icon = Icons.plus) { addSong() }
+                        Spacer(Modifier.height(8.dp))
+                        Text(songsFolderT.format(k.songsDir), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                    }
+                }
+                if (adding) AddSong(k) { adding = false; focus.requestFocus() }
                 return@Column
             }
-            // songs and what to hear
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
+            // songs
+            if (k.songs.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (k.songs.size > 1) for (s in k.songs) Chip(Paths.stem(s), s == k.song) { k.open(s) }
+                for (s in k.songs) Chip(Paths.stem(s), s == k.song) { if (!k.recording) k.open(s) }
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Chip(songT(), k.source == KaraokeState.Source.Song) { k.useSource(KaraokeState.Source.Song) }
-                if (k.music != null) Chip(musicT(), k.source == KaraokeState.Source.Music) { k.useSource(KaraokeState.Source.Music) }
-                if (k.voice != null) Chip(voiceT(), k.source == KaraokeState.Source.Voice) { k.useSource(KaraokeState.Source.Voice) }
+            // what plays in the headphones
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (k.music != null) {
+                    Text(guideT(), color = c.muted, fontSize = 12.sp)
+                    for ((v, t) in listOf(0f to "0", 0.15f to "15%", 0.35f to "35%", 1f to "100%")) Chip(t, kotlin.math.abs(k.guideLevel - v) < 0.01f) {
+                        k.guideLevel = v; if (k.playing && !k.recording) k.play()
+                    }
+                } else Text(separateHint(), color = c.muted, fontSize = 12.sp, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
                 Spacer(Modifier.weight(1f))
-                Btn(separateT(), enabled = k.busy == null && k.audio != null) { k.separate() }
-                Btn(recogniseT(), enabled = k.busy == null && k.audio != null) { k.recognise() }
+                Btn(separateT(), enabled = k.busy == null && k.audio != null && !k.recording) { k.separate() }
+                Btn(recogniseT(), enabled = k.busy == null && k.audio != null && !k.recording) { k.recognise() }
             }
             k.busy?.let { b ->
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -154,24 +182,65 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (editing) LineEditor(k, Modifier.fillMaxSize()) else Lyrics(k, Modifier.fillMaxSize())
+                if (editing && !k.recording) LineEditor(k, Modifier.fillMaxSize()) else Lyrics(k, Modifier.fillMaxSize())
             }
             Divider()
             Bar(k)
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn(firstWordsT(), enabled = k.lines.isNotEmpty()) { k.toFirstWords() }
-                IconBtn(Icons.up, prevLineT(), size = 44.dp, enabled = k.lines.isNotEmpty()) { k.stepLine(-1) }
-                IconBtn(if (k.playing) Icons.stop else Icons.play, S.play(), size = 52.dp, enabled = k.audio != null) { k.toggle() }
-                IconBtn(Icons.down, nextLineT(), size = 44.dp, enabled = k.lines.isNotEmpty()) { k.stepLine(1) }
+                Btn(firstWordsT(), enabled = k.lines.isNotEmpty() && !k.recording) { k.toFirstWords() }
+                IconBtn(Icons.up, prevLineT(), size = 44.dp, enabled = k.lines.isNotEmpty() && !k.recording) { k.stepLine(-1) }
+                IconBtn(if (k.playing && !k.recording) Icons.stop else Icons.play, S.play(), size = 48.dp, enabled = k.audio != null && !k.recording) { k.toggle() }
+                IconBtn(Icons.down, nextLineT(), size = 44.dp, enabled = k.lines.isNotEmpty() && !k.recording) { k.stepLine(1) }
+                // record
+                mlabeler.app.ui.Tip(if (k.recording) stopRecT() else recordT()) {
+                    Box(
+                        Modifier.size(52.dp).clip(CircleShape).background(c.danger.copy(alpha = if (k.audio != null) 0.9f else 0.3f))
+                            .clickable(enabled = k.audio != null) { if (k.recording) k.stopRecording() else k.record() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(if (k.recording) 18.dp else 22.dp).clip(if (k.recording) RoundedCornerShape(3.dp) else CircleShape).background(androidx.compose.ui.graphics.Color.White))
+                    }
+                }
+                if (k.recording) Box(Modifier.width(90.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(c.panelAlt)) {
+                    val db = if (k.level > 0f) 20 * kotlin.math.log10(k.level.toDouble()) else -90.0
+                    val lv = ((db + 60) / 60).toFloat().coerceIn(0f, 1f)
+                    Box(Modifier.fillMaxWidth(lv).height(8.dp).background(if (lv > 0.92f) c.danger else c.ok))
+                }
                 Text(mlabeler.app.ui.formatTime(k.position, precise = false) + " / " + mlabeler.app.ui.formatTime(k.duration, precise = false), color = c.muted, fontSize = 12.sp)
                 Spacer(Modifier.weight(1f))
-                if (editing) Btn(pasteT()) { pasting = true }
-                Btn(if (editing) doneT() else editT(), primary = editing) { editing = !editing; if (!editing) focus.requestFocus() }
+                if (editing && !k.recording) Btn(pasteT()) { pasting = true }
+                Btn(if (editing) doneT() else editT(), primary = editing, enabled = !k.recording) { editing = !editing; if (!editing) focus.requestFocus() }
+            }
+            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(takeT(), color = c.muted, fontSize = 12.sp)
+                Field(k.takeName, { k.takeName = it }, Modifier.width(180.dp))
+                if (k.lastTake != null && !k.recording) Btn(lastTakeT.format(k.lastTakeName), icon = Icons.play) { k.playLastTake() }
+                Text(intoT.format(Paths.name(k.folder)) + ". " + headphonesT(), color = c.muted, fontSize = 11.sp, maxLines = 2, modifier = Modifier.weight(1f))
             }
             if (!Platform.isMobile) Text(keysT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
         }
         mlabeler.app.ui.MessageToast(app, 24.dp)
         if (pasting) PasteLyrics(k) { pasting = false; focus.requestFocus() }
+        if (adding && k.songs.isNotEmpty()) AddSong(k) { adding = false; focus.requestFocus() }
+    }
+}
+
+/** Where file dialogs are missing: a path to type, and the folder to put songs into. */
+@Composable
+private fun AddSong(k: KaraokeState, onClose: () -> Unit) {
+    val c = T.c
+    var path by remember { mutableStateOf("") }
+    Overlay(onClose, 520) {
+        Column(Modifier.padding(18.dp)) {
+            Text(addSongT(), color = c.text, fontSize = 17.sp)
+            Spacer(Modifier.height(8.dp))
+            Field(path, { path = it }, Modifier.fillMaxWidth(), placeholder = songPathT(), onDone = { k.addSong(path); onClose() })
+            Text(songsFolderT.format(k.songsDir), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                Btn(S.cancel()) { onClose() }
+                Btn(S.ok(), primary = true, enabled = path.isNotBlank()) { k.addSong(path); onClose() }
+            }
+        }
     }
 }
 
@@ -187,7 +256,6 @@ private fun Lyrics(k: KaraokeState, modifier: Modifier) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(noLines(), color = c.text, fontSize = 14.sp, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(10.dp))
-                Text(separateT() + ": " + separateHint(), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
                 Text(recogniseT() + ": " + recogniseHint(), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
             }
         }
