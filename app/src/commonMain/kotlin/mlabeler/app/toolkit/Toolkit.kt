@@ -114,7 +114,11 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
     }
 
     /** Starts forced alignment of one uploaded file; returns the job id. */
-    suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean): String {
+    /**
+     * Starts alignment of [text] (words, or phonemes when [phonemes]); returns the job id. Empty text: the words are
+     * first recognised with Whisper when [whisper], otherwise the toolkit reports that the text is missing.
+     */
+    suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean, whisper: Boolean = false): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -127,6 +131,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             }
             put("model", model)
             if (language != null) put("language", language)
+            if (!whisper) put("transcribe", kotlinx.serialization.json.JsonNull)
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))
                 put("return_labels", true)

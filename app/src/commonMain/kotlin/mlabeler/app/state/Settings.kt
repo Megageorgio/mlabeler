@@ -151,6 +151,8 @@ data class ToolkitSettings(
     val lastLanguage: String = "",
     /** Model for recognising phonemes without lyrics. */
     val lastSegmentModel: String = "",
+    /** Aligning without text: recognise the words with Whisper first (a large download on first use). */
+    val whisper: Boolean = false,
     /** Phoneme recognition (WFL-ASR): see [mlabeler.app.toolkit.SegmentOptions]. */
     val wfl: WflSettings = WflSettings(),
     /** Start the toolkit on this computer when it's needed and not running. */

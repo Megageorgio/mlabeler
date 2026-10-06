@@ -356,7 +356,7 @@ class EditorState(
      * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown
      * as a comparison tier named after the model.
      */
-    fun autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean, recognize: Boolean = false) {
+    fun autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean, recognize: Boolean = false, whisper: Boolean = false) {
         val a = audio ?: return
         val it = item ?: return
         toolkitJob?.cancel()
@@ -375,7 +375,7 @@ class EditorState(
                 val fileId = client.upload(it.name + "_part.wav", wav)
                 val job = if (recognize) {
                     client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl)
-                } else client.align(fileId, model, language, text, phonemes)
+                } else client.align(fileId, model, language, text, phonemes, whisper)
                 serverJob = job
                 val result = client.await(job) { p, stage ->
                     toolkitProgress = p
@@ -405,6 +405,121 @@ class EditorState(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // stop the job on the toolkit side too
                 serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
+                throw e
+            } catch (e: Exception) {
+                app.message(e.message ?: e.toString(), error = true)
+            } finally {
+                toolkitBusy = null
+                toolkitProgress = null
+            }
+        }
+    }
+
+    /** Where each file's text comes from when many files are aligned at once. */
+    enum class BatchText { TxtNextToIt, Labels, None }
+
+    /** Files for [autolabelFiles]: those without labels, those not marked done, or all. */
+    fun batchFiles(which: FileFilter): List<Item> = items.filter {
+        when (which) {
+            FileFilter.NoLabels -> it.labelPath == null
+            FileFilter.NotDone -> !marks(it).done
+            else -> true
+        }
+    }
+
+    /**
+     * Labels many files one after another and saves each (the open one through its history, so it can be undone).
+     * Stopping keeps what is done; running again on files without labels goes on from there.
+     */
+    fun autolabelFiles(
+        files: List<Item>, model: String, language: String?, recognize: Boolean, source: BatchText,
+        phonemes: Boolean, whisper: Boolean,
+    ) {
+        if (files.isEmpty()) return
+        toolkitJob?.cancel()
+        toolkitJob = scope.launch {
+            val client = app.toolkit.client()
+            var serverJob: String? = null
+            val failed = mutableListOf<String>()
+            var done = 0
+            try {
+                toolkitBusySince = now()
+                toolkitSteps.clear()
+                toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
+                if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+                for ((n, f) in files.withIndex()) {
+                    val head = batchFile.format(n + 1, files.size, f.name)
+                    toolkitBusy = head
+                    toolkitProgress = n.toDouble() / files.size
+                    try {
+                        val bytes = withContext(Dispatchers.Default) { workspace.fs.read(f.audioPath) }
+                        val a = withContext(Dispatchers.Default) {
+                            if (Wav.isWav(bytes)) Wav.decode(bytes) else Platform.decodeAudio(f.audioPath) ?: error(S.unsupportedAudio())
+                        }
+                        val current = if (f.id == item?.id) committed else runCatching { workspace.readLabels(f, a.duration) }.getOrNull()
+                        val known: List<String> = when (source) {
+                            BatchText.Labels -> current?.let { d -> (d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier)?.texts?.filter { it.isNotEmpty() } }.orEmpty()
+                            else -> emptyList()
+                        }
+                        val txt: String? = if (source == BatchText.TxtNextToIt) {
+                            val p = Paths.join(Paths.parent(f.audioPath), Paths.stem(f.audioPath) + ".txt")
+                            runCatching { workspace.fs.read(p).decodeToString() }.getOrNull()
+                        } else null
+                        val upload = if (Wav.isWav(bytes)) bytes else withContext(Dispatchers.Default) { Wav.encode16(a) }
+                        val fileId = client.upload(Paths.stem(f.audioPath) + ".wav", upload)
+                        val job = if (recognize) client.segment(fileId, model, language, known, settings.toolkit.wfl)
+                        else {
+                            val asPhonemes = source == BatchText.Labels || (txt != null && (phonemes || mlabeler.core.format.TextImport.looksLikeLab(txt)))
+                            val text = when {
+                                source == BatchText.Labels -> known.joinToString(" ")
+                                txt != null -> mlabeler.core.format.TextImport.clean(txt, asPhonemes)
+                                else -> ""
+                            }
+                            if (text.isBlank() && !whisper) error(noText())
+                            client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper)
+                        }
+                        serverJob = job
+                        val result = client.await(job) { p, stage ->
+                            toolkitProgress = (n + p) / files.size
+                            toolkitBusy = head + " · " + stage.ifEmpty { S.toolkit() }
+                        }
+                        serverJob = null
+                        val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, 0.0, a.duration)
+                        fun merged(d: LabelDoc): LabelDoc {
+                            var out = d
+                            for (pt in part.tiers.filterIsInstance<IntervalTier>()) {
+                                val k = out.tierIndex(pt.name).takeIf { k -> k >= 0 } ?: if (pt.name == "phones") out.phonemeTierIndex() else -1
+                                out = if (k >= 0 && out.tiers[k] is IntervalTier) out.replace(k, pt.copy(name = (out.tiers[k] as IntervalTier).name))
+                                else out.copy(tiers = listOf(pt) + out.tiers)
+                            }
+                            return out
+                        }
+                        if (f.id == item?.id) {
+                            updateDoc { d -> merged(d) }
+                            saveLabels(quiet = true)
+                        } else {
+                            val updated = workspace.writeLabels(f, merged(current ?: LabelDoc.empty(a.duration)), a.duration,
+                                if (f.labelFormat == null) workspace.state.defaultFormat else null)
+                            histories.remove(f.id)
+                            items = items.map { x -> if (x.id == f.id) updated else x }
+                            updated.labelPath?.let { p -> labelTimes = labelTimes + (updated.id to (runCatching { workspace.fs.lastModified(p) }.getOrNull() ?: 0L)) }
+                            labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
+                        }
+                        done++
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        failed += f.name + ": " + (e.message ?: e.toString()).lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
+                        toolkitSteps.add(failed.last()); while (toolkitSteps.size > 6) toolkitSteps.removeAt(0)
+                    }
+                }
+                labelIndex = null
+                docVersion++
+                if (failed.isEmpty()) app.message(batchDone.format(done))
+                else app.message(batchDoneWithErrors.format(done, failed.size) + "\n" + failed.joinToString("\n"), error = true)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
+                withContext(kotlinx.coroutines.NonCancellable) { if (done > 0) app.message(batchStopped.format(done, files.size)) }
                 throw e
             } catch (e: Exception) {
                 app.message(e.message ?: e.toString(), error = true)
@@ -1367,3 +1482,9 @@ class EditorState(
         playhead = null
     }
 }
+
+private val batchFile = L("File {0} of {1}: {2}", "Файл {0} из {1}: {2}")
+private val batchDone = L("Labelled {0} files", "Размечено файлов: {0}")
+private val batchDoneWithErrors = L("Labelled {0} files, {1} with errors:", "Размечено файлов: {0}, с ошибками: {1}:")
+private val batchStopped = L("Stopped: {0} of {1} files labelled and saved", "Остановлено: размечено и сохранено {0} из {1}")
+private val noText = L("no text (a .txt with the same name, or Whisper)", "нет текста (.txt с тем же именем или Whisper)")
