@@ -90,71 +90,12 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         if (check()) return true
         if (!canRunHere || !settings.autoStart) return false
         if (LocalToolkit.findMvt(settings.mvtPath) == null) { status = Status.Missing; return false }
-        // not running yet, so nothing is interrupted: a good moment to bring it up to date
-        if (settings.autoUpdate) updateIfNewer()
         startLocked()
-    }
-
-    private fun now() = kotlin.time.Clock.System.now().toEpochMilliseconds()
-
-    /** The current revision of the install source: the commit of a GitHub branch, or the HEAD of a local git folder. */
-    suspend fun sourceRevision(): String? = runCatching {
-        val src = settings.installSource.ifBlank { mlabeler.app.state.ToolkitSettings.DEFAULT_SOURCE }.trim()
-        val gh = Regex("github\\.com/([^/]+)/([^/@#]+?)(?:\\.git)?(?:/archive/refs/heads/(.+)\\.zip|@([^#]+)|/?$)").find(src)
-        if (gh != null) {
-            val (owner, repo) = gh.destructured.let { it.component1() to it.component2() }
-            val branch = gh.groupValues[3].ifEmpty { gh.groupValues[4] }.ifEmpty { "main" }
-            val r = httpRequest("GET", "https://api.github.com/repos/$owner/$repo/commits/$branch",
-                mapOf("Accept" to "application/vnd.github.sha", "User-Agent" to "mLabeler"), null, 8_000)
-            r.text.trim().takeIf { r.status == 200 && it.length >= 7 && !it.startsWith("{") }
-        } else {
-            // a local folder with git: read its HEAD
-            val git = mlabeler.core.io.Paths.join(src, ".git")
-            val fs = mlabeler.core.io.PlatformFs
-            val head = fs.read(mlabeler.core.io.Paths.join(git, "HEAD")).decodeToString().trim()
-            if (!head.startsWith("ref:")) head
-            else {
-                val ref = head.removePrefix("ref:").trim()
-                val loose = mlabeler.core.io.Paths.join(git, ref)
-                if (fs.exists(loose)) fs.read(loose).decodeToString().trim()
-                else fs.read(mlabeler.core.io.Paths.join(git, "packed-refs")).decodeToString().lines()
-                    .firstOrNull { it.endsWith(" $ref") }?.substringBefore(' ')
-            }
-        }
-    }.getOrNull()
-
-    /** Installs the source again when it has changed since the last install (checked at most every few hours). */
-    private suspend fun updateIfNewer() {
-        val s = settings
-        if (now() - s.lastUpdateCheck < 3 * 3600_000L && s.installedRevision.isNotEmpty()) return
-        val rev = sourceRevision()
-        app.update { it.copy(toolkit = it.toolkit.copy(lastUpdateCheck = now())) }
-        if (rev == null || rev == s.installedRevision) return
-        addLog(updating())
-        updatingNow = true
-        try {
-            if (installNow()) app.update { it.copy(toolkit = it.toolkit.copy(installedRevision = rev)) }
-        } finally {
-            updatingNow = false
-        }
     }
 
     /** True while an automatic update runs. */
     var updatingNow by mutableStateOf(false)
         private set
-
-    /** Checks for a newer version now and installs it (stops a toolkit started here first). */
-    fun updateNow() {
-        if (installJob?.isActive == true || !LocalToolkit.supported) return
-        installJob = scope.launch {
-            lock.withLock {
-                if (ownProcess) stop()
-                app.update { it.copy(toolkit = it.toolkit.copy(lastUpdateCheck = 0, installedRevision = "")) }
-                updateIfNewer()
-                startLocked()
-            }
-        }
-    }
 
     suspend fun start(): Boolean = lock.withLock { startLocked() }
 
@@ -173,6 +114,8 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         repeat(240) {
             delay(500)
             if (!LocalToolkit.running) {
+                // the toolkit found a newer version of itself: it updates and starts again on its own
+                if (LocalToolkit.lastExitCode() == EXIT_UPDATING) return waitForUpdate()
                 status = Status.Failed
                 lastError = startFailed()
                 ownProcess = false
@@ -188,7 +131,39 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         return false
     }
 
+    /** The toolkit updates itself (it exited with [EXIT_UPDATING]); wait until it answers again, up to 15 minutes. */
+    private suspend fun waitForUpdate(): Boolean {
+        updatingNow = true
+        status = Status.Installing
+        addLog(updating())
+        try {
+            repeat(15 * 60) {
+                delay(1000)
+                if (runCatching { client().health() }.isSuccess) {
+                    restartedItself = true
+                    check()
+                    return true
+                }
+            }
+            status = Status.Failed
+            lastError = updateFailed()
+            ownProcess = false
+            return false
+        } finally {
+            updatingNow = false
+        }
+    }
+
+    /** Started here, but running as its own process after updating itself: it is stopped through /shutdown. */
+    private var restartedItself = false
+
     fun stop() {
+        if (restartedItself && ownProcess) {
+            restartedItself = false
+            val c = client()
+            // the app may be closing: ask briefly
+            runCatching { kotlinx.coroutines.runBlocking { kotlinx.coroutines.withTimeoutOrNull(1500) { c.shutdown() } } }
+        }
         LocalToolkit.stop()
         ownProcess = false
         networkToken = ""
@@ -207,11 +182,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     fun install() {
         if (installJob?.isActive == true || !LocalToolkit.supported) return
         installJob = scope.launch {
-            val rev = sourceRevision()
-            if (installNow()) {
-                rev?.let { r -> app.update { it.copy(toolkit = it.toolkit.copy(installedRevision = r, lastUpdateCheck = now())) } }
-                start()
-            }
+            if (installNow()) start()
         }
     }
 
@@ -283,6 +254,8 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         val noUv = L("Couldn't install uv. Install it from astral.sh/uv and try again.", "Не получилось установить uv. Установите его с astral.sh/uv и попробуйте снова.")
         val installFailed = L("Installation failed; see the log below", "Установка не удалась, подробности в журнале ниже")
         val installed = L("Installed", "Установлено")
-        val updating = L("A newer toolkit is out: updating before the start…", "Вышла новая версия тулкита: обновляю перед запуском…")
+        val updating = L("The toolkit is updating itself to a newer version and will start again…", "Тулкит обновляется до новой версии и запустится снова…")
+        val updateFailed = L("The toolkit didn't come back after updating; see the log", "Тулкит не запустился после обновления, подробности в журнале")
+        const val EXIT_UPDATING = 75
     }
 }

@@ -7,6 +7,7 @@ actual object LocalToolkit {
     actual fun findUv(): String? = null
     actual suspend fun run(command: List<String>, onLine: (String) -> Unit): Int = -1
     actual fun start(command: List<String>, onLine: (String) -> Unit): Boolean = false
+    actual fun lastExitCode(): Int? = null
     actual fun stop() {}
     actual fun lanAddresses(): List<String> = emptyList()
     actual fun uvInstallCommand(): List<String> = emptyList()

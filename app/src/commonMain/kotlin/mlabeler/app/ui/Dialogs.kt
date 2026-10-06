@@ -472,7 +472,6 @@ private fun ToolkitPage(app: AppState) {
     Field(token, { token = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(token = it.trim())) } }, Modifier.fillMaxWidth())
     if (mlabeler.app.toolkit.LocalToolkit.supported) {
         SwitchRow(S.toolkitAutoStart(), s.toolkit.autoStart) { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoStart = v)) } }
-        SwitchRow(S.toolkitAutoUpdate(), s.toolkit.autoUpdate) { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoUpdate = v)) } }
         SwitchRow(S.toolkitShare(), s.toolkit.shareOnNetwork) { v ->
             app.update { it.copy(toolkit = it.toolkit.copy(shareOnNetwork = v)) }
             if (tk.ownProcess || (v && tk.status != mlabeler.app.toolkit.ToolkitManager.Status.Ready)) tk.restart()
@@ -505,7 +504,6 @@ private fun ToolkitPage(app: AppState) {
             Field(src, { src = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(installSource = it.trim())) } }, Modifier.fillMaxWidth())
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Btn(S.toolkitReinstall(), enabled = !tk.installing) { tk.stop(); tk.install() }
-                Btn(S.toolkitCheckUpdate(), enabled = !tk.installing) { tk.updateNow() }
             }
         }
     }

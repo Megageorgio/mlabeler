@@ -47,6 +47,11 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         json.parseToJsonElement(r.text).jsonObject["detail"]?.let { (it as? JsonPrimitive)?.content ?: it.toString() }
     }.getOrNull() ?: "HTTP ${r.status}"
 
+    /** Asks the toolkit to stop (one this program started). */
+    suspend fun shutdown() {
+        runCatching { call("POST", "/shutdown", timeoutMs = 2_000) }
+    }
+
     suspend fun health(): JsonElement = call("GET", "/health", timeoutMs = 8_000)
 
     suspend fun languages(task: String = "align"): List<ToolkitLanguage> =

@@ -10,6 +10,7 @@ import kotlin.concurrent.thread
 actual object LocalToolkit {
     private val windows = System.getProperty("os.name").lowercase().contains("win")
     private var process: Process? = null
+    private var last: Process? = null
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread { stop() })
@@ -68,11 +69,14 @@ actual object LocalToolkit {
         stop()
         val p = runCatching { builder(command).start() }.getOrElse { onLine(it.message ?: it.toString()); return false }
         process = p
+        last = p
         thread(isDaemon = true, name = "toolkit-output") {
             runCatching { p.inputStream.bufferedReader(Charsets.UTF_8).forEachLine(onLine) }
         }
         return true
     }
+
+    actual fun lastExitCode(): Int? = last?.takeIf { !it.isAlive }?.exitValue()
 
     actual fun stop() {
         val p = process ?: return

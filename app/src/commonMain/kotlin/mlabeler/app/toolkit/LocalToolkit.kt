@@ -21,6 +21,9 @@ expect object LocalToolkit {
     /** Starts a long-running command (the server); output goes to [onLine]. */
     fun start(command: List<String>, onLine: (String) -> Unit): Boolean
 
+    /** Exit code of the last process started by [start] once it has ended, else null. */
+    fun lastExitCode(): Int?
+
     /** Stops the server started by [start], with its child processes. */
     fun stop()
 
