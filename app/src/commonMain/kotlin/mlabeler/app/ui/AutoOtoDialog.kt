@@ -49,8 +49,11 @@ private val existing = L("Existing entries of these files", "Существую�
 private val keep = L("Keep, add missing aliases", "Оставить, добавить недостающие")
 private val replaceT = L("Replace", "Заменить")
 private val methodT = L("How to find syllables", "Как искать слоги")
-private val builtIn = L("Built in (loudness and voicing)", "Встроенный (громкость и голос)")
-private val aligner = L("Aligner model from the toolkit (more precise)", "Модель выравнивания из тулкита (точнее)")
+private val builtIn = L("Built in (loudness and voicing) — recommended", "Встроенный (громкость и голос) — рекомендуется")
+private val aligner = L("Aligner model from the toolkit (slower)", "Модель выравнивания из тулкита (медленнее)")
+private val methodAbout = L(
+    "The built-in way is usually better and takes seconds. Aligner models learned on sung phrases, not on single syllables with silence around them: they place consonant starts less exactly, need the syllables turned into their own phonemes (which fails for some banks) and load a large model first.",
+    "Встроенный способ обычно точнее и работает за секунды. Модели выравнивания обучены на пропетых фразах, а не на отдельных слогах с тишиной вокруг: начало согласной они ставят менее точно, слоги надо переводить в их фонемы (для части банков это не выходит), и сначала грузится большая модель.")
 private val preview = L("This file: {0}", "Этот файл: {0}")
 private val start = L("Make entries", "Сделать записи")
 
@@ -92,6 +95,7 @@ fun AutoOtoDialog(app: AppState) {
                 Chip(builtIn(), !useAligner) { useAligner = false }
                 Chip(aligner(), useAligner) { useAligner = true }
             }
+            Text(methodAbout(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             if (useAligner) {
                 Column(Modifier.padding(vertical = 8.dp)) { ToolkitStatus(app) }
                 when {

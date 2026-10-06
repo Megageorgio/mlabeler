@@ -472,6 +472,14 @@ class EditorState(
     /** When the current toolkit work began (ms) and its earlier steps, for the busy panel. */
     var toolkitBusySince = 0L
         private set
+
+    /** Marks the start of toolkit work shown in the busy panel (its time counts from here). */
+    fun beginToolkitWork(what: String) {
+        toolkitBusySince = now()
+        toolkitSteps.clear()
+        toolkitProgress = null
+        toolkitBusy = what
+    }
     val toolkitSteps = androidx.compose.runtime.mutableStateListOf<String>()
     /** 0..1 while the toolkit works on a job, null when unknown. */
     var toolkitProgress by mutableStateOf<Double?>(null)

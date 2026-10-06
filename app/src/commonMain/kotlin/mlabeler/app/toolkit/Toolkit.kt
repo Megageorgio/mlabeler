@@ -114,6 +114,28 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
     }
 
     /** Starts forced alignment of one uploaded file; returns the job id. */
+    /** One job aligning many uploaded files, each with its phonemes (in the same order in the result). */
+    suspend fun alignPhonemes(files: List<Pair<String, List<String>>>, model: String, language: String?): String {
+        val req = buildJsonObject {
+            putJsonObject("input") {
+                put("items", buildJsonArray {
+                    for ((fileId, phonemes) in files) add(buildJsonObject {
+                        put("file_id", fileId)
+                        put("phonemes", buildJsonArray { phonemes.forEach { add(JsonPrimitive(it)) } })
+                    })
+                })
+            }
+            put("model", model)
+            if (language != null) put("language", language)
+            put("transcribe", kotlinx.serialization.json.JsonNull)
+            putJsonObject("output") {
+                put("formats", JsonArray(emptyList()))
+                put("return_labels", true)
+            }
+        }
+        return call("POST", "/align", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
     /**
      * Starts alignment of [text] (words, or phonemes when [phonemes]); returns the job id. Empty text: the words are
      * first recognised with Whisper when [whisper], otherwise the toolkit reports that the text is missing.
@@ -192,8 +214,8 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
 
     companion object {
         /** Tiers of the first item's label, times shifted by [offset] seconds. */
-        fun labelOf(result: JsonObject, offset: Double, duration: Double): LabelDoc {
-            val item = result["items"]!!.jsonArray.firstOrNull()?.jsonObject ?: throw ToolkitException("no result")
+        fun labelOf(result: JsonObject, offset: Double, duration: Double, index: Int = 0): LabelDoc {
+            val item = result["items"]!!.jsonArray.getOrNull(index)?.jsonObject ?: throw ToolkitException("no result")
             if ((item["ok"] as? JsonPrimitive)?.content == "false") throw ToolkitException((item["error"] as? JsonPrimitive)?.content ?: "failed")
             val tiers = item["label"]?.jsonObject?.get("tiers")?.jsonObject ?: throw ToolkitException("no labels in the result")
             val order = listOf("words", "phones")

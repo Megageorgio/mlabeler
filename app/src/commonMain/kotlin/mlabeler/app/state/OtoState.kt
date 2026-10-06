@@ -263,8 +263,14 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
             val made = mutableMapOf<String, List<OtoEntry>>()
             var failed = 0
             try {
+                ed.beginToolkitWork("oto 0/${targets.size}")
+                // read every sample first; with an aligner they all go to the toolkit as one job (a job per file
+                // spends most of its time starting and finishing, not aligning)
+                class Sample(val name: String, val syl: List<mlabeler.core.oto.Syllable>, val audio: mlabeler.core.audio.Audio)
+                val samples = mutableListOf<Sample>()
                 for ((k, it) in targets.withIndex()) {
-                    ed.toolkitBusy = "oto ${k + 1}/${targets.size}"
+                    ed.toolkitBusy = readingT.format(k + 1, targets.size)
+                    ed.toolkitProgress = if (aligner != null) 0.1 * k / targets.size else k.toDouble() / targets.size
                     val name = Paths.name(it.audioPath)
                     val syl = mlabeler.core.oto.Syllables.fromName(Paths.stem(it.audioPath))
                     if (syl.isEmpty()) { failed++; continue }
@@ -272,21 +278,43 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                         val bytes = ed.workspace.fs.read(it.audioPath)
                         if (mlabeler.core.audio.Wav.isWav(bytes)) mlabeler.core.audio.Wav.decode(bytes) else mlabeler.app.Platform.decodeAudio(it.audioPath)
                     } ?: run { failed++; null } ?: continue
-                    val timings = if (aligner != null) {
-                        if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
-                        val client = app.toolkit.client()
-                        val id = client.upload(name, mlabeler.core.audio.Wav.encode16(audio))
-                        val job = client.align(id, aligner, language, mlabeler.core.oto.AutoOto.phonemesFor(syl).joinToString(" "), phonemes = true)
-                        val res = client.await(job) { _, _ -> }
-                        val doc = mlabeler.app.toolkit.ToolkitClient.labelOf(res, 0.0, audio.duration)
-                        val phones = doc.tiers[doc.phonemeTierIndex()] as mlabeler.core.model.IntervalTier
-                        mlabeler.core.oto.AutoOto.fromPhonemes(phones, syl)
-                    } else {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    if (aligner == null) {
+                        val timings = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                             mlabeler.core.oto.AutoOto.segment(audio.samples, audio.sampleRate, syl, settings.bpm)
                         }
+                        made[name.lowercase()] = mlabeler.core.oto.AutoOto.entries(name, timings, audio.durationMs, settings)
+                    } else samples += Sample(name, syl, audio)
+                }
+                if (aligner != null && samples.isNotEmpty()) {
+                    ed.toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
+                    if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+                    val client = app.toolkit.client()
+                    val ids = mutableListOf<Pair<String, List<String>>>()
+                    for ((k, smp) in samples.withIndex()) {
+                        ed.toolkitBusy = uploadingT.format(k + 1, samples.size)
+                        ed.toolkitProgress = 0.1 + 0.2 * k / samples.size
+                        val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { mlabeler.core.audio.Wav.encode16(smp.audio) }
+                        ids += client.upload(smp.name, bytes) to mlabeler.core.oto.AutoOto.phonemesFor(smp.syl)
                     }
-                    made[name.lowercase()] = mlabeler.core.oto.AutoOto.entries(name, timings, audio.durationMs, settings)
+                    val job = client.alignPhonemes(ids, aligner, language)
+                    val res = client.await(job) { p, stage ->
+                        ed.toolkitProgress = 0.3 + 0.7 * p
+                        // the toolkit's own words: loading the model, aligning a file…
+                        if (stage.isNotEmpty() && stage != ed.toolkitBusy) {
+                            ed.toolkitBusy?.let { prev -> if (prev.substringBefore(' ') != stage.substringBefore(' ')) { ed.toolkitSteps.add(prev); while (ed.toolkitSteps.size > 6) ed.toolkitSteps.removeAt(0) } }
+                            ed.toolkitBusy = stage
+                        }
+                    }
+                    for ((k, smp) in samples.withIndex()) {
+                        try {
+                            val doc = mlabeler.app.toolkit.ToolkitClient.labelOf(res, 0.0, smp.audio.duration, k)
+                            val phones = doc.tiers[doc.phonemeTierIndex()] as mlabeler.core.model.IntervalTier
+                            val timings = mlabeler.core.oto.AutoOto.fromPhonemes(phones, smp.syl)
+                            made[smp.name.lowercase()] = mlabeler.core.oto.AutoOto.entries(smp.name, timings, smp.audio.durationMs, settings)
+                        } catch (e: Exception) {
+                            failed++
+                        }
+                    }
                 }
                 // one undo step for everything
                 val list = entries.toMutableList()
@@ -310,6 +338,7 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                 app.message(e.message ?: e.toString(), error = true)
             } finally {
                 ed.toolkitBusy = null
+                ed.toolkitProgress = null
             }
         }
     }
@@ -343,3 +372,6 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         version++
     }
 }
+
+private val readingT = mlabeler.app.i18n.L("Reading {0} of {1}", "Читаю {0} из {1}")
+private val uploadingT = mlabeler.app.i18n.L("Sending {0} of {1} to the toolkit", "Передаю тулкиту {0} из {1}")
