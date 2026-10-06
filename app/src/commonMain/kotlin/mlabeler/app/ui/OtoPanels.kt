@@ -71,6 +71,21 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                 Chip(S.starred(), ed.filter == FileFilter.Starred) { ed.filter = FileFilter.Starred }
                 Chip(noEntryFiles(), ed.filter == FileFilter.NoLabels) { ed.filter = FileFilter.NoLabels }
             }
+            // a voicebank with a folder per pitch (or per append): switch between them; each has its own oto.ini
+            val folders = remember(ed.items) { ed.items.map { Paths.parent(it.audioPath) }.distinct().sortedWith(compareBy { it.lowercase() }) }
+            if (folders.size > 1) {
+                val cur = ed.item?.let { Paths.parent(it.audioPath) }
+                Text(pitchFolders(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (f in folders) {
+                        val rel = ed.workspace.relative(f).ifEmpty { "." }
+                        Chip(rel, f == cur) {
+                            val i = ed.items.indexOfFirst { Paths.parent(it.audioPath) == f }
+                            if (i >= 0 && f != cur) { ed.open(i); onOpened() }
+                        }
+                    }
+                }
+            }
         }
         val dir = ed.item?.let { Paths.parent(it.audioPath) }
         val folderFiles = ed.items.withIndex().filter { dir == null || Paths.parent(it.value.audioPath) == dir }
@@ -189,6 +204,12 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
                 })
             }
         }
+        // how dragging the red line behaves; also on the toolbar and key {oto-lock}
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp).clickable { Commands.otoLock.run(ed, ed.app) }, verticalAlignment = Alignment.CenterVertically) {
+            Text(otoLockT() + "  (" + Commands.otoLock.keyLabel + ")", color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            androidx.compose.material3.Switch(ed.app.settings.edit.otoLockedDrag, { Commands.otoLock.run(ed, ed.app) })
+        }
+        Text(otoLockHint(), color = c.muted, fontSize = 11.sp)
         OtoCompareSection(ed)
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Btn(Commands.otoDuplicate.title()) { ed.oto.duplicate() }
@@ -217,3 +238,9 @@ private fun OtoCompareSection(ed: EditorState) {
     Text(S.otoDiffMean() + ": " + d.meanMs.entries.joinToString("  ") { (m, v) -> m.name.take(4).lowercase() + " " + (kotlin.math.round(v * 10) / 10) },
         color = c.muted, fontSize = 12.sp)
 }
+
+private val otoLockT = mlabeler.app.i18n.L("Preutterance moves all markers", "Preutterance двигает все маркеры")
+private val otoLockHint = mlabeler.app.i18n.L("Off: dragging the red line moves only it. Shift while dragging does the opposite of this switch.",
+    "Выключено — красная линия двигается одна. Shift во время перетаскивания делает наоборот.")
+
+private val pitchFolders = mlabeler.app.i18n.L("Folders (pitches, appends)", "Папки (высоты, аппенды)")

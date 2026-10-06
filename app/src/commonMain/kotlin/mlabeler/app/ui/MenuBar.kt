@@ -80,6 +80,8 @@ object MenuTitles {
     val filesPanel = L("Files and entries", "Файлы и записи")
     val detailsPanel = L("Details", "Подробности")
     val entriesPanel = L("Entries", "Записи")
+    val recent = L("Open recent", "Открыть недавние")
+    val followPlay = L("View follows playback", "Вид следует за воспроизведением")
     val entriesSeparate = L("Entries as a panel of their own", "Записи отдельной панелью")
     val entriesRight = L("Entries panel on the right", "Панель записей справа")
     val menuBar = L("Menu bar", "Строка меню")
@@ -110,6 +112,10 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MItem(MenuTitles.openFolder(), Commands.openFolder.keyLabel) {
             app.pickFolder(S.openFolder()) { app.leaveFolderThen { app.openFolder(it) } }
         })
+        val recent = s.recent.filter { it != ed.workspace.root }.take(12)
+        if (recent.isNotEmpty()) add(MSub(MenuTitles.recent(), recent.map { p ->
+            MItem(mlabeler.core.io.Paths.name(p) + "  —  " + p) { app.leaveFolderThen { app.openFolder(p) } }
+        }))
         add(MItem(MenuTitles.closeFolder()) { app.leaveFolderThen { app.closeFolder() } })
         if (!Platform.isMobile) add(MItem(MenuTitles.showInFolder()) { Platform.openInFileManager(ed.workspace.root) })
         add(MSep)
@@ -210,6 +216,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
         add(item(Commands.namesOnAudio, ed, app, checked = l.namesOnAudio))
         add(toggle(MenuTitles.specFirst(), l.spectrogramFirst) { it.copy(layout = it.layout.copy(spectrogramFirst = !it.layout.spectrogramFirst)) })
+        add(toggle(MenuTitles.followPlay(), s.edit.follow != "off") { it.copy(edit = it.edit.copy(follow = if (it.edit.follow == "off") "page" else "off")) })
         add(MSep)
         add(item(Commands.labelsBigger, ed, app))
         add(item(Commands.labelsSmaller, ed, app))
