@@ -252,7 +252,7 @@ fun ScaleTool(app: AppState, scale: Float, labels: Boolean, big: Boolean) {
                     }
                 } else Text(text, color = c.muted, fontSize = 12.sp)
             }
-            androidx.compose.material3.DropdownMenu(open, { open = false }) {
+            MenuPopup(open, onDismiss = { open = false }, focusable = true) {
                 for (p in listOf(50, 60, 70, 80, 90, 100, 115, 130, 150, 175)) {
                     androidx.compose.material3.DropdownMenuItem(
                         { Text((if (kotlin.math.abs(scale * 100 - p) < 1) "✓  " else "     ") + "$p%", fontSize = 14.sp) },

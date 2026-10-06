@@ -229,11 +229,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
             )
         }
         Spacer(Modifier.width(6.dp))
-        Row(
-            Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(vertical = 1.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.End,
-        ) {
+        ScrollRow(Modifier.weight(1f).padding(vertical = 1.dp), horizontalArrangement = Arrangement.End) {
             ToolbarGroupsRow(app, ed)
         }
         Sep()

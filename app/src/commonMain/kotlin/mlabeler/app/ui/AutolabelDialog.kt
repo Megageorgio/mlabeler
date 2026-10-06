@@ -335,7 +335,7 @@ private fun TextFromFile(folder: String, onText: (String) -> Unit) {
                 }
             } else menu = true
         }
-        androidx.compose.material3.DropdownMenu(menu, { menu = false }) {
+        MenuPopup(menu, onDismiss = { menu = false }, focusable = true) {
             val files = remember(folder) {
                 runCatching { mlabeler.core.io.PlatformFs.list(folder) }.getOrDefault(emptyList())
                     .filter { mlabeler.core.io.Paths.ext(it).lowercase() in exts }.sorted()

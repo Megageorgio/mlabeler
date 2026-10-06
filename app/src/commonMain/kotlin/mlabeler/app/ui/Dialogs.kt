@@ -768,7 +768,7 @@ private fun ActionRow(title: String, value: String, onChange: (String) -> Unit) 
         Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Box {
             Btn(MouseTitles.action(value) + "  ▾") { open = true }
-            androidx.compose.material3.DropdownMenu(open, { open = false }) {
+            MenuPopup(open, onDismiss = { open = false }, focusable = true) {
                 for (a in mlabeler.app.state.MouseActions.all) {
                     androidx.compose.material3.DropdownMenuItem(
                         { Text((if (a == value) "✓  " else "     ") + MouseTitles.action(a), fontSize = 13.sp) },

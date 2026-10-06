@@ -317,11 +317,7 @@ fun MenuItems(entries: List<MenuEntry>, close: () -> Unit) {
                         Spacer(Modifier.widthIn(min = 32.dp).weight(1f))
                         Text("›", fontSize = 14.sp, color = c.muted)
                     }
-                    DropdownMenu(
-                        openSub == k, { },
-                        offset = with(density) { DpOffset(width.toDp(), -h - 4.dp) },
-                        properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false),
-                    ) {
+                    MenuPopup(openSub == k, side = true) {
                         MenuItems(e.entries) { openSub = -1; close() }
                     }
                 }
@@ -427,7 +423,7 @@ fun MenuBar(app: AppState, ed: EditorState) {
                         .clickable(interactionSource = source, indication = null) { open = if (open == k) null else k }
                         .padding(horizontal = 10.dp, vertical = 2.dp),
                 )
-                DropdownMenu(open == k, { }, properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false)) {
+                MenuPopup(open == k) {
                     MenuItems(entries) { open = null }
                 }
             }
@@ -443,7 +439,7 @@ fun MenuButton(app: AppState, ed: EditorState, extra: List<MenuEntry> = emptyLis
     if (open) MenuCatcher({ open = false })
     Box {
         IconBtn(Icons.menu, S.more()) { open = true }
-        DropdownMenu(open, { }, properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false)) {
+        MenuPopup(open) {
             MenuItems(extra + (if (extra.isEmpty()) emptyList() else listOf(MSep)) + tree.map { (t, e) -> MSub(t, e) }) { open = false }
         }
     }
@@ -469,7 +465,7 @@ fun EnvironmentButton(app: AppState) {
                     .clickable { open = true }.padding(horizontal = 8.dp, vertical = 4.dp),
             )
         }
-        DropdownMenu(open, { }, properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false)) {
+        MenuPopup(open) {
             MenuItems(buildList {
                 for (e in all) add(MItem(e.title, checked = e.id == s.environment) { app.applyEnvironment(e.id) })
                 add(MSep)
