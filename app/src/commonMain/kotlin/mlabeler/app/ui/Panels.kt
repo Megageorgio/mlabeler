@@ -128,7 +128,9 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                         if (sub.isNotEmpty()) Text(sub.joinToString("  "), color = if (current && c.square) c.onAccent else c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     ed.labelTimes[item.id]?.let { t ->
-                        Text(ago(now - t), color = if (current && c.square) c.onAccent else c.muted, fontSize = 10.sp, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
+                        Tip(savedAt.format(mlabeler.app.formatDateTime(t))) {
+                            Text(ago(now - t), color = if (current && c.square) c.onAccent else c.muted, fontSize = 10.sp, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
+                        }
                     }
                     if (marks.star) Icon(Icons.starOn, null, Modifier.size(14.dp), tint = c.warn)
                 }
@@ -149,12 +151,13 @@ private val probLong = L("Too long", "Слишком длинная")
 private val probLongPause = L("Pause too long", "Слишком длинная пауза")
 private val probLongPhrase = L("Too long without a pause", "Слишком долго без паузы")
 private val dropAdd = L("Drop to add to the folder {0}", "Отпустите — файлы добавятся в папку {0}")
-private val agoNow = L("now", "сейчас")
-private val agoMin = L("{0} min", "{0} мин")
-private val agoHour = L("{0} h", "{0} ч")
-private val agoDay = L("{0} d", "{0} дн")
+private val agoNow = L("just now", "только что")
+private val agoMin = L("{0} min ago", "{0} мин назад")
+private val agoHour = L("{0} h ago", "{0} ч назад")
+private val agoDay = L("{0} d ago", "{0} дн назад")
+private val savedAt = L("Labels saved {0}", "Разметка сохранена {0}")
 
-/** How long ago, short: "now", "5 min", "3 h", "2 d". */
+/** How long ago the labels were saved: "just now", "5 min ago", "3 h ago", "2 d ago". */
 private fun ago(ms: Long): String {
     val m = ms / 60_000
     return when {

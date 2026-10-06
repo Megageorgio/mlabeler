@@ -65,3 +65,6 @@ expect fun systemFontNames(): List<String>
 
 /** A system font by family name, or null. */
 expect fun systemFontFamily(name: String): androidx.compose.ui.text.font.FontFamily?
+
+/** Date and time of [epochMs] in the local time zone, e.g. "2026-10-06 17:42". */
+expect fun formatDateTime(epochMs: Long): String
