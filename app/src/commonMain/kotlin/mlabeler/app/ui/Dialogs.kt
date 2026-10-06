@@ -76,6 +76,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import kotlinx.coroutines.launch
 
 /** Dim background with a centred card; full screen on narrow windows. */
+private val whatToShow = mlabeler.app.i18n.L("What to show", "Что показывать")
+
 @Composable
 fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     val c = T.c
@@ -280,8 +282,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             }
             Section.View -> {
                 ValueSlider(S.interfaceScale(), s.scale, 0.7f..2f, "%", factor = 100f, default = dScale, live = false) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
-                SectionTitle(S.view())
-                SectionTitle(S.view())
+                SectionTitle(whatToShow())
                 SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
                 ValueSlider(S.labelFontSize(), s.layout.labelFontSize, 8f..48f, "sp", default = dL.labelFontSize) { v -> app.update { it.copy(layout = it.layout.copy(labelFontSize = v.roundToInt().toFloat())) } }
                 if (s.layout.overlay) ValueSlider(S.overlayWaveFillAlpha(), s.layout.overlayWaveFillAlpha, 0.05f..1f, "%", factor = 100f,
