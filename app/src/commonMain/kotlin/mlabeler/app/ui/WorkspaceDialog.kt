@@ -71,6 +71,7 @@ fun WorkspaceDialog(app: AppState) {
             }
             if (ed.mode == Mode.Labels) {
                 SectionTitle(S.newFilesFormat())
+                ed.marksVersion // the folder state isn't observable by itself: recompose when it's changed
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (f in LabelFormat.entries.filter { it.standalone }) Chip(f.title, ed.workspace.state.defaultFormat == f) {
                         ed.workspace.updateState { it.copy(defaultFormat = f) }

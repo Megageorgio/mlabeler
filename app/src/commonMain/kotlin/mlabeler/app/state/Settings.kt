@@ -38,6 +38,9 @@ data class LayoutSettings(
     /** Which side the files/entries panel and the details panel are on: "left" or "right". */
     val filesSide: String = "left",
     val inspectorSide: String = "right",
+    /** A whole side of panels folded away (the buttons at the ends of the top bar). */
+    val leftCollapsed: Boolean = false,
+    val rightCollapsed: Boolean = false,
     /** How much the spectrogram is darkened in the overlaid view so labels and the waveform stay readable (0..0.8). */
     val overlayDim: Float = 0.35f,
     /** Overlaid view: fill the waveform instead of drawing only its outline. */
@@ -275,4 +278,34 @@ object LayoutPresets {
         showFiles = current.showFiles, showInspector = current.showInspector,
         filesWidth = current.filesWidth, inspectorWidth = current.inspectorWidth,
     )
+}
+
+/** Panels assigned to a side ("left"/"right"), shown or not. */
+fun LayoutSettings.panelsOn(side: String): List<String> = buildList {
+    if (filesSide == side) add("files")
+    if (inspectorSide == side) add("details")
+}
+
+private fun LayoutSettings.shown(p: String) = if (p == "files") showFiles else showInspector
+
+fun LayoutSettings.sideVisible(side: String): Boolean =
+    !(if (side == "left") leftCollapsed else rightCollapsed) && panelsOn(side).any { shown(it) }
+
+/** Folds a side away, or brings it back (showing its panels if all were hidden). */
+fun LayoutSettings.toggleSide(side: String): LayoutSettings {
+    if (sideVisible(side)) return if (side == "left") copy(leftCollapsed = true) else copy(rightCollapsed = true)
+    var l = if (side == "left") copy(leftCollapsed = false) else copy(rightCollapsed = false)
+    if (panelsOn(side).none { l.shown(it) }) for (p in panelsOn(side)) l = if (p == "files") l.copy(showFiles = true) else l.copy(showInspector = true)
+    return l
+}
+
+/** Shows or hides one panel; showing it also unfolds its side. */
+fun LayoutSettings.togglePanel(p: String): LayoutSettings {
+    val on = !shown(p)
+    var l = if (p == "files") copy(showFiles = on) else copy(showInspector = on)
+    if (on) {
+        val side = if (p == "files") filesSide else inspectorSide
+        l = if (side == "left") l.copy(leftCollapsed = false) else l.copy(rightCollapsed = false)
+    }
+    return l
 }

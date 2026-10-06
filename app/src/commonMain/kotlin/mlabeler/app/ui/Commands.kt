@@ -13,6 +13,8 @@ import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.Mode
+import mlabeler.app.state.togglePanel
+import mlabeler.app.state.toggleSide
 import mlabeler.core.format.OtoMarker
 
 /** A key combination. "Ctrl" is Cmd on macOS. */
@@ -147,8 +149,10 @@ object Commands {
         if (e.mode == Mode.Oto) e.oto.current()?.let { o -> e.oto.setMarks(o) { it.copy(star = !it.star) } }
         else e.item?.let { i -> e.setMarks(i) { it.copy(star = !it.star) } }
     }
-    val files = Command("files", S.toggleFiles, listOf(ch('B', ctrl = true))) { _, a -> a.update { it.copy(layout = it.layout.copy(showFiles = !it.layout.showFiles)) } }
-    val inspector = Command("inspector", S.toggleInspector, listOf(ch('I', ctrl = true))) { _, a -> a.update { it.copy(layout = it.layout.copy(showInspector = !it.layout.showInspector)) } }
+    val files = Command("files", S.toggleFiles, listOf(ch('B', ctrl = true))) { _, a -> a.update { it.copy(layout = it.layout.togglePanel("files")) } }
+    val inspector = Command("inspector", S.toggleInspector, listOf(ch('I', ctrl = true))) { _, a -> a.update { it.copy(layout = it.layout.togglePanel("details")) } }
+    val leftSide = Command("left-side", L("Left panels", "Левые панели"), emptyList()) { _, a -> a.update { it.copy(layout = it.layout.toggleSide("left")) } }
+    val rightSide = Command("right-side", L("Right panels", "Правые панели"), emptyList()) { _, a -> a.update { it.copy(layout = it.layout.toggleSide("right")) } }
     val wave = Command("waveform", S.waveform, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showWaveform = !it.layout.showWaveform)) } }
     val spectrogram = Command("spectrogram", S.spectrogram, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showSpectrogram = !it.layout.showSpectrogram)) } }
     val pitchLane = Command("pitch", S.pitch, listOf(ch('P'))) { _, a -> a.update { it.copy(layout = it.layout.copy(showPitch = !it.layout.showPitch)) } }
@@ -228,7 +232,7 @@ object Commands {
     }
 
     val all = listOf(
-        labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

@@ -77,7 +77,7 @@ import kotlinx.coroutines.launch
 
 /** Dim background with a centred card; full screen on narrow windows. */
 @Composable
-fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable () -> Unit) {
+fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     val c = T.c
     BoxWithConstraints(
         Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.6f))
@@ -91,7 +91,7 @@ fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable () 
             Card(
                 (if (narrow) Modifier.fillMaxSize() else Modifier.padding(top = 56.dp).widthIn(max = maxWidth.dp).fillMaxWidth().heightIn(max = this.maxHeight - 96.dp))
                     .clickable(remember { MutableInteractionSource() }, null) {},
-            ) { content() }
+            ) { Column { content() } }
             return@BoxWithConstraints
         }
         // computers: the window can be moved by its top strip and resized by the corner
@@ -113,7 +113,7 @@ fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable () 
                             .pointerInput(Unit) { detectDragGestures { ch, d -> ch.consume(); offset += d } },
                         contentAlignment = Alignment.Center,
                     ) { Box(Modifier.size(width = 40.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(c.border)) }
-                    Box(Modifier.weight(1f, fill = false)) { content() }
+                    Column(Modifier.weight(1f, fill = false)) { content() }
                 }
             }
             var cardSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
@@ -215,7 +215,7 @@ fun SettingsDialog(app: AppState) {
             IconBtn(Icons.close, S.close()) { app.showSettings = false }
         }
         Divider()
-        BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 420.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 240.dp)) {
             val narrow = maxWidth < 560.dp
             if (narrow) {
                 Column {
@@ -224,10 +224,10 @@ fun SettingsDialog(app: AppState) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) { for (s in Section.entries) Chip(sectionTitle(s), s == section) { section = s } }
                     Divider()
-                    SettingsPage(app, section, Modifier.fillMaxWidth())
+                    SettingsPage(app, section, Modifier.fillMaxWidth().weight(1f, fill = false))
                 }
             } else {
-                Row(Modifier.fillMaxWidth().height(minOf(560.dp, maxHeight))) {
+                Row(Modifier.fillMaxWidth().height(minOf(800.dp, maxHeight))) {
                     Column(Modifier.width(190.dp).fillMaxHeight().background(c.panelAlt).padding(vertical = 8.dp)) {
                         for (s in Section.entries) {
                             val sel = s == section

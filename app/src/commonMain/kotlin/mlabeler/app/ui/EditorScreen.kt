@@ -62,6 +62,8 @@ import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.Mode
+import mlabeler.app.state.panelsOn
+import mlabeler.app.state.sideVisible
 import mlabeler.app.theme.T
 import mlabeler.core.io.Paths
 
@@ -136,6 +138,8 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
             val right = mutableListOf<SidePanelId>()
             if (l.showFiles) (if (l.filesSide == "right") right else left) += SidePanelId.Files
             if (l.showInspector && wc == WidthClass.Expanded) (if (l.inspectorSide == "left") left else right) += SidePanelId.Details
+            if (l.leftCollapsed) left.clear()
+            if (l.rightCollapsed) right.clear()
             Row(Modifier.fillMaxSize()) {
                 if (left.isNotEmpty()) {
                     PanelStack(app, ed, left, Modifier.width(l.filesWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
@@ -199,7 +203,8 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
         Modifier.fillMaxWidth().heightIn(min = if (Platform.isMobile) 44.dp else 46.dp).background(c.panel).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBtn(Icons.panelLeft, S.toggleFiles(), Commands.files.keyLabel, active = s.layout.showFiles) { Commands.files.run(ed, app) }
+        // folds the left side away; only there when some panel lives on the left
+        if (s.layout.panelsOn("left").isNotEmpty()) IconBtn(Icons.panelLeft, Commands.leftSide.title(), active = s.layout.sideVisible("left")) { Commands.leftSide.run(ed, app) }
         Spacer(Modifier.width(6.dp))
         Column(Modifier.widthIn(min = 60.dp, max = 260.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -234,7 +239,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
         if (wc == WidthClass.Medium) {
             IconBtn(Icons.panelRight, S.toggleInspector(), active = overlayDetails) { toggleOverlay() }
         } else {
-            IconBtn(Icons.panelRight, S.toggleInspector(), Commands.inspector.keyLabel, active = s.layout.showInspector) { Commands.inspector.run(ed, app) }
+            if (s.layout.panelsOn("right").isNotEmpty()) IconBtn(Icons.panelRight, Commands.rightSide.title(), active = s.layout.sideVisible("right")) { Commands.rightSide.run(ed, app) }
         }
     }
 }

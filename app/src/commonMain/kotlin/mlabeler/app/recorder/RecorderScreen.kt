@@ -71,6 +71,15 @@ import mlabeler.app.ui.Overlay
 import mlabeler.app.ui.SectionTitle
 import mlabeler.app.ui.formatTime
 import mlabeler.core.io.Paths
+import mlabeler.core.dsp.Pitch
+import mlabeler.core.format.NoteNames
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import kotlin.math.log10
+import kotlin.math.pow
 import mlabeler.core.oto.Kana
 import mlabeler.core.oto.Syllables
 import kotlin.math.max
@@ -88,8 +97,8 @@ private val clickBpm = L("Click, BPM (0 = off)", "Метроном, BPM (0 — �
 private val countInT = L("Count-in beats", "Тактов отсчёта")
 private val guideT = L("Guide WAV in the folder (empty = none)", "Направляющий WAV в папке (пусто — нет)")
 private val autoNextT = L("Next line after a take", "Следующая строка после дубля")
-private val keysHint = L("R or the red button records, Space plays the take, ↑ ↓ change the line.",
-    "R или красная кнопка — запись, пробел — прослушать, ↑ ↓ — другая строка.")
+private val keysHint = L("R or the red button records, Space plays the take from the line, the Up and Down arrows change the item.",
+    "R или красная кнопка — запись, пробел — прослушать с линии, стрелки вверх и вниз — другая строка.")
 private val openInEditor = L("Open in the editor", "Открыть в редакторе")
 
 @Composable
@@ -195,63 +204,276 @@ private fun RecList(rec: RecorderState, modifier: Modifier) {
 private fun Current(rec: RecorderState, modifier: Modifier) {
     val c = T.c
     val name = rec.current ?: return
-    Column(modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.weight(0.4f))
-        Text(name.trimStart('_'), color = c.text, fontSize = if (name.length > 12) 34.sp else 52.sp, maxLines = 2)
+    val compact = Platform.isMobile
+    Column(modifier.padding(horizontal = 20.dp, vertical = if (compact) 10.dp else 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(name.trimStart('_'), color = c.text, fontSize = if (name.length > 12) 30.sp else 44.sp, maxLines = 2)
         // romaji under kana, comment from the list
         val sub = buildList {
             if (name.any { Kana.isKana(it) }) add(Syllables.fromName(name).joinToString(" ") { s -> Kana.romaji(s.text) ?: s.text })
             rec.comments[name]?.let { add(it) }
         }
-        if (sub.isNotEmpty()) Text(sub.joinToString("  ·  "), color = c.muted, fontSize = 16.sp)
-        Spacer(Modifier.height(18.dp))
-        // level meter
-        Box(Modifier.fillMaxWidth(0.6f).height(8.dp).clip(RoundedCornerShape(4.dp)).background(c.panelAlt)) {
-            val lv = min(1f, rec.level * 4f)
-            Box(Modifier.fillMaxWidth(lv).height(8.dp).background(if (lv > 0.9f) c.danger else c.ok))
-        }
-        Spacer(Modifier.height(14.dp))
-        val take = rec.take
-        Box(Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(c.radius)).background(c.laneBg).border(c.borderWidth, c.border, RoundedCornerShape(c.radius))) {
-            if (rec.countIn > 0) {
-                Text(rec.countIn.toString(), color = c.accent, fontSize = 48.sp, modifier = Modifier.align(Alignment.Center))
-            } else if (take != null && !rec.recording) {
-                val wave = c.wave
-                Canvas(Modifier.fillMaxSize()) {
-                    val w = size.width.toInt().coerceAtLeast(1)
-                    val mid = size.height / 2
-                    val path = Path()
-                    val per = max(1, take.samples.size / w)
-                    for (x in 0 until w) {
-                        var lo = 0f; var hi = 0f
-                        val a = x * per
-                        for (i in a until min(take.samples.size, a + per)) { val v = take.samples[i]; if (v < lo) lo = v; if (v > hi) hi = v }
-                        path.moveTo(x.toFloat(), mid - hi * mid)
-                        path.lineTo(x.toFloat(), mid - lo * mid + 0.5f)
-                    }
-                    drawPath(path, wave, style = Stroke(1f))
-                }
-                Text(formatTime(take.duration), color = c.muted, fontSize = 11.sp, modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp))
-            } else if (!rec.recording) {
-                Text(notRecorded(), color = c.muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.Center))
-            }
-        }
-        Spacer(Modifier.height(18.dp))
+        if (sub.isNotEmpty()) Text(sub.joinToString("  ·  "), color = c.muted, fontSize = 15.sp)
+        Spacer(Modifier.height(12.dp))
+        Readout(rec)
+        Spacer(Modifier.height(10.dp))
+        TakeView(rec, Modifier.fillMaxWidth().weight(1f).heightIn(min = 160.dp))
+        TakeInfo(rec)
+        Spacer(Modifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             IconBtn(Icons.up, S.prevFile(), size = 48.dp) { rec.step(-1) }
             Box(
-                Modifier.size(72.dp).clip(CircleShape).background(if (rec.recording) c.danger else c.danger.copy(alpha = 0.85f))
+                Modifier.size(68.dp).clip(CircleShape).background(if (rec.recording) c.danger else c.danger.copy(alpha = 0.85f))
                     .clickable { rec.toggle() },
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.size(if (rec.recording) 24.dp else 30.dp).clip(if (rec.recording) RoundedCornerShape(4.dp) else CircleShape).background(Color.White))
+                Box(Modifier.size(if (rec.recording) 22.dp else 28.dp).clip(if (rec.recording) RoundedCornerShape(4.dp) else CircleShape).background(Color.White))
             }
-            IconBtn(Icons.play, playTake(), size = 48.dp, enabled = take != null) { rec.playTake() }
+            IconBtn(if (rec.playhead >= 0) Icons.stop else Icons.play, playTake(), size = 48.dp, enabled = rec.take != null && !rec.recording) { rec.playTake() }
             IconBtn(Icons.down, S.nextFile(), size = 48.dp) { rec.step(1) }
         }
-        Spacer(Modifier.height(10.dp))
-        Text(keysHint(), color = c.muted, fontSize = 12.sp)
-        Spacer(Modifier.weight(0.6f))
+        if (!compact) {
+            Spacer(Modifier.height(8.dp))
+            Text(keysHint(), color = c.muted, fontSize = 12.sp)
+        }
+    }
+}
+
+private val noVoice = L("—", "—")
+private val takeNote = L("take: {0}", "дубль: {0}")
+private val clipped = L("too loud: the take clips", "слишком громко: дубль перегружен")
+private val quiet = L("very quiet take", "очень тихий дубль")
+private val takeHint = L("Click to play from there, drag to play a part", "Щелчок — играть отсюда, протяжка — играть кусок")
+
+/** Note name without cents for a MIDI value. */
+private fun noteName(midi: Double) = NoteNames.format(kotlin.math.round(midi))
+private fun midiToHz(m: Double) = 440.0 * 2.0.pow((m - 69) / 12)
+
+/** Median voiced pitch of the take, MIDI; null when nothing is voiced. */
+private fun medianNote(curve: mlabeler.core.dsp.Curve?): Double? {
+    val v = curve?.values?.filter { it > 0f }?.sorted() ?: return null
+    if (v.size < 5) return null
+    return Pitch.hzToMidi(v[v.size / 2].toDouble())
+}
+
+/** Level meter and the pitch heard now (or the take's typical pitch). */
+@Composable
+private fun Readout(rec: RecorderState) {
+    val c = T.c
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        // level
+        Box(Modifier.width(160.dp).height(10.dp).clip(RoundedCornerShape(5.dp)).background(c.panelAlt)) {
+            val db = if (rec.level > 0f) 20 * log10(rec.level.toDouble()) else -90.0
+            val lv = ((db + 60) / 60).toFloat().coerceIn(0f, 1f)
+            Box(Modifier.fillMaxWidth(lv).height(10.dp).background(if (lv > 0.92f) c.danger else if (lv > 0.75f) c.warn else c.ok))
+        }
+        Spacer(Modifier.width(20.dp))
+        val live = rec.recording
+        val note: Double? = if (live) rec.liveNote.takeIf { it > 0f }?.toDouble() else medianNote(rec.takePitch)
+        Box(Modifier.width(76.dp), contentAlignment = Alignment.CenterEnd) {
+            Text(note?.let { noteName(it) } ?: noVoice(), color = if (live && note != null) c.accent else c.text, fontSize = 30.sp, maxLines = 1)
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.width(110.dp)) {
+            if (note != null) {
+                val cents = kotlin.math.round((note - kotlin.math.round(note)) * 100).toInt()
+                Text("${kotlin.math.round(midiToHz(note)).toInt()} Hz", color = c.text, fontSize = 14.sp)
+                Text((if (cents >= 0) "+" else "") + "$cents ¢", color = if (kotlin.math.abs(cents) <= 15) c.ok else c.muted, fontSize = 12.sp)
+            } else Text(if (live) "" else " ", color = c.muted, fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun TakeInfo(rec: RecorderState) {
+    val c = T.c
+    val take = rec.take
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (take != null && !rec.recording) {
+            val peak = remember(take) { var p = 0f; for (v in take.samples) { val a = kotlin.math.abs(v); if (a > p) p = a }; p }
+            Text(takeHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            when {
+                peak >= 0.99f -> Text(clipped(), color = c.danger, fontSize = 11.sp)
+                peak < 0.06f -> Text(quiet(), color = c.warn, fontSize = 11.sp)
+            }
+        } else Spacer(Modifier.height(14.dp))
+    }
+}
+
+/**
+ * The take (or the live input while recording): waveform on top, pitch on a piano-roll grid below.
+ * Click plays from the click, drag plays the dragged part.
+ */
+@Composable
+private fun TakeView(rec: RecorderState, modifier: Modifier) {
+    val c = T.c
+    val measurer = rememberTextMeasurer(cacheSize = 64)
+    val take = rec.take
+    val shape = RoundedCornerShape(c.radius)
+    var dragFrom by remember { mutableStateOf(-1.0) }
+    var dragTo by remember { mutableStateOf(-1.0) }
+    // the take's peaks per pixel are cached by width
+    var peaksKey by remember { mutableStateOf<Pair<Any?, Int>?>(null) }
+    var peaks by remember { mutableStateOf(FloatArray(0) to FloatArray(0)) }
+    Box(modifier.clip(shape).background(c.laneBg).border(c.borderWidth, c.border, shape)) {
+        val live = rec.recording
+        val frames = rec.liveFrames
+        val canvasMod = if (take != null && !live) Modifier.fillMaxSize().pointerInput(take) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                val dur = take.duration
+                fun timeAt(x: Float) = (x / size.width * dur).coerceIn(0.0, dur)
+                val t0 = timeAt(down.position.x)
+                var moved = false
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    val ch = ev.changes.firstOrNull() ?: break
+                    if (!ch.pressed) break
+                    if (kotlin.math.abs(ch.position.x - down.position.x) > 6f) moved = true
+                    if (moved) { dragFrom = t0; dragTo = timeAt(ch.position.x) }
+                    ch.consume()
+                }
+                if (moved && dragFrom >= 0) {
+                    val a = min(dragFrom, dragTo); val b = max(dragFrom, dragTo)
+                    rec.cursor = a
+                    rec.playRange(a, b)
+                } else {
+                    rec.cursor = t0
+                    rec.playRange(t0, dur)
+                }
+                dragFrom = -1.0; dragTo = -1.0
+            }
+        } else Modifier.fillMaxSize()
+        val labelStyle = TextStyle(color = c.muted, fontSize = 10.sp)
+        Canvas(canvasMod) {
+            val w = size.width
+            val h = size.height
+            val waveH = h * 0.34f
+            val pitchTop = waveH
+            val pitchH = h - waveH
+            drawLine(c.border, Offset(0f, waveH), Offset(w, waveH), 1f)
+            // what to show: the take, or the last seconds of the input
+            val step = RecorderState.LIVE_STEP
+            val span: Double
+            val start: Double
+            if (live) {
+                val rec_s = frames * step
+                span = 8.0
+                start = max(0.0, rec_s - span * 0.9)
+            } else {
+                span = take?.duration ?: 1.0
+                start = 0.0
+            }
+            fun xOf(t: Double) = ((t - start) / span * w).toFloat()
+            // pitch range: around the typical note, at least an octave and a half
+            val voiced: List<Double> = if (live) {
+                val from = max(0, frames - (span / step).toInt())
+                (from until frames).mapNotNull { i -> rec.livePitch.getOrNull(i)?.takeIf { it > 0f }?.toDouble() }
+            } else (rec.takePitch?.values?.filter { it > 0f }?.map { Pitch.hzToMidi(it.toDouble()) } ?: emptyList<Double>())
+            val sorted = voiced.sorted()
+            val mid = if (sorted.size >= 5) sorted[sorted.size / 2] else 60.0
+            var lo = if (sorted.size >= 5) min(sorted[sorted.size / 20], mid - 9) else mid - 9
+            var hi = if (sorted.size >= 5) max(sorted[sorted.size * 19 / 20], mid + 9) else mid + 9
+            lo = kotlin.math.floor(lo) - 1; hi = kotlin.math.ceil(hi) + 1
+            val semis = (hi - lo).coerceAtLeast(1.0)
+            fun yOf(m: Double) = (pitchTop + pitchH - (m - lo) / semis * pitchH).toFloat()
+            val rowH = pitchH / semis.toFloat()
+            // piano-roll rows: dark rows for the black keys, a line under every C
+            for (k in lo.toInt() until hi.toInt()) {
+                val pc = ((k % 12) + 12) % 12
+                val yTop = yOf(k + 0.5)
+                if (pc in setOf(1, 3, 6, 8, 10)) drawRect(c.text.copy(alpha = 0.045f), Offset(0f, yTop), Size(w, rowH))
+                if (pc == 0) drawLine(c.text.copy(alpha = 0.16f), Offset(0f, yOf(k - 0.5)), Offset(w, yOf(k - 0.5)), 1f)
+                if (pc == 0 || (rowH >= 13f && pc in setOf(4, 7, 9))) {
+                    val lay = measurer.measure(NoteNames.format(k.toDouble()), labelStyle)
+                    if (yTop + rowH / 2 - lay.size.height / 2 > pitchTop) drawText(lay, topLeft = Offset(4f, yOf(k.toDouble()) - lay.size.height / 2))
+                }
+            }
+            // waveform
+            val midY = waveH / 2
+            val wave = c.wave
+            if (live) {
+                val path = Path()
+                val px = w / (span / step).toFloat()
+                val from = max(0, (start / step).toInt())
+                for (i in from until frames) {
+                    val x = xOf(i * step)
+                    val v = rec.liveWave.getOrElse(i) { 0f }.coerceAtMost(1f) * (midY - 2)
+                    path.moveTo(x, midY - v); path.lineTo(x, midY + v + 0.5f)
+                }
+                drawPath(path, wave, style = Stroke(max(1f, px)))
+            } else if (take != null) {
+                val wi = w.toInt().coerceAtLeast(1)
+                if (peaksKey != (take to wi)) {
+                    val lo2 = FloatArray(wi); val hi2 = FloatArray(wi)
+                    val n = take.samples.size
+                    for (x in 0 until wi) {
+                        val a = (x.toLong() * n / wi).toInt(); val b = max(a + 1, ((x + 1).toLong() * n / wi).toInt())
+                        var l = 0f; var hh = 0f
+                        for (i in a until min(n, b)) { val v = take.samples[i]; if (v < l) l = v; if (v > hh) hh = v }
+                        lo2[x] = l; hi2[x] = hh
+                    }
+                    peaks = lo2 to hi2
+                    peaksKey = take to wi
+                }
+                val (l2, h2) = peaks
+                val path = Path()
+                for (x in l2.indices) {
+                    path.moveTo(x.toFloat(), midY - h2[x] * (midY - 2))
+                    path.lineTo(x.toFloat(), midY - l2[x] * (midY - 2) + 0.5f)
+                }
+                drawPath(path, wave, style = Stroke(1f))
+            }
+            // pitch curve
+            val stroke = Stroke(2.2f)
+            val pc = Path()
+            var open = false
+            var lastM = 0.0
+            fun point(t: Double, m: Double) {
+                val x = xOf(t); val y = yOf(m)
+                if (open && kotlin.math.abs(m - lastM) < 1.5) pc.lineTo(x, y) else pc.moveTo(x, y)
+                open = true; lastM = m
+            }
+            if (live) {
+                val from = max(0, (start / step).toInt())
+                for (i in from until frames) {
+                    val v = rec.livePitch.getOrElse(i) { 0f }
+                    if (v > 0f) point(i * step, v.toDouble()) else open = false
+                }
+            } else rec.takePitch?.let { cur ->
+                for (i in cur.values.indices) {
+                    val v = cur.values[i]
+                    if (v > 0f) point(i * cur.hop, Pitch.hzToMidi(v.toDouble())) else open = false
+                }
+            }
+            drawPath(pc, c.accent, style = stroke)
+            if (!live && take != null) {
+                // dragged part, cursor and playhead
+                if (dragFrom >= 0) {
+                    val a = xOf(min(dragFrom, dragTo)); val b = xOf(max(dragFrom, dragTo))
+                    drawRect(c.selectionRange, Offset(a, 0f), Size(b - a, h))
+                }
+                val cx = xOf(rec.cursor)
+                drawLine(c.cursor.copy(alpha = 0.7f), Offset(cx, 0f), Offset(cx, h), 1f)
+                if (rec.playhead >= 0) {
+                    val x = xOf(rec.playhead)
+                    drawLine(c.playhead, Offset(x, 0f), Offset(x, h), 2f)
+                }
+            } else if (live) {
+                val x = xOf(frames * step)
+                drawLine(c.danger, Offset(x, 0f), Offset(x, h), 2f)
+            }
+        }
+        if (rec.countIn > 0) {
+            Text(rec.countIn.toString(), color = c.accent, fontSize = 48.sp, modifier = Modifier.align(Alignment.Center))
+        } else if (take == null && !live) {
+            Text(notRecorded(), color = c.muted, fontSize = 13.sp, modifier = Modifier.align(Alignment.Center))
+        }
+        val shown = when {
+            live -> formatTime(frames * RecorderState.LIVE_STEP)
+            take != null -> (if (rec.playhead >= 0) formatTime(rec.playhead) + " / " else "") + formatTime(take.duration)
+            else -> ""
+        }
+        if (shown.isNotEmpty()) Text(shown, color = c.muted, fontSize = 11.sp, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
     }
 }
 

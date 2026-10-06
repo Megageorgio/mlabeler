@@ -70,6 +70,31 @@ class RecorderState(val folder: String, private val app: AppState, private val s
         private set
     var version by mutableIntStateOf(0)
         private set
+    /** Pitch of the take, Hz per frame (0 = unvoiced). */
+    var takePitch by mutableStateOf<mlabeler.core.dsp.Curve?>(null)
+        private set
+    /** Where playback of the take is now, seconds; -1 when stopped. */
+    var playhead by mutableStateOf(-1.0)
+        private set
+    /** Where Space starts playback, seconds (set by clicking the take). */
+    var cursor by mutableStateOf(0.0)
+
+    /** Live input while recording, one value per [LIVE_STEP] seconds: peak level and pitch (MIDI, 0 = none). */
+    var liveFrames by mutableIntStateOf(0)
+        private set
+    var liveWave = FloatArray(0)
+        private set
+    var livePitch = FloatArray(0)
+        private set
+    /** Current input pitch, MIDI note number with fraction; 0 when there is none. */
+    var liveNote by mutableFloatStateOf(0f)
+        private set
+    private val ring = FloatArray(4096)
+    private var ringPos = 0
+    private var binPeak = 0f
+    private var binFill = 0
+    private var binSize = 441
+    private var playJob: Job? = null
 
     private val input = AudioIn()
     private val output = AudioOut()
@@ -129,7 +154,57 @@ class RecorderState(val folder: String, private val app: AppState, private val s
 
     private fun loadTake() {
         val n = current
-        take = if (n != null && fs.exists(pathOf(n))) runCatching { Wav.decode(fs.read(pathOf(n))) }.getOrNull() else null
+        stopPlayback()
+        useTake(if (n != null && fs.exists(pathOf(n))) runCatching { Wav.decode(fs.read(pathOf(n))) }.getOrNull() else null)
+    }
+
+    private var pitchJob: Job? = null
+
+    private fun useTake(a: Audio?) {
+        take = a
+        cursor = 0.0
+        takePitch = null
+        pitchJob?.cancel()
+        if (a == null) return
+        pitchJob = scope.launch {
+            val mono = if (a.channels > 1) FloatArray(a.samples.size / a.channels) { a.samples[it * a.channels] } else a.samples
+            val c = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(mono, a.sampleRate, hop = 0.01) }
+            if (take === a) takePitch = c
+        }
+    }
+
+    /** Input from the microphone: level, the scrolling picture and the pitch. Runs on the audio thread. */
+    private fun onInput(chunk: FloatArray, sr: Int) {
+        var e = 0.0
+        for (v in chunk) {
+            e += v * v
+            ring[ringPos] = v
+            ringPos = (ringPos + 1) % ring.size
+            val a = kotlin.math.abs(v)
+            if (a > binPeak) binPeak = a
+            if (++binFill >= binSize) {
+                val f = liveFrames
+                if (f < liveWave.size) {
+                    liveWave[f] = binPeak
+                    // pitch every few bins over the last ~90 ms
+                    livePitch[f] = if (f % 3 == 0 || f == 0) liveNow(sr) else livePitch[f - 1]
+                    liveNote = livePitch[f]
+                    liveFrames = f + 1
+                }
+                binPeak = 0f
+                binFill = 0
+            }
+        }
+        level = sqrt(e / chunk.size.coerceAtLeast(1)).toFloat()
+    }
+
+    private fun liveNow(sr: Int): Float {
+        val n = ring.size
+        val m = 2048
+        val buf = FloatArray(m) { ring[(ringPos + n - m + it) % n] }
+        val c = mlabeler.core.dsp.Pitch.yin(buf, sr, hop = 1.0, fmin = 65.0, fmax = 1100.0)
+        val hz = c.values.lastOrNull { it > 0f } ?: 0f
+        return if (hz > 0f) mlabeler.core.dsp.Pitch.hzToMidi(hz.toDouble()).toFloat() else 0f
     }
 
     fun toggle() = if (recording) stop() else record()
@@ -163,11 +238,18 @@ class RecorderState(val folder: String, private val app: AppState, private val s
             else -> null
         }
         try {
+            val bins = (s.maxSeconds + 2 * s.countInBeats + 2) * (1.0 / LIVE_STEP).toInt()
+            liveWave = FloatArray(bins)
+            livePitch = FloatArray(bins)
+            liveFrames = 0
+            liveNote = 0f
+            binSize = (sr * LIVE_STEP).toInt()
+            binPeak = 0f; binFill = 0
+            ring.fill(0f)
+            stopPlayback()
             input.start(sr) { chunk ->
                 sink.trySend(chunk)
-                var e = 0.0
-                for (v in chunk) e += v * v
-                level = sqrt(e / chunk.size.coerceAtLeast(1)).toFloat()
+                onInput(chunk, sr)
             }
         } catch (e: Exception) {
             app.message(micError.format(e.message ?: e.toString()), error = true)
@@ -195,6 +277,7 @@ class RecorderState(val folder: String, private val app: AppState, private val s
         input.stop()
         output.stop()
         level = 0f
+        liveNote = 0f
         val name = currentName ?: return
         val parts = ArrayList<FloatArray>()
         while (true) parts += chunks.tryReceive().getOrNull() ?: break
@@ -210,16 +293,45 @@ class RecorderState(val folder: String, private val app: AppState, private val s
                 }
                 fs.write(path, Wav.encode16(audio))
             }
-            take = audio
+            useTake(audio)
             version++
             app.message(savedTake.format("$name.wav"))
             if (settings.autoNext && index < names.size - 1) select(index + 1)
         }
     }
 
+    /** Space: plays from the cursor, or stops. */
     fun playTake() {
         val t = take ?: return
-        if (output.isPlaying) output.stop() else runCatching { output.play(t, 0, t.samples.size, false) }
+        if (playhead >= 0) stopPlayback() else playRange(cursor, t.duration)
+    }
+
+    /** Plays the take from [from] to [to] seconds and moves the playhead. */
+    fun playRange(from: Double, to: Double) {
+        val t = take ?: return
+        if (recording) return
+        val a = (from * t.sampleRate).toInt().coerceIn(0, t.samples.size)
+        val b = (to * t.sampleRate).toInt().coerceIn(0, t.samples.size)
+        if (b - a < t.sampleRate / 50) return
+        playJob?.cancel()
+        runCatching { output.play(t, a, b, false) }.onFailure { return }
+        playhead = from
+        playJob = scope.launch {
+            delay(30)
+            while (isActive && output.isPlaying) {
+                val p = output.position()
+                if (p >= 0) playhead = p.toDouble() / t.sampleRate
+                delay(30)
+            }
+            playhead = -1.0
+        }
+    }
+
+    fun stopPlayback() {
+        playJob?.cancel()
+        playJob = null
+        output.stop()
+        playhead = -1.0
     }
 
     fun close() {
@@ -229,6 +341,9 @@ class RecorderState(val folder: String, private val app: AppState, private val s
     }
 
     companion object {
+        /** Seconds per value of the live picture. */
+        const val LIVE_STEP = 0.01
+
         /** Clicks on every beat, a higher one on bar starts, for [seconds] after the count-in. */
         fun clickTrack(sr: Int, bpm: Int, countIn: Int, seconds: Int): FloatArray {
             val beat = 60.0 / bpm
