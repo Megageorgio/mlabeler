@@ -50,6 +50,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,8 +80,8 @@ private val separateT = L("Make a backing track", "Сделать минус")
 private val separateHint = L("The toolkit removes the voice from the song; the result is kept for the next time.",
     "Тулкит уберёт голос из песни; результат сохранится на следующий раз.")
 private val recogniseT = L("Recognise the words", "Распознать слова")
-private val recogniseHint = L("Whisper in the toolkit writes the lines with approximate times. Better after making the backing track.",
-    "Whisper в тулките запишет строки с примерным временем. Лучше после того, как сделан минус.")
+private val recogniseHint = L("Whisper in the toolkit writes the lines with approximate times, in the language set next to the button. It listens to the voice without the music, so the backing track is made first if there is none.",
+    "Whisper в тулките запишет строки с примерным временем, на языке, указанном рядом с кнопкой. Он слушает голос без музыки, поэтому сначала делается минус, если его ещё нет.")
 private val guideT = L("Original voice in the headphones", "Голос исполнителя в наушниках")
 private val headphonesT = L("Sing in headphones: whatever the speakers play gets into the take.", "Пойте в наушниках: всё, что играет из колонок, попадёт в дубль.")
 private val takeT = L("Take name", "Имя дубля")
@@ -100,11 +101,91 @@ private val prevLineT = L("Previous line", "Предыдущая строка")
 private val nextLineT = L("Next line", "Следующая строка")
 private val addHereT = L("Add a line here", "Строка отсюда")
 private val leadT = L("Start before a line, s", "Начинать до строки, с")
-private val languageT = L("Language (empty = detect)", "Язык (пусто — определить)")
+private val languageT = L("Lyrics language", "Язык текста")
+private val firstTimeT = L("The first time the toolkit installs the separation part and downloads its model (a few GB): this takes a while, then it is quick.",
+    "В первый раз тулкит ставит модуль разделения и качает модель (несколько ГБ): это долго, дальше быстро.")
 private val keysT = L("R records from the current place, Space plays and stops, the Up and Down arrows go by lines, Home goes to the first words.",
     "R — запись с текущего места, пробел — играть и стоп, стрелки вверх и вниз — по строкам, Home — к первым словам.")
 private val inT = L("in {0} s", "через {0} с")
 private val cancelWorkT = L("Stop", "Остановить")
+private val loopT = L("Repeat the line", "Повторять строку")
+private val scoreT = L("In tune {0}% of the time · {1} ¢ off on average", "В ноты: {0}% времени · в среднем мимо на {1} ¢")
+private val octDownT = L("an octave lower than the song", "октавой ниже песни")
+private val octUpT = L("an octave higher than the song", "октавой выше песни")
+private val pitchHint = L("Grey: the song's melody; colour: your voice (an octave up or down counts as right)",
+    "Серым — мелодия песни, цветом — ваш голос (октава выше или ниже считается верной)")
+
+/** The song's melody around now (from its separated voice) and the singer's pitch while recording. */
+@Composable
+private fun PitchLane(k: KaraokeState) {
+    val c = T.c
+    val ref = k.refPitch
+    @Suppress("UNUSED_VARIABLE") val tick = k.liveTick
+    val measurer = androidx.compose.ui.text.rememberTextMeasurer(cacheSize = 32)
+    val labelStyle = TextStyle(color = c.muted, fontSize = 10.sp)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(pitchHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1)
+            val now = (k.position / KaraokeState.PITCH_HOP).toInt()
+            val r = ref?.getOrNull(now)?.takeIf { !it.isNaN() }
+            val m = k.liveNote
+            if (k.recording && m > 0f) {
+                Text(mlabeler.core.format.NoteNames.format(kotlin.math.round(m.toDouble())), color = c.accent, fontSize = 16.sp)
+                if (r != null) {
+                    val d = m - r - 12 * kotlin.math.round((m - r) / 12f)
+                    val cents = (d * 100).toInt()
+                    Text("  " + (if (cents >= 0) "+" else "") + "$cents ¢", fontSize = 13.sp,
+                        color = if (kotlin.math.abs(cents) <= 50) c.ok else if (kotlin.math.abs(cents) <= 100) c.warn else c.danger)
+                }
+            }
+        }
+        Canvas(Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(c.radius)).background(c.laneBg)) {
+            val w = size.width; val h = size.height
+            val hop = KaraokeState.PITCH_HOP
+            val from = k.position - 5.0; val to = k.position + 3.0
+            fun xOf(t: Double) = ((t - from) / (to - from) * w).toFloat()
+            val i0 = (from / hop).toInt().coerceAtLeast(0)
+            val i1 = (to / hop).toInt()
+            // range: the melody around now, at least an octave
+            var lo = Float.MAX_VALUE; var hi = -Float.MAX_VALUE
+            if (ref != null) for (i in i0 until minOf(i1, ref.size)) { val v = ref[i]; if (!v.isNaN()) { if (v < lo) lo = v; if (v > hi) hi = v } }
+            if (lo > hi) { lo = 55f; hi = 67f }
+            val mid = (lo + hi) / 2
+            lo = minOf(lo, mid - 6) - 1; hi = maxOf(hi, mid + 6) + 1
+            fun yOf(m: Float) = h - (m - lo) / (hi - lo) * h
+            for (n in kotlin.math.ceil(lo).toInt()..hi.toInt()) {
+                val pc = ((n % 12) + 12) % 12
+                if (pc in setOf(1, 3, 6, 8, 10)) drawRect(c.text.copy(alpha = 0.035f), Offset(0f, yOf(n + 0.5f)), Size(w, h / (hi - lo)))
+                if (pc == 0) {
+                    drawLine(c.text.copy(alpha = 0.14f), Offset(0f, yOf(n - 0.5f)), Offset(w, yOf(n - 0.5f)), 1f)
+                    drawText(measurer.measure(mlabeler.core.format.NoteNames.format(n.toDouble()), labelStyle), topLeft = Offset(3f, yOf(n.toFloat()) - 7f))
+                }
+            }
+            fun curve(get: (Int) -> Float, color: androidx.compose.ui.graphics.Color, width: Float) {
+                val path = androidx.compose.ui.graphics.Path()
+                var open = false; var last = 0f
+                for (i in i0 until i1) {
+                    val v = get(i)
+                    if (v.isNaN() || v == 0f) { open = false; continue }
+                    val x = xOf(i * hop); val y = yOf(v)
+                    if (open && kotlin.math.abs(v - last) < 1.5f) path.lineTo(x, y) else path.moveTo(x, y)
+                    open = true; last = v
+                }
+                drawPath(path, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+            }
+            if (ref != null) curve({ ref.getOrElse(it) { Float.NaN } }, c.text.copy(alpha = 0.35f), 7f)
+            val live = k.livePitch
+            if (live.isNotEmpty()) curve({ i ->
+                val l = live.getOrElse(i) { 0f }
+                val r = ref?.getOrNull(i)
+                // shown in the song's octave: being an octave off is not a mistake
+                if (l == 0f || l.isNaN() || r == null || r.isNaN()) l else l - 12 * kotlin.math.round((l - r) / 12f)
+            }, c.accent, 2.5f)
+            val x = xOf(k.position)
+            drawLine(if (k.recording) c.danger else c.playhead, Offset(x, 0f), Offset(x, h), 2f)
+        }
+    }
+}
 
 @Composable
 fun KaraokeScreen(app: AppState, k: KaraokeState) {
@@ -173,16 +254,28 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 } else Text(separateHint(), color = c.muted, fontSize = 12.sp, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
                 Spacer(Modifier.weight(1f))
                 Btn(separateT(), enabled = k.busy == null && k.audio != null && !k.recording) { k.separate() }
+                Text(languageT(), color = c.muted, fontSize = 12.sp)
+                Field(k.language, { k.updateLanguage(it) }, Modifier.width(56.dp), placeholder = "ru")
                 Btn(recogniseT(), enabled = k.busy == null && k.audio != null && !k.recording) { k.recognise() }
             }
             k.busy?.let { b ->
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(b + if (k.progress >= 0) " ${(k.progress * 100).toInt()}%" else "", color = c.accent, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Column(Modifier.weight(1f)) {
+                        Text(b + if (k.progress >= 0) " ${(k.progress * 100).toInt()}%" else "", color = c.accent, fontSize = 12.sp)
+                        if (k.stageText.isNotBlank()) Text(k.stageText, color = c.muted, fontSize = 11.sp, maxLines = 1)
+                        if (k.music == null) Text(firstTimeT(), color = c.muted, fontSize = 11.sp)
+                    }
                     Btn(cancelWorkT()) { k.cancelWork() }
                 }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (editing && !k.recording) LineEditor(k, Modifier.fillMaxSize()) else Lyrics(k, Modifier.fillMaxSize())
+            }
+            if (k.refPitch != null || k.recording) PitchLane(k)
+            k.score?.let { sc ->
+                Text(scoreT.format((sc.inTune * 100).toInt(), sc.meanCents.toInt()) + when (sc.octaveShift) { 0 -> ""; -1 -> " · " + octDownT(); 1 -> " · " + octUpT(); else -> "" },
+                    color = if (sc.inTune >= 0.7) c.ok else if (sc.inTune >= 0.45) c.warn else c.danger, fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
             }
             Divider()
             Bar(k)
@@ -207,6 +300,7 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                     Box(Modifier.fillMaxWidth(lv).height(8.dp).background(if (lv > 0.92f) c.danger else c.ok))
                 }
                 Text(mlabeler.app.ui.formatTime(k.position, precise = false) + " / " + mlabeler.app.ui.formatTime(k.duration, precise = false), color = c.muted, fontSize = 12.sp)
+                Chip(loopT(), k.loopLine) { k.loopLine = !k.loopLine }
                 Spacer(Modifier.weight(1f))
                 if (editing && !k.recording) Btn(pasteT()) { pasting = true }
                 Btn(if (editing) doneT() else editT(), primary = editing, enabled = !k.recording) { editing = !editing; if (!editing) focus.requestFocus() }
@@ -271,6 +365,9 @@ private fun Lyrics(k: KaraokeState, modifier: Modifier) {
             itemsIndexed(k.lines) { i, l ->
                 val now = i == cur
                 val next = i == cur + 1
+                val sc = k.score?.perLine?.get(i)
+                if (sc != null) Text("${(sc * 100).toInt()}%", fontSize = 11.sp,
+                    color = if (sc >= 0.7) c.ok else if (sc >= 0.45) c.warn else c.danger)
                 Text(
                     l.text.ifEmpty { "…" },
                     color = when { now -> c.accent; next -> c.text; i < cur -> c.muted.copy(alpha = 0.6f); else -> c.muted },
@@ -295,8 +392,6 @@ private fun LineEditor(k: KaraokeState, modifier: Modifier) {
             Text(leadT(), color = c.muted, fontSize = 12.sp)
             for (v in listOf(1.0, 2.0, 3.0, 5.0)) Chip(v.toInt().toString(), k.lead == v) { k.lead = v }
             Spacer(Modifier.width(8.dp))
-            Text(languageT(), color = c.muted, fontSize = 12.sp)
-            Field(k.language, { k.language = it }, Modifier.width(70.dp), placeholder = "ru")
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
             itemsIndexed(k.lines, key = { i, l -> "$i:${l.time}" }) { i, l ->

@@ -201,10 +201,11 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
     }
 
     /** Starts recognising the words of one uploaded file (phrases with times); returns the job id. */
-    suspend fun transcribe(fileId: String, language: String?): String {
+    suspend fun transcribe(fileId: String, language: String?, prompt: String? = null): String {
         val req = buildJsonObject {
             putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) }) }
             if (language != null) put("language", language)
+            if (prompt != null) put("initial_prompt", prompt)
             put("frontend", false)
         }
         return call("POST", "/transcribe", req).jsonObject["id"]!!.jsonPrimitive.content

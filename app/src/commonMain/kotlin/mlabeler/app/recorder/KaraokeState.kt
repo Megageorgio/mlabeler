@@ -95,8 +95,18 @@ class KaraokeState(
         private set
     var progress by mutableDoubleStateOf(-1.0)
         private set
-    /** Language for recognition; empty = detect. */
+    /** What the toolkit reports it is doing (installing, loading the model…). */
+    var stageText by mutableStateOf("")
+        private set
+    /** Language of the lyrics for recognition (Whisper guesses wrong on singing over music, so it is set, not detected). */
     var language by mutableStateOf("")
+        private set
+    private val languagePath = Paths.join(songsDir, "language.txt")
+
+    fun updateLanguage(code: String) {
+        language = code.trim().lowercase()
+        runCatching { fs.write(languagePath, language.encodeToByteArray()) }
+    }
 
     // recording
     var recording by mutableStateOf(false)
@@ -117,8 +127,101 @@ class KaraokeState(
     private var playJob: Job? = null
     private var workJob: Job? = null
 
+    // ---------- pitch: the singer's against the song's ----------
+
+    /** Pitch of the song's own voice (from the separated voice), MIDI per [PITCH_HOP]; NaN = unvoiced. */
+    var refPitch by mutableStateOf<FloatArray?>(null)
+        private set
+    private var refJob: Job? = null
+    /** The singer's pitch heard while recording, MIDI per [PITCH_HOP] of song time; NaN = nothing. */
+    var livePitch: FloatArray = FloatArray(0)
+        private set
+    /** Bumped while recording so the pitch picture redraws. */
+    var liveTick by androidx.compose.runtime.mutableIntStateOf(0)
+        private set
+    /** The note heard now (MIDI), 0 when silent. */
+    var liveNote by mutableFloatStateOf(0f)
+        private set
+    private val ring = FloatArray(2048)
+    private var ringPos = 0
+    private var sinceYin = 0
+
+    /** How well the last take followed the song's melody. */
+    data class Score(val inTune: Double, val meanCents: Double, val perLine: Map<Int, Double>, val octaveShift: Int)
+    var score by mutableStateOf<Score?>(null)
+        private set
+
+    /** While playing (not recording), go back to the start of the current line when the next one begins. */
+    var loopLine by mutableStateOf(false)
+    private var loopFrom = -1
+
+    private fun analyseVoice(v: Audio?) {
+        refJob?.cancel()
+        refPitch = null
+        if (v == null) return
+        refJob = scope.launch {
+            val c = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(v.samples, v.sampleRate, hop = PITCH_HOP, fmin = 65.0, fmax = 1100.0) }
+            refPitch = FloatArray(c.values.size) { i -> val hz = c.values[i]; if (hz > 0f) mlabeler.core.dsp.Pitch.hzToMidi(hz.toDouble()).toFloat() else Float.NaN }
+        }
+    }
+
+    /** Called from the microphone thread: the pitch of the last ~46 ms, written at the current song time. */
+    private fun hearPitch(chunk: FloatArray) {
+        for (v in chunk) { ring[ringPos] = v; ringPos = (ringPos + 1) % ring.size }
+        sinceYin += chunk.size
+        if (sinceYin < 441) return
+        sinceYin = 0
+        val buf = FloatArray(ring.size) { ring[(ringPos + it) % ring.size] }
+        var peak = 0f
+        for (v in buf) { val a = kotlin.math.abs(v); if (a > peak) peak = a }
+        val hz = if (peak < 0.02f) 0f else mlabeler.core.dsp.Pitch.yin(buf, recRate, hop = 1.0, fmin = 65.0, fmax = 1100.0).values.lastOrNull { it > 0f } ?: 0f
+        val m = if (hz > 0f) mlabeler.core.dsp.Pitch.hzToMidi(hz.toDouble()).toFloat() else 0f
+        liveNote = m
+        val i = (position / PITCH_HOP).toInt()
+        val arr = livePitch
+        if (i in arr.indices) {
+            arr[i] = if (m > 0f) m else Float.NaN
+            // fill the 10 ms steps between two readings
+            if (i > 0 && arr[i - 1] == 0f) arr[i - 1] = arr[i]
+        }
+        liveTick++
+    }
+
+    /** Share of sung frames within half a semitone of the song's voice; an octave up or down counts as right. */
+    private fun scoreTake(from: Double, to: Double): Score? {
+        val ref = refPitch ?: return null
+        val live = livePitch
+        val a = (from / PITCH_HOP).toInt().coerceAtLeast(0)
+        val b = minOf((to / PITCH_HOP).toInt(), ref.size, live.size)
+        // the octave the singer chose: the most common whole-octave offset
+        val shifts = IntArray(5)
+        for (i in a until b) {
+            val r = ref[i]; val l = live[i]
+            if (r.isNaN() || l.isNaN() || l == 0f) continue
+            val o = kotlin.math.round((l - r) / 12.0).toInt().coerceIn(-2, 2)
+            shifts[o + 2]++
+        }
+        val octave = shifts.indices.maxByOrNull { shifts[it] }!! - 2
+        var n = 0; var good = 0; var cents = 0.0
+        val lineN = HashMap<Int, Int>(); val lineGood = HashMap<Int, Int>()
+        for (i in a until b) {
+            val r = ref[i]; val l = live[i]
+            if (r.isNaN() || l.isNaN() || l == 0f) continue
+            val d = kotlin.math.abs(l - r - 12 * octave)
+            n++; cents += d * 100
+            val t = i * PITCH_HOP
+            val line = lines.indexOfLast { it.time <= t }
+            lineN[line] = (lineN[line] ?: 0) + 1
+            if (d <= 0.5) { good++; lineGood[line] = (lineGood[line] ?: 0) + 1 }
+        }
+        if (n < 50) return null
+        return Score(good.toDouble() / n, cents / n, lineN.filter { it.value >= 20 }.mapValues { (k, v) -> (lineGood[k] ?: 0).toDouble() / v }, octave)
+    }
+
     init {
         fs.mkdirs(songsDir)
+        language = runCatching { fs.read(languagePath).decodeToString().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
+            ?: mlabeler.app.i18n.Lang.current
         reloadSongs()
         songs.firstOrNull()?.let { open(it) }
     }
@@ -162,6 +265,8 @@ class KaraokeState(
         stop()
         song = name
         audio = null; music = null; voice = null
+        analyseVoice(null)
+        score = null
         position = 0.0
         lines = readLrc(lrcPath(name))
         dirty = false
@@ -174,6 +279,7 @@ class KaraokeState(
             audio = a
             music = withContext(Dispatchers.Default) { partPath(name, "music").takeIf { fs.exists(it) }?.let { decode(it) } }
             voice = withContext(Dispatchers.Default) { partPath(name, "voice").takeIf { fs.exists(it) }?.let { decode(it) } }
+            analyseVoice(voice)
             busy = null
         }
     }
@@ -211,9 +317,19 @@ class KaraokeState(
         playing = true
         playJob = scope.launch {
             delay(30)
+            loopFrom = if (loopLine && !recording) current else -1
             while (isActive && output.isPlaying) {
                 val p = output.position()
                 if (p >= 0) position = p.toDouble() / a.sampleRate
+                val lf = loopFrom
+                if (loopLine && !recording && lf >= 0 && lf + 1 < lines.size && position >= lines[lf + 1].time) {
+                    val back = (lines[lf].time - minOf(lead, 1.0)).coerceAtLeast(0.0)
+                    output.stop()
+                    runCatching { output.play(a, (back * a.sampleRate).toInt(), a.samples.size, false) }
+                    position = back
+                    delay(60)
+                    continue
+                }
                 delay(30)
             }
             playing = false
@@ -251,6 +367,7 @@ class KaraokeState(
 
     fun toLine(i: Int, withLead: Boolean = true) {
         val l = lines.getOrNull(i) ?: return
+        loopFrom = i
         seek((l.time - if (withLead) lead else 0.0).coerceAtLeast(0.0))
     }
 
@@ -276,6 +393,7 @@ class KaraokeState(
                 try {
                     input.start(recRate) { chunk ->
                         sink.trySend(chunk.copyOf())
+                        hearPitch(chunk)
                         var p = 0f
                         for (v in chunk) { val a = kotlin.math.abs(v); if (a > p) p = a }
                         level = p
@@ -285,6 +403,8 @@ class KaraokeState(
                     return@launch
                 }
                 recStart = position
+                livePitch = FloatArray((duration / PITCH_HOP).toInt() + 2)
+                score = null
                 recording = true
                 play(position)
             }
@@ -298,6 +418,8 @@ class KaraokeState(
         val end = position
         stop()
         level = 0f
+        liveNote = 0f
+        score = scoreTake(recStart, end)
         val parts = ArrayList<FloatArray>()
         while (true) parts += chunks.tryReceive().getOrNull() ?: break
         val data = FloatArray(parts.sumOf { it.size }).also { out -> var p = 0; for (c in parts) { c.copyInto(out, p); p += c.size } }
@@ -394,6 +516,7 @@ class KaraokeState(
         workJob = scope.launch {
             busy = what
             progress = -1.0
+            stageText = ""
             try {
                 if (!app.toolkit.ensure()) throw ToolkitException(app.toolkit.statusText())
                 block(app.toolkit.client())
@@ -425,11 +548,16 @@ class KaraokeState(
     /** Makes the backing track (the song without its voice); the voice is kept too, as an optional guide. */
     fun separate() {
         val name = song ?: return
-        work(separatingT()) { client ->
-            val id = upload(client, name, null)
+        work(separatingT()) { client -> separateIn(client, name) }
+    }
+
+    private suspend fun separateIn(client: mlabeler.app.toolkit.ToolkitClient, name: String) {
+        run {
+            // a decoded WAV: the separator keeps the input's encoding and fails on MP3 and the like
+            val id = upload(client, name, audio)
             busy = separatingT()
             val job = client.separate(id)
-            val res = try { client.await(job) { p, _ -> progress = p } } catch (e: kotlinx.coroutines.CancellationException) { client.cancel(job); throw e }
+            val res = try { client.await(job) { p, stage -> progress = p; stageText = stage } } catch (e: kotlinx.coroutines.CancellationException) { client.cancel(job); throw e }
             val files = itemOf(res)["files"]?.jsonObject ?: throw ToolkitException("no files in the result")
             busy = fetchingT()
             progress = -1.0
@@ -446,7 +574,7 @@ class KaraokeState(
             }
             val m = fetch(musicKey, "music")
             val v = fetch(voiceKey, "voice")
-            if (song == name) { music = m; voice = v }
+            if (song == name) { music = m; voice = v; analyseVoice(v) }
             app.message(separatedT())
         }
     }
@@ -455,10 +583,12 @@ class KaraokeState(
     fun recognise() {
         val name = song ?: return
         work(recognisingT()) { client ->
+            // on the whole song the music confuses the recognizer: the voice is separated first
+            if (voice == null) separateIn(client, name)
             val id = upload(client, name, voice)
             busy = recognisingT()
-            val job = client.transcribe(id, language.trim().ifEmpty { null })
-            val res = try { client.await(job) { p, _ -> progress = p } } catch (e: kotlinx.coroutines.CancellationException) { client.cancel(job); throw e }
+            val job = client.transcribe(id, language.trim().ifEmpty { null }, lines.joinToString(" ") { it.text }.take(400).ifBlank { null })
+            val res = try { client.await(job) { p, stage -> progress = p; stageText = stage } } catch (e: kotlinx.coroutines.CancellationException) { client.cancel(job); throw e }
             val segs = itemOf(res)["data"]?.jsonObject?.get("transcription")?.jsonObject?.get("segments")?.jsonArray.orEmpty()
             val got = segs.mapNotNull { s ->
                 val o = s.jsonObject
@@ -474,6 +604,10 @@ class KaraokeState(
                 app.message(recognisedT.format(got.size))
             }
         }
+    }
+
+    companion object {
+        const val PITCH_HOP = 0.01
     }
 
     fun close() {
