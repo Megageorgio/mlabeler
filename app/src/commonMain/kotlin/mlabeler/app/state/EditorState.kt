@@ -633,6 +633,42 @@ class EditorState(
         open(itemIndex)
     }
 
+    /**
+     * Places worth a look in the open file, worst first: errors, then warnings, then the phonemes the aligner was
+     * least sure of. Nothing is shown or changed until someone steps through them.
+     */
+    fun reviewQueue(): List<IntervalRef> {
+        val d = doc ?: return emptyList()
+        val seen = mutableSetOf<IntervalRef>()
+        val out = mutableListOf<IntervalRef>()
+        fun conf(r: IntervalRef) = (d.tiers.getOrNull(r.tier) as? IntervalTier)?.takeIf { r.index < it.size }?.confidenceOf(r.index)?.toDouble() ?: 1.0
+        for (p in problems.sortedWith(compareBy<Problem>({ if (it.severity == mlabeler.core.check.Severity.Error) 0 else 1 }, { conf(it.ref) }, { it.ref.tier }, { it.ref.index }))) {
+            if (seen.add(p.ref)) out += p.ref
+        }
+        val unsure = mutableListOf<Pair<IntervalRef, Double>>()
+        for ((k, t) in d.tiers.withIndex()) if (t is IntervalTier) for (i in 0 until t.size) {
+            val c = t.confidenceOf(i) ?: continue
+            if (c < 0.8) unsure += IntervalRef(k, i) to c.toDouble()
+        }
+        for ((r, _) in unsure.sortedBy { it.second }) if (seen.add(r)) out += r
+        return out
+    }
+
+    /** Selects the next ([step] 1) or previous (-1) place of [reviewQueue] after the selected one. */
+    fun reviewStep(step: Int) {
+        val q = reviewQueue()
+        if (q.isEmpty()) { app.message(reviewNothing()); return }
+        val cur = (selection as? Selection.Interval)?.ref
+        val at = q.indexOf(cur)
+        val next = when {
+            at < 0 -> if (step > 0) 0 else q.size - 1
+            else -> at + step
+        }
+        if (next !in q.indices) { app.message(reviewEnd.format(q.size)); return }
+        selectInterval(q[next])
+        app.message(reviewPos.format(next + 1, q.size))
+    }
+
     /** Scans the folder again, keeping the open file. */
     fun rescan() {
         val id = item?.id
@@ -1502,3 +1538,6 @@ private val batchDone = L("Labelled {0} files", "Размечено файлов
 private val batchDoneWithErrors = L("Labelled {0} files, {1} with errors:", "Размечено файлов: {0}, с ошибками: {1}:")
 private val batchStopped = L("Stopped: {0} of {1} files labelled and saved", "Остановлено: размечено и сохранено {0} из {1}")
 private val noText = L("no text (a .txt with the same name, or Whisper)", "нет текста (.txt с тем же именем или Whisper)")
+private val reviewNothing = L("Nothing to look at in this file", "В этом файле нечего проверять")
+private val reviewEnd = L("That was the last of {0} places in this file; PgDn opens the next file", "Это было последнее из {0} мест в этом файле; PgDn — следующий файл")
+private val reviewPos = L("Place {0} of {1}", "Место {0} из {1}")

@@ -241,6 +241,11 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MSep)
         add(item(Commands.prevFile, ed, app))
         add(item(Commands.nextFile, ed, app))
+        if (!oto) {
+            add(MSep)
+            add(item(Commands.reviewNext, ed, app))
+            add(item(Commands.reviewPrev, ed, app))
+        }
     }
     val tools = buildList {
         if (oto) add(item(Commands.autoOto, ed, app)) else add(item(Commands.autolabel, ed, app))
