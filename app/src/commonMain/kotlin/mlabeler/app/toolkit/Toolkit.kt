@@ -54,6 +54,9 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
 
     suspend fun health(): JsonElement = call("GET", "/health", timeoutMs = 8_000)
 
+    /** Asks the toolkit to update itself now: {"updating": true, "log": …} when it does (it then restarts). */
+    suspend fun update(): JsonElement = call("POST", "/update", timeoutMs = 30_000)
+
     suspend fun languages(task: String = "align"): List<ToolkitLanguage> =
         call("GET", "/languages?task=$task").jsonObject["languages"]!!.jsonArray.map { g ->
             val o = g.jsonObject

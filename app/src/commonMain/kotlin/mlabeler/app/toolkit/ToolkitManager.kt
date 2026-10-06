@@ -109,51 +109,44 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     suspend fun start(): Boolean = lock.withLock { startLocked() }
 
     /**
-     * Updates the toolkit now: stops it, reinstalls it from its source with uv (only the toolkit itself is rebuilt,
-     * its dependencies come from uv's cache) and starts it again. Done here rather than by the toolkit, so it works
-     * whatever version is installed.
+     * Asks the toolkit to update itself now (it otherwise looks for a newer version when it starts). The toolkit
+     * does the update; this only waits for it to come back, as after an update found at start.
      */
     fun updateNow() {
-        if (!canRunHere || installJob?.isActive == true) return
+        if (installJob?.isActive == true) return
         installJob = scope.launch {
+            if (!ensure()) return@launch
+            val answer = runCatching { client().update().jsonObject }
+            val r = answer.getOrNull()
+            if (r == null) {
+                // toolkits from before this request: they update when they start
+                app.message(updateUnsupported())
+                return@launch
+            }
+            if ((r["updating"] as? JsonPrimitive)?.content != "true") {
+                val err = (r["error"] as? JsonPrimitive)?.content
+                app.message(err ?: upToDate.format(version.ifEmpty { "?" }), error = err != null)
+                return@launch
+            }
+            (r["log"] as? JsonPrimitive)?.content?.let { addLog("Update log: $it") }
             lock.withLock {
-                updatingNow = true
-                try {
-                    busy(Status.Installing)
-                    addLog(updateCheck())
-                    if (ownProcess) stop() else runCatching { client().shutdown() }
-                    // its files are in use until it has exited
-                    repeat(40) { if (runCatching { client().health() }.isFailure) return@repeat; delay(500) }
-                    delay(1000)
-                    busy(Status.Installing)
-                    val uv = LocalToolkit.findUv()
-                    if (uv == null) { status = Status.Failed; lastError = noUv(); return@withLock }
-                    val src = settings.installSource.ifBlank { mlabeler.app.state.ToolkitSettings.DEFAULT_SOURCE }
-                    val cmd = listOf(uv, "tool", "install", "--force", "--reinstall-package", "mvocaltoolkit", "--python", "3.12", src)
-                    addLog("> " + cmd.joinToString(" "))
-                    val code = LocalToolkit.run(cmd, ::addLog)
-                    if (code != 0 || LocalToolkit.findMvt(settings.mvtPath) == null) {
-                        status = Status.Failed
-                        lastError = log.lastOrNull { it.trimStart().startsWith("error") } ?: installFailed()
-                        return@withLock
-                    }
-                    addLog(installed())
-                } finally {
-                    updatingNow = false
-                }
-                startLocked()
+                // a toolkit started here exits now; one started elsewhere is followed by its log and address
+                repeat(40) { if (!(ownProcess && LocalToolkit.running)) return@repeat; delay(250) }
+                waitForUpdate(startCommand())
             }
         }
+    }
+
+    private fun startCommand(mvt: String = LocalToolkit.findMvt(settings.mvtPath) ?: "mvt"): List<String> = buildList {
+        add(mvt); add("serve"); add("--port"); add(port.toString())
+        if (settings.shareOnNetwork) { add("--host"); add("0.0.0.0") }
     }
 
     private suspend fun startLocked(): Boolean {
         val mvt = LocalToolkit.findMvt(settings.mvtPath) ?: run { status = Status.Missing; return false }
         busy(Status.Starting)
         networkToken = ""
-        val cmd = buildList {
-            add(mvt); add("serve"); add("--port"); add(port.toString())
-            if (settings.shareOnNetwork) { add("--host"); add("0.0.0.0") }
-        }
+        val cmd = startCommand(mvt)
         addLog("> " + cmd.joinToString(" "))
         if (!LocalToolkit.start(cmd, ::addLog)) { status = Status.Failed; lastError = log.lastOrNull() ?: ""; return false }
         ownProcess = true
@@ -367,4 +360,5 @@ private fun ByteArray.decodeUtf16le(): String {
     return chars.concatToString()
 }
 
-private val updateCheck = L("Updating the toolkit: it stops, is reinstalled from its source and starts again…", "Обновление тулкита: он остановится, переустановится из источника и запустится снова…")
+private val upToDate = L("The toolkit is up to date ({0})", "Тулкит последней версии ({0})")
+private val updateUnsupported = L("This toolkit version can't update on request; it looks for a newer version each time it starts", "Эта версия тулкита не умеет обновляться по запросу; она ищет новую версию при каждом запуске")
