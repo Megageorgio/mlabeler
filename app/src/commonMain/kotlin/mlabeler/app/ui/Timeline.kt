@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Row
@@ -111,6 +113,8 @@ private sealed interface Region {
     data class Tier(val index: Int) : Region
     data object WaveSpecSplit : Region
     data object TierSplit : Region
+    /** The line between two lanes ([above], [below] are lane ids), dragged to share the height differently. */
+    data class LaneSplit(val above: String, val below: String) : Region
 }
 
 /** Vertical layout of the timeline in pixels. */
@@ -136,6 +140,12 @@ private class Geom(
     val namesOnAudio: Boolean = false,
     val namesX: Float = 0.5f,
     val namesY: Float = 0.5f,
+    /** Lines between neighbouring lanes: y and the lanes above and below. */
+    val splits: List<Triple<Float, String, String>> = emptyList(),
+    /** Each shown lane's top and bottom, by id. */
+    val lanes: Map<String, Pair<Float, Float>> = emptyMap(),
+    /** Height shared by the audio lanes (for dragging their lines). */
+    val audioArea: Float = 0f,
 ) {
     val tiersBottom: Float get() = tiersTop + tierH * tierCount
     val audioTop: Float get() = min(waveTop, specTop)
@@ -145,13 +155,11 @@ private class Geom(
 
     fun region(y: Float, grab: Float): Region? {
         if (y < ruler) return Region.Ruler
+        for ((ly, a, b) in splits) if (abs(y - ly) < grab / 2) return Region.LaneSplit(a, b)
         if (tierCount > 0 && y >= tiersTop && y < tiersBottom) {
-            if (!overlay && !tiersOnTop && abs(y - tiersTop) < grab / 2) return Region.TierSplit
-            if (!overlay && tiersOnTop && abs(y - tiersBottom) < grab / 2) return Region.TierSplit
             return Region.Tier(((y - tiersTop) / tierH).toInt().coerceIn(0, tierCount - 1))
         }
-        if (!overlay && tierCount > 0 && abs(y - (if (tiersOnTop) tiersBottom else tiersTop)) < grab / 2) return Region.TierSplit
-        if (!overlay && waveBottom > waveTop && specBottom > specTop && abs(y - waveSpecLine) < grab / 2) return Region.WaveSpecSplit
+        for ((ly, a, b) in splits) if (abs(y - ly) < grab / 2) return Region.LaneSplit(a, b)
         if (y in specTop..specBottom && specBottom > specTop) return Region.Spec
         if (y in waveTop..waveBottom) return Region.Wave
         if (y in pitchTop..pitchBottom && pitchBottom > pitchTop) return Region.Spec
@@ -162,6 +170,36 @@ private class Geom(
     fun tierTop(k: Int) = tiersTop + k * tierH
 }
 
+/** Lane ids in their default order from the old switches (labels on top, spectrogram first). */
+fun defaultLaneOrder(l: LayoutSettings): List<String> {
+    val audio = if (l.spectrogramFirst) listOf("spec", "wave", "pitch", "power") else listOf("wave", "spec", "pitch", "power")
+    return if (l.tiersOnTop) listOf("labels") + audio else audio + "labels"
+}
+
+/** The user's lane order, completed with lanes it lacks. */
+fun laneOrder(l: LayoutSettings): List<String> {
+    val all = defaultLaneOrder(l)
+    val saved = l.laneOrder.filter { it in all }.distinct()
+    return if (saved.isEmpty()) all else saved + all.filter { it !in saved }
+}
+
+/** Shares of the audio area for the shown audio lanes (summing to 1). */
+fun laneShares(l: LayoutSettings, shown: List<String>): Map<String, Float> {
+    val ps = if ("pitch" in shown) l.pitchShare.coerceIn(0.1f, 0.6f) else 0f
+    val pw = if ("power" in shown) l.powerShare.coerceIn(0.08f, 0.5f) else 0f
+    val main = (1f - ps - pw).coerceAtLeast(0.1f)
+    val both = "wave" in shown && "spec" in shown
+    fun default(id: String) = when (id) {
+        "wave" -> if (both) main * l.waveShare.coerceIn(0.1f, 0.9f) else main
+        "spec" -> if (both) main * (1 - l.waveShare.coerceIn(0.1f, 0.9f)) else main
+        "pitch" -> ps
+        else -> pw
+    }
+    val raw = shown.associateWith { (l.laneWeights[it] ?: default(it)).coerceAtLeast(0.03f) }
+    val sum = raw.values.sum().coerceAtLeast(1e-6f)
+    return raw.mapValues { it.value / sum }
+}
+
 private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: Int): Geom {
     val w = size.width.toFloat()
     val h = size.height.toFloat()
@@ -169,50 +207,71 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val tierH = max(layout.tierHeight.coerceIn(28f, 96f), layout.labelFontSize.coerceIn(8f, 48f) * 2.1f + 6f) * density * (if (Platform.isMobile) 1.15f else 1f)
     val minAudio = 48f * density
     val overlay = layout.overlay
-    // stacked: tiers take their own space; overlaid: they lie over the audio picture
     var tiersH = tierH * tiers
     val audioH = if (overlay) h - ruler else max(minAudio, h - ruler - tiersH)
     if (!overlay) tiersH = h - ruler - audioH else tiersH = min(tiersH, (h - ruler) * 0.6f)
     val tierHeight = if (tiers > 0) min(tierH, tiersH / tiers) else tierH
-    val audioTop = if (layout.tiersOnTop && !overlay) ruler + tiersH else ruler
-    val tiersTop = when {
-        overlay && layout.tiersOnTop -> ruler
-        overlay -> h - tiersH
-        layout.tiersOnTop -> ruler
-        else -> ruler + audioH
-    }
-    val pitchH = if (layout.showPitch && !layout.pitchOverSpectrogram) audioH * layout.pitchShare.coerceIn(0.1f, 0.6f) else 0f
-    val powerH = if (layout.showPower) audioH * layout.powerShare.coerceIn(0.08f, 0.5f) else 0f
-    val mainH = audioH - pitchH - powerH
     val showW = layout.showWaveform
     val showS = layout.showSpectrogram
-    val waveTop: Float
-    val waveBottom: Float
-    val specTop: Float
-    val specBottom: Float
+    val pitchOwn = layout.showPitch && !layout.pitchOverSpectrogram
+    val common = { g: Geom -> g }
     if (overlay) {
-        // waveform drawn over the spectrogram in the same place
-        waveTop = audioTop; waveBottom = if (showW) audioTop + mainH else audioTop
-        specTop = audioTop; specBottom = if (showS) audioTop + mainH else audioTop
-    } else {
-        val waveH = when {
-            showW && showS -> mainH * layout.waveShare.coerceIn(0.1f, 0.9f)
-            showW -> mainH
-            else -> 0f
+        // one picture: the waveform over the spectrogram, labels over both; pitch and loudness lanes below it
+        val audioTop = ruler
+        val tiersTop = if (layout.tiersOnTop) ruler else h - tiersH
+        val order = laneOrder(layout).filter { it == "pitch" && pitchOwn || it == "power" && layout.showPower }
+        val shares = laneShares(layout, listOf("main") .let { listOf("wave", "spec").filter { id -> id == "wave" && showW || id == "spec" && showS }.ifEmpty { listOf("spec") } } + order)
+        val mainShare = shares.filterKeys { it == "wave" || it == "spec" }.values.sum()
+        val mainH = audioH * mainShare
+        var y = audioTop + mainH
+        val lanes = mutableMapOf<String, Pair<Float, Float>>()
+        val splits = mutableListOf<Triple<Float, String, String>>()
+        var prev = "main"
+        for (id in order) {
+            val hh = audioH * (shares[id] ?: 0f)
+            splits += Triple(y, prev, id)
+            lanes[id] = y to y + hh
+            y += hh
+            prev = id
         }
-        if (layout.spectrogramFirst && showS && showW) {
-            specTop = audioTop; specBottom = audioTop + mainH - waveH
-            waveTop = specBottom; waveBottom = audioTop + mainH
-        } else {
-            waveTop = audioTop; waveBottom = audioTop + waveH
-            specTop = waveBottom; specBottom = if (showS || !showW) audioTop + mainH else waveBottom
-        }
+        // the top of the labels laid over the picture can be dragged too
+        if (tiers > 0) splits += if (layout.tiersOnTop) Triple(tiersTop + tiersH, "labels", "main") else Triple(tiersTop, "main", "labels")
+        val (pt, pb) = lanes["pitch"] ?: (0f to 0f)
+        val (wt, wb) = lanes["power"] ?: (0f to 0f)
+        return Geom(w, h, ruler, audioTop, if (showW) audioTop + mainH else audioTop, audioTop, if (showS) audioTop + mainH else audioTop,
+            tiersTop, tierHeight, tiers, pt, pb, wt, wb, true, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f),
+            layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f), layout.namesOnAudio, layout.namesX.coerceIn(0f, 1f), layout.namesY.coerceIn(0f, 1f),
+            splits, lanes + ("main" to (audioTop to audioTop + mainH)), audioH)
     }
-    val pitchTop = audioTop + mainH
-    val powerTop = pitchTop + pitchH
-    return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, tiersTop, tierHeight, tiers,
-        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f),
-        layout.namesOnAudio, layout.namesX.coerceIn(0f, 1f), layout.namesY.coerceIn(0f, 1f))
+    // stacked lanes in the user's order
+    val visible = laneOrder(layout).filter { id ->
+        when (id) {
+            "wave" -> showW
+            "spec" -> showS
+            "pitch" -> pitchOwn
+            "power" -> layout.showPower
+            else -> tiers > 0
+        }
+    }.toMutableList()
+    if (visible.none { it != "labels" }) visible.add(if (layout.tiersOnTop) visible.size else 0, "spec")
+    val audioIds = visible.filter { it != "labels" }
+    val shares = laneShares(layout, audioIds)
+    var y = ruler
+    val lanes = mutableMapOf<String, Pair<Float, Float>>()
+    val splits = mutableListOf<Triple<Float, String, String>>()
+    for ((k, id) in visible.withIndex()) {
+        val hh = if (id == "labels") tiersH else audioH * (shares[id] ?: 0f)
+        if (k > 0) splits += Triple(y, visible[k - 1], id)
+        lanes[id] = y to y + hh
+        y += hh
+    }
+    fun top(id: String) = lanes[id]?.first ?: 0f
+    fun bottom(id: String) = lanes[id]?.second ?: 0f
+    val tiersTop = lanes["labels"]?.first ?: (ruler + audioH)
+    return Geom(w, h, ruler, top("wave"), bottom("wave"), top("spec"), bottom("spec"), tiersTop, tierHeight, tiers,
+        top("pitch"), bottom("pitch"), top("power"), bottom("power"), false, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f),
+        layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f), layout.namesOnAudio, layout.namesX.coerceIn(0f, 1f), layout.namesY.coerceIn(0f, 1f),
+        splits, lanes, audioH)
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -328,7 +387,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     ed.cursor = t
                                     val r = g.region(ch.position.y, 8 * density)
                                     hoverIcon = when {
-                                        r == Region.WaveSpecSplit || r == Region.TierSplit -> PointerIcon.Hand
+                                        r is Region.LaneSplit -> PointerIcon.Hand
                                         hitBound(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
                                         hitOto(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
                                         else -> PointerIcon.Default
@@ -339,7 +398,12 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     val d = ch.scrollDelta
                                     val mods = e.keyboardModifiers
                                     val gw = geom(this.size, density, layoutState.value, ed.laneTiers())
-                                    if (mods.isAltPressed && gw.pitchBottom > gw.pitchTop && ch.position.y in gw.pitchTop..gw.pitchBottom) {
+                                    if (mods.isAltPressed && gw.waveBottom > gw.waveTop && ch.position.y in gw.waveTop..gw.waveBottom) {
+                                        // the waveform: Alt+wheel zooms it vertically
+                                        val l = layoutState.value
+                                        val f = if (d.y < 0) 1.25f else 0.8f
+                                        onLayoutState.value(l.copy(waveGain = (l.waveGain * f).coerceIn(1f, 64f).let { v -> if (abs(v - 1f) < 0.05f) 1f else v }))
+                                    } else if (mods.isAltPressed && gw.pitchBottom > gw.pitchTop && ch.position.y in gw.pitchTop..gw.pitchBottom) {
                                         // the piano roll: Alt+wheel moves it up and down, Ctrl+Alt+wheel zooms it
                                         ed.scrollPitch(if (mods.isCtrlPressed) d.y.toDouble() else -d.y.toDouble() * 2, zoom = mods.isCtrlPressed)
                                     } else if (mods.isCtrlPressed || mods.isMetaPressed) {
@@ -376,9 +440,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                         fun timeAt(x: Float) = ed.viewStart + x / ed.pixelsPerSecond
                         val downTime = timeAt(down.position.x)
 
-                        // splitters
-                        if (region == Region.WaveSpecSplit || region == Region.TierSplit) {
-                            val audioH = max(g.specBottom, g.waveBottom) - min(g.specTop, g.waveTop)
+                        // lines between lanes: the two lanes share their height differently (labels: their row height)
+                        if (region is Region.LaneSplit) {
                             while (true) {
                                 val ev = awaitPointerEvent()
                                 val chg = ev.changes.first()
@@ -386,11 +449,28 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 val dy = chg.positionChange().y
                                 chg.consume()
                                 val l = layoutState.value
-                                if (region == Region.WaveSpecSplit) {
-                                    val sign = if (l.spectrogramFirst) -1 else 1
-                                    onLayoutState.value(l.copy(waveShare = (l.waveShare + sign * dy / audioH).coerceIn(0.1f, 0.9f)))
-                                } else if (g.tierCount > 0) {
-                                    onLayoutState.value(l.copy(tierHeight = (l.tierHeight + (if (g.tiersOnTop) dy else -dy) / density / g.tierCount).coerceIn(28f, 96f)))
+                                val (a, b) = region.above to region.below
+                                if (a == "labels" || b == "labels") {
+                                    if (g.tierCount > 0) {
+                                        // the labels grow when the line moves away from them
+                                        val grow = if (b == "labels") -dy else dy
+                                        onLayoutState.value(l.copy(tierHeight = (l.tierHeight + grow / density / g.tierCount).coerceIn(28f, 96f)))
+                                    }
+                                } else {
+                                    val shown = g.lanes.keys.filter { it != "labels" && it != "main" }
+                                    val shares = laneShares(l, shown).toMutableMap()
+                                    // in the overlaid picture "main" is the waveform and spectrogram together
+                                    fun idsOf(x: String) = if (x == "main") listOf("wave", "spec").filter { it in shares } else listOf(x)
+                                    val up = idsOf(a)
+                                    val down = idsOf(b)
+                                    val d = dy / g.audioArea.coerceAtLeast(1f)
+                                    val upSum = up.sumOf { (shares[it] ?: 0f).toDouble() }.toFloat()
+                                    val downSum = down.sumOf { (shares[it] ?: 0f).toDouble() }.toFloat()
+                                    if (upSum + d >= 0.05f && downSum - d >= 0.05f) {
+                                        for (id in up) shares[id] = (shares[id] ?: 0f) * (upSum + d) / upSum
+                                        for (id in down) shares[id] = (shares[id] ?: 0f) * (downSum - d) / downSum
+                                        onLayoutState.value(l.copy(laneWeights = l.laneWeights + shares))
+                                    }
                                 }
                             }
                             return@awaitEachGesture
@@ -640,6 +720,36 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
         }
         // piano roll controls in the corner of the pitch lane
         val gl = geom(size, LocalDensity.current.density, layout, tierCount)
+        // arranging (View → Panels → Arrange): every lane gets its name and arrows to move it up or down
+        if (ed.app.arrangePanels && !layout.overlay) {
+            val d = LocalDensity.current
+            val order = laneOrder(layout)
+            for ((id, tb) in gl.lanes) {
+                if (tb.second - tb.first < 24 * d.density) continue
+                Row(
+                    Modifier.offset { IntOffset((8 * d.density).toInt(), tb.first.toInt() + (4 * d.density).toInt()) }
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).background(c.accent.copy(alpha = 0.9f)).padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(LaneTitles.name(id), color = c.onAccent, fontSize = 12.sp)
+                    fun move(step: Int) {
+                        val o = order.toMutableList()
+                        val i = o.indexOf(id)
+                        val j = (i + step).coerceIn(0, o.size - 1)
+                        o.removeAt(i); o.add(j, id)
+                        ed.app.update { st -> st.copy(layout = st.layout.copy(laneOrder = o)) }
+                    }
+                    IconBtn(Icons.up, LaneTitles.up(), size = 24.dp, tint = c.onAccent) { move(-1) }
+                    IconBtn(Icons.down, LaneTitles.down(), size = 24.dp, tint = c.onAccent) { move(1) }
+                }
+            }
+        }
+        if (layout.waveGain > 1.01f && gl.waveBottom - gl.waveTop > 30 * LocalDensity.current.density) {
+            val d = LocalDensity.current
+            Text("×" + (kotlin.math.round(layout.waveGain * 10) / 10).toString(), color = c.muted, fontSize = 11.sp,
+                modifier = Modifier.offset { IntOffset((8 * d.density).toInt(), gl.waveTop.toInt() + (2 * d.density).toInt()) }
+                    .clickable { ed.app.update { st -> st.copy(layout = st.layout.copy(waveGain = 1f)) } })
+        }
         if (ed.mode == Mode.Labels && ed.pitch != null && gl.pitchBottom - gl.pitchTop > 40 * LocalDensity.current.density) {
             val d = LocalDensity.current
             Row(
@@ -896,7 +1006,9 @@ private fun DrawScope.drawTimeline(
     val peaks = ed.peaks
     if (g.waveBottom > g.waveTop) {
         val mid = (g.waveTop + g.waveBottom) / 2
-        val amp = (g.waveBottom - g.waveTop) / 2 * 0.92f
+        val half = (g.waveBottom - g.waveTop) / 2 * 0.92f
+        // vertical zoom (Alt+wheel over the waveform); what doesn't fit is cut at the lane edges
+        val amp = half * ed.app.settings.layout.waveGain.coerceIn(0.25f, 64f)
         drawLine(c.waveCenter, Offset(0f, mid), Offset(min(w, endX), mid), px)
         if (audio != null) {
             val sr = audio.sampleRate
@@ -909,7 +1021,7 @@ private fun DrawScope.drawTimeline(
                 var first = true
                 for (s in s0..s1) {
                     val xx = x(s.toDouble() / sr)
-                    val yy = mid - audio.samples[s] * amp
+                    val yy = (mid - audio.samples[s] * amp).coerceIn(mid - half, mid + half)
                     if (first) { path.moveTo(xx, yy); first = false } else path.lineTo(xx, yy)
                 }
                 // the same waveform in both views; over the spectrogram only its opacity differs
@@ -921,17 +1033,17 @@ private fun DrawScope.drawTimeline(
                     val b = ((v0 + (col + 1) / pps) * sr).toInt()
                     if (b <= 0 || a >= audio.samples.size) continue
                     val (lo, hi) = peaks.range(audio.samples, a, max(b, a + 1))
-                    path.moveTo(col + 0.5f, mid - hi * amp)
-                    path.lineTo(col + 0.5f, mid - lo * amp + 0.5f)
+                    path.moveTo(col + 0.5f, (mid - hi * amp).coerceIn(mid - half, mid + half))
+                    path.lineTo(col + 0.5f, (mid - lo * amp + 0.5f).coerceIn(mid - half, mid + half + 0.5f))
                 }
                 drawPath(path, if (g.overlay) c.wave.copy(alpha = c.wave.alpha * g.waveFill) else c.wave, style = Stroke(px))
             }
         }
     }
-    if (!g.overlay && g.specBottom > g.specTop && g.waveBottom > g.waveTop) {
-        // the line between the lanes can be dragged: a visible grip says so
-        drawRect(c.border, Offset(0f, g.waveSpecLine - px), Size(w, 2 * px))
-        drawRoundRect(c.muted.copy(alpha = 0.8f), Offset(w / 2 - 18 * px, g.waveSpecLine - 2 * px), Size(36 * px, 4 * px), androidx.compose.ui.geometry.CornerRadius(2 * px))
+    // the lines between lanes can be dragged: a visible grip says so
+    for ((ly, _, _) in g.splits) {
+        if (!g.overlay) drawRect(c.border, Offset(0f, ly - px), Size(w, 2 * px))
+        drawRoundRect(c.muted.copy(alpha = 0.8f), Offset(w / 2 - 18 * px, ly - 2 * px), Size(36 * px, 4 * px), androidx.compose.ui.geometry.CornerRadius(2 * px))
     }
 
     drawCurves(ed, g, c, measurer, smallStyle, ::x)
@@ -1498,4 +1610,17 @@ object PianoTitles {
     val undo = mlabeler.app.i18n.L("Undo the last stroke", "Отменить последний штрих")
     val reset = mlabeler.app.i18n.L("Back to the pitch of the recording", "Вернуть высоту тона записи")
     val fit = mlabeler.app.i18n.L("Fit to the singing (Alt+wheel moves, Ctrl+Alt+wheel zooms)", "Подогнать под пение (Alt+колесо — сдвиг, Ctrl+Alt+колесо — масштаб)")
+}
+
+object LaneTitles {
+    private val names = mapOf(
+        "wave" to mlabeler.app.i18n.L("Waveform", "Волна"),
+        "spec" to mlabeler.app.i18n.L("Spectrogram", "Спектрограмма"),
+        "pitch" to mlabeler.app.i18n.L("Pitch", "Высота тона"),
+        "power" to mlabeler.app.i18n.L("Loudness", "Громкость"),
+        "labels" to mlabeler.app.i18n.L("Labels", "Разметка"),
+    )
+    fun name(id: String) = names[id]?.invoke() ?: id
+    val up = mlabeler.app.i18n.L("Move the lane up", "Полосу выше")
+    val down = mlabeler.app.i18n.L("Move the lane down", "Полосу ниже")
 }

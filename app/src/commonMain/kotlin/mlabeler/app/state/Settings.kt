@@ -46,6 +46,12 @@ data class LayoutSettings(
     val entriesSeparate: Boolean = false,
     val entriesSide: String = "left",
     val showEntries: Boolean = true,
+    /** Lanes from top to bottom ("wave", "spec", "pitch", "power", "labels"); empty = the usual order. */
+    val laneOrder: List<String> = emptyList(),
+    /** Share of the audio area per lane (dragged at the lines between lanes); missing = the usual share. */
+    val laneWeights: Map<String, Float> = emptyMap(),
+    /** Vertical zoom of the waveform (Alt+wheel over it). */
+    val waveGain: Float = 1f,
     /** Sections of the details panel: their order and the folded ones. */
     val inspectorOrder: List<String> = emptyList(),
     val inspectorFolded: Set<String> = emptySet(),

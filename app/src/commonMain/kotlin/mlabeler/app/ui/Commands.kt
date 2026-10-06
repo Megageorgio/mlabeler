@@ -179,7 +179,7 @@ object Commands {
     val batchRename = Command("batch-rename", L("Rename by pattern…", "Переименовать по шаблону…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
     val overlay = Command("overlay", S.overlayShort, listOf(ch('V'))) { _, a -> a.update { it.copy(layout = it.layout.copy(overlay = !it.layout.overlay)) } }
     val namesOnAudio = Command("names-on-audio", L("Phoneme names on the picture", "Имена фонем на картинке"), emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(namesOnAudio = !it.layout.namesOnAudio)) } }
-    val tiersOnTop = Command("tiers-top", S.tiersOnTop, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(tiersOnTop = !it.layout.tiersOnTop)) } }
+    val tiersOnTop = Command("tiers-top", S.tiersOnTop, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(tiersOnTop = !it.layout.tiersOnTop, laneOrder = emptyList())) } }
     val autoOto = Command("auto-oto", L("Automatic oto…", "Автоматическое oto…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutoOto = true }.only(Mode.Oto)
     val record = Command("record", mlabeler.app.recorder.recordTitle, emptyList()) { e, a -> a.openRecorder(e.workspace.root) }
     val plugins = Command("plugins", S.pluginsTitle, listOf(ch('P', ctrl = true, shift = true))) { _, a -> a.reloadPlugins(); a.showPlugins = true }
@@ -202,6 +202,7 @@ object Commands {
     val f0Pencil = Command("f0-pencil", L("Draw the pitch in the pitch lane", "Рисовать высоту тона на полосе высоты"), listOf(ch('E'))) { e, _ -> e.f0Pencil = !e.f0Pencil }.only(Mode.Labels)
     val reviewNext = Command("review-next", L("Next place to check (worst first)", "Следующее место для проверки (худшее первым)"), listOf(Chord(Key.N))) { e, _ -> e.reviewStep(1) }.only(Mode.Labels)
     val reviewPrev = Command("review-prev", L("Previous place to check", "Предыдущее место для проверки"), listOf(Chord(Key.N, shift = true))) { e, _ -> e.reviewStep(-1) }.only(Mode.Labels)
+    val arrange = Command("arrange", L("Arrange panels and lanes", "Расставить панели и полосы"), emptyList()) { _, a -> a.arrangePanels = !a.arrangePanels }
     val summary = Command("dataset-summary", L("Dataset summary…", "Сводка по датасету…"), emptyList()) { _, a -> a.showSummary = true }.only(Mode.Labels)
     val soundCheck = Command("sound-check", L("Check the recordings…", "Проверка звука…"), emptyList()) { _, a -> a.showSoundCheck = true }
     val exportDs = Command("export-diffsinger", L("Export a DiffSinger dataset…", "Экспорт датасета DiffSinger…"), emptyList()) { _, a -> a.showDsExport = true }.only(Mode.Labels)
@@ -242,7 +243,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,
