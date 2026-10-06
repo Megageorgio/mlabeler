@@ -64,6 +64,9 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
 @Composable
 private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit) {
     val c = T.c
+    // labels' last change, shown as "5 min" and refreshed every minute
+    var now by remember { mutableStateOf(kotlin.time.Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60_000); now = kotlin.time.Clock.System.now().toEpochMilliseconds() } }
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp)) {
             Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = searchHint())
@@ -124,6 +127,9 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                         }
                         if (sub.isNotEmpty()) Text(sub.joinToString("  "), color = if (current && c.square) c.onAccent else c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    ed.labelTimes[item.id]?.let { t ->
+                        Text(ago(now - t), color = if (current && c.square) c.onAccent else c.muted, fontSize = 10.sp, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
+                    }
                     if (marks.star) Icon(Icons.starOn, null, Modifier.size(14.dp), tint = c.warn)
                 }
             }
@@ -143,6 +149,22 @@ private val probLong = L("Too long", "Слишком длинная")
 private val probLongPause = L("Pause too long", "Слишком длинная пауза")
 private val probLongPhrase = L("Too long without a pause", "Слишком долго без паузы")
 private val dropAdd = L("Drop to add to the folder {0}", "Отпустите — файлы добавятся в папку {0}")
+private val agoNow = L("now", "сейчас")
+private val agoMin = L("{0} min", "{0} мин")
+private val agoHour = L("{0} h", "{0} ч")
+private val agoDay = L("{0} d", "{0} дн")
+
+/** How long ago, short: "now", "5 min", "3 h", "2 d". */
+private fun ago(ms: Long): String {
+    val m = ms / 60_000
+    return when {
+        m < 1 -> agoNow()
+        m < 60 -> agoMin.format(m)
+        m < 48 * 60 -> agoHour.format(m / 60)
+        else -> agoDay.format(m / 1440)
+    }
+}
+
 private val searchHint = L("Search by name or phonemes", "Поиск по имени или фонемам")
 private val queueTitle = L("Phonemes in advance", "Фонемы наперёд")
 private val queueHint = L("e.g. SP k a sh i SP", "например: SP k a sh i SP")

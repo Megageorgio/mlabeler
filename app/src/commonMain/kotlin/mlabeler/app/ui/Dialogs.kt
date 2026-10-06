@@ -78,6 +78,16 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import kotlinx.coroutines.launch
 
 /** Dim background with a centred card; full screen on narrow windows. */
+private object PlayTitles {
+    val playback = mlabeler.app.i18n.L("Playback", "Воспроизведение")
+    val volume = mlabeler.app.i18n.L("Volume", "Громкость")
+    val follow = mlabeler.app.i18n.L("While playing, the view", "Во время воспроизведения вид")
+    val followOff = mlabeler.app.i18n.L("Stays put", "Не двигается")
+    val followPage = mlabeler.app.i18n.L("Turns the page at the edge", "Перелистывается у края")
+    val followKeep = mlabeler.app.i18n.L("Moves with the playhead", "Едет за курсором")
+    val followAt = mlabeler.app.i18n.L("Where the playhead stays (from the left)", "Где держится курсор (от левого края)")
+}
+
 private object CheckTitles {
     val maxLen = mlabeler.app.i18n.L("Longest phoneme (not a pause)", "Самая длинная фонема (не пауза)")
     val maxPause = mlabeler.app.i18n.L("Longest pause or gap", "Самая длинная пауза или пустота")
@@ -383,6 +393,15 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SwitchRow(S.ripple() + " — " + S.rippleHint(), s.edit.ripple) { v -> app.update { it.copy(edit = it.edit.copy(ripple = v)) } }
                 SwitchRow(S.linked() + " — " + S.linkedHint(), s.edit.linked) { v -> app.update { it.copy(edit = it.edit.copy(linked = v)) } }
                 SwitchRow(S.loop(), s.edit.loop) { v -> app.update { it.copy(edit = it.edit.copy(loop = v)) } }
+                SectionTitle(PlayTitles.playback())
+                ValueSlider(PlayTitles.volume(), s.edit.volume, 0f..1f, "%", factor = 100f, default = dE.volume) { v -> app.update { it.copy(edit = it.edit.copy(volume = v)) } }
+                Text(PlayTitles.follow(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Chip(PlayTitles.followOff(), s.edit.follow == "off") { app.update { it.copy(edit = it.edit.copy(follow = "off")) } }
+                    Chip(PlayTitles.followPage(), s.edit.follow == "page") { app.update { it.copy(edit = it.edit.copy(follow = "page")) } }
+                    Chip(PlayTitles.followKeep(), s.edit.follow == "keep") { app.update { it.copy(edit = it.edit.copy(follow = "keep")) } }
+                }
+                if (s.edit.follow == "keep") ValueSlider(PlayTitles.followAt(), s.edit.followAt, 0f..1f, "%", factor = 100f, default = dE.followAt) { v -> app.update { it.copy(edit = it.edit.copy(followAt = v)) } }
                 ValueSlider(S.speedSetting(), s.edit.speed, 0.1f..1f, "×", decimals = 2, default = dE.speed) { v -> app.update { it.copy(edit = it.edit.copy(speed = (v * 100).roundToInt() / 100f)) } }
                 SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
                 SwitchRow(S.otoLocked(), s.edit.otoLockedDrag) { v -> app.update { it.copy(edit = it.edit.copy(otoLockedDrag = v)) } }
@@ -439,11 +458,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             Section.Interface -> InterfacePage(app)
             Section.Themes -> ThemesPage(app)
             Section.Keys -> KeymapPage(app)
-            Section.About -> {
-                SectionTitle(S.about())
-                Text("mLabeler 0.1", color = c.text, fontSize = 15.sp)
-                Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
-            }
+            Section.About -> AboutPage()
         }
         // every page can go back to the defaults (with a second click to confirm)
         val reset: ((mlabeler.app.state.AppSettings) -> mlabeler.app.state.AppSettings)? = when (section) {
@@ -451,9 +466,9 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             Section.View -> { st -> st.copy(scale = dScale, font = "", layout = dL.copy(showFiles = st.layout.showFiles, showInspector = st.layout.showInspector,
                 filesWidth = st.layout.filesWidth, inspectorWidth = st.layout.inspectorWidth)) }
             Section.Spectrogram -> { st -> st.copy(view = dV) }
-            Section.Editing -> { st -> st.copy(edit = dE.copy(tool = st.edit.tool, cutAskName = st.edit.cutAskName, cutPlay = st.edit.cutPlay,
+            Section.Editing -> { st -> st.copy(edit = dE.copy(tool = st.edit.tool, tools = st.edit.tools, cutAskName = st.edit.cutAskName, cutPlay = st.edit.cutPlay,
                 playOnDrag = st.edit.playOnDrag, newFormat = st.edit.newFormat)) }
-            Section.Mouse -> { st -> st.copy(mouse = mlabeler.app.state.MouseSettings(), edit = st.edit.copy(tool = dE.tool, cutAskName = dE.cutAskName,
+            Section.Mouse -> { st -> st.copy(mouse = mlabeler.app.state.MouseSettings(), edit = st.edit.copy(tool = dE.tool, tools = dE.tools, cutAskName = dE.cutAskName,
                 cutPlay = dE.cutPlay, playOnDrag = dE.playOnDrag, selectAfterDrag = dE.selectAfterDrag, audioClickDeselects = dE.audioClickDeselects)) }
             Section.Checks -> { st -> st.copy(checks = dC) }
             Section.Toolkit -> { st -> st.copy(toolkit = mlabeler.app.state.ToolkitSettings(lastModel = st.toolkit.lastModel,
@@ -640,6 +655,10 @@ private fun swapAt(l: MutableList<String>, a: Int, b: Int) {
 object MouseTitles {
     val page = L("Mouse", "Мышь")
     val tool = L("Tool", "Инструмент")
+    val toolsOn = L("Mouse tools (scissors, hand, play) — keys 1–4 and a toolbar button",
+        "Инструменты мыши (ножницы, рука, проигрывание) — клавиши 1–4 и кнопка на панели")
+    val toolsOff = L("Off: the left button always works as the cursor. Right and middle clicks keep their own actions below.",
+        "Выключены: левая кнопка всегда работает как курсор. У правой и средней кнопок остаются свои действия ниже.")
     val cursor = L("Cursor: click selects, drag moves (1)", "Курсор: клик выбирает, перетаскивание двигает (1)")
     val cut = L("Scissors: click adds a boundary (2)", "Ножницы: клик ставит границу (2)")
     val pan = L("Hand: dragging scrolls (3)", "Рука: перетаскивание прокручивает (3)")
@@ -694,16 +713,20 @@ private fun MousePage(app: AppState) {
     val c = T.c
     val s = app.settings
     SectionTitle(MouseTitles.tool())
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    SwitchRow(MouseTitles.toolsOn(), s.edit.tools) { v -> app.update { it.copy(edit = it.edit.copy(tools = v)) } }
+    if (!s.edit.tools) Text(MouseTitles.toolsOff(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+    if (s.edit.tools) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip(MouseTitles.cursor(), s.edit.tool == "cursor") { app.update { it.copy(edit = it.edit.copy(tool = "cursor")) } }
         Chip(MouseTitles.cut(), s.edit.tool == "cut") { app.update { it.copy(edit = it.edit.copy(tool = "cut")) } }
         Chip(MouseTitles.pan(), s.edit.tool == "pan") { app.update { it.copy(edit = it.edit.copy(tool = "pan")) } }
         Chip(MouseTitles.playTool(), s.edit.tool == "play") { app.update { it.copy(edit = it.edit.copy(tool = "play")) } }
     }
-    Text(MouseTitles.toolHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-    SwitchRow(MouseTitles.cutOnLanes(), s.edit.cutOnLanes) { v -> app.update { it.copy(edit = it.edit.copy(cutOnLanes = v)) } }
-    SwitchRow(MouseTitles.askName(), s.edit.cutAskName) { v -> app.update { it.copy(edit = it.edit.copy(cutAskName = v)) } }
-    SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
+    if (s.edit.tools) {
+        Text(MouseTitles.toolHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+        SwitchRow(MouseTitles.cutOnLanes(), s.edit.cutOnLanes) { v -> app.update { it.copy(edit = it.edit.copy(cutOnLanes = v)) } }
+        SwitchRow(MouseTitles.askName(), s.edit.cutAskName) { v -> app.update { it.copy(edit = it.edit.copy(cutAskName = v)) } }
+        SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
+    }
     SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
     SwitchRow(MouseTitles.selectAfterDrag(), s.edit.selectAfterDrag) { v -> app.update { it.copy(edit = it.edit.copy(selectAfterDrag = v)) } }
     SwitchRow(MouseTitles.audioDeselects(), s.edit.audioClickDeselects) { v -> app.update { it.copy(edit = it.edit.copy(audioClickDeselects = v)) } }
@@ -714,7 +737,7 @@ private fun MousePage(app: AppState) {
         Chip(MouseTitles.wheelScroll(), m.wheel != "phonemes") { set { it.copy(wheel = "scroll") } }
         Chip(MouseTitles.wheelPhonemes(), m.wheel == "phonemes") { set { it.copy(wheel = "phonemes") } }
     }
-    Text(MouseTitles.leftHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+    if (s.edit.tools) Text(MouseTitles.leftHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
     SectionTitle(MouseTitles.onLabels())
     ActionRow(MouseTitles.double(), m.tierDouble) { v -> set { it.copy(tierDouble = v) } }
     ActionRow(MouseTitles.right(), m.tierRight) { v -> set { it.copy(tierRight = v) } }
@@ -777,4 +800,40 @@ fun LeaveDialog(app: AppState) {
             }
         }
     }
+}
+
+private object AboutTitles {
+    val author = mlabeler.app.i18n.L("Author", "Автор")
+    val thanks = mlabeler.app.i18n.L("Special thanks", "Отдельная благодарность")
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AboutPage() {
+    val c = T.c
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    @Composable
+    fun link(text: String, url: String) {
+        Text(text, color = c.accent, fontSize = 13.sp,
+            modifier = Modifier.clickable { runCatching { uri.openUri(url) } }.padding(vertical = 4.dp, horizontal = 2.dp))
+    }
+    @Composable
+    fun person(name: String, links: List<Pair<String, String>>) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(name, color = c.text, fontSize = 14.sp, modifier = Modifier.width(110.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) { for ((t, u) in links) link(t, u) }
+        }
+    }
+    SectionTitle(S.about())
+    Text("mLabeler ${mlabeler.app.AppInfo.VERSION}", color = c.text, fontSize = 15.sp)
+    Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+    SectionTitle(AboutTitles.author())
+    person("m", listOf(
+        "GitHub" to "https://github.com/Megageorgio",
+        "Telegram" to "https://t.me/m_repository",
+        "Discord" to "https://discord.gg/y5YsY9UfBG",
+    ))
+    SectionTitle(AboutTitles.thanks())
+    person("HHS_kt", listOf("YouTube" to "https://www.youtube.com/@HHS_kt", "Telegram" to "https://t.me/hhs_kt_666"))
+    person("Gitreti", emptyList())
 }

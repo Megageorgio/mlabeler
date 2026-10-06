@@ -1,5 +1,6 @@
 package mlabeler.app.ui
 
+import mlabeler.app.i18n.L
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -86,6 +87,12 @@ fun EnvironmentCards(
                         if (!e.builtIn && onDelete != null) IconBtn(Icons.trash, S.removeFromList(), size = 24.dp) { onDelete(e) }
                     }
                     if (e.description.isNotEmpty()) Text(e.description, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        for ((k, v) in EnvContents.of(e.env)) Row {
+                            Text(k, color = c.muted, fontSize = 11.sp, modifier = Modifier.width(78.dp))
+                            Text(v, color = c.text, fontSize = 11.sp)
+                        }
+                    }
                 }
             }
         }
@@ -101,6 +108,7 @@ fun EnvironmentsSection(app: AppState) {
     val entries = remember(version) { Environments.all() }
     val current = entries.firstOrNull { it.id == s.environment }
     Text(S.environmentHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+    Text(EnvContents.notIncluded(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
     EnvironmentCards(app, entries, s.environment, onDelete = { app.deleteEnvironment(it.id) }) { app.applyEnvironment(it.id) }
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (current != null && !Environments.matches(s, current)) {
@@ -121,5 +129,49 @@ fun EnvironmentsSection(app: AppState) {
                 Platform.openInFileManager(Environments.dir())
             }
         }
+    }
+}
+
+/** What an environment contains, as "part: value" lines shown on its card. */
+object EnvContents {
+    private val panels = L("Panels", "Панели")
+    private val lanes = L("Lanes", "Полосы")
+    private val toolbar = L("Toolbar", "Кнопки")
+    private val bars = L("Bars", "Строки")
+    private val tools = L("Mouse", "Мышь")
+    private val files = L("files", "файлы")
+    private val details = L("details", "подробности")
+    private val none = L("none", "нет")
+    private val wave = L("waveform", "волна")
+    private val spec = L("spectrogram", "спектрограмма")
+    private val pitch = L("pitch", "высота тона")
+    private val power = L("loudness", "громкость")
+    private val overlay = L("laid over each other", "друг поверх друга")
+    private val big = L("big", "крупные")
+    private val small = L("compact", "компактные")
+    private val named = L("with names", "с подписями")
+    private val menu = L("menu", "меню")
+    private val status = L("status", "статус")
+    private val withTools = L("cursor and tools", "курсор и инструменты")
+    private val cursorOnly = L("cursor only", "только курсор")
+    val notIncluded = L("Not part of an environment: theme, language, shortcuts, mouse buttons and labeling options.",
+        "В среду не входят: тема, язык, сочетания клавиш, кнопки мыши и настройки разметки.")
+
+    fun of(e: mlabeler.app.state.Environment): List<Pair<String, String>> {
+        val l = e.layout
+        val p = listOfNotNull(files().takeIf { l.showFiles }, details().takeIf { l.showInspector }).ifEmpty { listOf(none()) }
+        val ln = listOfNotNull(wave().takeIf { l.showWaveform }, spec().takeIf { l.showSpectrogram }, pitch().takeIf { l.showPitch },
+            power().takeIf { l.showPower }).joinToString(", ") + if (l.overlay) " — " + overlay() else ""
+        val t = e.toolbar
+        val tb = (listOf(if (t.big) big() else small()) + listOfNotNull(named().takeIf { t.labels })).joinToString(", ") + ": " +
+            t.groups.joinToString(", ") { ToolLabels.group(it)().lowercase() }
+        val b = listOfNotNull(menu().takeIf { e.menuBar && !Platform.isMobile }, status().takeIf { e.statusBar }).ifEmpty { listOf(none()) }
+        return listOf(
+            panels() to p.joinToString(", "),
+            lanes() to ln,
+            toolbar() to tb,
+            bars() to b.joinToString(", "),
+            tools() to if (e.tools) withTools() else cursorOnly(),
+        )
     }
 }

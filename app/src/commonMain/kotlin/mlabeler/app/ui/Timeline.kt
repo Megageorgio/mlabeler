@@ -436,7 +436,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             return@awaitEachGesture
                         }
                         val bound = if (ed.mode == Mode.Oto) null else hitBound(ed, g, region, down.position.x, grab)
-                        val panTool = ed.app.settings.edit.tool == "pan" && !touch
+                        val panTool = ed.app.settings.edit.activeTool == "pan" && !touch
                         val pan = first.buttons.isTertiaryPressed || region == Region.Ruler || panTool
 
                         if (bound != null && !pan) {
@@ -497,6 +497,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             if (dragged) {
                                 if (panning) ed.scrollBy(-chg.positionChange().x.toDouble())
                                 else if (selecting) {
+                                    // a selected part replaces a selected phoneme: Delete and nudging act on the part
+                                    if (ed.selection !is Selection.None && ed.mode == Mode.Labels) ed.selection = Selection.None
                                     val a = downTime
                                     val b = timeAt(chg.position.x).coerceIn(0.0, ed.duration)
                                     ed.range = min(a, b) to max(a, b)
@@ -506,7 +508,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             }
                         }
                         // the play tool plays what was just selected
-                        if (dragged && selecting && ed.app.settings.edit.tool == "play") ed.range?.let { (a, b) -> ed.play(a, b) }
+                        if (dragged && selecting && ed.app.settings.edit.activeTool == "play") ed.range?.let { (a, b) -> ed.play(a, b) }
                         if (!dragged) {
                             // a tap or click
                             val (t0, p0, n0) = lastTap.value
@@ -521,18 +523,18 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 ctrl -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Ctrl))
                                 mods.isAltPressed -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Alt))
                                 // scissors: every click is a cut (two quick cuts are not a double click)
-                                double && ed.app.settings.edit.tool != "cut" -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Double))
-                                ed.app.settings.edit.tool == "play" && !touch -> {
+                                double && ed.app.settings.edit.activeTool != "cut" -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Double))
+                                ed.app.settings.edit.activeTool == "play" && !touch -> {
                                     if (region is Region.Tier || (region == Region.Wave || region == Region.Spec) && ed.range == null) playUnder(ed, region, downTime)
                                 }
-                                ed.app.settings.edit.tool == "cut" && !touch && !mods.isShiftPressed && isLabelLane(ed, region) &&
+                                ed.app.settings.edit.activeTool == "cut" && !touch && !mods.isShiftPressed && isLabelLane(ed, region) &&
                                     (region !is Region.Tier || ed.app.settings.edit.cutOnLanes) -> {
                                     val e = ed.app.settings.edit
                                     ed.splitAt(downTime, laneOf(ed, region), askName = e.cutAskName, playLeft = e.cutPlay)
                                     cutByLastTap.value = true
                                     return@awaitEachGesture
                                 }
-                                else -> onTap(ed, region, downTime, double && ed.app.settings.edit.tool != "cut", touch, mods.isShiftPressed)
+                                else -> onTap(ed, region, downTime, double && ed.app.settings.edit.activeTool != "cut", touch, mods.isShiftPressed)
                             }
                             cutByLastTap.value = false
                         }

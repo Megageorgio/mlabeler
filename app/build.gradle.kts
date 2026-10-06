@@ -11,6 +11,20 @@ plugins {
 
 val appVersion = project.property("app.version") as String
 
+// the version shown in the program (Settings → About)
+val appInfoDir = layout.buildDirectory.dir("generated/appinfo")
+val generateAppInfo by tasks.registering {
+    val out = appInfoDir
+    val v = appVersion
+    inputs.property("version", v)
+    outputs.dir(out)
+    doLast {
+        val f = out.get().file("mlabeler/app/AppInfo.kt").asFile
+        f.parentFile.mkdirs()
+        f.writeText("package mlabeler.app\n\nobject AppInfo {\n    const val VERSION = \"$v\"\n}\n")
+    }
+}
+
 kotlin {
     jvm("desktop") { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
     androidTarget { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
@@ -40,6 +54,9 @@ kotlin {
             languageSettings.optIn("androidx.compose.ui.ExperimentalComposeUiApi")
             languageSettings.optIn("androidx.compose.foundation.ExperimentalFoundationApi")
             languageSettings.optIn("androidx.compose.material3.ExperimentalMaterial3Api")
+        }
+        commonMain {
+            kotlin.srcDir(generateAppInfo)
         }
         commonMain.dependencies {
             implementation(project(":core"))

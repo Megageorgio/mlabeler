@@ -18,6 +18,8 @@ data class Environment(
     val toolbar: ToolbarSettings,
     val menuBar: Boolean = true,
     val statusBar: Boolean = true,
+    /** Mouse tools (scissors, hand, play) available. */
+    val tools: Boolean = true,
 )
 
 data class EnvironmentEntry(val id: String, val title: String, val description: String, val env: Environment, val builtIn: Boolean)
@@ -31,7 +33,7 @@ object Environments {
             L("Big buttons with names for the main things; everything else in the menus.",
                 "Крупные подписанные кнопки для основного, остальное — в меню."),
         ) {
-            Environment("basic", LayoutSettings(showInspector = false), ToolbarSettings(ToolbarGroups.simple, labels = true, big = true))
+            Environment("basic", LayoutSettings(showInspector = false), ToolbarSettings(ToolbarGroups.simple, labels = true, big = true), tools = false)
         },
         BuiltIn(
             "labeling", L("Labeling", "Разметка"),
@@ -93,6 +95,7 @@ object Environments {
         menuBar = e.env.menuBar && !Platform.isMobile,
         statusBar = e.env.statusBar,
         toolbar = e.env.toolbar,
+        edit = s.edit.copy(tools = e.env.tools),
         layout = e.env.layout.copy(
             filesWidth = s.layout.filesWidth, inspectorWidth = s.layout.inspectorWidth,
             tierHeight = s.layout.tierHeight, waveShare = s.layout.waveShare,
@@ -102,13 +105,13 @@ object Environments {
     /** True when the interface still looks exactly like [e] (panel sizes aside). */
     fun matches(s: AppSettings, e: EnvironmentEntry): Boolean {
         val norm = { l: LayoutSettings -> l.copy(filesWidth = 0f, inspectorWidth = 0f, tierHeight = 0f, waveShare = 0f, leftCollapsed = false, rightCollapsed = false) }
-        return norm(s.layout) == norm(e.env.layout) && s.toolbar.copy(order = emptyList()) == e.env.toolbar.copy(order = emptyList()) && s.statusBar == e.env.statusBar &&
+        return norm(s.layout) == norm(e.env.layout) && s.toolbar.copy(order = emptyList()) == e.env.toolbar.copy(order = emptyList()) && s.statusBar == e.env.statusBar && s.edit.tools == e.env.tools &&
             (Platform.isMobile || s.menuBar == e.env.menuBar)
     }
 
     /** Saves the current interface as the user's environment [name] (replacing one with that name). */
     fun saveCurrent(s: AppSettings, name: String): String {
-        val env = Environment(name, s.layout, s.toolbar, s.menuBar, s.statusBar)
+        val env = Environment(name, s.layout, s.toolbar, s.menuBar, s.statusBar, s.edit.tools)
         PlatformFs.mkdirs(dir())
         PlatformFs.write(Paths.join(dir(), fileName(name)), Workspace.json.encodeToString(Environment.serializer(), env).encodeToByteArray())
         return USER + name

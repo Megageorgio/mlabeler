@@ -74,6 +74,11 @@ data class EditSettings(
     val linked: Boolean = true,
     val loop: Boolean = false,
     val nudgeMs: Float = 5f,
+    /** The view during playback: "off", "page" (turns the page at the edge) or "keep" (the playhead stays at [followAt]). */
+    val follow: String = "page",
+    val followAt: Float = 0.5f,
+    /** Playback volume, 0..1. */
+    val volume: Float = 1f,
     val minIntervalMs: Float = 1f,
     val saveOnSwitch: Boolean = true,
     val newFormat: LabelFormat = LabelFormat.Lab,
@@ -102,7 +107,11 @@ data class EditSettings(
     val speed: Float = 1f,
     /** Save every N seconds when there are changes; 0 = off. */
     val autosaveSeconds: Int = 0,
-)
+    /** Mouse tools 1–4 (cursor, scissors, hand, play); off = the cursor always. */
+    val tools: Boolean = true,
+) {
+    val activeTool: String get() = if (tools) tool else "cursor"
+}
 
 /** What mouse gestures do, on label lanes and on the waveform/spectrogram. Values are [MouseActions] ids. */
 @Serializable
@@ -142,6 +151,8 @@ data class ToolkitSettings(
     val lastLanguage: String = "",
     /** Model for recognising phonemes without lyrics. */
     val lastSegmentModel: String = "",
+    /** Phoneme recognition (WFL-ASR): see [mlabeler.app.toolkit.SegmentOptions]. */
+    val wfl: WflSettings = WflSettings(),
     /** Start the toolkit on this computer when it's needed and not running. */
     val autoStart: Boolean = true,
     /** `mvt` command or the folder it's in; empty = look in the usual places. */
@@ -315,3 +326,13 @@ fun LayoutSettings.togglePanel(p: String): LayoutSettings {
     }
     return l
 }
+
+/** Options of phoneme recognition without text (WFL-ASR); negative confidence = the model's own value. */
+@Serializable
+data class WflSettings(
+    val confidence: Float = -1f,
+    val decoder: String = "viterbi",
+    val viterbiBias: Float = 5f,
+    val silenceThreshold: Float = 0.005f,
+    val minSilence: Float = 0.5f,
+)

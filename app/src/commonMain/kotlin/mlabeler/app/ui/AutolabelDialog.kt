@@ -51,6 +51,44 @@ private val loadingModels = L("Asking the toolkit for models…", "Запраш�
 private val notInstalled = L("downloads on first use", "скачается при первом запуске")
 private val noModels = L("No models for this", "Для этого нет моделей")
 
+private val forcedTitle = L("Phonemes, if you know them (optional)", "Фонемы, если они известны (необязательно)")
+private val forcedHint = L("e.g. SP k a s a SP", "например: SP k a s a SP")
+private val forcedNote = L("Empty: the model hears the phonemes itself. Filled: it only places these, in this order.",
+    "Пусто — модель сама определит фонемы. Заполнено — она только расставит эти, в этом порядке.")
+private val wflMore = L("Recognition settings", "Настройки распознавания")
+private val wflConf = L("Confidence threshold (older models; −1 = the model's own)", "Порог уверенности (старые модели; −1 — как задано в модели)")
+private val wflConfHint = L("Phonemes the model is less sure about than this are merged into their neighbours.",
+    "Фонемы, в которых модель уверена меньше этого, сливаются с соседними.")
+private val wflNew = L("For models of the newer WFL-ASR version", "Для моделей новой версии WFL-ASR")
+private val wflDecoder = L("Decoding", "Декодирование")
+private val wflViterbi = L("Viterbi (smoother)", "Витерби (ровнее)")
+private val wflConstrained = L("Frame by frame", "По кадрам")
+private val wflBias = L("Holding a phoneme (Viterbi): higher = fewer, longer phonemes", "Удержание фонемы (Витерби): больше — меньше и длиннее фонемы")
+private val wflSilence = L("Silence level (share of full scale)", "Уровень тишины (доля от максимума)")
+private val wflMinSilence = L("Shortest silence marked as SP", "Самая короткая тишина, которая станет SP")
+
+/** WFL-ASR options, kept in the settings. */
+@Composable
+private fun WflOptions(app: AppState) {
+    val c = T.c
+    val w = app.settings.toolkit.wfl
+    val d = mlabeler.app.state.WflSettings()
+    fun set(f: (mlabeler.app.state.WflSettings) -> mlabeler.app.state.WflSettings) = app.update { it.copy(toolkit = it.toolkit.copy(wfl = f(it.toolkit.wfl))) }
+    Column(Modifier.padding(top = 6.dp).fillMaxWidth().background(c.panelAlt).padding(10.dp)) {
+        ValueSlider(wflConf(), w.confidence, -1f..1f, decimals = 2, default = d.confidence) { v -> set { it.copy(confidence = if (v < 0f) -1f else v) } }
+        Text(wflConfHint(), color = c.muted, fontSize = 11.sp)
+        SectionTitle(wflNew())
+        Text(wflDecoder(), color = c.text, fontSize = 13.sp)
+        Row(Modifier.padding(top = 4.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip(wflViterbi(), w.decoder == "viterbi") { set { it.copy(decoder = "viterbi") } }
+            Chip(wflConstrained(), w.decoder != "viterbi") { set { it.copy(decoder = "constrained") } }
+        }
+        if (w.decoder == "viterbi") ValueSlider(wflBias(), w.viterbiBias, 1f..20f, decimals = 1, default = d.viterbiBias) { v -> set { it.copy(viterbiBias = v) } }
+        ValueSlider(wflSilence(), w.silenceThreshold, 0f..0.05f, decimals = 3, default = d.silenceThreshold) { v -> set { it.copy(silenceThreshold = v) } }
+        ValueSlider(wflMinSilence(), w.minSilence, 0.1f..3f, " s", decimals = 2, default = d.minSilence) { v -> set { it.copy(minSilence = v) } }
+    }
+}
+
 private val ownModelLink = L("Add your own model…", "Добавить свою модель…")
 
 @Composable
@@ -86,6 +124,8 @@ fun AutolabelDialog(app: AppState) {
             .map { t.texts[it] }.filter { it.isNotEmpty() && it !in setOf("SP", "AP", "pau", "sil", "br") }.joinToString(" ")
     }
     var phonemes by remember { mutableStateOf(wordTier == null) }
+    var forced by remember { mutableStateOf("") }
+    var showWfl by remember { mutableStateOf(false) }
     var text by remember(whole) { mutableStateOf(if (wordTier != null) textsIn(wordTier, range) else textsIn(phoneTier, range)) }
     // the whole file goes into the labels by default; a part is compared first
     var replace by remember(whole) { mutableStateOf(whole && (doc == null || doc.tiers.all { t -> (t as? IntervalTier)?.texts?.all { it.isEmpty() } ?: true })) }
@@ -111,7 +151,8 @@ fun AutolabelDialog(app: AppState) {
                 langs == null -> Text(if (app.toolkit.status == mlabeler.app.toolkit.ToolkitManager.Status.Ready) loadingModels() else "—", color = c.muted, fontSize = 13.sp)
                 langs.isEmpty() -> Text(noModels(), color = c.muted, fontSize = 13.sp)
                 else -> {
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // all languages visible at once: chips wrap onto more lines
+                    androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (l in langs.sortedWith(compareBy({ it.code == "*" }, { mlabeler.app.i18n.LanguageNames.of(it.code, it.name) }))) Chip(mlabeler.app.i18n.LanguageNames.of(l.code, l.name), l.code == lang) { lang = l.code }
                     }
                     val models = langs.firstOrNull { it.code == lang }?.models.orEmpty()
@@ -132,6 +173,13 @@ fun AutolabelDialog(app: AppState) {
             }
             Text(ownModelLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
                 .clickable { app.settingsPage = "Toolkit"; app.showAutolabel = false; app.showSettings = true })
+            if (recognizeMode) {
+                SectionTitle(forcedTitle())
+                Field(forced, { forced = it }, Modifier.fillMaxWidth(), placeholder = forcedHint())
+                Text(forcedNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Row(Modifier.padding(top = 10.dp)) { Chip(wflMore(), showWfl) { showWfl = !showWfl } }
+                if (showWfl) WflOptions(app)
+            }
             if (!recognizeMode) {
                 SectionTitle(textTitle())
                 Field(text, { text = it }, Modifier.fillMaxWidth(), placeholder = textHint())
@@ -152,7 +200,7 @@ fun AutolabelDialog(app: AppState) {
                         it.copy(toolkit = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang)
                         else it.toolkit.copy(lastModel = model, lastLanguage = lang))
                     }
-                    ed.autolabel(range.first, range.second, model, lang.takeIf { it.isNotEmpty() && it != "*" }, text,
+                    ed.autolabel(range.first, range.second, model, lang.takeIf { it.isNotEmpty() && it != "*" }, if (recognizeMode) forced else text,
                         phonemes && text.isNotBlank(), replace, recognize = recognizeMode)
                     close()
                 }

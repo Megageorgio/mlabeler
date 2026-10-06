@@ -197,7 +197,7 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
                 if (ed.mode == Mode.Oto) {
                     B(Icons.link, ToolLabels.lock, Commands.otoLock, active = s.edit.otoLockedDrag)
                 } else {
-                    B(Icons.split, ToolLabels.cut, Commands.toolCut, active = s.edit.tool == "cut")
+                    if (s.edit.tools) B(Icons.split, ToolLabels.cut, Commands.toolCut, active = s.edit.tool == "cut")
                     B(Icons.ripple, ToolLabels.ripple, Commands.ripple, hint = S.ripple() + " — " + S.rippleHint(), active = s.edit.ripple)
                     B(Icons.link, ToolLabels.linked, Commands.linked, hint = S.linked() + " — " + S.linkedHint(), active = s.edit.linked)
                 }

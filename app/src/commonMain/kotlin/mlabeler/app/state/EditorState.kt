@@ -55,6 +55,7 @@ enum class Mode { Labels, Oto }
 private val dropAdded = L("Added to the folder {1}: {0}", "Добавлено в папку {1}: {0}")
 private val dropNoAudio = L("Only recordings can be added here", "Сюда можно добавить только записи")
 private val dropOtherAudio = L("Turn on other audio formats in Settings → General to add these", "Чтобы добавить такие файлы, включите другие форматы в Настройках → Общие")
+private val removedInRange = L("Boundaries removed in the selected part: {0}", "Убрано границ в выделенном куске: {0}")
 private val queueEmpty = L("Type the phonemes first", "Сначала впишите фонемы")
 private val queueNoPlace = L("Select a part or a phoneme to fill", "Выделите кусок или фонему, которую заполнить")
 private val grouped = L("Phonemes are grouped into notes (the words tier)", "Фонемы сгруппированы по нотам (слой words)")
@@ -148,6 +149,18 @@ class EditorState(
 
     private val player = AudioOut()
     private val labelMtime = mutableMapOf<String, Long>()
+    /** When each file's labels were last changed (ms), for the file list. */
+    var labelTimes by mutableStateOf<Map<String, Long>>(emptyMap())
+        private set
+
+    private fun readLabelTimes() {
+        val list = items
+        scope.launch {
+            labelTimes = withContext(Dispatchers.Default) {
+                list.mapNotNull { it.labelPath?.let { p -> runCatching { it.id to workspace.fs.lastModified(p) }.getOrNull() } }.toMap()
+            }
+        }
+    }
     private var lastEdit = 0L
     private var warnedExternal = ""
 
@@ -276,6 +289,7 @@ class EditorState(
 
     fun scan() {
         items = workspace.scan()
+        readLabelTimes()
         mode = when (workspace.state.kind) {
             "oto" -> Mode.Oto
             "labels" -> Mode.Labels
@@ -357,7 +371,9 @@ class EditorState(
                 val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
                 val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
                 val fileId = client.upload(it.name + "_part.wav", wav)
-                val job = if (recognize) client.segment(fileId, model) else client.align(fileId, model, language, text, phonemes)
+                val job = if (recognize) {
+                    client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl)
+                } else client.align(fileId, model, language, text, phonemes)
                 serverJob = job
                 val result = client.await(job) { p, stage ->
                     toolkitProgress = p
@@ -475,6 +491,7 @@ class EditorState(
     fun rescan() {
         val id = item?.id
         items = workspace.scan()
+        readLabelTimes()
         index = items.indexOfFirst { it.id == id }
         if (index < 0 && items.isNotEmpty()) open(0)
     }
@@ -762,6 +779,7 @@ class EditorState(
             items = items.map { x -> if (x.id == it.id) updated else x }
             h.markSaved()
             labelIndex = null
+            updated.labelPath?.let { p -> labelTimes = labelTimes + (updated.id to (runCatching { workspace.fs.lastModified(p) }.getOrNull() ?: 0L)) }
             labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
             docVersion++
             if (!quiet) app.message(S.saved.format(Paths.name(updated.labelPath ?: "")))
@@ -887,7 +905,45 @@ class EditorState(
         commit(Edits.moveBound(d, ref, time, duration, moveOptions()))
     }
 
+    /** Tier the selected part works on, and the inner boundaries inside the part. */
+    private fun rangeBounds(): Pair<Int, List<Int>>? {
+        val (a, b) = range ?: return null
+        val k = if (tier(activeTier) != null) activeTier else committed?.phonemeTierIndex() ?: return null
+        val t = tier(k) ?: return null
+        val inside = (1 until t.bounds.size - 1).filter { t.bounds[it] > a + 1e-6 && t.bounds[it] < b - 1e-6 }
+        return if (inside.isEmpty()) null else k to inside
+    }
+
+    /** Removes every boundary inside the selected part: its phonemes become one (the first name stays). */
+    fun deleteInRange(): Boolean {
+        val d = committed ?: return false
+        val (k, inside) = rangeBounds() ?: return false
+        var doc = d
+        for (b in inside.reversed()) doc = Edits.removeBound(doc, BoundRef(k, b))
+        commit(doc)
+        app.message(removedInRange.format(inside.size))
+        fixSelection()
+        return true
+    }
+
+    /** Moves every boundary inside the selected part together (and the part with them). */
+    fun nudgeRange(seconds: Double): Boolean {
+        val d = committed ?: return false
+        val (k, inside) = rangeBounds() ?: return false
+        val t = tier(k) ?: return false
+        val lo = t.bounds[inside.first() - 1] + settings.edit.minIntervalMs / 1000.0
+        val hi = t.bounds[inside.last() + 1] - settings.edit.minIntervalMs / 1000.0
+        val dt = seconds.coerceIn(lo - t.bounds[inside.first()], hi - t.bounds[inside.last()])
+        if (kotlin.math.abs(dt) < 1e-9) return true
+        val nb = t.bounds.toMutableList()
+        for (b in inside) nb[b] = nb[b] + dt
+        commit(d.replace(k, t.copy(bounds = nb)))
+        range = range?.let { (a, b) -> a + dt to b + dt }
+        return true
+    }
+
     fun nudge(steps: Int) {
+        if (selection == Selection.None && range != null && nudgeRange(steps * settings.edit.nudgeMs / 1000.0)) return
         val ref = (selection as? Selection.Bound)?.ref ?: return
         val t = tier(ref.tier) ?: return
         moveSelectedBound(t.bounds[ref.bound] + steps * settings.edit.nudgeMs / 1000.0)
@@ -1068,7 +1124,7 @@ class EditorState(
             is Selection.Note -> noteTier(s.tier)?.let { t ->
                 if (s.index > 0) { commit(d.replace(s.tier, mlabeler.core.edit.NoteEdits.mergeNext(t, s.index - 1))); selectNote(s.tier, s.index - 1) }
             }
-            Selection.None -> Unit
+            Selection.None -> if (range != null) deleteInRange()
         }
         fixSelection()
     }
@@ -1220,10 +1276,13 @@ class EditorState(
         val e = (min(duration, to) * sr).toInt().coerceIn(s, a.samples.size)
         if (e - s < 16) return
         val slow = speed < 0.99 && e - s > 4096
+        val vol = settings.edit.volume.coerceIn(0f, 1f)
+        // a quieter or slowed copy of the part: positions map back to the recording
+        val copy = slow || vol < 0.995f
         try {
-            if (slow) {
-                // slowed copy of the part, pitch kept; positions map back through the speed
-                val part = mlabeler.core.dsp.Stretch.wsola(a.samples.copyOfRange(s, e), sr, speed)
+            if (copy) {
+                var part = if (slow) mlabeler.core.dsp.Stretch.wsola(a.samples.copyOfRange(s, e), sr, speed) else a.samples.copyOfRange(s, e)
+                if (vol < 0.995f) { if (!slow) part = part.copyOf(); for (i in part.indices) part[i] *= vol }
                 player.play(Audio(sr, part), 0, part.size, loop)
             } else {
                 player.play(a, s, e, loop)
@@ -1237,11 +1296,32 @@ class EditorState(
             delay(30)
             while (isActive && player.isPlaying) {
                 val p = player.position()
-                if (p >= 0) playhead = if (slow) (s + p * speed) / sr else p.toDouble() / sr
+                if (p >= 0) {
+                    val t = when {
+                        slow -> (s + p * speed) / sr
+                        copy -> (s + p).toDouble() / sr
+                        else -> p.toDouble() / sr
+                    }
+                    playhead = t
+                    followPlayhead(t)
+                }
                 delay(16)
             }
             playing = false
             playhead = null
+        }
+    }
+
+    /** Keeps the playhead in view while playing (Settings → Editing → following the playback). */
+    private fun followPlayhead(t: Double) {
+        val mode = settings.edit.follow
+        if (mode == "off") return
+        val vis = visibleDuration
+        if (vis <= 0 || vis >= duration) return
+        if (mode == "keep") {
+            viewStart = (t - vis * settings.edit.followAt.coerceIn(0f, 1f)).coerceIn(0.0, max(0.0, duration - vis))
+        } else if (t > viewStart + vis * 0.98 || t < viewStart) {
+            viewStart = (t - vis * 0.02).coerceIn(0.0, max(0.0, duration - vis))
         }
     }
 

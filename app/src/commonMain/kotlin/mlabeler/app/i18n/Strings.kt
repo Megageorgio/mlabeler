@@ -248,8 +248,8 @@ object S {
     val environmentSaved = L("Saved environment \"{0}\"", "Среда «{0}» сохранена")
     val environmentSaveAs = L("Save the current one as…", "Сохранить текущую как…")
     val environmentName = L("Name of the new environment", "Название новой среды")
-    val environmentHint = L("An environment is a set of panels, lanes and toolbar buttons. Change anything, then save it as your own; environment files can be passed to other people.",
-        "Рабочая среда — это набор панелей, полос и кнопок. Настройте всё под себя и сохраните как свою; файлы сред можно передавать другим.")
+    val environmentHint = L("An environment is a set of panels, lanes, toolbar buttons, menu and status bars and the mouse tools switch. Change anything, then save it as your own; environment files can be passed to other people.",
+        "Рабочая среда — это набор панелей, полос, кнопок, строк меню и статуса и переключатель инструментов мыши. Настройте всё под себя и сохраните как свою; файлы сред можно передавать другим.")
     val environmentsFolder = L("Open the environments folder", "Открыть папку сред")
     val environmentUpdate = L("Save changes to \"{0}\"", "Сохранить изменения в «{0}»")
     val reset = L("Reset", "Вернуть как было")

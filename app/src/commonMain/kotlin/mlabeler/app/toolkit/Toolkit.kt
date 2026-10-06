@@ -132,13 +132,28 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return call("POST", "/align", req).jsonObject["id"]!!.jsonPrimitive.content
     }
 
-    /** Starts phoneme recognition without lyrics (WFL-ASR models); returns the job id. */
-    suspend fun segment(fileId: String, model: String): String {
+    /**
+     * Starts phoneme recognition without lyrics (WFL-ASR models); returns the job id. With [phonemes] the model
+     * places exactly these phonemes (forced alignment).
+     */
+    suspend fun segment(fileId: String, model: String, language: String? = null, phonemes: List<String> = emptyList(),
+                        options: mlabeler.app.state.WflSettings = mlabeler.app.state.WflSettings()): String {
         val req = buildJsonObject {
             putJsonObject("input") {
-                put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) })
+                put("items", buildJsonArray {
+                    add(buildJsonObject {
+                        put("file_id", fileId)
+                        if (phonemes.isNotEmpty()) put("phonemes", buildJsonArray { phonemes.forEach { add(JsonPrimitive(it)) } })
+                    })
+                })
             }
             put("model", model)
+            if (language != null) put("language", language)
+            if (options.confidence >= 0f) put("confidence_threshold", options.confidence.toDouble())
+            put("decoder", options.decoder)
+            put("viterbi_bias", options.viterbiBias.toDouble())
+            put("silence_threshold", options.silenceThreshold.toDouble())
+            put("min_silence_duration", options.minSilence.toDouble())
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))
                 put("return_labels", true)
