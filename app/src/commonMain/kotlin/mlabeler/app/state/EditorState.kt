@@ -84,6 +84,129 @@ class EditorState(
         private set
     var pitch by mutableStateOf<mlabeler.core.dsp.Curve?>(null)
         private set
+
+    // ---------- f0 drawn by hand (piano roll) ----------
+
+    /** Hand-drawn f0 over the analysed one (Hz, NaN = not changed; 0 = unvoiced), same frames as [pitch]. */
+    var f0Edits by mutableStateOf<FloatArray?>(null)
+        private set
+    private val f0Undo = ArrayDeque<FloatArray?>()
+    /** Drawing f0 with the mouse in the pitch lane instead of selecting. */
+    var f0Pencil by mutableStateOf(false)
+    /** Visible range of the pitch lane, MIDI note numbers. */
+    var pitchLo by mutableStateOf(48.0)
+    var pitchHi by mutableStateOf(72.0)
+
+    /** The f0 shown and used for notes: the analysed one with the drawn parts over it. */
+    val pitchCurve: mlabeler.core.dsp.Curve?
+        get() {
+            val p = pitch ?: return null
+            val e = f0Edits ?: return p
+            return mlabeler.core.dsp.Curve(p.hop, FloatArray(p.values.size) { i -> e.getOrNull(i)?.takeIf { !it.isNaN() } ?: p.values[i] })
+        }
+
+    private fun f0Path(id: String) = Paths.join(Paths.join(workspace.metaDir, "f0"), id.replace('/', '_').replace('\\', '_') + ".f0")
+
+    private fun loadF0Edits() {
+        val it = item ?: return
+        val p = pitch ?: return
+        f0Undo.clear()
+        f0Edits = runCatching {
+            val text = workspace.fs.read(f0Path(it.id)).decodeToString()
+            val lines = text.lines().filter { l -> l.isNotBlank() }
+            // "hop <seconds>" then "frame value" lines
+            val hop = lines.first().removePrefix("hop").trim().toDouble()
+            val out = FloatArray(p.values.size) { Float.NaN }
+            for (l in lines.drop(1)) {
+                val (t, v) = l.trim().split(Regex("\\s+")).let { it[0].toDouble() to it[1].toFloat() }
+                val i = (t / p.hop).toInt()
+                if (i in out.indices) out[i] = v
+            }
+            if (hop > 0) out else null
+        }.getOrNull()
+    }
+
+    private fun saveF0Edits() {
+        val it = item ?: return
+        val p = pitch ?: return
+        val e = f0Edits
+        val path = f0Path(it.id)
+        runCatching {
+            if (e == null || e.all { v -> v.isNaN() }) { if (workspace.fs.exists(path)) workspace.fs.delete(path); return }
+            val sb = StringBuilder("hop ${p.hop}\n")
+            for (i in e.indices) if (!e[i].isNaN()) sb.append(((i * p.hop * 10000).toLong() / 10000.0)).append(' ').append(e[i]).append('\n')
+            workspace.fs.mkdirs(Paths.parent(path))
+            workspace.fs.write(path, sb.toString().encodeToByteArray())
+        }
+    }
+
+    /** Shows the sung range in the pitch lane (a few semitones around it). */
+    fun fitPitchRange() {
+        val v = pitchCurve?.values?.filter { it > 0f && !it.isNaN() }?.map { mlabeler.core.dsp.Pitch.hzToMidi(it.toDouble()) }?.sorted()
+        if (v.isNullOrEmpty()) { pitchLo = 48.0; pitchHi = 72.0; return }
+        val lo = v[(v.size * 0.03).toInt()] - 4
+        val hi = v[((v.size - 1) * 0.97).toInt()] + 4
+        val mid = (lo + hi) / 2
+        val span = maxOf(hi - lo, 14.0)
+        pitchLo = (mid - span / 2).coerceIn(12.0, 100.0)
+        pitchHi = (mid + span / 2).coerceIn(pitchLo + 6, 120.0)
+    }
+
+    /** Moves (Alt+wheel) or zooms (Ctrl+Alt+wheel) the pitch lane vertically. */
+    fun scrollPitch(semitones: Double, zoom: Boolean) {
+        if (zoom) {
+            val mid = (pitchLo + pitchHi) / 2
+            val span = ((pitchHi - pitchLo) * (1 + semitones * 0.1)).coerceIn(6.0, 96.0)
+            pitchLo = mid - span / 2; pitchHi = mid + span / 2
+        } else {
+            pitchLo += semitones; pitchHi += semitones
+        }
+    }
+
+    fun beginF0Stroke() {
+        f0Undo.addLast(f0Edits?.copyOf())
+        while (f0Undo.size > 50) f0Undo.removeFirst()
+    }
+
+    /** Sets the drawn f0 from [t0] to [t1] (s) going from MIDI [m0] to [m1]; null erases the drawing there. */
+    fun drawF0(t0: Double, m0: Double?, t1: Double, m1: Double?) {
+        val p = pitch ?: return
+        val e = f0Edits?.copyOf() ?: FloatArray(p.values.size) { Float.NaN }
+        val a = (minOf(t0, t1) / p.hop).toInt().coerceIn(0, e.size - 1)
+        val b = (maxOf(t0, t1) / p.hop).toInt().coerceIn(0, e.size - 1)
+        for (i in a..b) {
+            if (m0 == null || m1 == null) { e[i] = Float.NaN; continue }
+            val f = if (b == a) 0.0 else (i - a).toDouble() / (b - a)
+            val m = if (t0 <= t1) m0 + (m1 - m0) * f else m1 + (m0 - m1) * f
+            e[i] = (440.0 * kotlin.math.exp((m - 69) / 12.0 * kotlin.math.ln(2.0))).toFloat()
+        }
+        f0Edits = e
+    }
+
+    fun endF0Stroke() = saveF0Edits()
+
+    fun undoF0() {
+        if (f0Undo.isEmpty()) return
+        f0Edits = f0Undo.removeLast()
+        saveF0Edits()
+    }
+
+    val canUndoF0: Boolean get() = f0Undo.isNotEmpty()
+
+    /** Forgets every drawn part of this file's f0 (can be undone). */
+    fun resetF0() {
+        if (f0Edits == null) return
+        beginF0Stroke()
+        f0Edits = null
+        saveF0Edits()
+    }
+
+    /** Drags note [i] of [tier] up or down to MIDI [pitch]. */
+    fun notePitchDragTo(tier: Int, i: Int, pitch: Double) {
+        val base = noteDragBase ?: return
+        val t = base.tiers[tier] as? mlabeler.core.model.NoteTier ?: return
+        dragDoc = base.replace(tier, mlabeler.core.edit.NoteEdits.setPitch(t, i, pitch))
+    }
     var power by mutableStateOf<mlabeler.core.dsp.Curve?>(null)
         private set
     var loading by mutableStateOf(false)
@@ -804,6 +927,8 @@ class EditorState(
         audio = null
         peaks = null
         pitch = null
+        f0Edits = null
+        f0Pencil = false
         power = null
         references = emptyList()
         spectrogram = null
@@ -867,6 +992,8 @@ class EditorState(
             if (settings.layout.showPitch) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
             computeSpectrogram(a)
             if (pitch == null) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
+            loadF0Edits()
+            fitPitchRange()
         }
     }
 
@@ -1173,7 +1300,7 @@ class EditorState(
 
     /** Pitch of the selected note, or of every note when [all], from the analysed f0. */
     fun notePitchFromAudio(all: Boolean, round: Boolean = true) {
-        val f0 = pitch ?: return app.message(S.pitchNotReady())
+        val f0 = pitchCurve ?: return app.message(S.pitchNotReady())
         val s = selection as? Selection.Note
         val k = s?.tier ?: doc?.tiers?.indexOfFirst { it is mlabeler.core.model.NoteTier } ?: -1
         val t = noteTier(k) ?: return
@@ -1260,7 +1387,7 @@ class EditorState(
     /** One note per group, its pitch from the recording; replaces the notes tier. */
     fun notesFromGroups() {
         val a = audio ?: return
-        val ready = pitch
+        val ready = pitchCurve
         scope.launch {
             val f0 = ready ?: withContext(Dispatchers.Default) { mlabeler.core.ds.Dataset.f0(a) }
             val d = committed ?: return@launch

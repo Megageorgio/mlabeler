@@ -1,5 +1,8 @@
 package mlabeler.app.ui
 
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -97,6 +100,9 @@ import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+
+/** Width of the piano keys at the left of the pitch lane, dp. */
+private const val PIANO_KEYS = 22f
 
 private sealed interface Region {
     data object Ruler : Region
@@ -332,7 +338,11 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 PointerEventType.Scroll -> {
                                     val d = ch.scrollDelta
                                     val mods = e.keyboardModifiers
-                                    if (mods.isCtrlPressed || mods.isMetaPressed) {
+                                    val gw = geom(this.size, density, layoutState.value, ed.laneTiers())
+                                    if (mods.isAltPressed && gw.pitchBottom > gw.pitchTop && ch.position.y in gw.pitchTop..gw.pitchBottom) {
+                                        // the piano roll: Alt+wheel moves it up and down, Ctrl+Alt+wheel zooms it
+                                        ed.scrollPitch(if (mods.isCtrlPressed) d.y.toDouble() else -d.y.toDouble() * 2, zoom = mods.isCtrlPressed)
+                                    } else if (mods.isCtrlPressed || mods.isMetaPressed) {
                                         val anchor = ed.viewStart + ch.position.x / ed.pixelsPerSecond
                                         ed.zoom(1.15.pow(-d.y.toDouble()), anchor)
                                     } else if (ed.app.settings.mouse.wheel == "phonemes" && !mods.isShiftPressed && ed.mode == Mode.Labels && abs(d.y) >= abs(d.x)) {
@@ -384,6 +394,80 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 }
                             }
                             return@awaitEachGesture
+                        }
+
+                        // the piano roll (pitch in its own lane): notes move up and down, the pencil draws f0
+                        val pitchLane = g.pitchBottom > g.pitchTop && down.position.y in g.pitchTop..g.pitchBottom &&
+                            ed.pitch != null && ed.mode == Mode.Labels && !first.buttons.isTertiaryPressed
+                        if (pitchLane) {
+                            val top = g.pitchTop
+                            val bottom = g.pitchBottom
+                            val rowH = ((bottom - top) / (ed.pitchHi - ed.pitchLo)).toFloat()
+                            fun midiAt(yy: Float) = ed.pitchLo + (bottom - yy) / (bottom - top) * (ed.pitchHi - ed.pitchLo)
+                            fun yOf(m: Double) = (bottom - (m - ed.pitchLo) / (ed.pitchHi - ed.pitchLo) * (bottom - top)).toFloat()
+                            if (down.position.x < PIANO_KEYS * density) {
+                                // a click on the keys fits the range to the singing
+                                ed.fitPitchRange()
+                                return@awaitEachGesture
+                            }
+                            if (ed.f0Pencil) {
+                                val erase = first.buttons.isSecondaryPressed
+                                ed.beginF0Stroke()
+                                var lt = downTime
+                                var lm = midiAt(down.position.y)
+                                ed.drawF0(lt, if (erase) null else lm, lt, if (erase) null else lm)
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!chg.pressed) break
+                                    if (chg.positionChange() != Offset.Zero) {
+                                        val t = timeAt(chg.position.x)
+                                        val m = midiAt(chg.position.y.coerceIn(top, bottom))
+                                        ed.drawF0(lt, if (erase) null else lm, t, if (erase) null else m)
+                                        lt = t
+                                        lm = m
+                                        ed.cursor = t
+                                        chg.consume()
+                                    }
+                                }
+                                ed.endF0Stroke()
+                                return@awaitEachGesture
+                            }
+                            val noteK = ed.doc?.tiers?.indexOfFirst { it is NoteTier } ?: -1
+                            val nt = ed.doc?.tiers?.getOrNull(noteK) as? NoteTier
+                            val hitI = if (nt == null || first.buttons.isSecondaryPressed) -1 else nt.notes.indexOfFirst { n ->
+                                n.pitch != null && downTime in n.start..n.end && abs(yOf(n.pitch!!) - down.position.y) <= max(rowH / 2, 6 * density)
+                            }
+                            if (nt != null && hitI >= 0) {
+                                val n = nt.notes[hitI]
+                                val edge = when {
+                                    abs(down.position.x - ((n.start - ed.viewStart) * ed.pixelsPerSecond).toFloat()) <= grab -> true
+                                    abs(down.position.x - ((n.end - ed.viewStart) * ed.pixelsPerSecond).toFloat()) <= grab -> false
+                                    else -> null
+                                }
+                                ed.selectNote(noteK, hitI)
+                                ed.beginNoteDrag()
+                                val base = n.pitch!!
+                                var moved = false
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!chg.pressed) break
+                                    if (chg.positionChange() != Offset.Zero) {
+                                        moved = true
+                                        if (edge != null) ed.noteDragTo(noteK, hitI, edge, timeAt(chg.position.x))
+                                        else {
+                                            val raw = base + (down.position.y - chg.position.y) / rowH
+                                            // semitones; with Alt in cents
+                                            ed.notePitchDragTo(noteK, hitI, if (ev.keyboardModifiers.isAltPressed) kotlin.math.round(raw * 100) / 100 else kotlin.math.round(raw))
+                                        }
+                                        chg.consume()
+                                    }
+                                }
+                                ed.endNoteDrag()
+                                if (!moved) ed.cursor = downTime
+                                return@awaitEachGesture
+                            }
                         }
 
                         // right click: what the mouse settings say (plays the part under the pointer by default)
@@ -553,6 +637,21 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
         Canvas(Modifier.fillMaxSize().clipToBounds()) {
             val g = geom(size, density, layout, tierCount)
             drawCursor(ed, g, c) { t -> ((t - ed.viewStart) * ed.pixelsPerSecond).toFloat() }
+        }
+        // piano roll controls in the corner of the pitch lane
+        val gl = geom(size, LocalDensity.current.density, layout, tierCount)
+        if (ed.mode == Mode.Labels && ed.pitch != null && gl.pitchBottom - gl.pitchTop > 40 * LocalDensity.current.density) {
+            val d = LocalDensity.current
+            Row(
+                Modifier.align(Alignment.TopEnd).offset { IntOffset(-(8 * d.density).toInt(), gl.pitchTop.toInt() + (4 * d.density).toInt()) }
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).background(c.panel.copy(alpha = 0.85f)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconBtn(Icons.edit, PianoTitles.pencil(), Commands.f0Pencil.keyLabel, active = ed.f0Pencil, size = 28.dp) { ed.f0Pencil = !ed.f0Pencil }
+                IconBtn(Icons.undo, PianoTitles.undo(), enabled = ed.canUndoF0, size = 28.dp) { ed.undoF0() }
+                IconBtn(Icons.trash, PianoTitles.reset(), enabled = ed.f0Edits != null, size = 28.dp) { ed.resetF0() }
+                IconBtn(Icons.fit, PianoTitles.fit(), size = 28.dp) { ed.fitPitchRange() }
+            }
         }
 
         // inline text editor
@@ -1200,7 +1299,7 @@ private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: 
     val w = size.width
     val v0 = ed.viewStart
     val v1 = v0 + w / ed.pixelsPerSecond
-    val pitch = ed.pitch
+    val pitch = ed.pitchCurve
     if (layout.showPitch && pitch != null) {
         val over = layout.pitchOverSpectrogram && g.specBottom > g.specTop
         val top = if (over) g.specTop else g.pitchTop
@@ -1214,18 +1313,28 @@ private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: 
                 y = { hz -> (bottom - Spectrogram.hzToMel(hz) / melTop * (bottom - top)).toFloat() }
             } else {
                 drawRect(c.laneBg, Offset(0f, top), Size(w, bottom - top))
-                drawLine(c.border, Offset(0f, top), Offset(w, top), px)
-                // semitone grid between C2 and C7, labelled at every C
-                val lo = 36.0
-                val hi = 96.0
+                // a piano roll: one row per semitone in the sung range, keys on the left
+                val lo = ed.pitchLo
+                val hi = ed.pitchHi
+                val row = ((bottom - top) / (hi - lo)).toFloat()
                 y = { hz -> (bottom - (mlabeler.core.dsp.Pitch.hzToMidi(hz) - lo) / (hi - lo) * (bottom - top)).toFloat() }
-                for (m in lo.toInt()..hi.toInt()) {
-                    val yy = (bottom - (m - lo) / (hi - lo) * (bottom - top)).toFloat()
+                val keyW = PIANO_KEYS * px
+                drawRect(Color(0xFFE6E6EA), Offset(0f, top), Size(keyW, bottom - top))
+                clipRect(0f, top, w, bottom) {
+                for (m in kotlin.math.floor(lo).toInt()..kotlin.math.ceil(hi).toInt()) {
+                    val yc = (bottom - (m - lo) / (hi - lo) * (bottom - top)).toFloat()
+                    val black = (m % 12) in setOf(1, 3, 6, 8, 10)
+                    if (black && row >= 3 * px) drawRect(c.text.copy(alpha = 0.035f), Offset(keyW, yc - row / 2), Size(w - keyW, row))
                     val octave = m % 12 == 0
-                    if (!octave && (bottom - top) / (hi - lo) < 4 * px) continue
-                    drawLine(c.text.copy(alpha = if (octave) 0.18f else 0.05f), Offset(0f, yy), Offset(w, yy), px)
-                    if (octave) safeText(measurer, "C${m / 12 - 1}", Offset(4 * px, yy - 13 * px), small)
+                    if (octave || row >= 5 * px) drawLine(c.text.copy(alpha = if (octave) 0.16f else 0.04f), Offset(keyW, yc + row / 2), Offset(w, yc + row / 2), px)
+                    // the keys: black ones shorter, a thin line between white ones
+                    if (black && row >= 2 * px) drawRect(Color(0xFF26262C), Offset(0f, yc - row / 2), Size(keyW * 0.62f, row))
+                    else if (row >= 3 * px && (m % 12 == 4 || m % 12 == 11)) drawLine(Color(0xFF9A9AA2), Offset(0f, yc - row / 2), Offset(keyW, yc - row / 2), px)
+                    if (octave && row * 3 >= 11 * px) safeText(measurer, "C${m / 12 - 1}", Offset(keyW + 3 * px, yc - 7 * px), small)
                 }
+                }
+                drawLine(c.border, Offset(keyW, top), Offset(keyW, bottom), px)
+                drawLine(c.border, Offset(0f, top), Offset(w, top), px)
             }
             val path = Path()
             var pen = false
@@ -1241,6 +1350,25 @@ private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: 
             }
             if (over) drawPath(path, Color.Black.copy(alpha = 0.6f), style = Stroke(3.5f * px))
             drawPath(path, pitchColor, style = Stroke(1.8f * px))
+            // the hand-drawn parts stand out; the analysed curve under them stays visible, faint
+            val edits = ed.f0Edits
+            val analysed = ed.pitch
+            if (edits != null && analysed != null) {
+                val under = Path()
+                val drawn = Path()
+                var penU = false
+                var penD = false
+                for (i in i0..i1) {
+                    val e = edits.getOrNull(i) ?: Float.NaN
+                    val xx = x(i * pitch.hop)
+                    if (e.isNaN()) { penU = false; penD = false; continue }
+                    val f = analysed.values.getOrNull(i) ?: 0f
+                    if (f > 0f) { val yy = y(f.toDouble()).coerceIn(top, bottom); if (penU) under.lineTo(xx, yy) else under.moveTo(xx, yy); penU = true } else penU = false
+                    if (e > 0f) { val yy = y(e.toDouble()).coerceIn(top, bottom); if (penD) drawn.lineTo(xx, yy) else drawn.moveTo(xx, yy); penD = true } else penD = false
+                }
+                drawPath(under, pitchColor.copy(alpha = 0.35f), style = Stroke(px, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * px, 3 * px))))
+                drawPath(drawn, c.accent, style = Stroke(2.4f * px))
+            }
             // notes as bars at their pitch, so they can be checked against the curve
             val notes = ed.doc?.tiers?.firstOrNull { it is NoteTier } as? NoteTier
             if (notes != null) {
@@ -1253,7 +1381,10 @@ private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: 
                     if (yy < top || yy > bottom) continue
                     val isSel = selNote != null && selNote.tier == noteK && selNote.index == ni
                     val col = if (isSel) c.boundSelected else Color(0xFFFFFFFF)
-                    drawRect(col.copy(alpha = if (isSel) 0.9f else 0.55f), Offset(x(n.start), yy - 3 * px), Size(x(n.end) - x(n.start), 6 * px))
+                    // in the piano roll a note is one semitone high
+                    val bh = if (over) 6 * px else max(6 * px, ((bottom - top) / (ed.pitchHi - ed.pitchLo)).toFloat() - 2 * px)
+                    drawRoundRect(col.copy(alpha = if (isSel) 0.9f else 0.5f), Offset(x(n.start), yy - bh / 2), Size(x(n.end) - x(n.start), bh),
+                        androidx.compose.ui.geometry.CornerRadius(2 * px))
                     safeText(measurer, mlabeler.core.format.NoteNames.format(m), Offset(x(n.start) + 2 * px, yy - 18 * px), small.copy(color = col))
                 }
             }
@@ -1360,3 +1491,11 @@ private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.awa
     }
 }
 
+
+object PianoTitles {
+    val pencil = mlabeler.app.i18n.L("Draw the pitch: left button draws, right button erases the drawing",
+        "Рисовать высоту тона: левая кнопка рисует, правая стирает нарисованное")
+    val undo = mlabeler.app.i18n.L("Undo the last stroke", "Отменить последний штрих")
+    val reset = mlabeler.app.i18n.L("Back to the pitch of the recording", "Вернуть высоту тона записи")
+    val fit = mlabeler.app.i18n.L("Fit to the singing (Alt+wheel moves, Ctrl+Alt+wheel zooms)", "Подогнать под пение (Alt+колесо — сдвиг, Ctrl+Alt+колесо — масштаб)")
+}
