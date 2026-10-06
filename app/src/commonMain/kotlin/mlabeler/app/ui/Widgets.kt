@@ -165,6 +165,25 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 /** Plain single-line field. */
+/** True while a text field has the keyboard: single-key shortcuts must not fire then. */
+object TextFocus {
+    var count by androidx.compose.runtime.mutableIntStateOf(0)
+    val active: Boolean get() = count > 0
+}
+
+/** Marks a text field so that typing in it doesn't run shortcuts. */
+@Composable
+fun Modifier.trackTextFocus(): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { if (focused) TextFocus.count-- } }
+    return this.onFocusChanged { st ->
+        if (st.isFocused != focused) {
+            focused = st.isFocused
+            if (focused) TextFocus.count++ else TextFocus.count--
+        }
+    }
+}
+
 @Composable
 fun Field(
     value: String,
@@ -184,7 +203,7 @@ fun Field(
         cursorBrush = SolidColor(c.accent),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
-        modifier = modifier.height(if (Platform.isMobile) 44.dp else 32.dp),
+        modifier = modifier.height(if (Platform.isMobile) 44.dp else 32.dp).trackTextFocus(),
         decorationBox = { inner ->
             Box(
                 Modifier.fillMaxWidth().fillMaxHeight().clip(shape).background(c.bg).border(c.borderWidth, c.border, shape).padding(horizontal = 10.dp),

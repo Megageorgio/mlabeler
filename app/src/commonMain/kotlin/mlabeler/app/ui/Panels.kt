@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import mlabeler.app.Platform
 import mlabeler.app.i18n.S
+import mlabeler.app.i18n.L
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.FileFilter
 import mlabeler.app.state.Selection
@@ -53,7 +54,7 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
     val c = T.c
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp)) {
-            Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = S.search())
+            Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = searchHint())
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -115,12 +116,22 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
         }
         Divider()
         val done = ed.items.count { ed.marks(it).done }
-        Text(
-            S.doneCount.format(done, ed.items.size), color = c.muted, fontSize = 12.sp,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(S.doneCount.format(done, ed.items.size), color = c.muted, fontSize = 12.sp)
+            if (ed.items.isNotEmpty()) Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(4.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp)).background(c.panelAlt)) {
+                Box(Modifier.fillMaxWidth(done.toFloat() / ed.items.size).height(4.dp).background(c.ok))
+            }
+        }
     }
 }
+
+private val searchHint = L("Search by name or phonemes", "Поиск по имени или фонемам")
+private val queueTitle = L("Phonemes in advance", "Фонемы наперёд")
+private val queueHint = L("e.g. SP k a sh i SP", "например: SP k a sh i SP")
+private val queueHelp = L("Type the phonemes, then each new boundary names its part with the next one.",
+    "Впишите фонемы — каждая новая граница подпишет свой кусок следующей из них.")
+private val queueNext = L("Next: {0} ({1} left)", "Следующая: {0} (осталось {1})")
+private val queueFill = L("Spread over the selection", "Расставить по выделенному")
 
 @Composable
 fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
@@ -215,6 +226,28 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
                 }
             }
             else -> Text(S.nothingSelected(), color = c.muted, fontSize = 13.sp)
+        }
+
+        if (doc != null) {
+            SectionTitle(queueTitle())
+            var queue by remember(ed.item?.id) { mutableStateOf(ed.phonemeQueue.joinToString(" ")) }
+            // the field follows the queue as boundaries use it up
+            LaunchedEffect(ed.phonemeQueue) {
+                if (queue.split(Regex("[\\s,]+")).filter { it.isNotEmpty() } != ed.phonemeQueue) queue = ed.phonemeQueue.joinToString(" ")
+            }
+            Field(queue, { queue = it; ed.setQueueText(it) }, Modifier.fillMaxWidth(), placeholder = queueHint())
+            val next = ed.phonemeQueue.firstOrNull()
+            Text(if (next != null) queueNext.format(next, ed.phonemeQueue.size) else queueHelp(), color = c.muted, fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp))
+            if (next != null) Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Btn(queueFill(), modifier = Modifier.weight(1f)) { ed.fillWithQueue() }
+                Btn(S.clear()) { ed.phonemeQueue = emptyList() }
+            }
+            SectionTitle(S.notes())
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Btn(Commands.groupPhonemes.title(), modifier = Modifier.fillMaxWidth()) { ed.groupPhonemes() }
+                Btn(Commands.notesFromGroups.title(), modifier = Modifier.fillMaxWidth()) { ed.notesFromGroups() }
+            }
         }
 
         if (doc != null) {

@@ -195,6 +195,10 @@ object Commands {
     val pitchUp = Command("note-up", L("Note a semitone higher", "Нота на полутон выше"), listOf(Chord(Key.DirectionUp, alt = true))) { e, _ -> e.nudgePitch(1.0) }.only(Mode.Labels)
     val pitchDown = Command("note-down", L("Note a semitone lower", "Нота на полутон ниже"), listOf(Chord(Key.DirectionDown, alt = true))) { e, _ -> e.nudgePitch(-1.0) }.only(Mode.Labels)
     val notesFromAudio = Command("notes-from-audio", L("Note pitches from the recording", "Высота нот по записи"), emptyList()) { e, _ -> e.notePitchFromAudio(all = true) }.only(Mode.Labels)
+    val groupPhonemes = Command("group-phonemes", L("Group phonemes into notes", "Сгруппировать фонемы по нотам"), emptyList()) { e, _ -> e.groupPhonemes() }.only(Mode.Labels)
+    val notesFromGroups = Command("notes-from-groups", L("Notes from groups and pitch", "Ноты по группам и высоте"), emptyList()) { e, _ -> e.notesFromGroups() }.only(Mode.Labels)
+    val fillQueue = Command("fill-queue", L("Spread typed phonemes over the selection", "Расставить вписанные фонемы по выделенному"), emptyList()) { e, _ -> e.fillWithQueue() }.only(Mode.Labels)
+    val exportDs = Command("export-diffsinger", L("Export a DiffSinger dataset…", "Экспорт датасета DiffSinger…"), emptyList()) { _, a -> a.showDsExport = true }.only(Mode.Labels)
     val midiOut = Command("midi-export", L("Save notes as MIDI", "Сохранить ноты в MIDI"), emptyList()) { e, _ -> e.exportMidi() }.only(Mode.Labels)
     val midiIn = Command("midi-import", L("Notes from a MIDI file next to the recording", "Ноты из MIDI рядом с записью"), emptyList()) { e, _ -> e.importMidi() }.only(Mode.Labels)
     val help = Command("help", L("How it works", "Как с этим работать"), listOf(Chord(Key.F1))) { _, a -> a.showHelp = true }
@@ -232,7 +236,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, exportDs, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

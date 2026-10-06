@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import mlabeler.core.io.decodeGuess
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -16,6 +17,7 @@ import kotlinx.coroutines.withContext
 import mlabeler.app.AudioOut
 import mlabeler.app.Platform
 import mlabeler.app.i18n.S
+import mlabeler.app.i18n.L
 import mlabeler.core.audio.Audio
 import mlabeler.core.audio.Wav
 import mlabeler.core.check.Checks
@@ -47,6 +49,10 @@ sealed interface Selection {
 enum class FileFilter { All, NotDone, Starred, NoLabels }
 
 enum class Mode { Labels, Oto }
+
+private val queueEmpty = L("Type the phonemes first", "Сначала впишите фонемы")
+private val queueNoPlace = L("Select a part or a phoneme to fill", "Выделите кусок или фонему, которую заполнить")
+private val grouped = L("Phonemes are grouped into notes (the words tier)", "Фонемы сгруппированы по нотам (слой words)")
 
 class EditorState(
     val workspace: Workspace,
@@ -409,11 +415,34 @@ class EditorState(
         marksVersion++
     }
 
+    /** Words of every label file, for searching files by phoneme. Built in the background on the first search. */
+    private var labelIndex by mutableStateOf<Map<String, Set<String>>?>(null)
+    private var indexJob: Job? = null
+
+    private fun ensureLabelIndex() {
+        if (labelIndex != null || indexJob?.isActive == true) return
+        val list = items
+        indexJob = scope.launch {
+            labelIndex = withContext(Dispatchers.Default) {
+                list.associate { item ->
+                    val words = item.labelPath?.let { p ->
+                        runCatching { decodeGuess(workspace.fs.read(p), "UTF-8").first }.getOrNull()
+                            ?.split(Regex("[\\s,\"]+"))?.filter { it.isNotEmpty() && it.toDoubleOrNull() == null }?.toSet()
+                    } ?: emptySet()
+                    item.id to words
+                }
+            }
+        }
+    }
+
     fun filtered(): List<Pair<Int, Item>> {
         marksVersion
         val q = query.trim().lowercase()
+        val tokens = query.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (q.isNotEmpty()) ensureLabelIndex()
+        val index = labelIndex
         return items.withIndex().filter { (_, it) ->
-            (q.isEmpty() || it.id.lowercase().contains(q)) && when (filter) {
+            (q.isEmpty() || it.id.lowercase().contains(q) || (index?.get(it.id)?.let { w -> tokens.all { t -> t in w } } == true)) && when (filter) {
                 FileFilter.All -> true
                 FileFilter.NotDone -> !marks(it).done
                 FileFilter.Starred -> marks(it).star
@@ -619,6 +648,7 @@ class EditorState(
             val updated = workspace.writeLabels(it, d, duration, if (it.labelFormat == null) (workspace.state.defaultFormat) else null)
             items = items.map { x -> if (x.id == it.id) updated else x }
             h.markSaved()
+            labelIndex = null
             labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
             docVersion++
             if (!quiet) app.message(S.saved.format(Paths.name(updated.labelPath ?: "")))
@@ -830,13 +860,63 @@ class EditorState(
         val k = if (tier(activeTier) != null) activeTier else d.phonemeTierIndex()
         // the new phoneme is the one the new boundary belongs to: before it ("end", default) or after it
         val newLeft = settings.edit.boundaryOwner == "end"
-        val r = Edits.split(d, k, time, "", settings.edit.minIntervalMs / 1000.0, newOnLeft = newLeft) ?: return
+        val queued = phonemeQueue.firstOrNull()
+        val r = Edits.split(d, k, time, queued ?: "", settings.edit.minIntervalMs / 1000.0, newOnLeft = newLeft) ?: return
         commit(r.first)
         val fresh = IntervalRef(k, if (newLeft) r.second.bound - 1 else r.second.bound)
         selectInterval(fresh, reveal = false)
         if (playLeft) tier(k)?.let { t -> val i = r.second.bound - 1; if (i >= 0) play(t.startOf(i), t.endOf(i), loop = false) }
         // with a keyboard, name the new part right away
+        // phonemes typed in advance name the new parts one by one
+        if (queued != null) { phonemeQueue = phonemeQueue.drop(1); return }
         if (askName) editingText = fresh
+    }
+
+    /** Phonemes typed in advance: each new boundary names its part with the next one. */
+    var phonemeQueue by mutableStateOf<List<String>>(emptyList())
+
+    fun setQueueText(text: String) {
+        phonemeQueue = text.split(Regex("[\\s,]+")).filter { it.isNotEmpty() }
+    }
+
+    /** The queued phonemes spread evenly over the selected part (or the selected interval), replacing what was there. */
+    fun fillWithQueue() {
+        val d = committed ?: return
+        val names = phonemeQueue.ifEmpty { return app.message(queueEmpty()) }
+        val k = (selection as? Selection.Interval)?.ref?.tier?.takeIf { tier(it) != null }
+            ?: activeTier.takeIf { tier(it) != null } ?: d.phonemeTierIndex()
+        val t = tier(k) ?: return
+        val (from, to) = range ?: selectedInterval()?.takeIf { it.tier == k }?.let { t.startOf(it.index) to t.endOf(it.index) }
+            ?: return app.message(queueNoPlace())
+        val step = (to - from) / names.size
+        val part = IntervalTier(t.name, List(names.size + 1) { from + it * step }, names)
+        commit(d.replace(k, mlabeler.core.edit.RangeEdits.replace(t, from, to, part)))
+        phonemeQueue = emptyList()
+        fixSelection()
+    }
+
+    private fun dictionary() = Dictionaries.byName(workspace.state.dictionary)
+
+    /** Groups the phonemes into notes (the words tier), using the folder's dictionary. */
+    fun groupPhonemes() {
+        updateDoc { mlabeler.core.ds.Grouping.withGroups(it, dictionary()) }
+        app.message(grouped())
+    }
+
+    /** One note per group, its pitch from the recording; replaces the notes tier. */
+    fun notesFromGroups() {
+        val a = audio ?: return
+        val ready = pitch
+        scope.launch {
+            val f0 = ready ?: withContext(Dispatchers.Default) { mlabeler.core.ds.Dataset.f0(a) }
+            val d = committed ?: return@launch
+            val withGroups = if (d.wordTierIndex() >= 0) d else mlabeler.core.ds.Grouping.withGroups(d, dictionary())
+            val noNotes = withGroups.copy(tiers = withGroups.tiers.filter { it !is mlabeler.core.model.NoteTier })
+            val notes = mlabeler.core.ds.Dataset.notesFor(noNotes, f0, 0.0, mlabeler.core.ds.DatasetOptions(dict = dictionary())).tiers.last()
+            val k = withGroups.tiers.indexOfFirst { it is mlabeler.core.model.NoteTier }
+            commit(if (k >= 0) withGroups.replace(k, notes) else withGroups.copy(tiers = withGroups.tiers + notes))
+            fixSelection()
+        }
     }
 
     fun mergeSelected() {

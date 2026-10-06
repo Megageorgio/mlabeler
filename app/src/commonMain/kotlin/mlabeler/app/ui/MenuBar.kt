@@ -117,6 +117,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MSep)
         add(item(Commands.workspace, ed, app))
         add(item(Commands.importLbp, ed, app))
+        if (!oto) add(item(Commands.exportDs, ed, app))
         add(item(Commands.record, ed, app))
         add(MSep)
         add(item(Commands.settings, ed, app, title = S.settings()))
@@ -155,9 +156,11 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.linked, ed, app, checked = s.edit.linked))
             add(MSep)
             add(MSub(MenuTitles.notes(), listOf(
+                item(Commands.groupPhonemes, ed, app), item(Commands.notesFromGroups, ed, app), MSep,
                 item(Commands.pitchUp, ed, app), item(Commands.pitchDown, ed, app), item(Commands.notesFromAudio, ed, app),
                 MSep, item(Commands.midiIn, ed, app), item(Commands.midiOut, ed, app),
             )))
+            add(item(Commands.fillQueue, ed, app))
             add(item(Commands.batchRename, ed, app))
         }
         add(MSep)

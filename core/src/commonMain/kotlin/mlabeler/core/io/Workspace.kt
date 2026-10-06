@@ -42,6 +42,10 @@ data class WorkspaceState(
     val compareFolders: List<String> = emptyList(),
     /** What is labelled in this folder: "labels" (lab/TextGrid tiers) or "oto"; null = detect. */
     val kind: String? = null,
+    /** Phoneme dictionary used to group phonemes into notes ("" = guess from letters). */
+    val dictionary: String = "",
+    /** Last DiffSinger export folder. */
+    val exportFolder: String = "",
 )
 
 /** One audio file and where its labels are. [id] is the audio path relative to the workspace root. */

@@ -110,7 +110,7 @@ fun AutolabelDialog(app: AppState) {
                 langs.isEmpty() -> Text(noModels(), color = c.muted, fontSize = 13.sp)
                 else -> {
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        for (l in langs) Chip(if (l.code == "*") "*" else l.name, l.code == lang) { lang = l.code }
+                        for (l in langs.sortedWith(compareBy({ it.code == "*" }, { mlabeler.app.i18n.LanguageNames.of(it.code, it.name) }))) Chip(mlabeler.app.i18n.LanguageNames.of(l.code, l.name), l.code == lang) { lang = l.code }
                     }
                     val models = langs.firstOrNull { it.code == lang }?.models.orEmpty()
                     Column(Modifier.padding(top = 6.dp).heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {

@@ -49,6 +49,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -98,6 +100,8 @@ fun EditorScreen(app: AppState, ed: EditorState) {
             .focusable()
             .onKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown || ed.editingText != null) return@onKeyEvent false
+                // typing in a field: only shortcuts with Ctrl/Cmd work
+                if (TextFocus.active && !e.isCtrlPressed && !e.isMetaPressed) return@onKeyEvent false
                 if (ed.toolkitBusy != null) {
                     // nothing is edited while autolabel works; Esc stops it
                     if (e.key == androidx.compose.ui.input.key.Key.Escape) ed.cancelToolkit()

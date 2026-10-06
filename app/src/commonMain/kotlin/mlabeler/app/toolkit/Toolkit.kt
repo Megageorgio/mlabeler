@@ -59,7 +59,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             val o = g.jsonObject
             ToolkitLanguage(
                 o["code"]!!.jsonPrimitive.content,
-                (o["native_name"] ?: o["name"] ?: o["code"])!!.jsonPrimitive.content,
+                (o["name"] ?: o["native_name"] ?: o["code"])!!.jsonPrimitive.content,
                 o["models"]!!.jsonArray.map { m ->
                     val mo = m.jsonObject
                     ToolkitModel(

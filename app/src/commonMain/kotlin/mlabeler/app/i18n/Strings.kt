@@ -209,6 +209,8 @@ object S {
     val themeReload = L("Reload theme files", "Перечитать файлы тем")
     val pitchNotReady = L("Pitch is still being analysed", "Высота тона ещё считается")
     val note = L("Note", "Нота")
+    val notes = L("Notes", "Ноты")
+    val clear = L("Clear", "Очистить")
     val slur = L("Slur", "Распев (slur)")
     val pitchFromAudioOne = L("Pitch from the recording", "Высота по записи")
     val pitchFromAudioAll = L("For all notes", "Для всех нот")

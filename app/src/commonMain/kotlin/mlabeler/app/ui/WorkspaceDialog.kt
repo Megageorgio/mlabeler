@@ -32,6 +32,9 @@ import mlabeler.core.format.LabelFormat
 
 private val folderSettings = L("Folder settings", "Настройки папки")
 private val whatLabelled = L("What is labelled here", "Что здесь размечается")
+private val phonemeDict = L("Phoneme dictionary", "Словарь фонем")
+private val phonemeDictHint = L("Used to group phonemes into notes (Edit → Notes) and for the DiffSinger export.",
+    "Нужен, чтобы группировать фонемы по нотам (Правка → Ноты) и для экспорта в DiffSinger.")
 private val kindLabels = L("Phonemes and words", "Фонемы и слова")
 private val kindLabelsHint = L("Tiers of intervals: .lab (HTK, NNSVS, DiffSinger), TextGrid, Audacity labels.",
     "Слои интервалов: .lab (HTK, NNSVS, DiffSinger), TextGrid, метки Audacity.")
@@ -78,6 +81,12 @@ fun WorkspaceDialog(app: AppState) {
                         ed.bumpMarks()
                     }
                 }
+                SectionTitle(phonemeDict())
+                DictionaryChips(ed.workspace.state.dictionary) { d ->
+                    ed.workspace.updateState { it.copy(dictionary = d) }
+                    ed.bumpMarks()
+                }
+                Text(phonemeDictHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 SectionTitle(labelFolders())
                 var folders by remember { mutableStateOf(ed.workspace.state.labelFolders.joinToString("\n")) }
                 androidx.compose.foundation.text.BasicTextField(

@@ -53,6 +53,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showHelp && app.settings.setupDone) mlabeler.app.ui.HelpDialog(app)
                     if (app.showPlugins && ed != null) mlabeler.app.ui.PluginsDialog(app)
                     if (app.showImport && ed != null) mlabeler.app.ui.ImportDialog(app)
+                    if (app.showDsExport && ed != null) mlabeler.app.ui.DsExportDialog(app, ed)
                     if (app.showAutoOto && ed != null) mlabeler.app.ui.AutoOtoDialog(app)
                     app.folderPick?.let { pick ->
                         mlabeler.app.ui.FolderBrowser(
