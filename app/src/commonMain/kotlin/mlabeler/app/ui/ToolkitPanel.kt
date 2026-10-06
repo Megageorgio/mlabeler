@@ -59,7 +59,8 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
         if (!checkOnShow) return@LaunchedEffect
         while (true) {
             if (tk.status != Status.Starting && tk.status != Status.Installing) tk.check()
-            kotlinx.coroutines.delay(if (tk.status == Status.Ready) 10_000 else 3_000)
+            // while it answers there is nothing to watch closely; every check is a request to the toolkit
+            kotlinx.coroutines.delay(if (tk.status == Status.Ready) 60_000 else 3_000)
         }
     }
     var logOpen by remember { mutableStateOf(false) }
@@ -118,6 +119,8 @@ fun rememberToolkitModels(app: AppState, task: String, enabled: Boolean = true):
         try {
             langs = app.toolkit.client().languages(task)
             error = null
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             error = e.message
         }

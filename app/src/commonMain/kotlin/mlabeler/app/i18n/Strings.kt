@@ -254,8 +254,9 @@ object S {
     val chooseEnvironment = L("Choose a work environment", "Выберите рабочую среду")
     val chooseEnvironmentHint = L("It can be changed later in View → Work environment.", "Её можно сменить потом: Вид → Рабочая среда.")
     val overlayWaveFill = L("Filled waveform in the overlaid view", "Закрашенная волна в наложенном виде")
-    val overlayWaveFillAlpha = L("Fill opacity (100% = solid)", "Непрозрачность заливки (100% — сплошная)")
+    val overlayWaveFillAlpha = L("Waveform opacity over the spectrogram", "Непрозрачность волны поверх спектрограммы")
     val resetToDefault = L("Back to default", "Вернуть по умолчанию")
     val resetPage = L("Reset this page to defaults", "Сбросить эту страницу по умолчанию")
     val audioReloaded = L("The recording changed on disk and was read again; labels kept", "Запись изменилась на диске и перечитана, разметка сохранена")
+    val labelFontSize = L("Label text size (Ctrl+Shift+= / −)", "Размер текста меток (Ctrl+Shift+= / −)")
 }

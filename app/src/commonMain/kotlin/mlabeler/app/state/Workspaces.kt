@@ -102,7 +102,7 @@ object Environments {
     /** True when the interface still looks exactly like [e] (panel sizes aside). */
     fun matches(s: AppSettings, e: EnvironmentEntry): Boolean {
         val norm = { l: LayoutSettings -> l.copy(filesWidth = 0f, inspectorWidth = 0f, tierHeight = 0f, waveShare = 0f) }
-        return norm(s.layout) == norm(e.env.layout) && s.toolbar == e.env.toolbar && s.statusBar == e.env.statusBar &&
+        return norm(s.layout) == norm(e.env.layout) && s.toolbar.copy(order = emptyList()) == e.env.toolbar.copy(order = emptyList()) && s.statusBar == e.env.statusBar &&
             (Platform.isMobile || s.menuBar == e.env.menuBar)
     }
 

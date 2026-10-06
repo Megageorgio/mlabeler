@@ -93,14 +93,16 @@ object Edits {
     }
 
     /** Splits the interval at [time] into two; the right part gets [rightText]. Returns the doc and the new boundary. */
-    fun split(doc: LabelDoc, tierIndex: Int, time: Double, rightText: String = "", minGap: Double = 0.001): Pair<LabelDoc, BoundRef>? {
+    /** Splits the interval at [time]. The new, empty part is on the right, or on the left with [newOnLeft]
+     *  (then the old text moves to the right part). */
+    fun split(doc: LabelDoc, tierIndex: Int, time: Double, rightText: String = "", minGap: Double = 0.001, newOnLeft: Boolean = false): Pair<LabelDoc, BoundRef>? {
         val tier = doc.tiers[tierIndex] as IntervalTier
         val i = tier.indexAt(time)
         if (i < 0) return null
         if (time - tier.startOf(i) < minGap || tier.endOf(i) - time < minGap) return null
         val nb = tier.bounds.toMutableList().apply { add(i + 1, time) }
-        val nt = tier.texts.toMutableList().apply { add(i + 1, rightText) }
-        val nc = tier.confidence?.toMutableList()?.apply { add(i + 1, null) }
+        val nt = tier.texts.toMutableList().apply { if (newOnLeft) add(i, rightText) else add(i + 1, rightText) }
+        val nc = tier.confidence?.toMutableList()?.apply { if (newOnLeft) add(i, null) else add(i + 1, null) }
         return doc.replace(tierIndex, tier.copy(bounds = nb, texts = nt, confidence = nc)) to BoundRef(tierIndex, i + 1)
     }
 

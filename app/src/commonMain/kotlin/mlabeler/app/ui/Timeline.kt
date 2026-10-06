@@ -130,6 +130,8 @@ private class Geom(
     val tiersBottom: Float get() = tiersTop + tierH * tierCount
     val audioTop: Float get() = min(waveTop, specTop)
     val audioBottom: Float get() = maxOf(waveBottom, specBottom, pitchBottom, powerBottom)
+    /** Line between the waveform and the spectrogram lanes (whichever is on top). */
+    val waveSpecLine: Float get() = if (specTop >= waveBottom) waveBottom else specBottom
 
     fun region(y: Float, grab: Float): Region? {
         if (y < ruler) return Region.Ruler
@@ -139,7 +141,7 @@ private class Geom(
             return Region.Tier(((y - tiersTop) / tierH).toInt().coerceIn(0, tierCount - 1))
         }
         if (!overlay && tierCount > 0 && abs(y - (if (tiersOnTop) tiersBottom else tiersTop)) < grab / 2) return Region.TierSplit
-        if (!overlay && waveBottom > waveTop && specBottom > specTop && abs(y - waveBottom) < grab / 2) return Region.WaveSpecSplit
+        if (!overlay && waveBottom > waveTop && specBottom > specTop && abs(y - waveSpecLine) < grab / 2) return Region.WaveSpecSplit
         if (y in specTop..specBottom && specBottom > specTop) return Region.Spec
         if (y in waveTop..waveBottom) return Region.Wave
         if (y in pitchTop..pitchBottom && pitchBottom > pitchTop) return Region.Spec
@@ -154,7 +156,7 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val w = size.width.toFloat()
     val h = size.height.toFloat()
     val ruler = 22f * density
-    val tierH = layout.tierHeight.coerceIn(28f, 96f) * density * (if (Platform.isMobile) 1.15f else 1f)
+    val tierH = max(layout.tierHeight.coerceIn(28f, 96f), layout.labelFontSize.coerceIn(8f, 48f) * 2.1f + 6f) * density * (if (Platform.isMobile) 1.15f else 1f)
     val minAudio = 48f * density
     val overlay = layout.overlay
     // stacked: tiers take their own space; overlaid: they lie over the audio picture
@@ -188,13 +190,18 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
             showW -> mainH
             else -> 0f
         }
-        waveTop = audioTop; waveBottom = audioTop + waveH
-        specTop = waveBottom; specBottom = if (showS || !showW) audioTop + mainH else waveBottom
+        if (layout.spectrogramFirst && showS && showW) {
+            specTop = audioTop; specBottom = audioTop + mainH - waveH
+            waveTop = specBottom; waveBottom = audioTop + mainH
+        } else {
+            waveTop = audioTop; waveBottom = audioTop + waveH
+            specTop = waveBottom; specBottom = if (showS || !showW) audioTop + mainH else waveBottom
+        }
     }
     val pitchTop = audioTop + mainH
     val powerTop = pitchTop + pitchH
     return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, tiersTop, tierHeight, tiers,
-        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), if (layout.overlayWaveFill) layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f) else 0f)
+        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f))
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -280,6 +287,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
     val onLayoutState = rememberUpdatedState(onLayout)
     val lastTap = remember { mutableStateOf(Triple(0L, Offset.Zero, 0)) }
     val cutByLastTap = remember { mutableStateOf(false) }
+    val lastWheelStep = remember { mutableStateOf(0L) }
 
     // spectrogram image for the current view
     val spec = ed.spectrogram
@@ -289,7 +297,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
     }
 
     BoxWithConstraints(modifier.background(c.laneBg)) {
-        val tierStyle = TextStyle(fontSize = if (Platform.isMobile) 15.sp else 13.sp, color = c.tierText, fontFamily = T.font)
+        val tierStyle = TextStyle(fontSize = (layout.labelFontSize.coerceIn(8f, 48f) + if (Platform.isMobile) 2f else 0f).sp, color = c.tierText, fontFamily = T.font)
         val smallStyle = TextStyle(fontSize = 10.sp, color = c.muted, fontFamily = T.font)
 
         Canvas(
@@ -322,6 +330,13 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     if (mods.isCtrlPressed || mods.isMetaPressed) {
                                         val anchor = ed.viewStart + ch.position.x / ed.pixelsPerSecond
                                         ed.zoom(1.15.pow(-d.y.toDouble()), anchor)
+                                    } else if (ed.app.settings.mouse.wheel == "phonemes" && !mods.isShiftPressed && ed.mode == Mode.Labels && abs(d.y) >= abs(d.x)) {
+                                        // the wheel walks through the phonemes (Shift+wheel still scrolls)
+                                        val now = ch.uptimeMillis
+                                        if (now - lastWheelStep.value > 60 && d.y != 0f) {
+                                            lastWheelStep.value = now
+                                            ed.stepInterval(if (d.y > 0) 1 else -1)
+                                        }
                                     } else {
                                         val dx = if (abs(d.x) > abs(d.y)) d.x else d.y
                                         ed.scrollBy(dx * 60.0 * density)
@@ -348,7 +363,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
 
                         // splitters
                         if (region == Region.WaveSpecSplit || region == Region.TierSplit) {
-                            val audioH = g.specBottom - g.waveTop
+                            val audioH = max(g.specBottom, g.waveBottom) - min(g.specTop, g.waveTop)
                             while (true) {
                                 val ev = awaitPointerEvent()
                                 val chg = ev.changes.first()
@@ -357,7 +372,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 chg.consume()
                                 val l = layoutState.value
                                 if (region == Region.WaveSpecSplit) {
-                                    onLayoutState.value(l.copy(waveShare = (l.waveShare + dy / audioH).coerceIn(0.1f, 0.9f)))
+                                    val sign = if (l.spectrogramFirst) -1 else 1
+                                    onLayoutState.value(l.copy(waveShare = (l.waveShare + sign * dy / audioH).coerceIn(0.1f, 0.9f)))
                                 } else if (g.tierCount > 0) {
                                     onLayoutState.value(l.copy(tierHeight = (l.tierHeight + (if (g.tiersOnTop) dy else -dy) / density / g.tierCount).coerceIn(28f, 96f)))
                                 }
@@ -415,7 +431,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             return@awaitEachGesture
                         }
                         val bound = if (ed.mode == Mode.Oto) null else hitBound(ed, g, region, down.position.x, grab)
-                        val pan = first.buttons.isTertiaryPressed || region == Region.Ruler
+                        val panTool = ed.app.settings.edit.tool == "pan" && !touch
+                        val pan = first.buttons.isTertiaryPressed || region == Region.Ruler || panTool
 
                         if (bound != null && !pan) {
                             // drag a boundary
@@ -483,6 +500,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 chg.consume()
                             }
                         }
+                        // the play tool plays what was just selected
+                        if (dragged && selecting && ed.app.settings.edit.tool == "play") ed.range?.let { (a, b) -> ed.play(a, b) }
                         if (!dragged) {
                             // a tap or click
                             val (t0, p0, n0) = lastTap.value
@@ -496,18 +515,19 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 first.buttons.isTertiaryPressed -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Middle))
                                 ctrl -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Ctrl))
                                 mods.isAltPressed -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Alt))
-                                double -> {
-                                    // the first click of a double click in the cut tool added a boundary: take it back
-                                    if (ed.app.settings.edit.tool == "cut" && cutByLastTap.value) { ed.undo(); cutByLastTap.value = false }
-                                    mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Double))
+                                // scissors: every click is a cut (two quick cuts are not a double click)
+                                double && ed.app.settings.edit.tool != "cut" -> mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Double))
+                                ed.app.settings.edit.tool == "play" && !touch -> {
+                                    if (region is Region.Tier || (region == Region.Wave || region == Region.Spec) && ed.range == null) playUnder(ed, region, downTime)
                                 }
-                                ed.app.settings.edit.tool == "cut" && !touch && !mods.isShiftPressed && isLabelLane(ed, region) -> {
+                                ed.app.settings.edit.tool == "cut" && !touch && !mods.isShiftPressed && isLabelLane(ed, region) &&
+                                    (region !is Region.Tier || ed.app.settings.edit.cutOnLanes) -> {
                                     val e = ed.app.settings.edit
                                     ed.splitAt(downTime, laneOf(ed, region), askName = e.cutAskName, playLeft = e.cutPlay)
                                     cutByLastTap.value = true
                                     return@awaitEachGesture
                                 }
-                                else -> onTap(ed, region, downTime, false, touch, mods.isShiftPressed)
+                                else -> onTap(ed, region, downTime, double && ed.app.settings.edit.tool != "cut", touch, mods.isShiftPressed)
                             }
                             cutByLastTap.value = false
                         }
@@ -529,8 +549,11 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
             val g = geom(size, density, layout, tierCount)
             val x0 = ((et.startOf(editing.index) - ed.viewStart) * ed.pixelsPerSecond).toFloat()
             val x1 = ((et.endOf(editing.index) - ed.viewStart) * ed.pixelsPerSecond).toFloat()
-            val w = max(x1 - x0, 90 * density).coerceAtMost(size.width.toFloat())
-            val x = x0.coerceIn(0f, max(0f, size.width - w))
+            // a small field over the middle of the visible part of the interval
+            val v0 = max(x0, 0f)
+            val v1 = min(x1, size.width.toFloat())
+            val w = (v1 - v0).coerceIn(64 * density, 150 * density).coerceAtMost(size.width.toFloat())
+            val x = ((v0 + v1) / 2 - w / 2).coerceIn(0f, max(0f, size.width - w))
             InlineEditor(
                 initial = et.texts[editing.index],
                 offset = IntOffset(x.toInt(), g.tierTop(editing.tier).toInt()),
@@ -775,40 +798,8 @@ private fun DrawScope.drawTimeline(
                     val yy = mid - audio.samples[s] * amp
                     if (first) { path.moveTo(xx, yy); first = false } else path.lineTo(xx, yy)
                 }
-                if (g.overlay) drawPath(path, Color.Black.copy(alpha = 0.55f), style = Stroke(3f * px))
-                drawPath(path, c.wave, style = Stroke(1.2f * px))
-            } else if (peaks != null && g.overlay) {
-                // over the spectrogram: only the outline, so the picture under it stays visible
-                val cols = min(w.toInt(), max(0, endX.toInt() + 1))
-                val upper = Path()
-                val lower = Path()
-                var started = false
-                for (col in max(0, x(0.0).toInt())..cols) {
-                    val a = ((v0 + col / pps) * sr).toInt()
-                    val b = ((v0 + (col + 1) / pps) * sr).toInt()
-                    if (b <= 0 || a >= audio.samples.size) continue
-                    val (lo, hi) = peaks.range(audio.samples, a, max(b, a + 1))
-                    val xx = col + 0.5f
-                    if (!started) { upper.moveTo(xx, mid - hi * amp); lower.moveTo(xx, mid - lo * amp); started = true }
-                    else { upper.lineTo(xx, mid - hi * amp); lower.lineTo(xx, mid - lo * amp) }
-                }
-                if (g.waveFill > 0f) {
-                    // filled body, see-through so the spectrogram still shows
-                    val body = Path()
-                    for (col in max(0, x(0.0).toInt())..cols) {
-                        val a = ((v0 + col / pps) * sr).toInt()
-                        val b = ((v0 + (col + 1) / pps) * sr).toInt()
-                        if (b <= 0 || a >= audio.samples.size) continue
-                        val (lo, hi) = peaks.range(audio.samples, a, max(b, a + 1))
-                        body.moveTo(col + 0.5f, mid - hi * amp)
-                        body.lineTo(col + 0.5f, mid - lo * amp + 0.5f)
-                    }
-                    drawPath(body, c.wave.copy(alpha = c.wave.alpha * g.waveFill), style = Stroke(px))
-                }
-                for (pth in listOf(upper, lower)) {
-                    drawPath(pth, Color.Black.copy(alpha = 0.55f), style = Stroke(3.2f * px))
-                    drawPath(pth, c.wave, style = Stroke(1.4f * px))
-                }
+                // the same waveform in both views; over the spectrogram only its opacity differs
+                drawPath(path, if (g.overlay) c.wave.copy(alpha = c.wave.alpha * g.waveFill) else c.wave, style = Stroke(1.2f * px))
             } else if (peaks != null) {
                 val cols = min(w.toInt(), max(0, endX.toInt() + 1))
                 for (col in max(0, x(0.0).toInt())..cols) {
@@ -819,11 +810,15 @@ private fun DrawScope.drawTimeline(
                     path.moveTo(col + 0.5f, mid - hi * amp)
                     path.lineTo(col + 0.5f, mid - lo * amp + 0.5f)
                 }
-                drawPath(path, c.wave, style = Stroke(px))
+                drawPath(path, if (g.overlay) c.wave.copy(alpha = c.wave.alpha * g.waveFill) else c.wave, style = Stroke(px))
             }
         }
     }
-    if (!g.overlay && g.specBottom > g.specTop && g.waveBottom > g.waveTop) drawLine(c.border, Offset(0f, g.waveBottom), Offset(w, g.waveBottom), px)
+    if (!g.overlay && g.specBottom > g.specTop && g.waveBottom > g.waveTop) {
+        // the line between the lanes can be dragged: a visible grip says so
+        drawRect(c.border, Offset(0f, g.waveSpecLine - px), Size(w, 2 * px))
+        drawRoundRect(c.muted.copy(alpha = 0.8f), Offset(w / 2 - 18 * px, g.waveSpecLine - 2 * px), Size(36 * px, 4 * px), androidx.compose.ui.geometry.CornerRadius(2 * px))
+    }
 
     drawCurves(ed, g, c, measurer, smallStyle, ::x)
 
@@ -873,8 +868,8 @@ private fun DrawScope.drawTimeline(
             if (!selected && xx - lastX < 8 * px) continue
             lastX = xx
             if (g.overlay) {
-                drawLine(Color.Black.copy(alpha = 0.6f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom), (if (selected) 5 else 3) * px)
-                drawLine(if (selected) c.boundSelected else c.bound, Offset(xx, g.audioTop), Offset(xx, g.audioBottom), if (selected) 2.5f * px else 1.3f * px)
+                drawLine(Color.Black.copy(alpha = 0.3f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom), (if (selected) 4f else 2.5f) * px)
+                drawLine(if (selected) c.boundSelected else c.bound.copy(alpha = 0.85f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom), if (selected) 2f * px else px)
             } else drawLine(
                 if (selected) c.boundSelected else c.bound.copy(alpha = 0.45f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom),
                 if (selected) 2 * px else px,
@@ -964,7 +959,11 @@ private fun DrawScope.drawIntervalTier(
         val a = x(s)
         val b = x(tier.endOf(i))
         val selected = sel is Selection.Interval && sel.ref.tier == k && sel.ref.index == i
-        if (selected) drawRect(c.intervalSelected, Offset(a, top), Size(b - a, h))
+        if (selected) {
+            drawRect(c.intervalSelected, Offset(a, top), Size(b - a, h))
+            // a clear frame, so the selected phoneme is easy to see
+            drawRect(c.accent, Offset(a + px, top + px), Size(max(0f, b - a - 2 * px), h - 2 * px), style = Stroke(2 * px))
+        }
         val text = tier.texts[i]
         if (text.isEmpty()) {
             drawRect(c.text.copy(alpha = 0.03f), Offset(a, top), Size(b - a, h))
@@ -1127,9 +1126,23 @@ private fun DrawScope.drawOto(
     drawRect(shade, Offset(0f, top), Size(max(0f, l), h))
     drawRect(shade, Offset(r, top), Size(max(0f, size.width - r), h))
     drawRect(otoColors.getValue(mlabeler.core.format.OtoMarker.Consonant).copy(alpha = 0.16f), Offset(l, top), Size(max(0f, k - l), h))
-    for ((m, col) in otoColors) {
+    // each marker named at its own height, so close markers stay readable
+    val names = listOf(
+        mlabeler.core.format.OtoMarker.Left to "Offset", mlabeler.core.format.OtoMarker.Overlap to "Ovl",
+        mlabeler.core.format.OtoMarker.Preutterance to "Preu", mlabeler.core.format.OtoMarker.Consonant to "Fixed",
+        mlabeler.core.format.OtoMarker.Right to "Cutoff",
+    )
+    val labelTop = top + 28 * px
+    for ((n, pair) in names.withIndex()) {
+        val (m, name) = pair
+        val col = otoColors.getValue(m)
         val xx = x(a.get(m) / 1000)
-        drawLine(col, Offset(xx, top), Offset(xx, bottom), if (m == mlabeler.core.format.OtoMarker.Preutterance) 2.5f * px else 1.5f * px)
+        val ly = labelTop + (n % 5) * 16 * px
+        drawLine(col, Offset(xx, ly + 14 * px), Offset(xx, bottom), if (m == mlabeler.core.format.OtoMarker.Preutterance) 2.5f * px else 1.5f * px)
+        val lay = measurer.measure(name, small.copy(color = col, fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+        val tx = if (m == mlabeler.core.format.OtoMarker.Right) xx - lay.size.width - 3 * px else xx + 3 * px
+        drawRect(c.bg.copy(alpha = 0.7f), Offset(tx - 2 * px, ly), Size(lay.size.width + 4f * px, lay.size.height.toFloat()))
+        drawText(lay, topLeft = Offset(tx, ly))
     }
     safeText(measurer, e.alias, Offset(l + 6 * px, top + 6 * px), big.copy(color = c.text))
 }

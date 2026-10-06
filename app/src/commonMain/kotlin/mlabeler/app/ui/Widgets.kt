@@ -317,8 +317,11 @@ fun ValueSlider(
     decimals: Int = 0,
     /** Default value: a reset button appears when the value differs from it. */
     default: Float? = null,
+    /** false: dragging moves only the slider, the value is applied when it's let go (for things that relayout). */
+    live: Boolean = true,
     onChange: (Float) -> Unit,
 ) {
+    var dragValue by remember { mutableStateOf<Float?>(null) }
     val c = T.c
     fun shown(v: Float): String {
         val x = v * factor
@@ -357,7 +360,10 @@ fun ValueSlider(
             }
         }
         androidx.compose.material3.Slider(
-            value = value.coerceIn(range), onValueChange = { editing = false; onChange(it) }, valueRange = range,
+            value = (dragValue ?: value).coerceIn(range),
+            onValueChange = { editing = false; if (live) onChange(it) else { dragValue = it; text = shown(it) } },
+            onValueChangeFinished = { dragValue?.let { onChange(it) }; dragValue = null },
+            valueRange = range,
             colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.border),
             modifier = Modifier.height(32.dp),
         )

@@ -131,17 +131,22 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
         TopBar(app, ed, wc, overlayDetails) { overlayDetails = !overlayDetails }
         Divider()
         Box(Modifier.weight(1f).fillMaxWidth()) {
+            // panels go to the side the user put them on; two on one side share it as tabs
+            val left = mutableListOf<SidePanelId>()
+            val right = mutableListOf<SidePanelId>()
+            if (l.showFiles) (if (l.filesSide == "right") right else left) += SidePanelId.Files
+            if (l.showInspector && wc == WidthClass.Expanded) (if (l.inspectorSide == "left") left else right) += SidePanelId.Details
             Row(Modifier.fillMaxSize()) {
-                if (l.showFiles) {
-                    SidePanel(ed, Modifier.width(l.filesWidth.coerceIn(180f, 480f).dp).fillMaxHeight())
-                    VSplitter { d -> app.update { it.copy(layout = it.layout.copy(filesWidth = (it.layout.filesWidth + d).coerceIn(180f, 480f))) } }
+                if (left.isNotEmpty()) {
+                    PanelStack(app, ed, left, Modifier.width(l.filesWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
+                    VSplitter { d -> app.update { it.copy(layout = it.layout.copy(filesWidth = (it.layout.filesWidth + d).coerceIn(180f, 520f))) } }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     EditorBody(app, ed)
                 }
-                if (l.showInspector && wc == WidthClass.Expanded) {
-                    VSplitter { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(220f, 520f))) } }
-                    Inspector(ed, Modifier.width(l.inspectorWidth.coerceIn(220f, 520f).dp).fillMaxHeight())
+                if (right.isNotEmpty()) {
+                    VSplitter { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(180f, 520f))) } }
+                    PanelStack(app, ed, right, Modifier.width(l.inspectorWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
                 }
             }
             // medium width: details slide over the timeline
@@ -410,6 +415,63 @@ fun MessageToast(app: AppState, bottom: Dp) {
                 .clickable { app.dismissMessage() }.padding(horizontal = 14.dp, vertical = 9.dp),
         ) {
             Text(m.text, color = c.bg, fontSize = 13.sp)
+        }
+    }
+}
+
+enum class SidePanelId { Files, Details }
+
+private val panelNames = mapOf(
+    SidePanelId.Files to mlabeler.app.i18n.L("Files and entries", "Файлы и записи"),
+    SidePanelId.Details to mlabeler.app.i18n.L("Details", "Подробности"),
+)
+private val toOtherSide = mlabeler.app.i18n.L("Move to the other side", "Перенести на другую сторону")
+private val hidePanel = mlabeler.app.i18n.L("Hide", "Скрыть")
+
+/** Side panels of one side: a header with tabs when there are two, move/hide buttons while arranging. */
+@Composable
+private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>, modifier: Modifier) {
+    val c = T.c
+    var tab by remember { mutableStateOf(0) }
+    val current = panels[tab.coerceIn(0, panels.size - 1)]
+    val arranging = app.arrangePanels
+    Column(modifier.background(c.panel)) {
+        if (panels.size > 1 || arranging) {
+            Row(Modifier.fillMaxWidth().background(if (arranging) c.accent.copy(alpha = 0.12f) else c.panel).padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                for ((k, p) in panels.withIndex()) {
+                    val sel = p == current
+                    Text(
+                        panelNames.getValue(p)(), fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1,
+                        modifier = Modifier.clip(RoundedCornerShape(c.radius)).background(if (sel && panels.size > 1) c.panelAlt else c.panel.copy(alpha = 0f))
+                            .clickable { tab = k }.padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                if (arranging) {
+                    IconBtn(Icons.layers, toOtherSide(), size = 28.dp) {
+                        app.update { st ->
+                            st.copy(layout = when (current) {
+                                SidePanelId.Files -> st.layout.copy(filesSide = if (st.layout.filesSide == "right") "left" else "right")
+                                SidePanelId.Details -> st.layout.copy(inspectorSide = if (st.layout.inspectorSide == "left") "right" else "left")
+                            })
+                        }
+                    }
+                    IconBtn(Icons.close, hidePanel(), size = 28.dp) {
+                        app.update { st ->
+                            st.copy(layout = when (current) {
+                                SidePanelId.Files -> st.layout.copy(showFiles = false)
+                                SidePanelId.Details -> st.layout.copy(showInspector = false)
+                            })
+                        }
+                    }
+                }
+            }
+            Divider()
+        }
+        when (current) {
+            SidePanelId.Files -> SidePanel(ed, Modifier.weight(1f).fillMaxWidth())
+            SidePanelId.Details -> Inspector(ed, Modifier.weight(1f).fillMaxWidth())
         }
     }
 }

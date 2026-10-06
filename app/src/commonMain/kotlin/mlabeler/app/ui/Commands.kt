@@ -202,6 +202,18 @@ object Commands {
     val toolCut = Command("tool-cut", L("Cut tool: click adds a boundary", "Ножницы: клик ставит границу"), listOf(Chord(Key.Two))) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = if (it.edit.tool == "cut") "cursor" else "cut")) }
     }.only(Mode.Labels)
+    val toolPan = Command("tool-pan", L("Hand tool: dragging scrolls", "Рука: перетаскивание прокручивает"), listOf(Chord(Key.Three))) { _, a ->
+        a.update { it.copy(edit = it.edit.copy(tool = "pan")) }
+    }.only(Mode.Labels)
+    val toolPlay = Command("tool-play", L("Play tool: a click plays the phoneme", "Проигрывание: клик играет фонему"), listOf(Chord(Key.Four))) { _, a ->
+        a.update { it.copy(edit = it.edit.copy(tool = "play")) }
+    }.only(Mode.Labels)
+    val labelsBigger = Command("labels-bigger", L("Bigger label text", "Крупнее текст меток"), listOf(Chord(Key.Equals, ctrl = true, shift = true))) { _, a ->
+        a.update { it.copy(layout = it.layout.copy(labelFontSize = (it.layout.labelFontSize + 2f).coerceAtMost(48f))) }
+    }
+    val labelsSmaller = Command("labels-smaller", L("Smaller label text", "Мельче текст меток"), listOf(Chord(Key.Minus, ctrl = true, shift = true))) { _, a ->
+        a.update { it.copy(layout = it.layout.copy(labelFontSize = (it.layout.labelFontSize - 2f).coerceAtLeast(8f))) }
+    }
     val playOnDrag = Command("play-on-drag", S.playOnDrag, emptyList()) { _, a -> a.update { it.copy(edit = it.edit.copy(playOnDrag = !it.edit.playOnDrag)) } }
     val cleanup = Command("cleanup", L("Clean the recording…", "Чистка записи…"), listOf(ch('C', ctrl = true, shift = true))) { _, a -> a.showCleanup = true }
     val reloadAudio = Command("reload-audio", L("Read the recording again", "Перечитать запись"), listOf(Chord(Key.F5))) { e, _ -> e.reloadAudio() }
@@ -216,7 +228,7 @@ object Commands {
     }
 
     val all = listOf(
-        cleanup, reloadAudio, deselect, toolCursor, toolCut, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, midiOut, midiIn, overlay, tiersOnTop, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

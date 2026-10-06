@@ -21,6 +21,8 @@ data class LayoutSettings(
     /** Height of the audio area (waveform + spectrogram) in dp; 0 = fill. */
     val audioHeight: Float = 0f,
     val tierHeight: Float = 40f,
+    /** Size of the label text on the lanes, sp (lanes grow to fit). */
+    val labelFontSize: Float = 13f,
     val showPitch: Boolean = false,
     val showPower: Boolean = false,
     /** Pitch drawn over the spectrogram instead of its own lane. */
@@ -31,12 +33,17 @@ data class LayoutSettings(
     val overlay: Boolean = false,
     /** Label tiers above the audio instead of below. */
     val tiersOnTop: Boolean = false,
+    /** Spectrogram lane above the waveform lane. */
+    val spectrogramFirst: Boolean = false,
+    /** Which side the files/entries panel and the details panel are on: "left" or "right". */
+    val filesSide: String = "left",
+    val inspectorSide: String = "right",
     /** How much the spectrogram is darkened in the overlaid view so labels and the waveform stay readable (0..0.8). */
     val overlayDim: Float = 0.35f,
     /** Overlaid view: fill the waveform instead of drawing only its outline. */
     val overlayWaveFill: Boolean = false,
-    /** Opacity of that fill: 1 = solid. */
-    val overlayWaveFillAlpha: Float = 0.55f,
+    /** Opacity of the waveform over the spectrogram: 1 = as in its own lane. */
+    val overlayWaveFillAlpha: Float = 0.85f,
 )
 
 @Serializable
@@ -71,12 +78,15 @@ data class EditSettings(
     val boundaryOwner: String = "end",
     /** Space while playing starts again instead of stopping. */
     val spaceRestarts: Boolean = false,
-    /** Mouse tool: "cursor" (click selects, drag moves boundaries) or "cut" (click adds a boundary). */
+    /** Mouse tool: "cursor" (click selects, drag moves boundaries), "cut" (click adds a boundary),
+     *  "pan" (dragging scrolls), "play" (click plays the phoneme, a selection plays when let go). */
     val tool: String = "cursor",
     /** After adding a boundary with the mouse: type the name of the new part right away. */
     val cutAskName: Boolean = true,
     /** After adding a boundary with the mouse: play the part before it. */
     val cutPlay: Boolean = true,
+    /** Scissors cut on label lanes too (otherwise only over the audio; clicks on labels select and rename). */
+    val cutOnLanes: Boolean = false,
     /** After moving a boundary, select the phoneme it belongs to (Space then plays it). */
     val selectAfterDrag: Boolean = true,
     /** A click on the waveform or spectrogram removes the phoneme selection (Space then plays from the cursor). */
@@ -100,6 +110,8 @@ data class MouseSettings(
     val audioMiddle: String = MouseActions.PLAY,
     val audioCtrl: String = MouseActions.SPLIT,
     val audioAlt: String = MouseActions.NONE,
+    /** The mouse wheel: "scroll" through time, or "phonemes" (selects the next/previous phoneme; Shift+wheel scrolls). */
+    val wheel: String = "scroll",
 )
 
 object MouseActions {
@@ -144,7 +156,27 @@ data class ToolbarSettings(
     /** Text under the buttons. */
     val labels: Boolean = true,
     val big: Boolean = true,
-)
+    /** Order of all groups, shown or not (so turning one off and on keeps its place). */
+    val order: List<String> = emptyList(),
+) {
+    fun fullOrder(): List<String> = (order + groups + ToolbarGroups.all).distinct().filter { it in ToolbarGroups.all }
+
+    /** Shows or hides [g] keeping every group where it was. */
+    fun toggled(g: String, on: Boolean): ToolbarSettings {
+        val o = fullOrder()
+        val vis = groups.toSet().let { if (on) it + g else it - g }
+        return copy(order = o, groups = o.filter { it in vis })
+    }
+
+    fun moved(g: String, delta: Int): ToolbarSettings {
+        val o = fullOrder().toMutableList()
+        val i = o.indexOf(g)
+        val j = i + delta
+        if (i < 0 || j !in o.indices) return this
+        o[i] = o[j]; o[j] = g
+        return copy(order = o, groups = o.filter { it in groups })
+    }
+}
 
 object ToolbarGroups {
     const val FILES = "files"

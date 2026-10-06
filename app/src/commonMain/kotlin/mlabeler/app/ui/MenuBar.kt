@@ -85,6 +85,10 @@ object MenuTitles {
     val bigButtons = L("Big buttons", "Крупные кнопки")
     val audio = L("Audio", "Звук")
     val interfaceSet = L("Interface", "Интерфейс")
+    val filesRight = L("Files panel on the right", "Панель файлов справа")
+    val detailsLeft = L("Details panel on the left", "Подробности слева")
+    val arrange = L("Arrange panels (move and hide buttons)", "Расставить панели (кнопки переноса и скрытия)")
+    val specFirst = L("Spectrogram above the waveform", "Спектрограмма над волной")
     val labelsOnTop = L("Labels above the audio", "Разметка над звуком")
     val overlay = L("Labels over the audio (one picture)", "Разметка поверх звука (одна картинка)")
     val keys = L("Keyboard shortcuts…", "Горячие клавиши…")
@@ -141,8 +145,10 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.nudgeLeft, ed, app))
             add(item(Commands.nudgeRight, ed, app))
             add(MSep)
-            add(item(Commands.toolCursor, ed, app, checked = s.edit.tool != "cut"))
+            add(item(Commands.toolCursor, ed, app, checked = s.edit.tool == "cursor"))
             add(item(Commands.toolCut, ed, app, checked = s.edit.tool == "cut"))
+            add(item(Commands.toolPan, ed, app, checked = s.edit.tool == "pan"))
+            add(item(Commands.toolPlay, ed, app, checked = s.edit.tool == "play"))
             add(item(Commands.playOnDrag, ed, app, checked = s.edit.playOnDrag))
             add(MSep)
             add(item(Commands.ripple, ed, app, checked = s.edit.ripple))
@@ -161,12 +167,9 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     fun toggle(title: String, on: Boolean, keys: String = "", f: (mlabeler.app.state.AppSettings) -> mlabeler.app.state.AppSettings) =
         MItem(title, keys, on) { app.update(f) }
     val toolbar = buildList<MenuEntry> {
-        for (g in ToolbarGroups.all) {
+        for (g in s.toolbar.fullOrder()) {
             val on = g in s.toolbar.groups
-            add(toggle(ToolLabels.group(g)(), on) { st ->
-                val groups = if (on) st.toolbar.groups - g else ToolbarGroups.all.filter { it in st.toolbar.groups || it == g }
-                st.copy(toolbar = st.toolbar.copy(groups = groups))
-            })
+            add(toggle(ToolLabels.group(g)(), on) { st -> st.copy(toolbar = st.toolbar.toggled(g, !on)) })
         }
         add(MSep)
         add(toggle(MenuTitles.buttonLabels(), s.toolbar.labels) { it.copy(toolbar = it.toolbar.copy(labels = !it.toolbar.labels)) })
@@ -176,6 +179,11 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MSub(MenuTitles.panels(), buildList {
             add(item(Commands.files, ed, app, checked = l.showFiles, title = MenuTitles.filesPanel()))
             add(item(Commands.inspector, ed, app, checked = l.showInspector, title = MenuTitles.detailsPanel()))
+            add(MSep)
+            add(toggle(MenuTitles.filesRight(), l.filesSide == "right") { it.copy(layout = it.layout.copy(filesSide = if (it.layout.filesSide == "right") "left" else "right")) })
+            add(toggle(MenuTitles.detailsLeft(), l.inspectorSide == "left") { it.copy(layout = it.layout.copy(inspectorSide = if (it.layout.inspectorSide == "left") "right" else "left")) })
+            add(MItem(MenuTitles.arrange(), checked = app.arrangePanels) { app.arrangePanels = !app.arrangePanels })
+            add(MSep)
             if (!Platform.isMobile) add(toggle(MenuTitles.menuBar(), s.menuBar) { it.copy(menuBar = !it.menuBar) })
             add(toggle(MenuTitles.statusBar(), s.statusBar) { it.copy(statusBar = !it.statusBar) })
         }))
@@ -187,8 +195,11 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.powerLane, ed, app, checked = l.showPower))
         add(MSep)
         add(item(Commands.overlay, ed, app, checked = l.overlay, title = MenuTitles.overlay()))
-        if (l.overlay) add(toggle(S.overlayWaveFill(), l.overlayWaveFill) { it.copy(layout = it.layout.copy(overlayWaveFill = !it.layout.overlayWaveFill)) })
         add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
+        add(toggle(MenuTitles.specFirst(), l.spectrogramFirst) { it.copy(layout = it.layout.copy(spectrogramFirst = !it.layout.spectrogramFirst)) })
+        add(MSep)
+        add(item(Commands.labelsBigger, ed, app))
+        add(item(Commands.labelsSmaller, ed, app))
         add(MSep)
         add(item(Commands.zoomIn, ed, app))
         add(item(Commands.zoomOut, ed, app))

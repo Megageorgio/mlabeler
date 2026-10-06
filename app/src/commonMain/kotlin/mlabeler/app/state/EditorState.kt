@@ -436,6 +436,8 @@ class EditorState(
         val it = items[i]
         workspace.updateState { s -> s.copy(lastItem = it.id) }
         load(it)
+        // keys (Delete, Space…) go to the editor again after a click in the file list
+        runCatching { requestFocus() }
     }
 
     fun openRelative(delta: Int) {
@@ -826,13 +828,15 @@ class EditorState(
             return
         }
         val k = if (tier(activeTier) != null) activeTier else d.phonemeTierIndex()
-        val r = Edits.split(d, k, time, "", settings.edit.minIntervalMs / 1000.0) ?: return
+        // the new phoneme is the one the new boundary belongs to: before it ("end", default) or after it
+        val newLeft = settings.edit.boundaryOwner == "end"
+        val r = Edits.split(d, k, time, "", settings.edit.minIntervalMs / 1000.0, newOnLeft = newLeft) ?: return
         commit(r.first)
-        val right = IntervalRef(k, r.second.bound)
-        selectInterval(right, reveal = false)
+        val fresh = IntervalRef(k, if (newLeft) r.second.bound - 1 else r.second.bound)
+        selectInterval(fresh, reveal = false)
         if (playLeft) tier(k)?.let { t -> val i = r.second.bound - 1; if (i >= 0) play(t.startOf(i), t.endOf(i), loop = false) }
         // with a keyboard, name the new part right away
-        if (askName) editingText = right
+        if (askName) editingText = fresh
     }
 
     fun mergeSelected() {

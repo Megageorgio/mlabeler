@@ -34,6 +34,8 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         val r = try {
             httpRequest(method, base + path, headers(if (body != null) mapOf("Content-Type" to "application/json") else emptyMap()),
                 body?.toString()?.encodeToByteArray(), timeoutMs)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             throw ToolkitException("Toolkit is not reachable at $base (${e.message})")
         }

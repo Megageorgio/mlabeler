@@ -32,6 +32,8 @@ class AppState(private val scope: CoroutineScope) {
     var showWorkspace by mutableStateOf(false)
     var showAutolabel by mutableStateOf(false)
     var showCleanup by mutableStateOf(false)
+    /** Panels show move/hide buttons (View → Arrange panels). */
+    var arrangePanels by mutableStateOf(false)
     var showHelp by mutableStateOf(false)
     var showAutoOto by mutableStateOf(false)
     var showPlugins by mutableStateOf(false)

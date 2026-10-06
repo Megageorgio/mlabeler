@@ -65,6 +65,14 @@ import mlabeler.app.theme.T
 import mlabeler.app.theme.Themes
 import mlabeler.core.format.LabelFormat
 import kotlin.math.roundToInt
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import kotlinx.coroutines.launch
 
 /** Dim background with a centred card; full screen on narrow windows. */
@@ -79,10 +87,51 @@ fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable () 
         contentAlignment = Alignment.TopCenter,
     ) {
         val narrow = this.maxWidth < 600.dp
-        Card(
-            (if (narrow) Modifier.fillMaxSize() else Modifier.padding(top = 56.dp).widthIn(max = maxWidth.dp).fillMaxWidth().heightIn(max = this.maxHeight - 96.dp))
-                .clickable(remember { MutableInteractionSource() }, null) {},
-        ) { content() }
+        if (narrow || mlabeler.app.Platform.isMobile) {
+            Card(
+                (if (narrow) Modifier.fillMaxSize() else Modifier.padding(top = 56.dp).widthIn(max = maxWidth.dp).fillMaxWidth().heightIn(max = this.maxHeight - 96.dp))
+                    .clickable(remember { MutableInteractionSource() }, null) {},
+            ) { content() }
+            return@BoxWithConstraints
+        }
+        // computers: the window can be moved by its top strip and resized by the corner
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        var size by remember { mutableStateOf<androidx.compose.ui.unit.DpSize?>(null) }
+        val boxW = this.maxWidth
+        val boxH = this.maxHeight
+        Box(
+            Modifier.padding(top = 56.dp).offset { androidx.compose.ui.unit.IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
+                .then(size?.let { Modifier.size(it.width.coerceIn(320.dp, boxW), it.height.coerceIn(200.dp, boxH)) }
+                    ?: Modifier.widthIn(max = maxWidth.dp).fillMaxWidth().heightIn(max = boxH - 96.dp)),
+        ) {
+            Card(Modifier.fillMaxSize().clickable(remember { MutableInteractionSource() }, null) {}) {
+                Column {
+                    Box(
+                        Modifier.fillMaxWidth().height(12.dp)
+                            .pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon.Hand)
+                            .pointerInput(Unit) { detectDragGestures { ch, d -> ch.consume(); offset += d } },
+                        contentAlignment = Alignment.Center,
+                    ) { Box(Modifier.size(width = 40.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(c.border)) }
+                    Box(Modifier.weight(1f, fill = false)) { content() }
+                }
+            }
+            var cardSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+            Box(Modifier.matchParentSize().onSizeChanged { cardSize = it })
+            Box(
+                Modifier.align(Alignment.BottomEnd).size(16.dp)
+                    .pointerHoverIcon(mlabeler.app.resizeHorizontalIcon)
+                    .pointerInput(Unit) {
+                        detectDragGestures { ch, d ->
+                            ch.consume()
+                            val cur = size ?: with(density) { androidx.compose.ui.unit.DpSize(cardSize.width.toDp(), cardSize.height.toDp()) }
+                            size = with(density) { androidx.compose.ui.unit.DpSize(cur.width + d.x.toDp(), cur.height + d.y.toDp()) }
+                        }
+                    },
+            ) {
+                Text("◢", color = c.muted, fontSize = 11.sp, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 2.dp))
+            }
+        }
     }
 }
 
@@ -230,12 +279,12 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
             }
             Section.View -> {
-                ValueSlider(S.interfaceScale(), s.scale, 0.7f..2f, "%", factor = 100f, default = dScale) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
+                ValueSlider(S.interfaceScale(), s.scale, 0.7f..2f, "%", factor = 100f, default = dScale, live = false) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
                 SectionTitle(S.view())
                 SectionTitle(S.view())
                 SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
-                if (s.layout.overlay) SwitchRow(S.overlayWaveFill(), s.layout.overlayWaveFill) { v -> app.update { it.copy(layout = it.layout.copy(overlayWaveFill = v)) } }
-                if (s.layout.overlay && s.layout.overlayWaveFill) ValueSlider(S.overlayWaveFillAlpha(), s.layout.overlayWaveFillAlpha, 0.05f..1f, "%", factor = 100f,
+                ValueSlider(S.labelFontSize(), s.layout.labelFontSize, 8f..48f, "sp", default = dL.labelFontSize) { v -> app.update { it.copy(layout = it.layout.copy(labelFontSize = v.roundToInt().toFloat())) } }
+                if (s.layout.overlay) ValueSlider(S.overlayWaveFillAlpha(), s.layout.overlayWaveFillAlpha, 0.05f..1f, "%", factor = 100f,
                     default = mlabeler.app.state.LayoutSettings().overlayWaveFillAlpha) { v -> app.update { it.copy(layout = it.layout.copy(overlayWaveFillAlpha = v)) } }
                 if (s.layout.overlay) ValueSlider(S.overlayDim(), s.layout.overlayDim, 0f..0.8f, "%", factor = 100f, default = dL.overlayDim) { v -> app.update { it.copy(layout = it.layout.copy(overlayDim = v)) } }
                 SwitchRow(S.tiersOnTop(), s.layout.tiersOnTop) { v -> app.update { it.copy(layout = it.layout.copy(tiersOnTop = v)) } }
@@ -475,25 +524,16 @@ private fun InterfacePage(app: AppState) {
     SwitchRow(MenuTitles.buttonLabels(), s.toolbar.labels) { v -> app.update { it.copy(toolbar = it.toolbar.copy(labels = v)) } }
     SwitchRow(MenuTitles.bigButtons(), s.toolbar.big) { v -> app.update { it.copy(toolbar = it.toolbar.copy(big = v)) } }
     Text(S.toolbarHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
-    // shown groups first, in their order, then the hidden ones
-    val shown = s.toolbar.groups
-    val order = shown + mlabeler.app.state.ToolbarGroups.all.filter { it !in shown }
-    for (g in order) {
-        val on = g in shown
-        val i = shown.indexOf(g)
+    // a fixed list: ticking a group on or off doesn't move it
+    val order = s.toolbar.fullOrder()
+    for ((i, g) in order.withIndex()) {
+        val on = g in s.toolbar.groups
         Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Checkbox(on, { v ->
-                app.update { st -> st.copy(toolbar = st.toolbar.copy(groups = if (v) st.toolbar.groups + g else st.toolbar.groups - g)) }
-            }, colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.muted, checkmarkColor = c.onAccent))
+            androidx.compose.material3.Checkbox(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } },
+                colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.muted, checkmarkColor = c.onAccent))
             Text(ToolLabels.group(g)(), color = if (on) c.text else c.muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            if (on) {
-                IconBtn(Icons.up, S.moveUp(), enabled = i > 0, size = 28.dp) {
-                    app.update { st -> st.copy(toolbar = st.toolbar.copy(groups = st.toolbar.groups.toMutableList().also { swapAt(it, i, i - 1) })) }
-                }
-                IconBtn(Icons.down, S.moveDown(), enabled = i < shown.size - 1, size = 28.dp) {
-                    app.update { st -> st.copy(toolbar = st.toolbar.copy(groups = st.toolbar.groups.toMutableList().also { swapAt(it, i, i + 1) })) }
-                }
-            }
+            IconBtn(Icons.up, S.moveUp(), enabled = i > 0, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, -1)) } }
+            IconBtn(Icons.down, S.moveDown(), enabled = i < order.size - 1, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, 1)) } }
         }
     }
 }
@@ -508,6 +548,14 @@ object MouseTitles {
     val tool = L("Tool", "Инструмент")
     val cursor = L("Cursor: click selects, drag moves (1)", "Курсор: клик выбирает, перетаскивание двигает (1)")
     val cut = L("Scissors: click adds a boundary (2)", "Ножницы: клик ставит границу (2)")
+    val pan = L("Hand: dragging scrolls (3)", "Рука: перетаскивание прокручивает (3)")
+    val playTool = L("Play: a click plays the phoneme (4)", "Проигрывание: клик играет фонему (4)")
+    val cutOnLanes = L("Scissors cut on label lanes too (otherwise a click on a label selects it, a double click renames)",
+        "Ножницы режут и на полосах разметки (иначе клик по метке её выбирает, двойной — переименовывает)")
+    val wheel = L("Mouse wheel", "Колесо мыши")
+    val wheelScroll = L("Scrolls through time (Ctrl+wheel zooms)", "Прокручивает по времени (Ctrl+колесо — масштаб)")
+    val wheelPhonemes = L("Steps through phonemes, Space plays the chosen one (Shift+wheel scrolls)",
+        "Переходит по фонемам, пробел играет выбранную (Shift+колесо — прокрутка)")
     val toolHint = L("Near a boundary both tools drag it. Shift+click and dragging over the audio select a part in both.",
         "Рядом с границей оба инструмента её двигают. Shift+клик и протягивание по звуку выделяют кусок в обоих.")
     val askName = L("Type the name of the new part right away", "Сразу вводить название новой части")
@@ -524,8 +572,8 @@ object MouseTitles {
         "Клик по волне или спектрограмме снимает выделение (пробел играет оттуда)")
     val spaceRestarts = L("Space while playing starts again (instead of stopping)", "Пробел во время проигрывания начинает заново (а не останавливает)")
     val owner = L("A boundary belongs to the phoneme…", "Граница относится к фонеме…")
-    val ownerHint = L("Delete on a selected boundary removes that phoneme; Space plays it.",
-        "Delete на выбранной границе убирает эту фонему, пробел её проигрывает.")
+    val ownerHint = L("Delete on a selected boundary removes that phoneme, Space plays it, and a new boundary creates it (that part gets the new name).",
+        "Delete на выбранной границе убирает эту фонему, пробел её проигрывает, а новая граница создаёт её (эта часть получает новое название).")
     val ownerEnd = L("that ends at it", "которая на ней заканчивается")
     val ownerStart = L("that starts at it", "которая с неё начинается")
 
@@ -550,10 +598,13 @@ private fun MousePage(app: AppState) {
     val s = app.settings
     SectionTitle(MouseTitles.tool())
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip(MouseTitles.cursor(), s.edit.tool != "cut") { app.update { it.copy(edit = it.edit.copy(tool = "cursor")) } }
+        Chip(MouseTitles.cursor(), s.edit.tool == "cursor") { app.update { it.copy(edit = it.edit.copy(tool = "cursor")) } }
         Chip(MouseTitles.cut(), s.edit.tool == "cut") { app.update { it.copy(edit = it.edit.copy(tool = "cut")) } }
+        Chip(MouseTitles.pan(), s.edit.tool == "pan") { app.update { it.copy(edit = it.edit.copy(tool = "pan")) } }
+        Chip(MouseTitles.playTool(), s.edit.tool == "play") { app.update { it.copy(edit = it.edit.copy(tool = "play")) } }
     }
     Text(MouseTitles.toolHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+    SwitchRow(MouseTitles.cutOnLanes(), s.edit.cutOnLanes) { v -> app.update { it.copy(edit = it.edit.copy(cutOnLanes = v)) } }
     SwitchRow(MouseTitles.askName(), s.edit.cutAskName) { v -> app.update { it.copy(edit = it.edit.copy(cutAskName = v)) } }
     SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
     SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
@@ -561,6 +612,11 @@ private fun MousePage(app: AppState) {
     SwitchRow(MouseTitles.audioDeselects(), s.edit.audioClickDeselects) { v -> app.update { it.copy(edit = it.edit.copy(audioClickDeselects = v)) } }
     val m = s.mouse
     fun set(f: (mlabeler.app.state.MouseSettings) -> mlabeler.app.state.MouseSettings) = app.update { it.copy(mouse = f(it.mouse)) }
+    SectionTitle(MouseTitles.wheel())
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Chip(MouseTitles.wheelScroll(), m.wheel != "phonemes") { set { it.copy(wheel = "scroll") } }
+        Chip(MouseTitles.wheelPhonemes(), m.wheel == "phonemes") { set { it.copy(wheel = "phonemes") } }
+    }
     SectionTitle(MouseTitles.onLabels())
     ActionRow(MouseTitles.double(), m.tierDouble) { v -> set { it.copy(tierDouble = v) } }
     ActionRow(MouseTitles.right(), m.tierRight) { v -> set { it.copy(tierRight = v) } }

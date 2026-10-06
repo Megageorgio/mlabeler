@@ -57,7 +57,11 @@ The plan is in [docs/DESIGN.md](docs/DESIGN.md).
   stay exactly the same; the first version is kept in `.mlabeler/backup`, with undo and "put back the original".
 - A recording changed on disk is read again by itself (or F5); labels and undo history stay. After moving a boundary
   its phoneme is selected (Space plays it); a click on the audio or Esc clears the selection.
-- Any system font for the interface. Every settings page and every slider can go back to its default.
+- Tools 1–4: cursor, scissors (cut over the audio; labels stay clickable), hand, play. A new boundary creates the
+  phoneme it belongs to (named right away, small field). Label text size (Ctrl+Shift+= / −). The wheel can walk
+  through phonemes instead of scrolling. Panels can sit on either side (two on one side become tabs; View → Panels,
+  "Arrange panels"); spectrogram above or below the waveform. Dialogs on computers can be moved and resized.
+- Any system font (the wheel over the font name steps through them) for the interface. Every settings page and every slider can go back to its default.
 - System folder dialog (Explorer with the address bar on Windows). Only WAV files are listed unless other formats are
   turned on in Settings → General.
 - Every slider in the settings has a number field next to it for an exact value.

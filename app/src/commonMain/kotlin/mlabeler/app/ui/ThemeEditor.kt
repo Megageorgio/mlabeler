@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.sp
 import mlabeler.app.Platform
 import mlabeler.app.i18n.L
@@ -254,7 +255,23 @@ private fun FontPicker(app: AppState) {
     val cur = app.settings.font
     SectionTitle(fontT())
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Btn((cur.ifEmpty { fontTheme() }) + "  ▾") { open = !open }
+        // the mouse wheel over the font name steps through the fonts, as in text editors
+        Box(Modifier.pointerInput(names) {
+            awaitPointerEventScope {
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    if (ev.type != androidx.compose.ui.input.pointer.PointerEventType.Scroll || names.isEmpty()) continue
+                    val dy = ev.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                    if (dy == 0f) continue
+                    val i = names.indexOf(app.settings.font)
+                    val next = (if (i < 0) 0 else i + (if (dy > 0) 1 else -1)).coerceIn(0, names.size - 1)
+                    app.update { it.copy(font = names[next]) }
+                    ev.changes.forEach { it.consume() }
+                }
+            }
+        }) {
+            Btn((cur.ifEmpty { fontTheme() }) + "  ▾") { open = !open }
+        }
         if (cur.isNotEmpty()) Btn(fontTheme()) { app.update { it.copy(font = "") } }
     }
     Text(fontSample(), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
