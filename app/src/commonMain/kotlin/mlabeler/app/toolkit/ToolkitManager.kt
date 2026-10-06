@@ -145,9 +145,21 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         updatingNow = true
         busy(Status.Installing)
         addLog(updating())
+        // the updater writes uv's output to a file (its path is in the toolkit's last words): show it as it grows
+        var shown = 0
         try {
             repeat(15 * 60) {
                 delay(1000)
+                // (looked up each time: the toolkit's last lines reach the log a moment after it exits)
+                val updateLog = log.lastOrNull { it.startsWith("Update log: ") }?.removePrefix("Update log: ")?.trim()
+                if (updateLog != null) runCatching {
+                    val bytes = mlabeler.core.io.PlatformFs.read(updateLog)
+                    val text = if (bytes.size > 1 && bytes[1] == 0.toByte()) bytes.decodeUtf16le() else bytes.decodeToString()
+                    val lines = text.lines().map { it.trimEnd('\r', '\uFEFF') }.filter { it.isNotBlank() }
+                    if (lines.size < shown) shown = 0
+                    for (l in lines.drop(shown)) addLog(l)
+                    shown = lines.size
+                }
                 if (runCatching { client().health() }.isSuccess) {
                     restartedItself = true
                     check()
@@ -267,4 +279,10 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         val updateFailed = L("The toolkit didn't come back after updating; see the log", "Тулкит не запустился после обновления, подробности в журнале")
         const val EXIT_UPDATING = 75
     }
+}
+
+private fun ByteArray.decodeUtf16le(): String {
+    val start = if (size >= 2 && this[0] == 0xFF.toByte() && this[1] == 0xFE.toByte()) 2 else 0
+    val chars = CharArray((size - start) / 2) { i -> ((this[start + 2 * i].toInt() and 0xFF) or ((this[start + 2 * i + 1].toInt() and 0xFF) shl 8)).toChar() }
+    return chars.concatToString()
 }
