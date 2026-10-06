@@ -129,6 +129,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.importLbp, ed, app))
         if (!oto) add(item(Commands.exportDs, ed, app))
         add(item(Commands.record, ed, app))
+        add(item(Commands.karaoke, ed, app))
         add(MSep)
         add(item(Commands.settings, ed, app, title = S.settings()))
     }

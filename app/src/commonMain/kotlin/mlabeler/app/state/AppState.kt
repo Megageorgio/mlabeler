@@ -95,6 +95,22 @@ class AppState(private val scope: CoroutineScope) {
         recorder = mlabeler.app.recorder.RecorderState(folder, this, scope)
     }
 
+    var karaoke by mutableStateOf<mlabeler.app.recorder.KaraokeState?>(null)
+        private set
+
+    /** Opens singing along the songs of [folder]. */
+    fun openKaraoke(folder: String) {
+        if (!PlatformFs.isDirectory(folder)) return
+        editor?.let { if (it.dirty) it.save(quiet = true) }
+        recorder?.close(); recorder = null
+        karaoke = mlabeler.app.recorder.KaraokeState(folder, this, scope)
+    }
+
+    fun closeKaraoke() {
+        karaoke?.close()
+        karaoke = null
+    }
+
     fun closeRecorder() {
         recorder?.close()
         recorder = null

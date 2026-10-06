@@ -81,6 +81,7 @@ fun StartScreen(app: AppState) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Btn(S.openFolder(), primary = true, icon = Icons.folder) { open() }
                 Btn(mlabeler.app.recorder.recordTitle(), icon = Icons.circle) { app.pickFolder(mlabeler.app.recorder.recordTitle()) { app.openRecorder(it) } }
+                Btn(mlabeler.app.recorder.karaokeTitle(), icon = Icons.play) { app.pickFolder(mlabeler.app.recorder.karaokeTitle()) { app.openKaraoke(it) } }
             }
             Text(S.openFolderHint(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp).widthIn(max = 520.dp))
             Spacer(Modifier.height(32.dp))

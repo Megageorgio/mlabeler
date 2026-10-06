@@ -149,6 +149,8 @@ fun RecorderScreen(app: AppState, rec: RecorderState) {
                     Text(recordTitle(), color = c.text, fontSize = 15.sp)
                     Text(Paths.name(rec.folder), color = c.muted, fontSize = 11.sp, maxLines = 1)
                 }
+                Btn(karaokeTitle()) { val f = rec.folder; app.openKaraoke(f) }
+                Spacer(Modifier.width(6.dp))
                 Btn(editList()) { editing = true }
                 Spacer(Modifier.width(6.dp))
                 IconBtn(Icons.settings, S.settings()) { showSettings = true }

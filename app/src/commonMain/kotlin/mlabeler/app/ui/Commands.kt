@@ -182,6 +182,7 @@ object Commands {
     val tiersOnTop = Command("tiers-top", S.tiersOnTop, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(tiersOnTop = !it.layout.tiersOnTop, laneOrder = emptyList())) } }
     val autoOto = Command("auto-oto", L("Automatic oto…", "Автоматическое oto…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutoOto = true }.only(Mode.Oto)
     val record = Command("record", mlabeler.app.recorder.recordTitle, emptyList()) { e, a -> a.openRecorder(e.workspace.root) }
+    val karaoke = Command("karaoke", mlabeler.app.recorder.karaokeTitle, emptyList()) { e, a -> a.openKaraoke(e.workspace.root) }
     val plugins = Command("plugins", S.pluginsTitle, listOf(ch('P', ctrl = true, shift = true))) { _, a -> a.reloadPlugins(); a.showPlugins = true }
     private fun slotCmd(k: Int, key: Key) = Command("plugin-slot-${k + 1}", L("Quick plugin ${k + 1}", "Быстрый плагин ${k + 1}"), listOf(Chord(key, ctrl = true))) { _, a ->
         val name = a.settings.pluginSlots.getOrNull(k)?.takeIf { it.isNotEmpty() }
@@ -243,7 +244,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

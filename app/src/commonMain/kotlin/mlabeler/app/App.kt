@@ -42,11 +42,13 @@ fun App(app: AppState = rememberAppState()) {
                 Box(Modifier.fillMaxSize()) {
                     val ed = app.editor
                     val rec = app.recorder
-                    if (rec != null) mlabeler.app.recorder.RecorderScreen(app, rec)
+                    val kar = app.karaoke
+                    if (kar != null) mlabeler.app.recorder.KaraokeScreen(app, kar)
+                    else if (rec != null) mlabeler.app.recorder.RecorderScreen(app, rec)
                     else if (ed == null) StartScreen(app) else EditorScreen(app, ed)
                     if (app.showCommands && ed != null) CommandPalette(app)
                     if (app.showSettings) SettingsDialog(app)
-                    if (!app.settings.setupDone && rec == null) mlabeler.app.ui.SetupDialog(app)
+                    if (!app.settings.setupDone && rec == null && kar == null) mlabeler.app.ui.SetupDialog(app)
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
                     if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)
                     if (app.showAutolabel && ed != null) mlabeler.app.ui.AutolabelDialog(app)

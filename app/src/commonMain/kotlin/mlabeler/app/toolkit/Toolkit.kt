@@ -192,6 +192,37 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return call("POST", "/segment", req).jsonObject["id"]!!.jsonPrimitive.content
     }
 
+    /** Starts separating the voice from the music of one uploaded file; returns the job id. */
+    suspend fun separate(fileId: String): String {
+        val req = buildJsonObject {
+            putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) }) }
+        }
+        return call("POST", "/separate", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
+    /** Starts recognising the words of one uploaded file (phrases with times); returns the job id. */
+    suspend fun transcribe(fileId: String, language: String?): String {
+        val req = buildJsonObject {
+            putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) }) }
+            if (language != null) put("language", language)
+            put("frontend", false)
+        }
+        return call("POST", "/transcribe", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
+    /** Downloads a result file of a job. */
+    suspend fun download(path: String): ByteArray {
+        val enc = buildString {
+            for (b in path.encodeToByteArray()) {
+                val ch = (b.toInt() and 0xFF).toChar()
+                if (ch.isLetterOrDigit() && ch.code < 128 || ch in "-_.~/") append(ch) else append('%' + (b.toInt() and 0xFF).toString(16).padStart(2, '0').uppercase())
+            }
+        }
+        val r = httpRequest("GET", "$base/files/download?path=$enc", headers(), null, 600_000)
+        if (r.status !in 200..299) throw ToolkitException(errorText(r))
+        return r.body
+    }
+
     /** Waits for a job; [onProgress] gets 0..1 and the stage. Returns the result object. */
     suspend fun await(jobId: String, onProgress: (Double, String) -> Unit): JsonObject {
         while (true) {
