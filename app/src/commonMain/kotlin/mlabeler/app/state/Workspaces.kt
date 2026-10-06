@@ -55,11 +55,40 @@ object Environments {
             )
         },
         BuiltIn(
+            "singing", L("Singing data", "Певческий датасет"),
+            L("Pitch as its own lane, loudness and notes.", "Высота тона своей полосой, громкость и ноты."),
+        ) {
+            Environment(
+                "singing", LayoutSettings(showInspector = true, showPitch = true, pitchOverSpectrogram = false, showPower = true, waveShare = 0.3f),
+                ToolbarSettings(listOf(ToolbarGroups.FILES, ToolbarGroups.HISTORY, ToolbarGroups.PLAY, ToolbarGroups.EDIT, ToolbarGroups.MODES,
+                    ToolbarGroups.AUTO, ToolbarGroups.MARKS, ToolbarGroups.ZOOM), labels = true, big = false),
+            )
+        },
+        BuiltIn(
+            "oto", L("Voicebank (oto)", "Войсбанк (oto)"),
+            L("Oto entries in their own panel.", "Записи oto отдельной панелью."),
+        ) {
+            Environment(
+                "oto", LayoutSettings(showInspector = true, entriesSeparate = true, entriesSide = "left", showPitch = false, waveShare = 0.45f),
+                ToolbarSettings(listOf(ToolbarGroups.FILES, ToolbarGroups.HISTORY, ToolbarGroups.PLAY, ToolbarGroups.MODES, ToolbarGroups.AUTO,
+                    ToolbarGroups.ZOOM), labels = true, big = false),
+            )
+        },
+        BuiltIn(
+            "compact", L("Small screen", "Маленький экран"),
+            L("Panels hidden, big buttons: for a phone or a narrow window.", "Панели скрыты, кнопки крупные: для телефона или узкого окна."),
+        ) {
+            Environment(
+                "compact", LayoutSettings(showFiles = false, showInspector = false, showSpectrogram = false),
+                ToolbarSettings(ToolbarGroups.simple, labels = false, big = true), statusBar = false, tools = false,
+            )
+        },
+        BuiltIn(
             "full", L("Full", "Полная"),
             L("Every button as an icon, pitch and loudness.", "Все кнопки значками, высота тона и громкость."),
         ) {
             Environment(
-                "full", LayoutSettings(showInspector = true, showPitch = true, showPower = true),
+                "full", LayoutSettings(showInspector = true, showPitch = true, showPower = true, entriesSeparate = true),
                 ToolbarSettings(ToolbarGroups.all, labels = false, big = false),
             )
         },
