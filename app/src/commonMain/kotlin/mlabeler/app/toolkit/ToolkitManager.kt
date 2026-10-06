@@ -162,7 +162,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
                 var lines: List<String> = emptyList()
                 if (updateLog != null) runCatching {
                     val bytes = mlabeler.core.io.PlatformFs.read(updateLog)
-                    val text = if (bytes.size > 1 && bytes[1] == 0.toByte()) bytes.decodeUtf16le() else bytes.decodeToString()
+                    val text = bytes.decodeLog()
                     lines = text.lines().map { it.trimEnd('\r', '\uFEFF') }.filter { it.isNotBlank() }
                     if (lines.size < shown) shown = 0
                     for (l in lines.drop(shown)) addLog(l)
@@ -309,6 +309,18 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         val updateFailed = L("The toolkit didn't come back after updating; see the log", "Тулкит не запустился после обновления, подробности в журнале")
         const val EXIT_UPDATING = 75
     }
+}
+
+/**
+ * A log written by PowerShell is UTF-16 (with a byte order mark, or plain), uv's own output is UTF-8.
+ * Older toolkits updated through PowerShell, so both kinds turn up.
+ */
+internal fun ByteArray.decodeLog(): String {
+    val bom = size >= 2 && this[0] == 0xFF.toByte() && this[1] == 0xFE.toByte()
+    // plain UTF-16 of mostly Latin text: every second byte is zero
+    val zeros = (1 until minOf(size, 200) step 2).count { this[it] == 0.toByte() }
+    val utf16 = bom || (size >= 4 && zeros * 2 >= minOf(size, 200) / 2)
+    return if (utf16) decodeUtf16le() else decodeToString().removePrefix("\uFEFF")
 }
 
 private fun ByteArray.decodeUtf16le(): String {
