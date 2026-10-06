@@ -111,7 +111,7 @@ class KaraokeState(
     var lastTakeName by mutableStateOf("")
         private set
     private var recStart = 0.0
-    private val chunks = ArrayList<FloatArray>()
+    private var chunks = kotlinx.coroutines.channels.Channel<FloatArray>(kotlinx.coroutines.channels.Channel.UNLIMITED)
     private val recRate = 44100
 
     private var playJob: Job? = null
@@ -270,10 +270,12 @@ class KaraokeState(
         input.requestPermission { ok ->
             if (!ok) { app.message(noMic(), error = true); return@requestPermission }
             scope.launch {
-                synchronized(chunks) { chunks.clear() }
+                chunks.close()
+                chunks = kotlinx.coroutines.channels.Channel(kotlinx.coroutines.channels.Channel.UNLIMITED)
+                val sink = chunks
                 try {
                     input.start(recRate) { chunk ->
-                        synchronized(chunks) { chunks += chunk.copyOf() }
+                        sink.trySend(chunk.copyOf())
                         var p = 0f
                         for (v in chunk) { val a = kotlin.math.abs(v); if (a > p) p = a }
                         level = p
@@ -296,9 +298,9 @@ class KaraokeState(
         val end = position
         stop()
         level = 0f
-        val data = synchronized(chunks) {
-            FloatArray(chunks.sumOf { it.size }).also { out -> var p = 0; for (c in chunks) { c.copyInto(out, p); p += c.size } }.also { chunks.clear() }
-        }
+        val parts = ArrayList<FloatArray>()
+        while (true) parts += chunks.tryReceive().getOrNull() ?: break
+        val data = FloatArray(parts.sumOf { it.size }).also { out -> var p = 0; for (c in parts) { c.copyInto(out, p); p += c.size } }
         if (data.size < recRate / 2) return
         val name = takeName.trim().removeSuffix(".wav").ifEmpty { song?.let { nextTakeName(it) } ?: "take" }
         // the words sung in the recorded part go next to the take (autolabel can use them)
