@@ -109,20 +109,38 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     suspend fun start(): Boolean = lock.withLock { startLocked() }
 
     /**
-     * Updates the toolkit now instead of waiting for its own check (it looks for a newer version at most every
-     * few hours, when it starts): stops it, clears the time of its last check and starts it again, which makes
-     * it update itself first when there is something new.
+     * Updates the toolkit now: stops it, reinstalls it from its source with uv (only the toolkit itself is rebuilt,
+     * its dependencies come from uv's cache) and starts it again. Done here rather than by the toolkit, so it works
+     * whatever version is installed.
      */
     fun updateNow() {
-        if (!canRunHere || LocalToolkit.findMvt(settings.mvtPath) == null) return
-        scope.launch {
+        if (!canRunHere || installJob?.isActive == true) return
+        installJob = scope.launch {
             lock.withLock {
-                addLog(updateCheck())
-                if (ownProcess) stop() else runCatching { client().shutdown() }
-                // its files are in use until it has exited
-                repeat(20) { if (runCatching { client().health() }.isFailure) return@repeat; delay(500) }
-                val state = mlabeler.core.io.Paths.join(mlabeler.app.Platform.homeDir(), "mVocalToolkit/update.json")
-                runCatching { mlabeler.core.io.PlatformFs.write(state, "{\"checked\": 0}".encodeToByteArray()) }
+                updatingNow = true
+                try {
+                    busy(Status.Installing)
+                    addLog(updateCheck())
+                    if (ownProcess) stop() else runCatching { client().shutdown() }
+                    // its files are in use until it has exited
+                    repeat(40) { if (runCatching { client().health() }.isFailure) return@repeat; delay(500) }
+                    delay(1000)
+                    busy(Status.Installing)
+                    val uv = LocalToolkit.findUv()
+                    if (uv == null) { status = Status.Failed; lastError = noUv(); return@withLock }
+                    val src = settings.installSource.ifBlank { mlabeler.app.state.ToolkitSettings.DEFAULT_SOURCE }
+                    val cmd = listOf(uv, "tool", "install", "--force", "--reinstall-package", "mvocaltoolkit", "--python", "3.12", src)
+                    addLog("> " + cmd.joinToString(" "))
+                    val code = LocalToolkit.run(cmd, ::addLog)
+                    if (code != 0 || LocalToolkit.findMvt(settings.mvtPath) == null) {
+                        status = Status.Failed
+                        lastError = log.lastOrNull { it.trimStart().startsWith("error") } ?: installFailed()
+                        return@withLock
+                    }
+                    addLog(installed())
+                } finally {
+                    updatingNow = false
+                }
                 startLocked()
             }
         }
@@ -349,4 +367,4 @@ private fun ByteArray.decodeUtf16le(): String {
     return chars.concatToString()
 }
 
-private val updateCheck = L("Looking for a newer toolkit: it stops and starts again…", "Поиск новой версии тулкита: он остановится и запустится снова…")
+private val updateCheck = L("Updating the toolkit: it stops, is reinstalled from its source and starts again…", "Обновление тулкита: он остановится, переустановится из источника и запустится снова…")
