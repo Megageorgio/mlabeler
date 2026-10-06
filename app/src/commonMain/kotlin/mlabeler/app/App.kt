@@ -57,6 +57,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showDsExport && ed != null) mlabeler.app.ui.DsExportDialog(app, ed)
                     if (app.pendingLeave != null) mlabeler.app.ui.LeaveDialog(app)
                     if (app.showAutoOto && ed != null) mlabeler.app.ui.AutoOtoDialog(app)
+                    if (app.errorDetails != null) mlabeler.app.ui.ErrorDetailsDialog(app)
                     app.folderPick?.let { pick ->
                         mlabeler.app.ui.FolderBrowser(
                             start = ed?.workspace?.root ?: Platform.homeDir(),

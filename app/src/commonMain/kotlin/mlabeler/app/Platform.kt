@@ -10,6 +10,8 @@ expect object Platform {
     val isMac: Boolean
     /** Phones and tablets: touch first, no hover. */
     val isMobile: Boolean
+    /** Processor cores for parallel work. */
+    val cores: Int
     /** Two-letter code of the system language. */
     val systemLanguage: String
     /** Folder for settings and caches. */

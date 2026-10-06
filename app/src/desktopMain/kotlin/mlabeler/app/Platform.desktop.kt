@@ -19,6 +19,7 @@ actual object Platform {
     actual val name: String = System.getProperty("os.name")
     actual val isMac: Boolean = os.contains("mac")
     actual val isMobile: Boolean = false
+    actual val cores: Int get() = Runtime.getRuntime().availableProcessors()
     actual val systemLanguage: String = Locale.getDefault().language
 
     actual fun dataDir(): String {

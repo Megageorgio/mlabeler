@@ -184,27 +184,63 @@ class Spectrogram(
             maxDb: Float = -10f,
             progress: (Spectrogram) -> Unit = {},
         ): Spectrogram {
-            val hop = max(1, (hopSeconds * sampleRate).toInt())
-            var win = 64
-            while (win * 2 <= windowSeconds * sampleRate * 1.5) win *= 2
-            val fft = Fft(win)
-            val window = DoubleArray(win) { 0.35875 - 0.48829 * cos(2 * PI * it / (win - 1)) + 0.14128 * cos(4 * PI * it / (win - 1)) - 0.01168 * cos(6 * PI * it / (win - 1)) }
-            val wsum = window.sum()
-            val top = min(maxFreq, sampleRate / 2.0)
-            val frames = max(1, (samples.size + hop - 1) / hop)
-            val nyqBins = win / 2
-            // band edges in fft bins (mel spaced)
+            val b = Builder(samples, sampleRate, hopSeconds, windowSeconds, bands, maxFreq, minDb, maxDb)
+            var f = 0
+            while (f < b.frames) {
+                val to = min(b.frames, f + 1024)
+                b.fill(f, to)
+                f = to
+                b.result.ready = f
+                if (f < b.frames) progress(b.result)
+            }
+            return b.result
+        }
+    }
+
+    /**
+     * Fills a spectrogram frame range by frame range; separate ranges can be filled at the same time
+     * (each call has its own buffers), so a long recording can use every core.
+     */
+    class Builder(
+        private val samples: FloatArray,
+        sampleRate: Int,
+        hopSeconds: Double,
+        windowSeconds: Double,
+        private val bands: Int,
+        maxFreq: Double,
+        private val minDb: Float,
+        maxDb: Float,
+    ) {
+        private val hop = max(1, (hopSeconds * sampleRate).toInt())
+        private val win: Int = run {
+            var w = 64
+            while (w * 2 <= windowSeconds * sampleRate * 1.5) w *= 2
+            w
+        }
+        private val window = DoubleArray(win) { 0.35875 - 0.48829 * cos(2 * PI * it / (win - 1)) + 0.14128 * cos(4 * PI * it / (win - 1)) - 0.01168 * cos(6 * PI * it / (win - 1)) }
+        private val wsum = window.sum()
+        private val top = min(maxFreq, sampleRate / 2.0)
+        val frames = max(1, (samples.size + hop - 1) / hop)
+        private val nyqBins = win / 2
+        private val edges = run {
             val melTop = hzToMel(top)
-            val edges = DoubleArray(bands + 1) { melToHz(it * melTop / bands) * win / sampleRate }
-            val data = ByteArray(frames * bands)
-            val result = Spectrogram(sampleRate, hop, frames, bands, top, minDb, maxDb, data).also { it.ready = 0 }
+            DoubleArray(bands + 1) { melToHz(it * melTop / bands) * win / sampleRate }
+        }
+        private val data = ByteArray(frames * bands)
+        private val scale = 255.0 / (maxDb - minDb)
+        val result = Spectrogram(sampleRate, hop, frames, bands, top, minDb, maxDb, data).also { it.ready = 0 }
+
+        /** Frames from the start that are done (the picture shows only those). */
+        fun setReady(n: Int) { result.ready = n.coerceIn(0, frames) }
+
+        /** Computes frames [from, to). */
+        fun fill(from: Int, to: Int) {
+            val fft = Fft(win)
             val re = DoubleArray(win)
             val im = DoubleArray(win)
             val mag = DoubleArray(nyqBins + 1)
-            val scale = 255.0 / (maxDb - minDb)
-            for (f in 0 until frames) {
-                val center = f * hop
-                val start = center - win / 2
+            for (f in from until min(to, frames)) {
+                val start = f * hop - win / 2
                 for (i in 0 until win) {
                     val s = start + i
                     re[i] = if (s in samples.indices) samples[s] * window[i] else 0.0
@@ -231,13 +267,7 @@ class Spectrogram(
                     val db = 20 * log10(v + 1e-12)
                     data[f * bands + b] = ((db - minDb) * scale).toInt().coerceIn(0, 255).toByte()
                 }
-                if (f % 1024 == 1023) {
-                    result.ready = f + 1
-                    progress(result)
-                }
             }
-            result.ready = frames
-            return result
         }
     }
 }

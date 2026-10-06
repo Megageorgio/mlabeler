@@ -28,6 +28,7 @@ actual object Platform {
     actual val name: String = "iOS"
     actual val isMac: Boolean = false
     actual val isMobile: Boolean = true
+    actual val cores: Int get() = platform.Foundation.NSProcessInfo.processInfo.activeProcessorCount.toInt()
     actual val systemLanguage: String get() = NSLocale.currentLocale.languageCode
 
     private fun dir(kind: ULong): String =

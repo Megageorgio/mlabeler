@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
@@ -10,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -425,7 +426,20 @@ fun MessageToast(app: AppState, bottom: Dp) {
     val c = T.c
     val m = app.message ?: return
     Box(Modifier.fillMaxSize().padding(bottom = bottom, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
-        Box(
+        if (m.error && m.hasDetails) {
+            Row(
+                Modifier.widthIn(max = 640.dp).clip(RoundedCornerShape(c.radius)).background(c.danger)
+                    .clickable { app.errorDetails = m.text }.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(m.headline, color = c.bg, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(ErrorTitles.more(), color = c.bg, fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 12.dp).clip(RoundedCornerShape(c.radius)).background(c.bg.copy(alpha = 0.18f))
+                        .clickable { app.errorDetails = m.text }.padding(horizontal = 10.dp, vertical = 6.dp))
+                Text("✕", color = c.bg, fontSize = 13.sp,
+                    modifier = Modifier.padding(start = 4.dp).clip(RoundedCornerShape(c.radius)).clickable { app.dismissMessage() }.padding(horizontal = 10.dp, vertical = 6.dp))
+            }
+        } else Box(
             Modifier.clip(RoundedCornerShape(c.radius)).background(if (m.error) c.danger else c.text)
                 .clickable { app.dismissMessage() }.padding(horizontal = 14.dp, vertical = 9.dp),
         ) {
@@ -488,6 +502,53 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
         when (current) {
             SidePanelId.Files -> SidePanel(ed, Modifier.weight(1f).fillMaxWidth())
             SidePanelId.Details -> Inspector(ed, Modifier.weight(1f).fillMaxWidth())
+        }
+    }
+}
+
+object ErrorTitles {
+    val more = mlabeler.app.i18n.L("Details", "Подробнее")
+    val title = mlabeler.app.i18n.L("Error details", "Подробности ошибки")
+    val copy = mlabeler.app.i18n.L("Copy", "Копировать")
+    val copied = mlabeler.app.i18n.L("Copied", "Скопировано")
+    val openLog = mlabeler.app.i18n.L("Open the log folder", "Открыть папку журнала")
+}
+
+/** The whole text of an error: selectable, copyable, with its log folder when the text names a log file here. */
+@Composable
+fun ErrorDetailsDialog(app: AppState) {
+    val text = app.errorDetails ?: return
+    val c = T.c
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember(text) { mutableStateOf(false) }
+    val log = remember(text) {
+        Regex("""(?:Full output|Update log|log):\s*(.+)""", RegexOption.IGNORE_CASE).findAll(text).lastOrNull()?.groupValues?.get(1)?.trim()
+            ?.takeIf { !mlabeler.app.Platform.isMobile && runCatching { mlabeler.core.io.PlatformFs.exists(it) }.getOrDefault(false) }
+    }
+    Overlay({ app.errorDetails = null }, 760) {
+        Column(Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(ErrorTitles.title(), color = c.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                IconBtn(Icons.close, S.close()) { app.errorDetails = null }
+            }
+            Box(
+                Modifier.padding(top = 10.dp).fillMaxWidth().weight(1f, fill = false).clip(RoundedCornerShape(c.radius)).background(c.panelAlt)
+                    .border(c.borderWidth, c.border, RoundedCornerShape(c.radius)),
+            ) {
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(
+                        text.trim(), color = c.text, fontSize = 12.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp),
+                    )
+                }
+            }
+            Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Btn(if (copied) ErrorTitles.copied() else ErrorTitles.copy(), primary = true) {
+                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(text.trim())); copied = true
+                }
+                if (log != null) Btn(ErrorTitles.openLog()) { mlabeler.app.Platform.openInFileManager(mlabeler.core.io.Paths.parent(log)) }
+                Btn(S.close()) { app.errorDetails = null }
+            }
         }
     }
 }

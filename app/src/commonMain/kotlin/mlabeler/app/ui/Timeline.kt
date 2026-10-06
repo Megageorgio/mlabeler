@@ -548,6 +548,12 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
             val g = geom(size, density, layout, tierCount)
             drawTimeline(ed, g, c, doc, specImage, measurer, tierStyle, smallStyle)
         }
+        // the cursor follows the mouse and the playhead moves while playing: a separate layer, so the picture
+        // under them isn't drawn again for every mouse move (that is slow on long recordings seen whole)
+        Canvas(Modifier.fillMaxSize().clipToBounds()) {
+            val g = geom(size, density, layout, tierCount)
+            drawCursor(ed, g, c) { t -> ((t - ed.viewStart) * ed.pixelsPerSecond).toFloat() }
+        }
 
         // inline text editor
         val editing = ed.editingText
@@ -856,10 +862,7 @@ private fun DrawScope.drawTimeline(
     if (ed.mode == Mode.Oto) {
         drawOto(ed, g, c, measurer, smallStyle, tierStyle, ::x)
     } else if (doc == null) return
-    if (ed.mode == Mode.Oto || doc == null) {
-        drawCursor(ed, g, c, ::x)
-        return
-    }
+    if (ed.mode == Mode.Oto || doc == null) return
     val sel = ed.selection
     val problemsByTier = ed.problems.groupBy { it.ref.tier }
 
@@ -962,15 +965,7 @@ private fun DrawScope.drawTimeline(
     if (doc.tiers.isNotEmpty()) drawLine(c.border, Offset(0f, g.tiersTop + g.tierH * doc.tiers.size), Offset(w, g.tiersTop + g.tierH * doc.tiers.size), px)
     drawReferences(ed, g, c, doc, measurer, tierStyle, ::x, tEnd)
 
-    // cursor and playhead
-    ed.cursor?.let { cur ->
-        val xx = x(cur)
-        if (xx in 0f..w) drawLine(c.cursor, Offset(xx, g.ruler), Offset(xx, g.height), px)
-    }
-    ed.playhead?.let { p ->
-        val xx = x(p)
-        if (xx in 0f..w) drawLine(c.playhead, Offset(xx, 0f), Offset(xx, g.height), 2 * px)
-    }
+    // the cursor and the playhead are drawn on their own layer (see TimelineCursor)
 }
 
 private fun DrawScope.drawIntervalTier(
@@ -991,6 +986,8 @@ private fun DrawScope.drawIntervalTier(
     val first = tier.indexAt(ed.viewStart).let { if (it < 0) 0 else it }
     val h = bottom - top
     val problemIdx = problems.associateBy { it.ref.index }
+    // zoomed far out short phonemes are everywhere: marks are thinned out like the boundaries
+    var lastMark = Float.NEGATIVE_INFINITY
     for (i in first until tier.size) {
         val s = tier.startOf(i)
         if (s > tEnd) break
@@ -1007,8 +1004,9 @@ private fun DrawScope.drawIntervalTier(
             drawRect(c.text.copy(alpha = 0.03f), Offset(a, top), Size(b - a, h))
         }
         // a phoneme squeezed between two boundaries that look like one line: a small mark shows it's there
-        if (b - a < 5 * px && tier.durationOf(i) < 0.03) {
+        if (b - a < 5 * px && tier.durationOf(i) < 0.03 && (a + b) / 2 - lastMark > 12 * px) {
             val cx = (a + b) / 2
+            lastMark = cx
             val tri = Path().apply { moveTo(cx - 4 * px, top); lineTo(cx + 4 * px, top); lineTo(cx, top + 6 * px); close() }
             drawPath(tri, c.warn)
             val tri2 = Path().apply { moveTo(cx - 4 * px, bottom); lineTo(cx + 4 * px, bottom); lineTo(cx, bottom - 6 * px); close() }
@@ -1361,3 +1359,4 @@ private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.awa
         if (ch != null) return ch
     }
 }
+

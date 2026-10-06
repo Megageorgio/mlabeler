@@ -15,7 +15,12 @@ import mlabeler.app.i18n.Lang
 import mlabeler.core.io.PlatformFs
 import mlabeler.core.io.Workspace
 
-data class Message(val text: String, val error: Boolean, val id: Long)
+data class Message(val text: String, val error: Boolean, val id: Long) {
+    /** The first meaningful line, for the short message. */
+    val headline: String get() = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() && !it.endsWith(":") }
+        ?: text.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: text
+    val hasDetails: Boolean get() = text.trim().contains('\n') || text.length > 160
+}
 
 private val dropOnlyAudio = mlabeler.app.i18n.L("Drop a recording or a folder", "Перетащите запись или папку")
 private val dropOtherAudio = mlabeler.app.i18n.L("Turn on other audio formats in Settings → General to open these", "Чтобы открывать такие файлы, включите другие форматы в Настройках → Общие")
@@ -157,10 +162,15 @@ class AppState(private val scope: CoroutineScope) {
         environmentsVersion++
     }
 
+    /** Full text of an error opened from its message, or null. */
+    var errorDetails by mutableStateOf<String?>(null)
+
     fun message(text: String, error: Boolean = false) {
         val m = Message(text, error, ++counter)
         message = m
         messageJob?.cancel()
+        // an error with more to read stays until it is closed
+        if (error && m.hasDetails) return
         messageJob = scope.launch {
             delay(if (error) 8000 else 2500)
             if (message?.id == m.id) message = null

@@ -68,6 +68,7 @@ actual object Platform {
     actual val name: String = "Android"
     actual val isMac: Boolean = false
     actual val isMobile: Boolean = true
+    actual val cores: Int get() = Runtime.getRuntime().availableProcessors()
     actual val systemLanguage: String get() = Locale.getDefault().language
 
     actual fun dataDir(): String = AndroidContext.context.filesDir.path

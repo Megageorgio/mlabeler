@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -453,14 +455,30 @@ class EditorState(
         val v = settings.view
         specKey = currentSpecKey()
         val hop = if (v.hopMs > 0) v.hopMs / 1000.0 else if (a.duration <= 120) 0.0025 else 0.005
-        val spec = withContext(Dispatchers.Default) {
-            Spectrogram.compute(
-                a.samples, a.sampleRate, hopSeconds = hop, windowSeconds = v.windowMs / 1000.0, bands = v.bands,
-                maxFreq = 16000.0, minDb = v.minDb, maxDb = v.maxDb,
-            ) { partial ->
+        val builder = Spectrogram.Builder(
+            a.samples, a.sampleRate, hopSeconds = hop, windowSeconds = v.windowMs / 1000.0, bands = v.bands,
+            maxFreq = 16000.0, minDb = v.minDb, maxDb = v.maxDb,
+        )
+        val spec = builder.result
+        spectrogram = spec
+        // every core works on its own piece of each batch; the picture is refreshed a few times a second at most
+        val workers = mlabeler.app.Platform.cores.coerceIn(1, 16)
+        val chunk = 2048
+        var lastShown = kotlin.time.TimeSource.Monotonic.markNow()
+        var f = 0
+        withContext(Dispatchers.Default) {
+            while (f < builder.frames) {
+                val batchEnd = minOf(builder.frames, f + workers * chunk)
+                (f until batchEnd step chunk).map { from ->
+                    async { builder.fill(from, minOf(from + chunk, batchEnd)) }
+                }.awaitAll()
+                f = batchEnd
                 ensureActive()
-                if (spectrogram !== partial) spectrogram = partial
-                spectrogramProgress = partial.ready
+                builder.setReady(f)
+                if (lastShown.elapsedNow().inWholeMilliseconds > 400 || f >= builder.frames) {
+                    lastShown = kotlin.time.TimeSource.Monotonic.markNow()
+                    spectrogramProgress = f
+                }
             }
         }
         spectrogram = spec
