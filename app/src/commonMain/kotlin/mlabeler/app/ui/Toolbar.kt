@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -163,6 +164,7 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
         ToolBtn(icon, label(), hint, cmd?.keyLabel ?: "", enabled, active, lab, big, onClick)
 
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (tb.scaleButton ?: Platform.isMobile) Group { ScaleTool(app, s.scale, lab, big) }
         for (g in tb.groups) when (g) {
             ToolbarGroups.FILES -> Group {
                 B(Icons.prevFile, ToolLabels.prev, Commands.prevFile)
@@ -221,6 +223,42 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
             ToolbarGroups.EXTRAS -> Group {
                 B(Icons.plugin, ToolLabels.plugins, Commands.plugins)
                 B(Icons.command, ToolLabels.commands, Commands.palette)
+            }
+        }
+    }
+}
+
+private val scaleLabel = L("Size", "Размер")
+private val scaleHint = L("Interface size", "Размер интерфейса")
+
+/** The interface scale in percent; a tap opens the list of sizes. */
+@Composable
+fun ScaleTool(app: AppState, scale: Float, labels: Boolean, big: Boolean) {
+    val c = T.c
+    var open by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val text = "${kotlin.math.round(scale * 100).toInt()}%"
+    Tip(scaleHint()) {
+        Box {
+            Box(
+                Modifier.clip(RoundedCornerShape(c.radius)).clickable { open = true }
+                    .then(if (big && labels) Modifier.height(if (Platform.isMobile) 52.dp else 48.dp).widthIn(min = 52.dp) else Modifier.height(if (big) 40.dp else targetSize))
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (big && labels) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text, color = c.text, fontSize = 14.sp)
+                        Text(scaleLabel(), color = c.text, fontSize = 11.sp, maxLines = 1)
+                    }
+                } else Text(text, color = c.muted, fontSize = 12.sp)
+            }
+            androidx.compose.material3.DropdownMenu(open, { open = false }) {
+                for (p in listOf(50, 60, 70, 80, 90, 100, 115, 130, 150, 175)) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        { Text((if (kotlin.math.abs(scale * 100 - p) < 1) "✓  " else "     ") + "$p%", fontSize = 14.sp) },
+                        onClick = { open = false; app.update { it.copy(scale = p / 100f) } },
+                    )
+                }
             }
         }
     }

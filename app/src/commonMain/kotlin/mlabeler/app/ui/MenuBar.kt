@@ -199,6 +199,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MSep)
         add(item(Commands.overlay, ed, app, checked = l.overlay, title = MenuTitles.overlay()))
         add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
+        add(item(Commands.namesOnAudio, ed, app, checked = l.namesOnAudio))
         add(toggle(MenuTitles.specFirst(), l.spectrogramFirst) { it.copy(layout = it.layout.copy(spectrogramFirst = !it.layout.spectrogramFirst)) })
         add(MSep)
         add(item(Commands.labelsBigger, ed, app))

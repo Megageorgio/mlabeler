@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -92,6 +93,7 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
         if (!LocalToolkit.supported && tk.status != Status.Ready && tk.status != Status.Checking) {
             Text(phoneHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         }
+        if (tk.status == Status.Installing || tk.status == Status.Starting) InstallStats(tk)
         if (logOpen || tk.status == Status.Installing) {
             val state = rememberLazyListState()
             LaunchedEffect(tk.log.size) { if (tk.log.isNotEmpty()) state.scrollToItem(tk.log.size - 1) }
@@ -126,4 +128,31 @@ fun rememberToolkitModels(app: AppState, task: String, enabled: Boolean = true):
         }
     }
     return langs to error
+}
+
+private val elapsedT = L("{0} so far", "прошло {0}")
+private val pkgsT = L("packages downloaded: {0}", "скачано пакетов: {0}")
+private val nowT = L("now: {0}", "сейчас: {0}")
+private val linesT = L("log lines: {0}", "строк в журнале: {0}")
+
+/** What the installation is doing, in numbers: time, packages downloaded, the package being fetched. */
+@Composable
+private fun InstallStats(tk: mlabeler.app.toolkit.ToolkitManager) {
+    val c = T.c
+    var now by remember { mutableStateOf(kotlin.time.Clock.System.now().toEpochMilliseconds()) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); now = kotlin.time.Clock.System.now().toEpochMilliseconds() } }
+    val secs = ((now - tk.busySince) / 1000).coerceAtLeast(0)
+    val log = tk.log.toList()
+    // uv prints "Downloading torch (2.3GiB)" and " Downloaded torch"
+    val downloaded = log.count { it.trimStart().startsWith("Downloaded ") }
+    val current = log.lastOrNull { it.trimStart().startsWith("Downloading ") }?.trim()?.removePrefix("Downloading ")
+    val parts = buildList {
+        add(elapsedT.format("${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"))
+        if (downloaded > 0) add(pkgsT.format(downloaded))
+        if (current != null && log.indexOfLast { it.trimStart().startsWith("Downloaded ") } < log.indexOfLast { it.trimStart().startsWith("Downloading ") }) add(nowT.format(current))
+        add(linesT.format(log.size))
+    }
+    androidx.compose.material3.LinearProgressIndicator(color = c.accent, trackColor = c.border, modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(3.dp))
+    Text(parts.joinToString("  ·  "), color = c.text, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+    log.lastOrNull()?.let { Text(it, color = c.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
 }

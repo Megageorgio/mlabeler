@@ -8,7 +8,7 @@ import mlabeler.core.model.LabelDoc
 enum class Severity { Warning, Error }
 
 data class Problem(val kind: Kind, val ref: IntervalRef, val severity: Severity = Severity.Warning, val detail: String = "") {
-    enum class Kind { Short, Empty, UnknownPhoneme, LowConfidence, NoPauseAtEdge }
+    enum class Kind { Short, Empty, UnknownPhoneme, LowConfidence, NoPauseAtEdge, Long, LongPause, LongPhrase, Script }
 }
 
 @Serializable
@@ -19,9 +19,20 @@ data class CheckSettings(
     val phonemeSet: Set<String> = emptySet(),
     val confidenceBelow: Float = 0.5f,
     val pauseAtEdges: Boolean = false,
+    /** A phoneme (not a pause) longer than this is a warning; 0 = not checked. */
+    val maxDurationMs: Double = 0.0,
+    /** A pause or an unnamed gap longer than this is an error; 0 = not checked. */
+    val maxPauseSeconds: Double = 0.0,
+    /** Singing without a pause (at least [phrasePauseMs] long) for longer than this is an error; 0 = not checked. */
+    val maxPhraseSeconds: Double = 0.0,
+    val phrasePauseMs: Double = 200.0,
+    /** Own checks: JavaScript files run on every change (see the settings page). */
+    val scripts: Boolean = true,
 )
 
 object Checks {
+    private fun sec(v: Double) = "${kotlin.math.round(v * 10) / 10} s"
+
     fun run(doc: LabelDoc, s: CheckSettings = CheckSettings()): List<Problem> {
         val out = mutableListOf<Problem>()
         val ph = doc.phonemeTierIndex()
@@ -39,6 +50,28 @@ object Checks {
                 }
                 val c = t.confidenceOf(i)
                 if (c != null && c < s.confidenceBelow) out += Problem(Problem.Kind.LowConfidence, ref, detail = "${(c * 100).toInt()}%")
+            }
+            if (k == ph) {
+                for (i in 0 until t.size) {
+                    val text = t.texts[i]
+                    val pause = text.isEmpty() || text in s.pauses
+                    val d = t.durationOf(i)
+                    if (!pause && s.maxDurationMs > 0 && d * 1000 > s.maxDurationMs) out += Problem(Problem.Kind.Long, IntervalRef(k, i), detail = "${(d * 1000).toInt()} ms")
+                    if (pause && s.maxPauseSeconds > 0 && d > s.maxPauseSeconds) out += Problem(Problem.Kind.LongPause, IntervalRef(k, i), Severity.Error, sec(d))
+                }
+                if (s.maxPhraseSeconds > 0) {
+                    // stretches of singing between pauses long enough to cut at
+                    var i = 0
+                    while (i < t.size) {
+                        fun cut(j: Int) = (t.texts[j].isEmpty() || t.texts[j] in s.pauses) && t.durationOf(j) * 1000 >= s.phrasePauseMs
+                        if (cut(i)) { i++; continue }
+                        var j = i
+                        while (j + 1 < t.size && !cut(j + 1)) j++
+                        val len = t.endOf(j) - t.startOf(i)
+                        if (len > s.maxPhraseSeconds) out += Problem(Problem.Kind.LongPhrase, IntervalRef(k, i), Severity.Error, sec(len))
+                        i = j + 1
+                    }
+                }
             }
             if (k == ph && s.pauseAtEdges && t.size > 0) {
                 if (t.texts.first() !in s.pauses) out += Problem(Problem.Kind.NoPauseAtEdge, IntervalRef(k, 0))

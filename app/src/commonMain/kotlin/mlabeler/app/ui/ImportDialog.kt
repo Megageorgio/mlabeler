@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,7 +50,7 @@ fun ImportDialog(app: AppState) {
     }
     var chosen by remember { mutableStateOf(found.firstOrNull()) }
     Overlay({ close() }, 600) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
             Text(importTitle(), color = c.text, fontSize = 17.sp)
             Text(hint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
             if (found.isEmpty()) Text(noneFound(), color = c.muted, fontSize = 13.sp)

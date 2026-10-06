@@ -313,6 +313,7 @@ private fun CompactEditor(app: AppState, ed: EditorState) {
                 IconBtn(Icons.undo, S.undo(), enabled = ed.canUndo) { ed.undo() }
                 IconBtn(Icons.redo, S.redo(), enabled = ed.canRedo) { ed.redo() }
                 IconBtn(Icons.save, S.save(), enabled = ed.dirty || ed.item?.labelPath == null) { ed.save() }
+                if (app.settings.toolbar.scaleButton != false) ScaleTool(app, app.settings.scale, labels = false, big = false)
                 CompactMenu(app, ed) { showDetails = true }
             }
             Divider()
@@ -403,9 +404,10 @@ fun SidePanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Un
         Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for ((k, t) in listOf(S.files(), mlabeler.app.ui.entriesTitle()).withIndex()) {
                 val sel = k == tab
+                // tabs share the width and shorten their names in a narrow panel, so none goes out of reach
                 Text(
-                    t, fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false,
-                    modifier = Modifier.clip(RoundedCornerShape(c.radius)).background(if (sel) c.panelAlt else c.panel)
+                    t, fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(c.radius)).background(if (sel) c.panelAlt else c.panel)
                         .clickable { tab = k }.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             }
@@ -448,15 +450,16 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
         if (panels.size > 1 || arranging) {
             Row(Modifier.fillMaxWidth().background(if (arranging) c.accent.copy(alpha = 0.12f) else c.panel).padding(horizontal = 6.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 for ((k, p) in panels.withIndex()) {
                     val sel = p == current
                     Text(
-                        panelNames.getValue(p)(), fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1,
-                        modifier = Modifier.clip(RoundedCornerShape(c.radius)).background(if (sel && panels.size > 1) c.panelAlt else c.panel.copy(alpha = 0f))
+                        panelNames.getValue(p)(), fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(c.radius)).background(if (sel && panels.size > 1) c.panelAlt else c.panel.copy(alpha = 0f))
                             .clickable { tab = k }.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
-                Spacer(Modifier.weight(1f))
+                }
                 if (arranging) {
                     IconBtn(Icons.layers, toOtherSide(), size = 28.dp) {
                         app.update { st ->

@@ -55,9 +55,11 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp)) {
             Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = searchHint())
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
+            // chips wrap onto more lines in a narrow panel (a sideways scroll can't be reached with a wheel)
+            androidx.compose.foundation.layout.FlowRow(
+                Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Chip(S.all(), ed.filter == FileFilter.All) { ed.filter = FileFilter.All }
                 Chip(S.notDone(), ed.filter == FileFilter.NotDone) { ed.filter = FileFilter.NotDone }
@@ -125,6 +127,9 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
     }
 }
 
+private val probLong = L("Too long", "Слишком длинная")
+private val probLongPause = L("Pause too long", "Слишком длинная пауза")
+private val probLongPhrase = L("Too long without a pause", "Слишком долго без паузы")
 private val searchHint = L("Search by name or phonemes", "Поиск по имени или фонемам")
 private val queueTitle = L("Phonemes in advance", "Фонемы наперёд")
 private val queueHint = L("e.g. SP k a sh i SP", "например: SP k a sh i SP")
@@ -298,6 +303,10 @@ private fun problemTitle(p: Problem) = when (p.kind) {
     Problem.Kind.UnknownPhoneme -> S.probUnknown()
     Problem.Kind.LowConfidence -> S.probConfidence() + " (${p.detail})"
     Problem.Kind.NoPauseAtEdge -> S.probEdge()
+    Problem.Kind.Long -> probLong() + " (${p.detail})"
+    Problem.Kind.LongPause -> probLongPause() + " (${p.detail})"
+    Problem.Kind.LongPhrase -> probLongPhrase() + " (${p.detail})"
+    Problem.Kind.Script -> p.detail
 }
 
 @Composable

@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,7 +55,7 @@ fun BatchRenameDialog(app: AppState) {
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
     androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
     Overlay({ close() }, 520) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
             Text(title(), color = c.text, fontSize = 17.sp)
             Text(if (oto) scopeOto() else scopeLabels(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
             Text(find(), color = c.muted, fontSize = 12.sp)

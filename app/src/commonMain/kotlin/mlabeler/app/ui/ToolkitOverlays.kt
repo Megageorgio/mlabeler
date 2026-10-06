@@ -22,6 +22,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +37,7 @@ import mlabeler.app.theme.T
 private val working = L("Autolabel is running", "Идёт авторазметка")
 private val waitHint = L("Editing is paused until it finishes, so the result lands where it belongs.",
     "Правка на паузе, пока она не закончится, — чтобы результат лёг куда нужно.")
+private val elapsed = L("{0} so far", "прошло {0}")
 private val stopT = L("Stop", "Остановить")
 private val modelResult = L("Model result", "Результат модели")
 private val accept = L("Accept", "Принять")
@@ -59,14 +62,21 @@ fun AutolabelBusy(ed: EditorState) {
                 CircularProgressIndicator(Modifier.size(20.dp), color = c.accent, strokeWidth = 2.dp)
                 Text(working(), color = c.text, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp))
             }
-            Text(stage, color = c.muted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
+            // earlier steps, then the current one with its numbers
+            for (s in ed.toolkitSteps) Text("✓ $s", color = c.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            Text(stage, color = c.text, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
             val p = ed.toolkitProgress
             if (p != null && p > 0) {
                 LinearProgressIndicator(
                     progress = { p.toFloat().coerceIn(0f, 1f) }, color = c.accent, trackColor = c.border,
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(4.dp),
                 )
-            }
+            } else LinearProgressIndicator(color = c.accent, trackColor = c.border, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).height(4.dp))
+            var now by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(kotlin.time.Clock.System.now().toEpochMilliseconds()) }
+            androidx.compose.runtime.LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(1000); now = kotlin.time.Clock.System.now().toEpochMilliseconds() } }
+            val secs = ((now - ed.toolkitBusySince) / 1000).coerceAtLeast(0)
+            val pct = if (p != null && p > 0) "${(p * 100).toInt()}%  ·  " else ""
+            Text(pct + elapsed.format("${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             Text(waitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {
                 Btn(stopT()) { ed.cancelToolkit() }

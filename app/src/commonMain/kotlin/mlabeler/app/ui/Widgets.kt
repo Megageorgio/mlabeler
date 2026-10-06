@@ -58,7 +58,13 @@ import mlabeler.app.resizeHorizontalIcon
 import mlabeler.app.theme.T
 
 /** Touch targets are larger on phones. */
-val targetSize: Dp get() = if (Platform.isMobile) 40.dp else 32.dp
+/** Smallest button: on touch screens at least 44 dp at the chosen interface size (a finger doesn't shrink with it). */
+val targetSize: Dp get() = if (Platform.isMobile) (44f / UiScale.current.coerceAtMost(1f)).coerceAtMost(60f).dp else 32.dp
+
+/** The interface scale currently applied (set where it's applied). */
+object UiScale {
+    var current by androidx.compose.runtime.mutableFloatStateOf(1f)
+}
 
 @Composable
 fun Tip(text: String, content: @Composable () -> Unit) {
@@ -154,7 +160,7 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
     val c = T.c
     val shape = RoundedCornerShape(if (c.square) 0.dp else 50.dp)
     Box(
-        Modifier.height(if (Platform.isMobile) 36.dp else 26.dp).clip(shape)
+        Modifier.height(if (Platform.isMobile) 40.dp else 26.dp).clip(shape)
             .background(if (selected) c.accent.copy(alpha = if (c.square) 1f else 0.2f) else Color.Transparent)
             .border(c.borderWidth, if (selected) c.accent else c.border, shape)
             .clickable(onClick = onClick).padding(horizontal = 10.dp),

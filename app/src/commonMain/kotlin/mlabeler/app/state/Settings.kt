@@ -23,6 +23,10 @@ data class LayoutSettings(
     val tierHeight: Float = 40f,
     /** Size of the label text on the lanes, sp (lanes grow to fit). */
     val labelFontSize: Float = 13f,
+    /** Phoneme names also drawn over the waveform and the spectrogram, at [namesX], [namesY] of each phoneme (0..1). */
+    val namesOnAudio: Boolean = false,
+    val namesX: Float = 0.5f,
+    val namesY: Float = 0.5f,
     val showPitch: Boolean = false,
     val showPower: Boolean = false,
     /** Pitch drawn over the spectrogram instead of its own lane. */
@@ -167,6 +171,8 @@ data class ToolbarSettings(
     val big: Boolean = true,
     /** Order of all groups, shown or not (so turning one off and on keeps its place). */
     val order: List<String> = emptyList(),
+    /** A button with the interface scale in percent (null = on phones and tablets only). */
+    val scaleButton: Boolean? = null,
 ) {
     fun fullOrder(): List<String> = (order + groups + ToolbarGroups.all).distinct().filter { it in ToolbarGroups.all }
 

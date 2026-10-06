@@ -65,7 +65,7 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp, bottom = 6.dp)) {
             Field(ed.query, { ed.query = it }, Modifier.fillMaxWidth(), placeholder = S.search())
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(S.all(), ed.filter == FileFilter.All) { ed.filter = FileFilter.All }
                 Chip(S.notDone(), ed.filter == FileFilter.NotDone) { ed.filter = FileFilter.NotDone }
                 Chip(S.starred(), ed.filter == FileFilter.Starred) { ed.filter = FileFilter.Starred }

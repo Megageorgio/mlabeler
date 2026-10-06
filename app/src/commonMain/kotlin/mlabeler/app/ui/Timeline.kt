@@ -50,6 +50,7 @@ import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.input.pointer.isShiftPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -126,6 +127,9 @@ private class Geom(
     val tiersOnTop: Boolean = false,
     val dim: Float = 0f,
     val waveFill: Float = 0f,
+    val namesOnAudio: Boolean = false,
+    val namesX: Float = 0.5f,
+    val namesY: Float = 0.5f,
 ) {
     val tiersBottom: Float get() = tiersTop + tierH * tierCount
     val audioTop: Float get() = min(waveTop, specTop)
@@ -201,7 +205,8 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val pitchTop = audioTop + mainH
     val powerTop = pitchTop + pitchH
     return Geom(w, h, ruler, waveTop, waveBottom, specTop, specBottom, tiersTop, tierHeight, tiers,
-        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f))
+        pitchTop, pitchTop + pitchH, powerTop, powerTop + powerH, overlay, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f), layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f),
+        layout.namesOnAudio, layout.namesX.coerceIn(0f, 1f), layout.namesY.coerceIn(0f, 1f))
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -349,7 +354,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                 }
                 .pointerInput(ed) {
                     awaitEachGesture {
-                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitAnyButtonDown()
                         // a click anywhere on the picture finishes typing a label (focus leaves the field)
                         ed.requestFocus()
                         val first = currentEvent
@@ -453,7 +458,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     chg.consume()
                                 }
                             }
-                            if (moved) ed.endDrag(bound) else ed.cancelDrag()
+                            if (moved) ed.endDrag(bound) else ed.cancelDrag(bound)
                             return@awaitEachGesture
                         }
 
@@ -568,6 +573,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                     }
                 },
                 onCancel = { if (ed.editingText == editing) ed.editingText = null },
+                // Enter/Esc give the keys back to the editor: Space plays the renamed phoneme
+                onKeyFinish = { ed.requestFocus() },
             )
         }
     }
@@ -883,6 +890,35 @@ private fun DrawScope.drawTimeline(
         }
     }
 
+    // phoneme names over the audio, where the settings put them
+    if (guide != null && g.namesOnAudio && g.audioBottom > g.audioTop) {
+        val areas = if (g.overlay) listOf(min(g.waveTop, g.specTop) to max(g.waveBottom, g.specBottom))
+        else listOfNotNull((g.waveTop to g.waveBottom).takeIf { it.second > it.first }, (g.specTop to g.specBottom).takeIf { it.second > it.first })
+        val style = tierStyle.copy(fontSize = tierStyle.fontSize * 0.85f)
+        val i0 = max(0, guide.indexAt(v0))
+        for (i in i0 until guide.size) {
+            val st = guide.startOf(i)
+            if (st > tEnd) break
+            val text = guide.texts[i]
+            if (text.isEmpty()) continue
+            val a = max(x(st), 0f)
+            val b = min(x(guide.endOf(i)), w)
+            if (b - a < 10 * px) continue
+            val lay = measurer.measure(text, style, maxLines = 1, softWrap = false)
+            val bw = lay.size.width + 8 * px
+            val bh = lay.size.height + 2 * px
+            if (bw > b - a) continue
+            val bx = (a + (b - a) * g.namesX - bw / 2).coerceIn(a, b - bw)
+            val selected = sel is Selection.Interval && sel.ref.tier == ed.guideTier && sel.ref.index == i
+            for ((top, bottom) in areas) {
+                if (bottom - top < bh + 4 * px) continue
+                val by = (top + (bottom - top) * g.namesY - bh / 2).coerceIn(top + 2 * px, bottom - bh - 2 * px)
+                drawRoundRect(if (selected) c.accent else c.panel.copy(alpha = 0.82f), Offset(bx, by), Size(bw, bh), androidx.compose.ui.geometry.CornerRadius(4 * px))
+                drawText(lay, color = if (selected) c.onAccent else c.text, topLeft = Offset(bx + 4 * px, by + px))
+            }
+        }
+    }
+
     // tiers
     for ((k, tier) in doc.tiers.withIndex()) {
         val top = g.tierTop(k)
@@ -968,6 +1004,14 @@ private fun DrawScope.drawIntervalTier(
         if (text.isEmpty()) {
             drawRect(c.text.copy(alpha = 0.03f), Offset(a, top), Size(b - a, h))
         }
+        // a phoneme squeezed between two boundaries that look like one line: a small mark shows it's there
+        if (b - a < 5 * px && tier.durationOf(i) < 0.03) {
+            val cx = (a + b) / 2
+            val tri = Path().apply { moveTo(cx - 4 * px, top); lineTo(cx + 4 * px, top); lineTo(cx, top + 6 * px); close() }
+            drawPath(tri, c.warn)
+            val tri2 = Path().apply { moveTo(cx - 4 * px, bottom); lineTo(cx + 4 * px, bottom); lineTo(cx, bottom - 6 * px); close() }
+            drawPath(tri2, c.warn)
+        }
         val p = problemIdx[i]
         if (p != null) {
             val col = if (p.severity == Severity.Error) c.danger else c.warn
@@ -1005,7 +1049,7 @@ private fun DrawScope.drawIntervalTier(
 }
 
 @Composable
-private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heightPx: Int, onDraft: (String) -> Unit, onCommit: (String) -> Unit, onCancel: () -> Unit) {
+private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heightPx: Int, onDraft: (String) -> Unit, onCommit: (String) -> Unit, onCancel: () -> Unit, onKeyFinish: () -> Unit = {}) {
     val c = T.c
     val density = LocalDensity.current
     var value by remember(initial) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(initial, androidx.compose.ui.text.TextRange(0, initial.length))) }
@@ -1026,7 +1070,7 @@ private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heigh
             singleLine = true,
             textStyle = TextStyle(color = c.text, fontSize = 14.sp, fontFamily = T.font),
             cursorBrush = SolidColor(c.accent),
-            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { finish(true) }),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { finish(true); onKeyFinish() }),
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done, autoCorrectEnabled = false),
             modifier = Modifier
                 .offset { offset }
@@ -1041,8 +1085,8 @@ private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heigh
                 }
                 .onPreviewKeyEvent {
                     when (it.key) {
-                        Key.Escape -> { finish(false); true }
-                        Key.Enter, Key.NumPadEnter -> { finish(true); true }
+                        Key.Escape -> { finish(false); onKeyFinish(); true }
+                        Key.Enter, Key.NumPadEnter -> { finish(true); onKeyFinish(); true }
                         else -> false
                     }
                 },
@@ -1305,4 +1349,13 @@ private fun hitNote(ed: EditorState, k: Int, x: Float, grab: Float): Triple<Int,
         if (i == 0 || abs(t.notes[i - 1].end - n.start) > 1e-6) if (abs(xs - x) < bestD) { bestD = abs(xs - x); best = Triple(k, i, true) }
     }
     return best
+}
+
+/** Like awaitFirstDown, but for every mouse button (awaitFirstDown only reacts to the left one on desktop). */
+private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.awaitAnyButtonDown(): androidx.compose.ui.input.pointer.PointerInputChange {
+    while (true) {
+        val e = awaitPointerEvent()
+        val ch = e.changes.firstOrNull { it.changedToDownIgnoreConsumed() }
+        if (ch != null) return ch
+    }
 }

@@ -1,5 +1,6 @@
 package mlabeler.app
 
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -18,8 +19,17 @@ fun main(args: Array<String>) = application {
         onCloseRequest = { app.close(); exitApplication() },
         state = state,
         title = app.editor?.let { e -> e.item?.name?.let { "$it — mLabeler" } } ?: "mLabeler",
+        icon = appIcon,
     ) {
         window.minimumSize = java.awt.Dimension(360, 480)
         App(app)
     }
+}
+
+private val appIcon: androidx.compose.ui.graphics.painter.Painter? by lazy {
+    runCatching {
+        val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("icon.png") ?: return@runCatching null
+        val img = javax.imageio.ImageIO.read(stream)
+        androidx.compose.ui.graphics.painter.BitmapPainter(img.toComposeImageBitmap())
+    }.getOrNull()
 }

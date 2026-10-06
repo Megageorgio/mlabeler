@@ -46,6 +46,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
@@ -76,6 +78,62 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import kotlinx.coroutines.launch
 
 /** Dim background with a centred card; full screen on narrow windows. */
+private object CheckTitles {
+    val maxLen = mlabeler.app.i18n.L("Longest phoneme (not a pause)", "Самая длинная фонема (не пауза)")
+    val maxPause = mlabeler.app.i18n.L("Longest pause or gap", "Самая длинная пауза или пустота")
+    val maxPhrase = mlabeler.app.i18n.L("Longest singing without a pause (DiffSinger: about 15 s)", "Самый долгий кусок без паузы (для DiffSinger — около 15 с)")
+    val phrasePause = mlabeler.app.i18n.L("A pause counts from", "Пауза считается от")
+    val zeroOff = mlabeler.app.i18n.L("0 = not checked.", "0 — не проверять.")
+    val scripts = mlabeler.app.i18n.L("Own checks (scripts)", "Свои проверки (скрипты)")
+    val scriptsHint = mlabeler.app.i18n.L("Small JavaScript files that mark problems in the labels. For every folder: {0}; for one folder: {1} inside it. The example shows how.",
+        "Небольшие файлы на JavaScript, которые отмечают проблемы в разметке. Для всех папок: {0}; для одной папки: {1} внутри неё. Как писать — в примере.")
+    val runScripts = mlabeler.app.i18n.L("Run them", "Запускать их")
+    val none = mlabeler.app.i18n.L("No scripts yet", "Скриптов пока нет")
+    val example = mlabeler.app.i18n.L("Create an example", "Создать пример")
+    val reload = mlabeler.app.i18n.L("Read again", "Перечитать")
+    val written = mlabeler.app.i18n.L("Example saved: {0}", "Пример сохранён: {0}")
+}
+
+private val scaleButtonT = mlabeler.app.i18n.L("Interface size button (in percent) on the toolbar", "Кнопка размера интерфейса (в процентах) на панели")
+private val namesOnAudioT = mlabeler.app.i18n.L("Phoneme names on the waveform and spectrogram too", "Имена фонем ещё и на волне и спектрограмме")
+private val namesWhereT = mlabeler.app.i18n.L("Where inside each phoneme: drag the dot or click the grid", "Где внутри каждой фонемы: перетащите точку или щёлкните по сетке")
+
+/** A box standing for one phoneme: the dot is where its name goes (0..1 across and down). */
+@Composable
+private fun PlacementPad(x: Float, y: Float, onChange: (Float, Float) -> Unit) {
+    val c = T.c
+    var px by remember { mutableStateOf(x) }
+    var py by remember { mutableStateOf(y) }
+    androidx.compose.runtime.LaunchedEffect(x, y) { px = x; py = y }
+    fun snap(v: Float) = (kotlin.math.round(v * 20) / 20f).coerceIn(0f, 1f)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.Canvas(
+            Modifier.size(180.dp, 110.dp).clip(RoundedCornerShape(c.radius)).background(c.laneBg)
+                .border(c.borderWidth, c.border, RoundedCornerShape(c.radius))
+                .pointerInput(Unit) {
+                    detectTapGestures { o -> px = snap(o.x / size.width); py = snap(o.y / size.height); onChange(px, py) }
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures(onDragEnd = { onChange(px, py) }) { ch, _ ->
+                        px = snap(ch.position.x / size.width); py = snap(ch.position.y / size.height)
+                    }
+                },
+        ) {
+            for (k in 1..3) {
+                drawLine(c.border, androidx.compose.ui.geometry.Offset(size.width * k / 4, 0f), androidx.compose.ui.geometry.Offset(size.width * k / 4, size.height), 1f)
+                drawLine(c.border, androidx.compose.ui.geometry.Offset(0f, size.height * k / 4), androidx.compose.ui.geometry.Offset(size.width, size.height * k / 4), 1f)
+            }
+            drawCircle(c.accent, 7.dp.toPx(), androidx.compose.ui.geometry.Offset(px * size.width, py * size.height))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("${(px * 100).toInt()}% · ${(py * 100).toInt()}%", color = c.text, fontSize = 13.sp)
+            Spacer(Modifier.height(6.dp))
+            Btn(S.reset()) { px = 0.5f; py = 0.5f; onChange(0.5f, 0.5f) }
+        }
+    }
+}
+
 private val whatToShow = mlabeler.app.i18n.L("What to show", "Что показывать")
 
 @Composable
@@ -170,7 +228,7 @@ fun CommandPalette(app: AppState) {
             onDone = { runAt(index) },
         )
         Divider()
-        LazyColumn(Modifier.heightIn(max = 420.dp), state = state) {
+        LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 420.dp), state = state) {
             itemsIndexed(list) { i, cmd ->
                 Row(
                     Modifier.fillMaxWidth().background(if (i == index) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else c.panel)
@@ -281,9 +339,15 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
             }
             Section.View -> {
-                ValueSlider(S.interfaceScale(), s.scale, 0.7f..2f, "%", factor = 100f, default = dScale, live = false) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
+                ValueSlider(S.interfaceScale(), s.scale, 0.5f..2f, "%", factor = 100f, default = dScale, live = false) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
+                SwitchRow(scaleButtonT(), s.toolbar.scaleButton ?: mlabeler.app.Platform.isMobile) { v -> app.update { it.copy(toolbar = it.toolbar.copy(scaleButton = v)) } }
                 SectionTitle(whatToShow())
                 SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
+                SwitchRow(namesOnAudioT(), s.layout.namesOnAudio) { v -> app.update { it.copy(layout = it.layout.copy(namesOnAudio = v)) } }
+                if (s.layout.namesOnAudio) {
+                    Text(namesWhereT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
+                    PlacementPad(s.layout.namesX, s.layout.namesY) { x, y -> app.update { it.copy(layout = it.layout.copy(namesX = x, namesY = y)) } }
+                }
                 ValueSlider(S.labelFontSize(), s.layout.labelFontSize, 8f..48f, "sp", default = dL.labelFontSize) { v -> app.update { it.copy(layout = it.layout.copy(labelFontSize = v.roundToInt().toFloat())) } }
                 if (s.layout.overlay) ValueSlider(S.overlayWaveFillAlpha(), s.layout.overlayWaveFillAlpha, 0.05f..1f, "%", factor = 100f,
                     default = mlabeler.app.state.LayoutSettings().overlayWaveFillAlpha) { v -> app.update { it.copy(layout = it.layout.copy(overlayWaveFillAlpha = v)) } }
@@ -342,6 +406,34 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     phonemes = v
                     app.update { it.copy(checks = it.checks.copy(phonemeSet = v.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }.toSet())) }
                 }, Modifier.fillMaxWidth())
+                ValueSlider(CheckTitles.maxLen(), s.checks.maxDurationMs.toFloat(), 0f..3000f, S.msUnit(), default = 0f) { v ->
+                    app.update { it.copy(checks = it.checks.copy(maxDurationMs = ((v / 10).roundToInt() * 10).toDouble())) }
+                }
+                ValueSlider(CheckTitles.maxPause(), s.checks.maxPauseSeconds.toFloat(), 0f..30f, S.secondsShort(), decimals = 1, default = 0f) { v ->
+                    app.update { it.copy(checks = it.checks.copy(maxPauseSeconds = (v * 10).roundToInt() / 10.0)) }
+                }
+                ValueSlider(CheckTitles.maxPhrase(), s.checks.maxPhraseSeconds.toFloat(), 0f..60f, S.secondsShort(), decimals = 1, default = 0f) { v ->
+                    app.update { it.copy(checks = it.checks.copy(maxPhraseSeconds = (v * 10).roundToInt() / 10.0)) }
+                }
+                if (s.checks.maxPhraseSeconds > 0) ValueSlider(CheckTitles.phrasePause(), s.checks.phrasePauseMs.toFloat(), 50f..1000f, S.msUnit(), default = 200f) { v ->
+                    app.update { it.copy(checks = it.checks.copy(phrasePauseMs = v.roundToInt().toDouble())) }
+                }
+                Text(CheckTitles.zeroOff(), color = c.muted, fontSize = 12.sp)
+                SectionTitle(CheckTitles.scripts())
+                Text(CheckTitles.scriptsHint.format(mlabeler.app.plugins.CheckScripts.appDir(), ".mlabeler/checks"), color = c.muted, fontSize = 12.sp)
+                SwitchRow(CheckTitles.runScripts(), s.checks.scripts) { v -> app.update { it.copy(checks = it.checks.copy(scripts = v)) }; app.editor?.reloadCheckScripts() }
+                val ed = app.editor
+                if (ed != null) {
+                    Text(if (ed.checkScripts.isEmpty()) CheckTitles.none() else ed.checkScripts.joinToString(", ") { it.name }, color = c.text, fontSize = 13.sp, modifier = Modifier.padding(vertical = 6.dp))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Btn(CheckTitles.example()) {
+                        val p = runCatching { mlabeler.app.plugins.CheckScripts.writeExample() }.getOrNull()
+                        app.editor?.reloadCheckScripts()
+                        if (p != null) { app.message(CheckTitles.written.format(p)); if (!mlabeler.app.Platform.isMobile) mlabeler.app.Platform.openInFileManager(mlabeler.app.plugins.CheckScripts.appDir()) }
+                    }
+                    Btn(CheckTitles.reload()) { app.editor?.reloadCheckScripts() }
+                }
             }
             Section.Toolkit -> ToolkitPage(app)
             Section.Interface -> InterfacePage(app)
@@ -561,6 +653,8 @@ object MouseTitles {
         "Рядом с границей оба инструмента её двигают. Shift+клик и протягивание по звуку выделяют кусок в обоих.")
     val askName = L("Type the name of the new part right away", "Сразу вводить название новой части")
     val playIt = L("Play the part before a new boundary", "Проигрывать часть перед новой границей")
+    val leftHint = L("A plain left click does what the tool above says (keys 1–4); below are the other clicks.",
+        "Обычный левый клик делает то, что задаёт инструмент выше (клавиши 1–4); ниже — остальные клики.")
     val onLabels = L("On label lanes", "На полосах разметки")
     val onAudio = L("On the waveform and spectrogram", "На волне и спектрограмме")
     val double = L("Double click", "Двойной клик")
@@ -568,7 +662,8 @@ object MouseTitles {
     val middle = L("Middle click (dragging with it scrolls)", "Средний клик (с перетаскиванием — прокрутка)")
     val ctrl = L("Ctrl+click", "Ctrl+клик")
     val alt = L("Alt+click", "Alt+клик")
-    val selectAfterDrag = L("After moving a boundary, select its phoneme (Space plays it)", "После перетаскивания границы выделять её фонему (пробел её проигрывает)")
+    val selectAfterDrag = L("Touching a boundary (moving or just pressing it) selects its phoneme: Space plays it, Delete removes it",
+        "Касание границы (перетаскивание или просто нажатие) выделяет её фонему: пробел её играет, Delete удаляет")
     val audioDeselects = L("A click on the waveform or spectrogram clears the selection (Space plays from there)",
         "Клик по волне или спектрограмме снимает выделение (пробел играет оттуда)")
     val spaceRestarts = L("Space while playing starts again (instead of stopping)", "Пробел во время проигрывания начинает заново (а не останавливает)")
@@ -618,6 +713,7 @@ private fun MousePage(app: AppState) {
         Chip(MouseTitles.wheelScroll(), m.wheel != "phonemes") { set { it.copy(wheel = "scroll") } }
         Chip(MouseTitles.wheelPhonemes(), m.wheel == "phonemes") { set { it.copy(wheel = "phonemes") } }
     }
+    Text(MouseTitles.leftHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
     SectionTitle(MouseTitles.onLabels())
     ActionRow(MouseTitles.double(), m.tierDouble) { v -> set { it.copy(tierDouble = v) } }
     ActionRow(MouseTitles.right(), m.tierRight) { v -> set { it.copy(tierRight = v) } }

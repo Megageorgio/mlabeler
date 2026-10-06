@@ -28,7 +28,8 @@ fun rememberAppState(): AppState {
 fun App(app: AppState = rememberAppState()) {
     DisposableEffect(app) { onDispose { app.close() } }
     val base = LocalDensity.current
-    val scale = app.settings.scale.coerceIn(0.7f, 2f)
+    val scale = app.settings.scale.coerceIn(0.5f, 2f)
+    mlabeler.app.ui.UiScale.current = scale
     val st = app.settings
     androidx.compose.runtime.LaunchedEffect(st.orientation, st.fullscreen) { Platform.applyScreen(st.orientation, st.fullscreen) }
     CompositionLocalProvider(

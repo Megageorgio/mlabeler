@@ -25,6 +25,13 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
 
     var status by mutableStateOf(Status.Unknown)
         private set
+    /** When the current installing or starting began (ms), for the time shown. */
+    var busySince = 0L
+        private set
+    private fun busy(s: Status) {
+        if (status != s) busySince = kotlin.time.Clock.System.now().toEpochMilliseconds()
+        status = s
+    }
     var version by mutableStateOf("")
         private set
     /** Token printed by a toolkit started with network access (for phones). */
@@ -101,7 +108,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
 
     private suspend fun startLocked(): Boolean {
         val mvt = LocalToolkit.findMvt(settings.mvtPath) ?: run { status = Status.Missing; return false }
-        status = Status.Starting
+        busy(Status.Starting)
         networkToken = ""
         val cmd = buildList {
             add(mvt); add("serve"); add("--port"); add(port.toString())
@@ -134,7 +141,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     /** The toolkit updates itself (it exited with [EXIT_UPDATING]); wait until it answers again, up to 15 minutes. */
     private suspend fun waitForUpdate(): Boolean {
         updatingNow = true
-        status = Status.Installing
+        busy(Status.Installing)
         addLog(updating())
         try {
             repeat(15 * 60) {
@@ -188,7 +195,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
 
     /** The installation itself; true when `mvt` is there afterwards. */
     private suspend fun installNow(): Boolean {
-            status = Status.Installing
+            busy(Status.Installing)
             try {
                 var uv = LocalToolkit.findUv()
                 if (uv == null) {

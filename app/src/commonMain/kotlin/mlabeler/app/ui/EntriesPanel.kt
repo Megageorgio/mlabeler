@@ -93,7 +93,7 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Field(query, { query = it }, Modifier.fillMaxWidth(), placeholder = searchHint())
-            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(thisFile(), !all) { all = false }
                 Chip(allFiles(), all) { all = true }
                 Chip(summary(), counts) { counts = !counts }

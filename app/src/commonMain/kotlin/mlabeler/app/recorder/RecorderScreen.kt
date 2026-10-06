@@ -259,7 +259,8 @@ private fun medianNote(curve: mlabeler.core.dsp.Curve?): Double? {
 @Composable
 private fun Readout(rec: RecorderState) {
     val c = T.c
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+    // fixed height: numbers appearing and disappearing while singing must not move the picture below
+    Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         // level
         Box(Modifier.width(160.dp).height(10.dp).clip(RoundedCornerShape(5.dp)).background(c.panelAlt)) {
             val db = if (rec.level > 0f) 20 * log10(rec.level.toDouble()) else -90.0
@@ -270,15 +271,13 @@ private fun Readout(rec: RecorderState) {
         val live = rec.recording
         val note: Double? = if (live) rec.liveNote.takeIf { it > 0f }?.toDouble() else medianNote(rec.takePitch)
         Box(Modifier.width(76.dp), contentAlignment = Alignment.CenterEnd) {
-            Text(note?.let { noteName(it) } ?: noVoice(), color = if (live && note != null) c.accent else c.text, fontSize = 30.sp, maxLines = 1)
+            Text(note?.let { noteName(it) } ?: noVoice(), color = if (live && note != null) c.accent else c.text, fontSize = 30.sp, maxLines = 1, softWrap = false)
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.width(110.dp)) {
-            if (note != null) {
-                val cents = kotlin.math.round((note - kotlin.math.round(note)) * 100).toInt()
-                Text("${kotlin.math.round(midiToHz(note)).toInt()} Hz", color = c.text, fontSize = 14.sp)
-                Text((if (cents >= 0) "+" else "") + "$cents ¢", color = if (kotlin.math.abs(cents) <= 15) c.ok else c.muted, fontSize = 12.sp)
-            } else Text(if (live) "" else " ", color = c.muted, fontSize = 12.sp)
+            val cents = note?.let { kotlin.math.round((it - kotlin.math.round(it)) * 100).toInt() } ?: 0
+            Text(note?.let { "${kotlin.math.round(midiToHz(it)).toInt()} Hz" } ?: "", color = c.text, fontSize = 14.sp, maxLines = 1)
+            Text(if (note != null) (if (cents >= 0) "+" else "") + "$cents ¢" else "", color = if (kotlin.math.abs(cents) <= 15) c.ok else c.muted, fontSize = 12.sp, maxLines = 1)
         }
     }
 }
@@ -287,7 +286,7 @@ private fun Readout(rec: RecorderState) {
 private fun TakeInfo(rec: RecorderState) {
     val c = T.c
     val take = rec.take
-    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp).height(18.dp), verticalAlignment = Alignment.CenterVertically) {
         if (take != null && !rec.recording) {
             val peak = remember(take) { var p = 0f; for (v in take.samples) { val a = kotlin.math.abs(v); if (a > p) p = a }; p }
             Text(takeHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -295,7 +294,7 @@ private fun TakeInfo(rec: RecorderState) {
                 peak >= 0.99f -> Text(clipped(), color = c.danger, fontSize = 11.sp)
                 peak < 0.06f -> Text(quiet(), color = c.warn, fontSize = 11.sp)
             }
-        } else Spacer(Modifier.height(14.dp))
+        }
     }
 }
 
@@ -314,6 +313,8 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
     // the take's peaks per pixel are cached by width
     var peaksKey by remember { mutableStateOf<Pair<Any?, Int>?>(null) }
     var peaks by remember { mutableStateOf(FloatArray(0) to FloatArray(0)) }
+    // the note range while recording only grows (a range following every new note made the grid jump)
+    val liveRange = remember(rec.recording) { DoubleArray(2) { Double.NaN } }
     Box(modifier.clip(shape).background(c.laneBg).border(c.borderWidth, c.border, shape)) {
         val live = rec.recording
         val frames = rec.liveFrames
@@ -374,6 +375,11 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
             var lo = if (sorted.size >= 5) min(sorted[sorted.size / 20], mid - 9) else mid - 9
             var hi = if (sorted.size >= 5) max(sorted[sorted.size * 19 / 20], mid + 9) else mid + 9
             lo = kotlin.math.floor(lo) - 1; hi = kotlin.math.ceil(hi) + 1
+            if (live) {
+                if (liveRange[0].isNaN() || sorted.size >= 5 && liveRange[0] == 50.0 && liveRange[1] == 70.0) { liveRange[0] = lo; liveRange[1] = hi }
+                else { liveRange[0] = min(liveRange[0], lo); liveRange[1] = max(liveRange[1], hi) }
+                lo = liveRange[0]; hi = liveRange[1]
+            }
             val semis = (hi - lo).coerceAtLeast(1.0)
             fun yOf(m: Double) = (pitchTop + pitchH - (m - lo) / semis * pitchH).toFloat()
             val rowH = pitchH / semis.toFloat()
@@ -482,7 +488,7 @@ private fun ListEditor(rec: RecorderState, onClose: () -> Unit) {
     val c = T.c
     var text by remember { mutableStateOf(rec.listText()) }
     Overlay(onClose, 560) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
             Text(editList(), color = c.text, fontSize = 17.sp)
             Text(emptyList(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
             BasicTextField(
@@ -504,7 +510,7 @@ private fun RecSettings(rec: RecorderState, onClose: () -> Unit) {
     val c = T.c
     val s = rec.settings
     Overlay(onClose, 480) {
-        Column(Modifier.padding(18.dp)) {
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
             Text(S.settings(), color = c.text, fontSize = 17.sp)
             SectionTitle(clickBpm())
             var bpm by remember { mutableStateOf(s.bpm.toString()) }

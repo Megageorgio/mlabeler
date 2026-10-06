@@ -113,8 +113,9 @@ compose.desktop {
             packageName = "mLabeler"
             packageVersion = appVersion.substringBefore('-').let { if (it.startsWith("0.")) "1." + it.removePrefix("0.") else it }
             modules("java.desktop", "jdk.unsupported")
-            windows { menu = true; perUserInstall = true; upgradeUuid = "6f1d1d7e-2b8e-4c39-9a41-6b2a0c6d0f2e" }
-            macOS { bundleID = "io.github.megageorgio.mlabeler" }
+            windows { menu = true; perUserInstall = true; upgradeUuid = "6f1d1d7e-2b8e-4c39-9a41-6b2a0c6d0f2e"; iconFile.set(rootProject.file("art/icon.ico")) }
+            macOS { bundleID = "io.github.megageorgio.mlabeler"; iconFile.set(rootProject.file("art/icon.icns")) }
+            linux { iconFile.set(rootProject.file("art/icon.png")) }
         }
         buildTypes.release.proguard { isEnabled.set(false) }
     }

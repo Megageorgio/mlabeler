@@ -247,6 +247,10 @@ class EditorState(
     // ---------- autolabel through the toolkit ----------
 
     var toolkitBusy by mutableStateOf<String?>(null)
+    /** When the current toolkit work began (ms) and its earlier steps, for the busy panel. */
+    var toolkitBusySince = 0L
+        private set
+    val toolkitSteps = androidx.compose.runtime.mutableStateListOf<String>()
     /** 0..1 while the toolkit works on a job, null when unknown. */
     var toolkitProgress by mutableStateOf<Double?>(null)
     /** Model results (comparison tiers) of the open file. */
@@ -273,6 +277,8 @@ class EditorState(
             val client = app.toolkit.client()
             var serverJob: String? = null
             try {
+                toolkitBusySince = now()
+                toolkitSteps.clear()
                 toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
                 if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
                 toolkitBusy = S.uploading()
@@ -282,7 +288,15 @@ class EditorState(
                 val fileId = client.upload(it.name + "_part.wav", wav)
                 val job = if (recognize) client.segment(fileId, model) else client.align(fileId, model, language, text, phonemes)
                 serverJob = job
-                val result = client.await(job) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
+                val result = client.await(job) { p, stage ->
+                    toolkitProgress = p
+                    val st = stage.ifEmpty { S.toolkit() }
+                    // a new step (not the same one with new numbers) goes to the list of steps
+                    val key = st.substringBefore(':').substringBefore('(').trim()
+                    val prev = toolkitBusy
+                    if (prev != null && prev.substringBefore(':').substringBefore('(').trim() != key) { toolkitSteps.add(prev); while (toolkitSteps.size > 6) toolkitSteps.removeAt(0) }
+                    toolkitBusy = st
+                }
                 val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate)
                 if (replace) {
                     updateDoc { d ->
@@ -590,7 +604,35 @@ class EditorState(
     private fun docChanged() {
         docVersion++
         val d = committed ?: return
-        problems = Checks.run(d, settings.checks)
+        val builtIn = Checks.run(d, settings.checks)
+        problems = builtIn + scriptProblems.takeIf { scriptDoc === d }.orEmpty()
+        runScripts(d, builtIn)
+    }
+
+    private var scriptProblems: List<mlabeler.core.check.Problem> = emptyList()
+    private var scriptDoc: LabelDoc? = null
+    private var scriptJob: Job? = null
+    /** Own check scripts, read again when the folder opens or the settings page asks. */
+    var checkScripts: List<mlabeler.app.plugins.CheckScripts.Script> = runCatching { mlabeler.app.plugins.CheckScripts.load(workspace.root) }.getOrDefault(emptyList())
+
+    fun reloadCheckScripts() {
+        checkScripts = runCatching { mlabeler.app.plugins.CheckScripts.load(workspace.root) }.getOrDefault(emptyList())
+        docChanged()
+    }
+
+    private fun runScripts(d: LabelDoc, builtIn: List<mlabeler.core.check.Problem>) {
+        scriptJob?.cancel()
+        val scripts = checkScripts
+        if (!settings.checks.scripts || scripts.isEmpty()) { scriptProblems = emptyList(); return }
+        val name = item?.name ?: ""
+        val dur = duration
+        scriptJob = scope.launch {
+            delay(250)
+            val found = runCatching { mlabeler.app.plugins.CheckScripts.run(scripts, d, name, dur) }.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it; emptyList() }
+            scriptProblems = found
+            scriptDoc = d
+            if (committed === d) problems = builtIn + found
+        }
     }
 
     fun commit(newDoc: LabelDoc) {
@@ -761,9 +803,11 @@ class EditorState(
         if (bound != null && settings.edit.selectAfterDrag) boundOwnerInterval(bound)?.let { selectInterval(it, reveal = false) }
     }
 
-    fun cancelDrag() {
+    /** A boundary was pressed but not moved. */
+    fun cancelDrag(bound: BoundRef? = null) {
         dragBase = null
         dragDoc = null
+        if (bound != null && settings.edit.selectAfterDrag) boundOwnerInterval(bound)?.let { selectInterval(it, reveal = false) }
     }
 
     fun moveSelectedBound(time: Double) {

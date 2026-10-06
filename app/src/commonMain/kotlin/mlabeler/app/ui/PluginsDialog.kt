@@ -81,7 +81,7 @@ fun PluginsDialog(app: AppState) {
             IconBtn(Icons.close, S.close()) { close() }
         }
         Divider()
-        BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 380.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 240.dp)) {
             val narrow = maxWidth < 560.dp
             val listView: @Composable (Modifier) -> Unit = { m ->
                 Column(m.background(c.panelAlt).verticalScroll(rememberScrollState())) {
