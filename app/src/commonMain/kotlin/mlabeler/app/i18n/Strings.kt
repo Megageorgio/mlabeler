@@ -259,4 +259,7 @@ object S {
     val resetPage = L("Reset this page to defaults", "Сбросить эту страницу по умолчанию")
     val audioReloaded = L("The recording changed on disk and was read again; labels kept", "Запись изменилась на диске и перечитана, разметка сохранена")
     val labelFontSize = L("Label text size (Ctrl+Shift+= / −)", "Размер текста меток (Ctrl+Shift+= / −)")
+    val toolkitAutoUpdate = L("Update it by itself when a new version is out (checked before it starts)",
+        "Обновлять самому, когда выходит новая версия (проверяется перед запуском)")
+    val toolkitCheckUpdate = L("Update now", "Обновить сейчас")
 }

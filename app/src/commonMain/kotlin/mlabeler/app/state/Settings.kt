@@ -143,6 +143,12 @@ data class ToolkitSettings(
     val installSource: String = ToolkitSettings.DEFAULT_SOURCE,
     /** Let phones and other computers in the local network use the toolkit started here. */
     val shareOnNetwork: Boolean = false,
+    /** Before starting the toolkit, install a newer version from the install source if there is one. */
+    val autoUpdate: Boolean = true,
+    /** Revision (commit) of the source the installed toolkit was made from. */
+    val installedRevision: String = "",
+    /** When the source was last checked for a newer version (ms since epoch). */
+    val lastUpdateCheck: Long = 0,
 ) {
     companion object {
         const val DEFAULT_SOURCE = "https://github.com/Megageorgio/mVocalToolkit/archive/refs/heads/main.zip"
