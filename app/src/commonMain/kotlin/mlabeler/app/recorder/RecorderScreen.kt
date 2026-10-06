@@ -76,6 +76,8 @@ import mlabeler.core.format.NoteNames
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.isCtrlPressed
+import androidx.compose.ui.input.pointer.isMetaPressed
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import kotlin.math.log10
@@ -97,9 +99,21 @@ private val clickBpm = L("Click, BPM (0 = off)", "Метроном, BPM (0 — �
 private val countInT = L("Count-in beats", "Тактов отсчёта")
 private val guideT = L("Guide WAV in the folder (empty = none)", "Направляющий WAV в папке (пусто — нет)")
 private val autoNextT = L("Next line after a take", "Следующая строка после дубля")
-private val keysHint = L("R or the red button records, Space plays the take from the line, the Up and Down arrows change the item.",
-    "R или красная кнопка — запись, пробел — прослушать с линии, стрелки вверх и вниз — другая строка.")
+private val keysHint = L("R or the red button records, Space plays the take from the line, the Up and Down arrows change the item, T plays the target note.",
+    "R или красная кнопка — запись, пробел — прослушать с линии, стрелки вверх и вниз — другая строка, T — целевая нота.")
 private val openInEditor = L("Open in the editor", "Открыть в редакторе")
+private val newLineT = L("New line…", "Новая строка…")
+private val addLineT = L("Add to the list after the current line", "Добавить в список после текущей строки")
+private val keepSel = L("Keep the selection", "Оставить выделенное")
+private val cutSel = L("Cut out", "Вырезать")
+private val selToFile = L("To a separate file…", "В отдельный файл…")
+private val fileNameT = L("Name of the new file", "Имя нового файла")
+private val selInfo = L("Selected {0}", "Выделено {0}")
+private val targetT = L("Target note (e.g. C4, empty = none)", "Целевая нота (например C4, пусто — нет)")
+private val listenBackT = L("Play the take right after recording", "Прослушать дубль сразу после записи")
+private val toneT = L("Play the target note (T)", "Сыграть целевую ноту (T)")
+private val toTarget = L("to {0}: {1}", "до {0}: {1}")
+private val zoomHint = L("Ctrl+wheel zooms, the wheel scrolls", "Ctrl+колесо — масштаб, колесо — прокрутка")
 
 @Composable
 fun RecorderScreen(app: AppState, rec: RecorderState) {
@@ -115,13 +129,14 @@ fun RecorderScreen(app: AppState, rec: RecorderState) {
         Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .focusRequester(focus).focusable()
             .onKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown || editing || showSettings) return@onKeyEvent false
+                if (e.type != KeyEventType.KeyDown || editing || showSettings || mlabeler.app.ui.TextFocus.active) return@onKeyEvent false
                 when (e.key) {
                     Key.R -> { rec.toggle(); true }
                     Key.Spacebar -> { rec.playTake(); true }
                     Key.DirectionDown -> { rec.step(1); true }
                     Key.DirectionUp -> { rec.step(-1); true }
-                    Key.Escape -> { if (rec.recording) rec.stop(); true }
+                    Key.Escape -> { if (rec.recording) rec.stop() else rec.selection = null; true }
+                    Key.T -> { rec.playTone(); true }
                     else -> false
                 }
             },
@@ -196,7 +211,12 @@ private fun RecList(rec: RecorderState, modifier: Modifier) {
             }
         }
         Divider()
-        Text(recordedCount.format(rec.names.count { rec.isRecorded(it) }, rec.names.size), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(12.dp))
+        var line by remember { mutableStateOf("") }
+        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Field(line, { line = it }, Modifier.weight(1f), placeholder = newLineT(), onDone = { rec.addLine(line); line = "" })
+            IconBtn(Icons.plus, addLineT(), enabled = line.isNotBlank()) { rec.addLine(line); line = "" }
+        }
+        Text(recordedCount.format(rec.names.count { rec.isRecorded(it) }, rec.names.size), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
     }
 }
 
@@ -242,7 +262,7 @@ private val noVoice = L("—", "—")
 private val takeNote = L("take: {0}", "дубль: {0}")
 private val clipped = L("too loud: the take clips", "слишком громко: дубль перегружен")
 private val quiet = L("very quiet take", "очень тихий дубль")
-private val takeHint = L("Click to play from there, drag to play a part", "Щелчок — играть отсюда, протяжка — играть кусок")
+private val takeHint = L("Click to play from there, drag to select and play a part", "Щелчок — играть отсюда, протяжка — выделить и прослушать кусок")
 
 /** Note name without cents for a MIDI value. */
 private fun noteName(midi: Double) = NoteNames.format(kotlin.math.round(midi))
@@ -274,11 +294,20 @@ private fun Readout(rec: RecorderState) {
             Text(note?.let { noteName(it) } ?: noVoice(), color = if (live && note != null) c.accent else c.text, fontSize = 30.sp, maxLines = 1, softWrap = false)
         }
         Spacer(Modifier.width(10.dp))
-        Column(Modifier.width(110.dp)) {
-            val cents = note?.let { kotlin.math.round((it - kotlin.math.round(it)) * 100).toInt() } ?: 0
+        val target = rec.targetMidi
+        Column(Modifier.width(if (target != null) 130.dp else 110.dp)) {
             Text(note?.let { "${kotlin.math.round(midiToHz(it)).toInt()} Hz" } ?: "", color = c.text, fontSize = 14.sp, maxLines = 1)
-            Text(if (note != null) (if (cents >= 0) "+" else "") + "$cents ¢" else "", color = if (kotlin.math.abs(cents) <= 15) c.ok else c.muted, fontSize = 12.sp, maxLines = 1)
+            if (target != null) {
+                // deviation from the note to sing, not from the nearest one
+                val cents = note?.let { kotlin.math.round((it - target) * 100).toInt() } ?: 0
+                val txt = if (note != null) toTarget.format(noteName(target), (if (cents >= 0) "+" else "") + "$cents ¢") else ""
+                Text(txt, color = if (kotlin.math.abs(cents) <= 25) c.ok else if (kotlin.math.abs(cents) <= 100) c.warn else c.danger, fontSize = 12.sp, maxLines = 1)
+            } else {
+                val cents = note?.let { kotlin.math.round((it - kotlin.math.round(it)) * 100).toInt() } ?: 0
+                Text(if (note != null) (if (cents >= 0) "+" else "") + "$cents ¢" else "", color = if (kotlin.math.abs(cents) <= 15) c.ok else c.muted, fontSize = 12.sp, maxLines = 1)
+            }
         }
+        if (target != null) IconBtn(Icons.play, toneT(), enabled = !rec.recording) { rec.playTone() }
     }
 }
 
@@ -286,10 +315,31 @@ private fun Readout(rec: RecorderState) {
 private fun TakeInfo(rec: RecorderState) {
     val c = T.c
     val take = rec.take
+    val sel = rec.selection
+    var naming by remember(take) { mutableStateOf<String?>(null) }
+    if (take != null && !rec.recording && sel != null) {
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(selInfo.format(formatTime(sel.second - sel.first)), color = c.muted, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val n = naming
+            if (n != null) {
+                val fr = remember { FocusRequester() }
+                LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+                Field(n, { naming = it }, Modifier.width(160.dp).focusRequester(fr), placeholder = fileNameT(), onDone = { rec.selectionToFile(n); naming = null })
+                Btn(S.save(), primary = true, enabled = n.isNotBlank()) { rec.selectionToFile(n); naming = null }
+                Btn(S.cancel()) { naming = null }
+            } else {
+                Btn(keepSel()) { rec.trimToSelection() }
+                Btn(cutSel()) { rec.cutSelection() }
+                Btn(selToFile()) { naming = "" }
+                IconBtn(Icons.close, S.cancel()) { rec.selection = null }
+            }
+        }
+        return
+    }
     Row(Modifier.fillMaxWidth().padding(top = 4.dp).height(18.dp), verticalAlignment = Alignment.CenterVertically) {
         if (take != null && !rec.recording) {
             val peak = remember(take) { var p = 0f; for (v in take.samples) { val a = kotlin.math.abs(v); if (a > p) p = a }; p }
-            Text(takeHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(takeHint() + (if (Platform.isMobile) "" else ". " + zoomHint()), color = c.muted, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             when {
                 peak >= 0.99f -> Text(clipped(), color = c.danger, fontSize = 11.sp)
                 peak < 0.06f -> Text(quiet(), color = c.warn, fontSize = 11.sp)
@@ -310,8 +360,20 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
     val shape = RoundedCornerShape(c.radius)
     var dragFrom by remember { mutableStateOf(-1.0) }
     var dragTo by remember { mutableStateOf(-1.0) }
-    // the take's peaks per pixel are cached by width
-    var peaksKey by remember { mutableStateOf<Pair<Any?, Int>?>(null) }
+    // the shown part of the take: start and length, s (length 0 = the whole take)
+    var vStart by remember(take) { mutableStateOf(0.0) }
+    var vSpan by remember(take) { mutableStateOf(0.0) }
+    val dur0 = take?.duration ?: 1.0
+    fun span() = if (vSpan <= 0.0 || vSpan >= dur0) dur0 else vSpan
+    fun zoomBy(f: Double, anchor: Double) {
+        val old = span()
+        val ns = (old * f).coerceIn(min(0.05, dur0), dur0)
+        vStart = (anchor - (anchor - vStart) * ns / old).coerceIn(0.0, max(0.0, dur0 - ns))
+        vSpan = if (ns >= dur0) 0.0 else ns
+        if (vSpan == 0.0) vStart = 0.0
+    }
+    // the take's peaks per pixel are cached by width and the shown part
+    var peaksKey by remember { mutableStateOf<List<Any?>?>(null) }
     var peaks by remember { mutableStateOf(FloatArray(0) to FloatArray(0)) }
     // the note range while recording only grows (a range following every new note made the grid jump)
     val liveRange = remember(rec.recording) { DoubleArray(2) { Double.NaN } }
@@ -319,10 +381,26 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
         val live = rec.recording
         val frames = rec.liveFrames
         val canvasMod = if (take != null && !live) Modifier.fillMaxSize().pointerInput(take) {
+            awaitPointerEventScope {
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    if (ev.type != androidx.compose.ui.input.pointer.PointerEventType.Scroll) continue
+                    val ch = ev.changes.firstOrNull() ?: continue
+                    val d = ch.scrollDelta
+                    val anchor = vStart + ch.position.x / size.width * span()
+                    if (ev.keyboardModifiers.isCtrlPressed || ev.keyboardModifiers.isMetaPressed) zoomBy(1.2.pow(d.y.toDouble()), anchor)
+                    else if (vSpan > 0.0) {
+                        val dx = if (kotlin.math.abs(d.x) > kotlin.math.abs(d.y)) d.x else d.y
+                        vStart = (vStart + dx * span() * 0.1).coerceIn(0.0, max(0.0, take.duration - span()))
+                    }
+                    ch.consume()
+                }
+            }
+        }.pointerInput(take) {
             awaitEachGesture {
                 val down = awaitFirstDown()
                 val dur = take.duration
-                fun timeAt(x: Float) = (x / size.width * dur).coerceIn(0.0, dur)
+                fun timeAt(x: Float) = (vStart + x / size.width * span()).coerceIn(0.0, dur)
                 val t0 = timeAt(down.position.x)
                 var moved = false
                 while (true) {
@@ -336,10 +414,13 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
                 if (moved && dragFrom >= 0) {
                     val a = min(dragFrom, dragTo); val b = max(dragFrom, dragTo)
                     rec.cursor = a
+                    rec.selection = if (b - a > 0.01) a to b else null
                     rec.playRange(a, b)
                 } else {
-                    rec.cursor = t0
-                    rec.playRange(t0, dur)
+                    val sel = rec.selection
+                    // a click inside the selection plays it, outside drops it
+                    if (sel != null && t0 in sel.first..sel.second) { rec.cursor = sel.first; rec.playRange(sel.first, sel.second) }
+                    else { rec.selection = null; rec.cursor = t0; rec.playRange(t0, dur) }
                 }
                 dragFrom = -1.0; dragTo = -1.0
             }
@@ -361,8 +442,8 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
                 span = 8.0
                 start = max(0.0, rec_s - span * 0.9)
             } else {
-                span = take?.duration ?: 1.0
-                start = 0.0
+                span = span()
+                start = if (vSpan > 0.0) vStart else 0.0
             }
             fun xOf(t: Double) = ((t - start) / span * w).toFloat()
             // pitch range: around the typical note, at least an octave and a half
@@ -374,6 +455,8 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
             val mid = if (sorted.size >= 5) sorted[sorted.size / 2] else 60.0
             var lo = if (sorted.size >= 5) min(sorted[sorted.size / 20], mid - 9) else mid - 9
             var hi = if (sorted.size >= 5) max(sorted[sorted.size * 19 / 20], mid + 9) else mid + 9
+            val target = rec.targetMidi
+            if (target != null) { lo = min(lo, target - 2); hi = max(hi, target + 2) }
             lo = kotlin.math.floor(lo) - 1; hi = kotlin.math.ceil(hi) + 1
             if (live) {
                 if (liveRange[0].isNaN() || sorted.size >= 5 && liveRange[0] == 50.0 && liveRange[1] == 70.0) { liveRange[0] = lo; liveRange[1] = hi }
@@ -409,17 +492,20 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
                 drawPath(path, wave, style = Stroke(max(1f, px)))
             } else if (take != null) {
                 val wi = w.toInt().coerceAtLeast(1)
-                if (peaksKey != (take to wi)) {
+                val key = listOf(take, wi, start, span)
+                if (peaksKey != key) {
                     val lo2 = FloatArray(wi); val hi2 = FloatArray(wi)
                     val n = take.samples.size
+                    val s0 = (start * take.sampleRate).toLong()
+                    val sn = (span * take.sampleRate).toLong().coerceAtLeast(1)
                     for (x in 0 until wi) {
-                        val a = (x.toLong() * n / wi).toInt(); val b = max(a + 1, ((x + 1).toLong() * n / wi).toInt())
+                        val a = (s0 + x.toLong() * sn / wi).toInt().coerceIn(0, n); val b = max(a + 1, (s0 + (x + 1).toLong() * sn / wi).toInt())
                         var l = 0f; var hh = 0f
                         for (i in a until min(n, b)) { val v = take.samples[i]; if (v < l) l = v; if (v > hh) hh = v }
                         lo2[x] = l; hi2[x] = hh
                     }
                     peaks = lo2 to hi2
-                    peaksKey = take to wi
+                    peaksKey = key
                 }
                 val (l2, h2) = peaks
                 val path = Path()
@@ -451,11 +537,16 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
                     if (v > 0f) point(i * cur.hop, Pitch.hzToMidi(v.toDouble())) else open = false
                 }
             }
+            if (target != null && target > lo && target < hi) {
+                val y = yOf(target)
+                drawLine(c.warn, Offset(0f, y), Offset(w, y), 1.5f, pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(8f, 6f)))
+            }
             drawPath(pc, c.accent, style = stroke)
             if (!live && take != null) {
-                // dragged part, cursor and playhead
-                if (dragFrom >= 0) {
-                    val a = xOf(min(dragFrom, dragTo)); val b = xOf(max(dragFrom, dragTo))
+                // dragged or kept selection, cursor and playhead
+                val sel = if (dragFrom >= 0) min(dragFrom, dragTo) to max(dragFrom, dragTo) else rec.selection
+                if (sel != null) {
+                    val a = xOf(sel.first); val b = xOf(sel.second)
                     drawRect(c.selectionRange, Offset(a, 0f), Size(b - a, h))
                 }
                 val cx = xOf(rec.cursor)
@@ -480,6 +571,12 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
             else -> ""
         }
         if (shown.isNotEmpty()) Text(shown, color = c.muted, fontSize = 11.sp, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp))
+        if (take != null && !live) Row(Modifier.align(Alignment.BottomEnd).padding(2.dp)) {
+            val mid = vStart + span() / 2
+            if (vSpan > 0.0) IconBtn(Icons.fit, S.zoomFit(), size = 30.dp) { vSpan = 0.0; vStart = 0.0 }
+            IconBtn(Icons.zoomOut, S.zoomOut(), size = 30.dp, enabled = vSpan > 0.0) { zoomBy(1.6, mid) }
+            IconBtn(Icons.zoomIn, S.zoomIn(), size = 30.dp) { zoomBy(1 / 1.6, rec.selection?.let { (it.first + it.second) / 2 } ?: mid) }
+        }
     }
 }
 
@@ -526,6 +623,17 @@ private fun RecSettings(rec: RecorderState, onClose: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(S.ok(), s.autoNext) { rec.updateSettings { st -> st.copy(autoNext = true) } }
                 Chip("—", !s.autoNext) { rec.updateSettings { st -> st.copy(autoNext = false) } }
+            }
+            SectionTitle(targetT())
+            var tgt by remember { mutableStateOf(s.targetNote) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Field(tgt, { tgt = it; rec.updateSettings { st -> st.copy(targetNote = it.trim()) } }, Modifier.width(120.dp), placeholder = "C4")
+                if (tgt.isNotBlank()) Text(if (rec.targetMidi != null) "✓" else "?", color = if (rec.targetMidi != null) c.ok else c.danger, modifier = Modifier.padding(start = 8.dp))
+            }
+            SectionTitle(listenBackT())
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(S.ok(), s.listenBack) { rec.updateSettings { st -> st.copy(listenBack = true) } }
+                Chip("—", !s.listenBack) { rec.updateSettings { st -> st.copy(listenBack = false) } }
             }
             SectionTitle("Hz")
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

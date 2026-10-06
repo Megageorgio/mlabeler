@@ -40,10 +40,16 @@ data class RecorderSettings(
     val autoNext: Boolean = true,
     /** Longest take, seconds. */
     val maxSeconds: Int = 30,
+    /** Note to sing at (e.g. "C4"): a line on the pitch and the deviation from it; empty = none. */
+    val targetNote: String = "",
+    /** Play the take once right after it is recorded. */
+    val listenBack: Boolean = false,
 )
 
 private val savedTake = L("Saved {0}", "Сохранено: {0}")
 private val noMic = L("No access to the microphone", "Нет доступа к микрофону")
+private val trimmed = L("Only the selected part is kept; the previous take is in .mlabeler/takes", "Оставлен только выделенный кусок; прошлый дубль — в .mlabeler/takes")
+private val cutDone = L("The selected part is cut out; the previous take is in .mlabeler/takes", "Выделенный кусок вырезан; прошлый дубль — в .mlabeler/takes")
 private val micError = L("Recording failed: {0}", "Не удалось записать: {0}")
 
 /** Recording samples from a list (reclist) into a folder, one WAV per line. */
@@ -68,6 +74,8 @@ class RecorderState(val folder: String, private val app: AppState, private val s
     /** The take of the current item (just recorded or read from disk). */
     var take by mutableStateOf<Audio?>(null)
         private set
+    /** The part of the take chosen by dragging, seconds; null when none. */
+    var selection by mutableStateOf<Pair<Double, Double>?>(null)
     var version by mutableIntStateOf(0)
         private set
     /** Pitch of the take, Hz per frame (0 = unvoiced). */
@@ -140,6 +148,108 @@ class RecorderState(val folder: String, private val app: AppState, private val s
         loadTake()
     }
 
+    /** Adds [line] (a name, optionally a comment after a space) to the list after the current one, and selects it. */
+    fun addLine(line: String) {
+        val l = line.trim()
+        if (l.isEmpty()) return
+        val name = l.substringBefore('\t').substringBefore(' ').removeSuffix(".wav")
+        if (name in names) { select(names.indexOf(name)); return }
+        val lines = listText().lines().toMutableList().let { ls -> if (ls.lastOrNull()?.isBlank() == true) ls.dropLast(1).toMutableList() else ls }
+        // after the current line of the file (comments and blank lines kept where they are)
+        val cur = current
+        val at = lines.indexOfFirst { it.trim().substringBefore('\t').substringBefore(' ').removeSuffix(".wav") == cur }
+        if (at >= 0) lines.add(at + 1, l) else lines.add(l)
+        fs.write(listPath, (lines.joinToString("\n") + "\n").encodeToByteArray())
+        loadList()
+        select(names.indexOf(name).coerceAtLeast(0))
+    }
+
+    // ---------- editing a take ----------
+
+
+    private fun backupAndWrite(name: String, audio: Audio) {
+        val path = pathOf(name)
+        if (fs.exists(path)) {
+            runCatching { fs.copy(path, Paths.join(Paths.join(Paths.join(folder, ".mlabeler"), "takes"), "$name.${Workspace.timestamp()}.wav")) }
+        }
+        fs.write(path, Wav.encode16(audio))
+    }
+
+    private fun piece(a: Audio, from: Double, to: Double): Audio {
+        val s0 = (from * a.sampleRate).toInt().coerceIn(0, a.samples.size)
+        val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
+        return Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))
+    }
+
+    /** Keeps only the selected part of the take (the previous take stays in .mlabeler/takes). */
+    fun trimToSelection() {
+        val t = take ?: return
+        val (a, b) = selection ?: return
+        val name = current ?: return
+        val out = piece(t, a, b)
+        scope.launch {
+            withContext(Dispatchers.Default) { backupAndWrite(name, out) }
+            selection = null
+            useTake(out)
+            version++
+            app.message(trimmed())
+        }
+    }
+
+    /** Removes the selected part from the take. */
+    fun cutSelection() {
+        val t = take ?: return
+        val (a, b) = selection ?: return
+        val name = current ?: return
+        val s0 = (a * t.sampleRate).toInt().coerceIn(0, t.samples.size)
+        val s1 = (b * t.sampleRate).toInt().coerceIn(s0, t.samples.size)
+        val out = Audio(t.sampleRate, t.samples.copyOfRange(0, s0) + t.samples.copyOfRange(s1, t.samples.size))
+        scope.launch {
+            withContext(Dispatchers.Default) { backupAndWrite(name, out) }
+            selection = null
+            useTake(out)
+            version++
+            app.message(cutDone())
+        }
+    }
+
+    /** Saves the selected part as [newName].wav and adds that name to the list (e.g. "ava" out of "avata"). */
+    fun selectionToFile(newName: String) {
+        val t = take ?: return
+        val (a, b) = selection ?: return
+        val n = newName.trim().removeSuffix(".wav")
+        if (n.isEmpty()) return
+        val out = piece(t, a, b)
+        val keep = index
+        scope.launch {
+            withContext(Dispatchers.Default) { backupAndWrite(n, out) }
+            if (n !in names) {
+                addLine(n)
+                select(keep)
+            }
+            version++
+            app.message(savedTake.format("$n.wav"))
+        }
+    }
+
+    /** Target note as MIDI, or null. */
+    val targetMidi: Double? get() = mlabeler.core.format.NoteNames.parse(settings.targetNote.trim())
+
+    /** A second of the target note as a sine, to hear where to sing. */
+    fun playTone() {
+        val m = targetMidi ?: liveNote.takeIf { it > 0f }?.toDouble() ?: return
+        if (recording) return
+        val sr = 44100
+        val hz = 440.0 * kotlin.math.exp((m - 69) / 12.0 * kotlin.math.ln(2.0))
+        val n = sr
+        val tone = FloatArray(n) { i ->
+            val env = minOf(1.0, i / 2000.0, (n - i) / 4000.0)
+            (0.25 * env * sin(2 * PI * hz * i / sr)).toFloat()
+        }
+        stopPlayback()
+        runCatching { output.play(Audio(sr, tone), 0, n, false) }
+    }
+
     val current: String? get() = names.getOrNull(index)
     fun pathOf(name: String) = Paths.join(folder, "$name.wav")
     fun isRecorded(name: String): Boolean { version; return fs.exists(pathOf(name)) }
@@ -162,6 +272,7 @@ class RecorderState(val folder: String, private val app: AppState, private val s
 
     private fun useTake(a: Audio?) {
         take = a
+        selection = null
         cursor = 0.0
         takePitch = null
         pitchJob?.cancel()
@@ -296,7 +407,8 @@ class RecorderState(val folder: String, private val app: AppState, private val s
             useTake(audio)
             version++
             app.message(savedTake.format("$name.wav"))
-            if (settings.autoNext && index < names.size - 1) select(index + 1)
+            if (settings.listenBack) playRange(0.0, audio.duration)
+            else if (settings.autoNext && index < names.size - 1) select(index + 1)
         }
     }
 
