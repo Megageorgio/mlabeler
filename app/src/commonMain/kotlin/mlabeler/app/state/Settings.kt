@@ -42,6 +42,13 @@ data class LayoutSettings(
     /** Which side the files/entries panel and the details panel are on: "left" or "right". */
     val filesSide: String = "left",
     val inspectorSide: String = "right",
+    /** Entries as a panel of their own (otherwise a tab of the files panel), its side and whether it's shown. */
+    val entriesSeparate: Boolean = false,
+    val entriesSide: String = "left",
+    val showEntries: Boolean = true,
+    /** Sections of the details panel: their order and the folded ones. */
+    val inspectorOrder: List<String> = emptyList(),
+    val inspectorFolded: Set<String> = emptySet(),
     /** A whole side of panels folded away (the buttons at the ends of the top bar). */
     val leftCollapsed: Boolean = false,
     val rightCollapsed: Boolean = false,
@@ -302,10 +309,27 @@ object LayoutPresets {
 /** Panels assigned to a side ("left"/"right"), shown or not. */
 fun LayoutSettings.panelsOn(side: String): List<String> = buildList {
     if (filesSide == side) add("files")
+    if (entriesSeparate && entriesSide == side) add("entries")
     if (inspectorSide == side) add("details")
 }
 
-private fun LayoutSettings.shown(p: String) = if (p == "files") showFiles else showInspector
+private fun LayoutSettings.shown(p: String) = when (p) {
+    "files" -> showFiles
+    "entries" -> showEntries
+    else -> showInspector
+}
+
+private fun LayoutSettings.withShown(p: String, on: Boolean) = when (p) {
+    "files" -> copy(showFiles = on)
+    "entries" -> copy(showEntries = on)
+    else -> copy(showInspector = on)
+}
+
+private fun LayoutSettings.sideOf(p: String) = when (p) {
+    "files" -> filesSide
+    "entries" -> entriesSide
+    else -> inspectorSide
+}
 
 fun LayoutSettings.sideVisible(side: String): Boolean =
     !(if (side == "left") leftCollapsed else rightCollapsed) && panelsOn(side).any { shown(it) }
@@ -314,16 +338,16 @@ fun LayoutSettings.sideVisible(side: String): Boolean =
 fun LayoutSettings.toggleSide(side: String): LayoutSettings {
     if (sideVisible(side)) return if (side == "left") copy(leftCollapsed = true) else copy(rightCollapsed = true)
     var l = if (side == "left") copy(leftCollapsed = false) else copy(rightCollapsed = false)
-    if (panelsOn(side).none { l.shown(it) }) for (p in panelsOn(side)) l = if (p == "files") l.copy(showFiles = true) else l.copy(showInspector = true)
+    if (panelsOn(side).none { l.shown(it) }) for (p in panelsOn(side)) l = l.withShown(p, true)
     return l
 }
 
 /** Shows or hides one panel; showing it also unfolds its side. */
 fun LayoutSettings.togglePanel(p: String): LayoutSettings {
     val on = !shown(p)
-    var l = if (p == "files") copy(showFiles = on) else copy(showInspector = on)
+    var l = withShown(p, on)
     if (on) {
-        val side = if (p == "files") filesSide else inspectorSide
+        val side = sideOf(p)
         l = if (side == "left") l.copy(leftCollapsed = false) else l.copy(rightCollapsed = false)
     }
     return l

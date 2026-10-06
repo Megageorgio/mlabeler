@@ -433,9 +433,21 @@ class EditorState(
     var references by mutableStateOf<List<Reference>>(emptyList())
         private set
 
+    /** References hidden from the picture (still listed in the side panel): their keys, see [refKey]. */
+    var hiddenRefs by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    fun refKey(r: Reference) = r.folder.ifEmpty { "model:" + r.name + ":" + r.range }
+
+    fun isHidden(r: Reference) = refKey(r) in hiddenRefs
+
+    fun setHidden(r: Reference, hidden: Boolean) {
+        hiddenRefs = if (hidden) hiddenRefs + refKey(r) else hiddenRefs - refKey(r)
+    }
+
     /** Interval tiers drawn below the edited ones: (reference index, tier). */
     val referenceTiers: List<Pair<Int, IntervalTier>> get() =
-        references.withIndex().flatMap { (k, r) -> r.doc.tiers.filterIsInstance<IntervalTier>().map { k to it } }
+        references.withIndex().filter { (_, r) -> !isHidden(r) }.flatMap { (k, r) -> r.doc.tiers.filterIsInstance<IntervalTier>().map { k to it } }
 
     /** Results of autolabelled parts kept for comparison (per file, not saved). */
     private val modelResults = mutableMapOf<String, List<Reference>>()

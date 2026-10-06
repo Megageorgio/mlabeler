@@ -349,6 +349,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SectionTitle(S.files())
                 SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
                 SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
+                DangerZone(app)
                 ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
             }
             Section.View -> {
@@ -843,4 +844,33 @@ private fun AboutPage() {
     SectionTitle(AboutTitles.thanks())
     person("HHS_kt", listOf("YouTube" to "https://www.youtube.com/@HHS_kt", "Telegram" to "https://t.me/hhs_kt_666"))
     person("Gitreti", emptyList())
+}
+
+private object DangerTitles {
+    val title = mlabeler.app.i18n.L("Delete all program data", "Удалить все данные программы")
+    val about = mlabeler.app.i18n.L(
+        "Settings, themes, environments, shortcuts, phoneme dictionaries, plugins, check scripts and caches of mLabeler are deleted, and it starts as on the first launch. Recordings and labels in your folders stay. This can't be undone.",
+        "Удаляются настройки, темы, рабочие среды, сочетания клавиш, словари фонем, плагины, скрипты проверок и кэш mLabeler, и программа начинает как при первом запуске. Записи и разметка в ваших папках остаются. Отменить это нельзя.")
+    val sure = mlabeler.app.i18n.L("Yes, delete everything", "Да, удалить всё")
+}
+
+/** The button that deletes everything the program keeps; a second, red button confirms. */
+@Composable
+private fun DangerZone(app: AppState) {
+    val c = T.c
+    var asked by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(top = 28.dp).border(c.borderWidth, c.danger.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).padding(12.dp)) {
+        Text(DangerTitles.title(), color = c.danger, fontSize = 14.sp)
+        Text(DangerTitles.about(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!asked) Btn(DangerTitles.title()) { asked = true }
+            else {
+                Box(Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).background(c.danger)
+                    .clickable { app.deleteAllProgramData() }.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                    Text(DangerTitles.sure(), color = c.bg, fontSize = 13.sp)
+                }
+                Btn(S.cancel()) { asked = false }
+            }
+        }
+    }
 }

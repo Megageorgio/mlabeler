@@ -88,7 +88,7 @@ fun AutolabelBusy(ed: EditorState) {
 /** One line per model result of this file: accept it into the labels or remove it. */
 @Composable
 fun ModelResultsBar(ed: EditorState) {
-    val results = ed.modelReferences
+    val results = ed.modelReferences.filter { !ed.isHidden(it) }
     if (results.isEmpty()) return
     val c = T.c
     Column(Modifier.fillMaxWidth().background(c.panelAlt)) {
@@ -103,7 +103,12 @@ fun ModelResultsBar(ed: EditorState) {
                 r.range?.let { (a, b) -> Text("${formatTime(a)} – ${formatTime(b)}", color = c.muted, fontSize = 12.sp) }
                 Tip(acceptHint()) { Btn(accept(), primary = true, icon = Icons.check) { ed.acceptModelResult(r) } }
                 Btn(discard(), icon = Icons.close) { ed.dropModelResult(r) }
+                Tip(hideHint()) { Btn(hideT(), icon = Icons.eyeOff) { ed.setHidden(r, true) } }
             }
         }
     }
 }
+
+private val hideT = mlabeler.app.i18n.L("Hide", "Скрыть")
+private val hideHint = mlabeler.app.i18n.L("Keep it for later: it stays in Details → Compare, where it can be shown again or removed",
+    "Оставить на потом: результат останется в Подробности → Сравнение, там его можно снова показать или убрать")

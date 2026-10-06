@@ -1,5 +1,6 @@
 package mlabeler.app.ui
 
+import androidx.compose.foundation.layout.height
 import mlabeler.app.i18n.L
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -86,12 +87,10 @@ fun EnvironmentCards(
                         Text(e.title, color = if (sel) c.accent else c.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                         if (!e.builtIn && onDelete != null) IconBtn(Icons.trash, S.removeFromList(), size = 24.dp) { onDelete(e) }
                     }
-                    if (e.description.isNotEmpty()) Text(e.description, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-                    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        for ((k, v) in EnvContents.of(e.env)) Row {
-                            Text(k, color = c.muted, fontSize = 11.sp, modifier = Modifier.width(78.dp))
-                            Text(v, color = c.text, fontSize = 11.sp)
-                        }
+                    Text(e.description, color = c.muted, fontSize = 12.sp, minLines = 3, maxLines = 3, modifier = Modifier.padding(top = 6.dp))
+                    // what it looks like instead of a list of words; the words are in the tooltip
+                    Tip(EnvContents.of(e.env).joinToString("\n") { (k, v) -> "$k: $v" }) {
+                        EnvPreview(e.env, Modifier.padding(top = 8.dp).fillMaxWidth().height(64.dp))
                     }
                 }
             }
@@ -173,5 +172,71 @@ object EnvContents {
             bars() to b.joinToString(", "),
             tools() to if (e.tools) withTools() else cursorOnly(),
         )
+    }
+}
+
+/** A small drawing of an environment: menu and button bars, side panels, lanes, status bar. */
+@Composable
+fun EnvPreview(e: mlabeler.app.state.Environment, modifier: Modifier) {
+    val c = T.c
+    androidx.compose.foundation.Canvas(modifier) {
+        val px = density
+        val w = size.width
+        val h = size.height
+        val line = c.border
+        val fill = c.text.copy(alpha = 0.10f)
+        val r = androidx.compose.ui.geometry.CornerRadius(3 * px)
+        drawRoundRect(c.bg, size = size, cornerRadius = r)
+        drawRoundRect(line, size = size, cornerRadius = r, style = androidx.compose.ui.graphics.drawscope.Stroke(px))
+        var top = 3 * px
+        if (e.menuBar && !mlabeler.app.Platform.isMobile) {
+            for (i in 0 until 4) drawRect(c.muted.copy(alpha = 0.5f), androidx.compose.ui.geometry.Offset(5 * px + i * 11 * px, top + px), androidx.compose.ui.geometry.Size(8 * px, 2 * px))
+            top += 5 * px
+        }
+        // the button bar: big buttons are taller, groups as little blocks
+        val barH = if (e.toolbar.big) 9 * px else 6 * px
+        val groups = e.toolbar.groups.size.coerceAtLeast(1)
+        val gw = (w - 10 * px) / groups
+        for (i in 0 until groups) drawRoundRect(c.accent.copy(alpha = 0.45f), androidx.compose.ui.geometry.Offset(5 * px + i * gw, top), androidx.compose.ui.geometry.Size(gw - 2 * px, barH), androidx.compose.ui.geometry.CornerRadius(px))
+        top += barH + 3 * px
+        val bottom = h - (if (e.statusBar) 6 * px else 3 * px)
+        if (e.statusBar) drawRect(c.muted.copy(alpha = 0.35f), androidx.compose.ui.geometry.Offset(3 * px, h - 4 * px), androidx.compose.ui.geometry.Size(w - 6 * px, 1.5f * px))
+        val l = e.layout
+        var left = 3 * px
+        var right = w - 3 * px
+        val side = w * 0.2f
+        if (l.showFiles) {
+            val onRight = l.filesSide == "right"
+            val x = if (onRight) right - side else left
+            drawRoundRect(fill, androidx.compose.ui.geometry.Offset(x, top), androidx.compose.ui.geometry.Size(side, bottom - top), r)
+            for (i in 0 until 4) drawRect(c.muted.copy(alpha = 0.4f), androidx.compose.ui.geometry.Offset(x + 3 * px, top + 4 * px + i * 5 * px), androidx.compose.ui.geometry.Size(side - 6 * px, 1.5f * px))
+            if (onRight) right -= side + 2 * px else left += side + 2 * px
+        }
+        if (l.showInspector) {
+            val onLeft = l.inspectorSide == "left"
+            val x = if (onLeft) left else right - side
+            drawRoundRect(fill, androidx.compose.ui.geometry.Offset(x, top), androidx.compose.ui.geometry.Size(side, bottom - top), r)
+            if (onLeft) left += side + 2 * px else right -= side + 2 * px
+        }
+        // lanes of the picture
+        val lanes = buildList {
+            if (l.showWaveform) add(c.wave)
+            if (l.showSpectrogram) add(androidx.compose.ui.graphics.Color(0xFFE07A3F))
+            if (l.showPitch && !l.pitchOverSpectrogram) add(androidx.compose.ui.graphics.Color(0xFF4FD1C5))
+            if (l.showPower) add(c.muted)
+        }
+        val labelsH = 6 * px
+        val areaB = bottom - labelsH - 2 * px
+        if (l.overlay || lanes.isEmpty()) {
+            drawRoundRect(androidx.compose.ui.graphics.Color(0xFFE07A3F).copy(alpha = 0.5f), androidx.compose.ui.geometry.Offset(left, top), androidx.compose.ui.geometry.Size(right - left, bottom - top), r)
+            drawRect(c.wave.copy(alpha = 0.8f), androidx.compose.ui.geometry.Offset(left, (top + bottom) / 2 - 2 * px), androidx.compose.ui.geometry.Size(right - left, 4 * px))
+            drawRect(c.text.copy(alpha = 0.35f), androidx.compose.ui.geometry.Offset(left, bottom - labelsH), androidx.compose.ui.geometry.Size(right - left, labelsH))
+        } else {
+            val each = (areaB - top) / lanes.size
+            for ((i, col) in lanes.withIndex()) {
+                drawRoundRect(col.copy(alpha = 0.55f), androidx.compose.ui.geometry.Offset(left, top + i * each), androidx.compose.ui.geometry.Size(right - left, each - 1.5f * px), androidx.compose.ui.geometry.CornerRadius(px))
+            }
+            drawRect(c.text.copy(alpha = 0.35f), androidx.compose.ui.geometry.Offset(left, bottom - labelsH), androidx.compose.ui.geometry.Size(right - left, labelsH))
+        }
     }
 }

@@ -65,6 +65,8 @@ object Icons {
     )
     val close = icon("close", "M6 6l12 12", "M18 6L6 18")
     val plus = icon("plus", "M12 5v14", "M5 12h14")
+    val eye = icon("eye", "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z", "M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z")
+    val eyeOff = icon("eye-off", "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z", "M4 4l16 16")
     val trash = icon("trash", "M4 7h16", "M9 7V4h6v3", "M6 7l1 13h10l1-13")
     val edit = icon("edit", "M4 20h4L19 9l-4-4L4 16z", "M13 7l4 4")
     val tag = icon("tag", "M3 12V4h8l10 10-8 8z", "M7.5 7.5h.01")

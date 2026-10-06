@@ -242,6 +242,26 @@ class AppState(private val scope: CoroutineScope) {
 
     fun forgetRecent(path: String) = update { it.copy(recent = it.recent - path) }
 
+    /**
+     * Deletes everything the program keeps in its own folder (settings, themes, environments, dictionaries,
+     * plugins, check scripts, caches) and starts over as on the first launch. Labels and recordings in the user's
+     * folders are not touched.
+     */
+    fun deleteAllProgramData() {
+        closeFolder()
+        val dir = Platform.dataDir()
+        fun wipe(p: String) {
+            if (PlatformFs.isDirectory(p)) runCatching { PlatformFs.list(p) }.getOrDefault(emptyList()).forEach { wipe(it) }
+            runCatching { PlatformFs.delete(p) }
+        }
+        runCatching { PlatformFs.list(dir) }.getOrDefault(emptyList()).forEach { wipe(it) }
+        mlabeler.app.ui.Keymap.load(emptyMap())
+        settings = AppSettings()
+        Lang.current = Platform.systemLanguage.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
+        runCatching { mlabeler.app.theme.ThemeFiles.load(dir) }
+        showSettings = false
+    }
+
     fun close() {
         editor?.saveAllOnClose()
         toolkit.stop()

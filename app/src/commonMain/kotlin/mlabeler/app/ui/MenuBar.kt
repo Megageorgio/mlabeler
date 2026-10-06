@@ -50,6 +50,7 @@ import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.Mode
 import mlabeler.app.state.ToolbarGroups
+import mlabeler.app.state.togglePanel
 
 sealed interface MenuEntry
 class MItem(
@@ -78,6 +79,9 @@ object MenuTitles {
     val panels = L("Panels", "Панели")
     val filesPanel = L("Files and entries", "Файлы и записи")
     val detailsPanel = L("Details", "Подробности")
+    val entriesPanel = L("Entries", "Записи")
+    val entriesSeparate = L("Entries as a panel of their own", "Записи отдельной панелью")
+    val entriesRight = L("Entries panel on the right", "Панель записей справа")
     val menuBar = L("Menu bar", "Строка меню")
     val statusBar = L("Status bar", "Строка состояния")
     val toolbar = L("Toolbar", "Панель инструментов")
@@ -183,8 +187,11 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     val view = buildList {
         add(MSub(MenuTitles.panels(), buildList {
             add(item(Commands.files, ed, app, checked = l.showFiles, title = MenuTitles.filesPanel()))
+            if (l.entriesSeparate) add(toggle(MenuTitles.entriesPanel(), l.showEntries) { it.copy(layout = it.layout.togglePanel("entries")) })
             add(item(Commands.inspector, ed, app, checked = l.showInspector, title = MenuTitles.detailsPanel()))
             add(MSep)
+            add(toggle(MenuTitles.entriesSeparate(), l.entriesSeparate) { it.copy(layout = it.layout.copy(entriesSeparate = !it.layout.entriesSeparate, showEntries = true, entriesSide = it.layout.filesSide)) })
+            if (l.entriesSeparate) add(toggle(MenuTitles.entriesRight(), l.entriesSide == "right") { it.copy(layout = it.layout.copy(entriesSide = if (it.layout.entriesSide == "right") "left" else "right")) })
             add(toggle(MenuTitles.filesRight(), l.filesSide == "right") { it.copy(layout = it.layout.copy(filesSide = if (it.layout.filesSide == "right") "left" else "right")) })
             add(toggle(MenuTitles.detailsLeft(), l.inspectorSide == "left") { it.copy(layout = it.layout.copy(inspectorSide = if (it.layout.inspectorSide == "left") "right" else "left")) })
             add(MItem(MenuTitles.arrange(), checked = app.arrangePanels) { app.arrangePanels = !app.arrangePanels })
@@ -396,7 +403,7 @@ fun MenuBar(app: AppState, ed: EditorState) {
         )
     }
     Row(
-        Modifier.fillMaxWidth().height(28.dp).background(c.panel).padding(horizontal = 4.dp),
+        Modifier.fillMaxWidth().height(24.dp).background(c.panel).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         for ((k, pair) in tree.withIndex()) {
@@ -410,7 +417,7 @@ fun MenuBar(app: AppState, ed: EditorState) {
                         .background(if (open == k || hovered) c.text.copy(alpha = 0.08f) else androidx.compose.ui.graphics.Color.Transparent)
                         .hoverable(source)
                         .clickable(interactionSource = source, indication = null) { open = if (open == k) null else k }
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                        .padding(horizontal = 10.dp, vertical = 2.dp),
                 )
                 DropdownMenu(open == k, { }, properties = androidx.compose.ui.window.PopupProperties(focusable = false, dismissOnClickOutside = false)) {
                     MenuItems(entries) { open = null }

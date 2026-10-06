@@ -132,10 +132,7 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
     val l = s.layout
     var overlayDetails by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
-        if (s.menuBar && !Platform.isMobile) {
-            MenuBar(app, ed)
-            Divider()
-        }
+        if (s.menuBar && !Platform.isMobile) MenuBar(app, ed)
         TopBar(app, ed, wc, overlayDetails) { overlayDetails = !overlayDetails }
         Divider()
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -143,6 +140,7 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
             val left = mutableListOf<SidePanelId>()
             val right = mutableListOf<SidePanelId>()
             if (l.showFiles) (if (l.filesSide == "right") right else left) += SidePanelId.Files
+            if (l.entriesSeparate && l.showEntries && ed.mode != Mode.Oto) (if (l.entriesSide == "right") right else left) += SidePanelId.Entries
             if (l.showInspector && wc == WidthClass.Expanded) (if (l.inspectorSide == "left") left else right) += SidePanelId.Details
             if (l.leftCollapsed) left.clear()
             if (l.rightCollapsed) right.clear()
@@ -232,7 +230,7 @@ private fun TopBar(app: AppState, ed: EditorState, wc: WidthClass, overlayDetail
         }
         Spacer(Modifier.width(6.dp))
         Row(
-            Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(vertical = 3.dp),
+            Modifier.weight(1f).horizontalScroll(rememberScrollState()).padding(vertical = 1.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.End,
         ) {
@@ -405,6 +403,8 @@ fun SidePanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Un
     if (ed.mode == Mode.Oto) return OtoEntryList(ed, modifier, onOpened)
     var tab by remember { mutableStateOf(0) }
     val c = T.c
+    // entries in a panel of their own: here only the files
+    if (ed.app.settings.layout.entriesSeparate) return FilesPanel(ed, modifier.background(c.panel), onOpened)
     Column(modifier.background(c.panel)) {
         Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             for ((k, t) in listOf(S.files(), mlabeler.app.ui.entriesTitle()).withIndex()) {
@@ -448,14 +448,17 @@ fun MessageToast(app: AppState, bottom: Dp) {
     }
 }
 
-enum class SidePanelId { Files, Details }
+enum class SidePanelId { Files, Entries, Details }
 
 private val panelNames = mapOf(
     SidePanelId.Files to mlabeler.app.i18n.L("Files and entries", "Файлы и записи"),
+    SidePanelId.Entries to mlabeler.app.i18n.L("Entries", "Записи"),
     SidePanelId.Details to mlabeler.app.i18n.L("Details", "Подробности"),
 )
 private val toOtherSide = mlabeler.app.i18n.L("Move to the other side", "Перенести на другую сторону")
 private val hidePanel = mlabeler.app.i18n.L("Hide", "Скрыть")
+private val splitEntries = mlabeler.app.i18n.L("Entries as a panel of their own", "Записи отдельной панелью")
+private val joinEntries = mlabeler.app.i18n.L("Back into the files panel", "Вернуть в панель файлов")
 
 /** Side panels of one side: a header with tabs when there are two, move/hide buttons while arranging. */
 @Composable
@@ -472,18 +475,26 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                 for ((k, p) in panels.withIndex()) {
                     val sel = p == current
                     Text(
-                        panelNames.getValue(p)(), fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                        (if (p == SidePanelId.Files && app.settings.layout.entriesSeparate) S.files() else panelNames.getValue(p)()), fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(c.radius)).background(if (sel && panels.size > 1) c.panelAlt else c.panel.copy(alpha = 0f))
                             .clickable { tab = k }.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
                 }
                 if (arranging) {
+                    if (current == SidePanelId.Files && ed.mode != Mode.Oto && !app.settings.layout.entriesSeparate) IconBtn(Icons.panelRight, splitEntries(), size = 28.dp) {
+                        app.update { st -> st.copy(layout = st.layout.copy(entriesSeparate = true, showEntries = true, entriesSide = st.layout.filesSide)) }
+                    }
+                    if (current == SidePanelId.Entries) IconBtn(Icons.merge, joinEntries(), size = 28.dp) {
+                        app.update { st -> st.copy(layout = st.layout.copy(entriesSeparate = false)) }
+                    }
                     IconBtn(Icons.layers, toOtherSide(), size = 28.dp) {
                         app.update { st ->
+                            fun flip(x: String) = if (x == "right") "left" else "right"
                             st.copy(layout = when (current) {
-                                SidePanelId.Files -> st.layout.copy(filesSide = if (st.layout.filesSide == "right") "left" else "right")
-                                SidePanelId.Details -> st.layout.copy(inspectorSide = if (st.layout.inspectorSide == "left") "right" else "left")
+                                SidePanelId.Files -> st.layout.copy(filesSide = flip(st.layout.filesSide))
+                                SidePanelId.Entries -> st.layout.copy(entriesSide = flip(st.layout.entriesSide))
+                                SidePanelId.Details -> st.layout.copy(inspectorSide = flip(st.layout.inspectorSide))
                             })
                         }
                     }
@@ -491,6 +502,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                         app.update { st ->
                             st.copy(layout = when (current) {
                                 SidePanelId.Files -> st.layout.copy(showFiles = false)
+                                SidePanelId.Entries -> st.layout.copy(showEntries = false)
                                 SidePanelId.Details -> st.layout.copy(showInspector = false)
                             })
                         }
@@ -501,6 +513,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
         }
         when (current) {
             SidePanelId.Files -> SidePanel(ed, Modifier.weight(1f).fillMaxWidth())
+            SidePanelId.Entries -> EntriesPanel(ed, Modifier.weight(1f).fillMaxWidth().background(c.panel)) {}
             SidePanelId.Details -> Inspector(ed, Modifier.weight(1f).fillMaxWidth())
         }
     }

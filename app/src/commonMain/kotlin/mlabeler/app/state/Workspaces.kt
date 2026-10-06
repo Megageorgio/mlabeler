@@ -30,15 +30,13 @@ object Environments {
     private val builtIn = listOf(
         BuiltIn(
             "basic", L("Basic", "Базовая"),
-            L("Big buttons with names for the main things; everything else in the menus.",
-                "Крупные подписанные кнопки для основного, остальное — в меню."),
+            L("Big named buttons for the main things.", "Крупные подписанные кнопки для основного."),
         ) {
             Environment("basic", LayoutSettings(showInspector = false), ToolbarSettings(ToolbarGroups.simple, labels = true, big = true), tools = false)
         },
         BuiltIn(
             "labeling", L("Labeling", "Разметка"),
-            L("Editing tools, marks and zoom on the toolbar, details panel on the right.",
-                "Инструменты правки, отметки и масштаб на панели, подробности справа."),
+            L("Editing, marks and zoom; details on the right.", "Правка, отметки и масштаб; подробности справа."),
         ) {
             Environment(
                 "labeling", LayoutSettings(showInspector = true),
@@ -48,8 +46,7 @@ object Environments {
         },
         BuiltIn(
             "one-picture", L("One picture", "Одна картинка"),
-            L("Waveform, spectrogram, pitch and labels laid over each other.",
-                "Волна, спектрограмма, высота тона и разметка друг поверх друга."),
+            L("Sound and labels in one picture.", "Звук и разметка одной картинкой."),
         ) {
             Environment(
                 "one-picture", LayoutSettings(overlay = true, showPitch = true, showInspector = false),
@@ -59,8 +56,7 @@ object Environments {
         },
         BuiltIn(
             "full", L("Full", "Полная"),
-            L("Every tool group as compact icons, details panel, pitch and loudness.",
-                "Все группы инструментов компактными значками, подробности, высота тона и громкость."),
+            L("Every button as an icon, pitch and loudness.", "Все кнопки значками, высота тона и громкость."),
         ) {
             Environment(
                 "full", LayoutSettings(showInspector = true, showPitch = true, showPower = true),

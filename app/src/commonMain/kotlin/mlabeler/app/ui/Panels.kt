@@ -1,5 +1,6 @@
 package mlabeler.app.ui
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -182,9 +183,10 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
     val c = T.c
     val item = ed.item
     val doc = ed.doc
+    val sel = ed.selection
     Column(modifier.background(c.panel).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 4.dp)) {
-        if (item != null) {
-            SectionTitle(S.file())
+        for (id in inspectorOrder(ed.app.settings.layout.inspectorOrder)) when (id) {
+            "file" -> if (item != null) InspectorSection(ed, id, S.file()) {
             Text(Paths.name(item.audioPath), color = c.text, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val a = ed.audio
             if (a != null) Text("${formatTime(a.duration)} · ${a.sampleRate} Hz", color = c.muted, fontSize = 12.sp)
@@ -199,10 +201,9 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
                 tag, { tag = it; ed.setMarks(item) { m -> m.copy(tag = it.trim()) } },
                 Modifier.fillMaxWidth().padding(top = 6.dp), placeholder = S.tag(),
             )
-        }
-
-        val sel = ed.selection
-        SectionTitle(when (sel) { is Selection.Bound -> S.boundary(); is Selection.Note -> S.note(); else -> S.interval() })
+        
+            }
+            "selection" -> InspectorSection(ed, id, when (sel) { is Selection.Bound -> S.boundary(); is Selection.Note -> S.note(); else -> S.interval() }) {
         when {
             doc == null -> Unit
             sel is Selection.Interval -> {
@@ -271,8 +272,8 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
             else -> Text(S.nothingSelected(), color = c.muted, fontSize = 13.sp)
         }
 
-        if (doc != null) {
-            SectionTitle(queueTitle())
+            }
+            "queue" -> if (doc != null) InspectorSection(ed, id, queueTitle()) {
             var queue by remember(ed.item?.id) { mutableStateOf(ed.phonemeQueue.joinToString(" ")) }
             // the field follows the queue as boundaries use it up
             LaunchedEffect(ed.phonemeQueue) {
@@ -286,24 +287,27 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
                 Btn(queueFill(), modifier = Modifier.weight(1f)) { ed.fillWithQueue() }
                 Btn(S.clear()) { ed.phonemeQueue = emptyList() }
             }
-            SectionTitle(S.notes())
+            }
+            "notes" -> if (doc != null) InspectorSection(ed, id, S.notes()) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Btn(Commands.groupPhonemes.title(), modifier = Modifier.fillMaxWidth()) { ed.groupPhonemes() }
                 Btn(Commands.notesFromGroups.title(), modifier = Modifier.fillMaxWidth()) { ed.notesFromGroups() }
             }
-        }
-
-        if (doc != null) {
-            SectionTitle(S.tiers()) {
+        
+            }
+            "tiers" -> if (doc != null) InspectorSection(ed, id, S.tiers(), trailing = {
                 IconBtn(Icons.plus, S.addTier(), size = 26.dp) {
                     ed.updateDoc { Edits.addTier(it, S.newTierName.format(it.tiers.size + 1), ed.duration) }
                 }
-            }
+            }) {
             for ((k, tier) in doc.tiers.withIndex()) {
                 TierRow(ed, k, tier.name, k == ed.activeTier, k, doc.tiers.size)
             }
-            CompareSection(ed)
-            SectionTitle(S.problems())
+            }
+            "compare" -> if (doc != null) InspectorSection(ed, id, compareTitle(), trailing = {
+                IconBtn(Icons.plus, addFolder(), size = 26.dp) { ed.app.pickFolder(addFolder()) { ed.addCompareFolder(it) } }
+            }) { CompareSection(ed) }
+            "problems" -> if (doc != null) InspectorSection(ed, id, S.problems()) {
             if (ed.problems.isEmpty()) {
                 Text(S.noProblems(), color = c.muted, fontSize = 13.sp)
             } else {
@@ -324,10 +328,64 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
                     }
                 }
             }
-            Spacer(Modifier.height(20.dp))
+            }
         }
+        Spacer(Modifier.height(20.dp))
     }
 }
+
+/** Sections of the details panel, in their default order. */
+val INSPECTOR_SECTIONS = listOf("file", "selection", "queue", "notes", "tiers", "compare", "problems")
+
+/** The user's order with sections it lacks (new ones) added at their default place. */
+fun inspectorOrder(saved: List<String>): List<String> {
+    val out = saved.filter { it in INSPECTOR_SECTIONS }.distinct().toMutableList()
+    for ((k, id) in INSPECTOR_SECTIONS.withIndex()) if (id !in out) out.add(k.coerceAtMost(out.size), id)
+    return out
+}
+
+/**
+ * A section of the details panel: its title folds it; while panels are being arranged (View → Panels) arrows
+ * move it up and down. Both are remembered.
+ */
+@Composable
+private fun InspectorSection(
+    ed: EditorState, id: String, title: String,
+    trailing: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    val c = T.c
+    val app = ed.app
+    val l = app.settings.layout
+    val folded = id in l.inspectorFolded
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).clip(RoundedCornerShape(c.radius))
+                .clickable { app.update { st -> st.copy(layout = st.layout.copy(inspectorFolded = if (folded) st.layout.inspectorFolded - id else st.layout.inspectorFolded + id)) } }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(if (folded) "▸" else "▾", color = c.muted, fontSize = 11.sp, modifier = Modifier.width(14.dp))
+            Text(if (c.square) title.uppercase() else title, color = c.muted, fontSize = 11.sp, letterSpacing = if (c.square) 1.sp else 0.3.sp)
+        }
+        if (app.arrangePanels) {
+            fun move(step: Int) = app.update { st ->
+                val o = inspectorOrder(st.layout.inspectorOrder).toMutableList()
+                val i = o.indexOf(id)
+                val j = (i + step).coerceIn(0, o.size - 1)
+                o.removeAt(i); o.add(j, id)
+                st.copy(layout = st.layout.copy(inspectorOrder = o))
+            }
+            IconBtn(Icons.up, sectionUp(), size = 24.dp) { move(-1) }
+            IconBtn(Icons.down, sectionDown(), size = 24.dp) { move(1) }
+        }
+        if (!folded) trailing()
+    }
+    if (!folded) Column { content() }
+}
+
+private val sectionUp = mlabeler.app.i18n.L("Move up", "Выше")
+private val sectionDown = mlabeler.app.i18n.L("Move down", "Ниже")
 
 private fun formatMsField(seconds: Double): String {
     val v = kotlin.math.round(seconds * 1000 * 10) / 10.0
@@ -402,6 +460,8 @@ private val compareHint = mlabeler.app.i18n.L(
     "Показать разметку тех же файлов из другой папки (другая модель, другой человек) под этой и отметить различия.")
 private val addFolder = mlabeler.app.i18n.L("Add folder…", "Добавить папку…")
 private val useThese = mlabeler.app.i18n.L("Use these labels", "Взять эту разметку")
+private val showRef = mlabeler.app.i18n.L("Show under the labels", "Показать под разметкой")
+private val hideRef = mlabeler.app.i18n.L("Hide (stays in this list)", "Скрыть (останется в этом списке)")
 private val noMatch = mlabeler.app.i18n.L("no labels for this file", "для этого файла разметки нет")
 private val statsLine = mlabeler.app.i18n.L("{0} ms average, {1} ms median, {2}% under 20 ms, {3} other texts",
     "в среднем {0} мс, медиана {1} мс, {2}% ближе 20 мс, другой текст: {3}")
@@ -410,22 +470,22 @@ private val statsLine = mlabeler.app.i18n.L("{0} ms average, {1} ms median, {2}%
 private fun CompareSection(ed: EditorState) {
     val c = T.c
     val doc = ed.doc ?: return
-    SectionTitle(compareTitle()) {
-        IconBtn(Icons.plus, addFolder(), size = 26.dp) { ed.app.pickFolder(addFolder()) { ed.addCompareFolder(it) } }
-    }
-    val folders = ed.workspace.state.compareFolders + ed.references.filter { it.folder.isEmpty() }.map { "model:" + it.name }
-    if (folders.isEmpty()) {
+    // compare folders (each may have labels for this file) and results of autolabel kept for comparison
+    val entries: List<Pair<String, EditorState.Reference?>> = ed.workspace.state.compareFolders.map { dir -> dir to ed.references.firstOrNull { it.folder == dir } } +
+        ed.modelReferences.map { "" to it }
+    if (entries.isEmpty()) {
         Text(compareHint(), color = c.muted, fontSize = 12.sp)
         return
     }
-    for (dir in folders) {
-        val r = if (dir.startsWith("model:")) ed.references.firstOrNull { it.folder.isEmpty() && "model:" + it.name == dir }
-            else ed.references.firstOrNull { it.folder == dir }
+    for ((dir, r) in entries) {
         Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(dir.removePrefix("model:").let { if (dir.startsWith("model:")) it else Paths.name(it) }, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val name = if (dir.isEmpty()) r!!.name + (r.range?.let { (a, b) -> "  ${formatTime(a)}–${formatTime(b)}" } ?: "") else Paths.name(dir)
+                val hidden = r != null && ed.isHidden(r)
+                Text(name, color = if (hidden) c.muted else c.text, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (r != null) IconBtn(if (hidden) Icons.eyeOff else Icons.eye, if (hidden) showRef() else hideRef(), size = 24.dp) { ed.setHidden(r, !hidden) }
                 IconBtn(Icons.close, S.removeFromList(), size = 24.dp) {
-                    if (dir.startsWith("model:")) r?.let { ed.dropModelResult(it) } else ed.removeCompareFolder(dir)
+                    if (dir.isEmpty()) r?.let { ed.dropModelResult(it) } else ed.removeCompareFolder(dir)
                 }
             }
             if (r == null) {
