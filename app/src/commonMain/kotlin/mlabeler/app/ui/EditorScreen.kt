@@ -512,6 +512,10 @@ object ErrorTitles {
     val copy = mlabeler.app.i18n.L("Copy", "Копировать")
     val copied = mlabeler.app.i18n.L("Copied", "Скопировано")
     val openLog = mlabeler.app.i18n.L("Open the log folder", "Открыть папку журнала")
+    val updateToolkit = mlabeler.app.i18n.L("Update the toolkit now", "Обновить тулкит сейчас")
+    val oldToolkit = mlabeler.app.i18n.L(
+        "The toolkit gave no reason. Newer versions of it report the exit code and the engine's last output, and keep the engine's whole output in a log: update it and run this again.",
+        "Тулкит не сообщил причину. Новые версии тулкита показывают код завершения и последние строки движка, а весь вывод сохраняют в журнал: обновите его и запустите ещё раз.")
 }
 
 /** The whole text of an error: selectable, copyable, with its log folder when the text names a log file here. */
@@ -542,8 +546,14 @@ fun ErrorDetailsDialog(app: AppState) {
                     )
                 }
             }
+            // an engine died and an older toolkit lost its output
+            val noReason = "stopped unexpectedly" in text && "exit code" !in text
+            if (noReason) Text(ErrorTitles.oldToolkit(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn(if (copied) ErrorTitles.copied() else ErrorTitles.copy(), primary = true) {
+                if (noReason && app.toolkit.canRunHere) Btn(ErrorTitles.updateToolkit(), primary = true) {
+                    app.toolkit.updateNow(); app.errorDetails = null; app.dismissMessage(); app.showAutolabel = true
+                }
+                Btn(if (copied) ErrorTitles.copied() else ErrorTitles.copy(), primary = !noReason) {
                     clipboard.setText(androidx.compose.ui.text.AnnotatedString(text.trim())); copied = true
                 }
                 if (log != null) Btn(ErrorTitles.openLog()) { mlabeler.app.Platform.openInFileManager(mlabeler.core.io.Paths.parent(log)) }

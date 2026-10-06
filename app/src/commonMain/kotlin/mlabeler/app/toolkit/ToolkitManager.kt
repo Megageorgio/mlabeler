@@ -108,6 +108,26 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
 
     suspend fun start(): Boolean = lock.withLock { startLocked() }
 
+    /**
+     * Updates the toolkit now instead of waiting for its own check (it looks for a newer version at most every
+     * few hours, when it starts): stops it, clears the time of its last check and starts it again, which makes
+     * it update itself first when there is something new.
+     */
+    fun updateNow() {
+        if (!canRunHere || LocalToolkit.findMvt(settings.mvtPath) == null) return
+        scope.launch {
+            lock.withLock {
+                addLog(updateCheck())
+                if (ownProcess) stop() else runCatching { client().shutdown() }
+                // its files are in use until it has exited
+                repeat(20) { if (runCatching { client().health() }.isFailure) return@repeat; delay(500) }
+                val state = mlabeler.core.io.Paths.join(mlabeler.app.Platform.homeDir(), "mVocalToolkit/update.json")
+                runCatching { mlabeler.core.io.PlatformFs.write(state, "{\"checked\": 0}".encodeToByteArray()) }
+                startLocked()
+            }
+        }
+    }
+
     private suspend fun startLocked(): Boolean {
         val mvt = LocalToolkit.findMvt(settings.mvtPath) ?: run { status = Status.Missing; return false }
         busy(Status.Starting)
@@ -328,3 +348,5 @@ private fun ByteArray.decodeUtf16le(): String {
     val chars = CharArray((size - start) / 2) { i -> ((this[start + 2 * i].toInt() and 0xFF) or ((this[start + 2 * i + 1].toInt() and 0xFF) shl 8)).toChar() }
     return chars.concatToString()
 }
+
+private val updateCheck = L("Looking for a newer toolkit: it stops and starts again…", "Поиск новой версии тулкита: он остановится и запустится снова…")

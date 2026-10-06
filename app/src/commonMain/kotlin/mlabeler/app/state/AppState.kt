@@ -19,7 +19,8 @@ data class Message(val text: String, val error: Boolean, val id: Long) {
     /** The first meaningful line, for the short message. */
     val headline: String get() = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() && !it.endsWith(":") }
         ?: text.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: text
-    val hasDetails: Boolean get() = text.trim().contains('\n') || text.length > 160
+    // (a message ending with ":" lost what came after it)
+    val hasDetails: Boolean get() = text.trim().contains('\n') || text.length > 160 || text.trimEnd().endsWith(":")
 }
 
 private val dropOnlyAudio = mlabeler.app.i18n.L("Drop a recording or a folder", "Перетащите запись или папку")

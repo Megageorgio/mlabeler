@@ -573,6 +573,9 @@ private fun ToolkitPage(app: AppState) {
     SectionTitle(S.toolkit())
     Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
     ToolkitStatus(app)
+    if (tk.canRunHere) Row(Modifier.padding(top = 6.dp)) {
+        Btn(ErrorTitles.updateToolkit(), enabled = !tk.updatingNow) { tk.updateNow() }
+    }
     OwnModelsSection(app)
     SectionTitle(S.toolkitUrl())
     var url by remember { mutableStateOf(s.toolkit.url) }
