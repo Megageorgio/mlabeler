@@ -1,5 +1,15 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package mlabeler.app.ui
 
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -181,7 +191,7 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
         }
         Text(e.sample, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
         val marks = ed.oto.marks(e)
-        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Chip(S.done(), marks.done) { ed.oto.setMarks(e) { it.copy(done = !it.done) } }
             Chip(S.star(), marks.star) { ed.oto.setMarks(e) { it.copy(star = !it.star) } }
         }
@@ -211,7 +221,7 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
         }
         Text(otoLockHint(), color = c.muted, fontSize = 11.sp)
         OtoCompareSection(ed)
-        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Btn(Commands.otoDuplicate.title()) { ed.oto.duplicate() }
             Btn(Commands.otoDelete.title()) { ed.oto.delete() }
         }
@@ -244,3 +254,40 @@ private val otoLockHint = mlabeler.app.i18n.L("Off: dragging the red line moves 
     "Выключено — красная линия двигается одна. Shift во время перетаскивания делает наоборот.")
 
 private val pitchFolders = mlabeler.app.i18n.L("Folders (pitches, appends)", "Папки (высоты, аппенды)")
+
+private val renameHere = L("Click to rename; Enter keeps it, Esc cancels", "Щёлкните, чтобы переименовать; Enter — сохранить, Esc — отменить")
+
+/** The selected entry's alias in large type over the picture, renamed in place, with its recording in brackets. */
+@Composable
+fun OtoHeader(ed: EditorState) {
+    val c = T.c
+    val e = ed.oto.current() ?: return
+    var text by remember(ed.oto.selected, ed.oto.version) { mutableStateOf(e.alias) }
+    var focused by remember { mutableStateOf(false) }
+    fun commit() { if (text.trim() != e.alias) ed.oto.rename(text.trim()) }
+    Row(Modifier.fillMaxWidth().background(c.bg).padding(horizontal = 14.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Tip(renameHere()) {
+            androidx.compose.foundation.text.BasicTextField(
+                text, { text = it }, singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(color = c.text, fontSize = 26.sp, fontFamily = T.font),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { commit(); ed.requestFocus() }),
+                modifier = Modifier.width(IntrinsicSize.Min).widthIn(min = 60.dp)
+                    .border(c.borderWidth, if (focused) c.accent else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(c.radius))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .trackTextFocus()
+                    .onFocusChanged { st -> if (focused && !st.isFocused) commit(); focused = st.isFocused }
+                    .onPreviewKeyEvent { k ->
+                        if (k.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && k.key == androidx.compose.ui.input.key.Key.Escape) {
+                            text = e.alias; ed.requestFocus(); true
+                        } else false
+                    },
+            )
+        }
+        Text("(" + Paths.name(e.sample) + ")", color = c.muted, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 10.dp).weight(1f))
+        val n = ed.oto.entries.size
+        ed.oto.selected?.let { Text("${it + 1} / $n", color = c.muted, fontSize = 12.sp) }
+    }
+}

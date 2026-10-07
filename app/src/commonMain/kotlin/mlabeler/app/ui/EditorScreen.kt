@@ -182,7 +182,7 @@ private fun EditorBody(app: AppState, ed: EditorState) {
     val c = T.c
     var dropHover by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
-    if (ed.mode != Mode.Oto) ModelResultsBar(ed)
+    if (ed.mode != Mode.Oto) ModelResultsBar(ed) else if (app.settings.layout.otoHeader) OtoHeader(ed)
     // a recording dropped on the picture opens (its folder too, when it is from elsewhere)
     Box(Modifier.weight(1f).fillMaxWidth().fileDrop({ dropHover = it }) { app.openDropped(it) }) {
         when {

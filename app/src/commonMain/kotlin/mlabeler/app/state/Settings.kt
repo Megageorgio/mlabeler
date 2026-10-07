@@ -52,6 +52,8 @@ data class LayoutSettings(
     val laneWeights: Map<String, Float> = emptyMap(),
     /** Vertical zoom of the waveform (Alt+wheel over it). */
     val waveGain: Float = 1f,
+    /** oto: the selected alias in large type over the picture (renamed in place). */
+    val otoHeader: Boolean = true,
     /** Sections of the details panel: their order and the folded ones. */
     val inspectorOrder: List<String> = emptyList(),
     val inspectorFolded: Set<String> = emptySet(),

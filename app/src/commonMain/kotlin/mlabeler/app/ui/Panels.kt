@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package mlabeler.app.ui
 
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -192,7 +194,7 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
             if (a != null) Text("${formatTime(a.duration)} · ${a.sampleRate} Hz", color = c.muted, fontSize = 12.sp)
             KeyValue(S.labels(), item.labelPath?.let { Paths.name(it) } ?: S.notSavedYet())
             val marks = ed.marks(item)
-            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(S.done(), marks.done) { ed.setMarks(item) { it.copy(done = !it.done) } }
                 Chip(S.star(), marks.star) { ed.setMarks(item) { it.copy(star = !it.star) } }
             }
@@ -257,13 +259,13 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
                         IconBtn(Icons.down, "-1", size = 30.dp) { ed.nudgePitch(-1.0) }
                         IconBtn(Icons.up, "+1", size = 30.dp) { ed.nudgePitch(1.0) }
                     }
-                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Chip(S.slur(), n.slur) { ed.changeNote { tt, i -> mlabeler.core.edit.NoteEdits.setSlur(tt, i, !n.slur) } }
                     }
                     KeyValue(S.start(), formatTime(n.start))
                     KeyValue(S.end(), formatTime(n.end))
                     KeyValue(S.length(), formatMs(n.end - n.start))
-                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Btn(S.pitchFromAudioOne()) { ed.notePitchFromAudio(all = false) }
                         Btn(S.pitchFromAudioAll()) { ed.notePitchFromAudio(all = true) }
                     }
@@ -283,7 +285,7 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
             val next = ed.phonemeQueue.firstOrNull()
             Text(if (next != null) queueNext.format(next, ed.phonemeQueue.size) else queueHelp(), color = c.muted, fontSize = 12.sp,
                 modifier = Modifier.padding(top = 4.dp))
-            if (next != null) Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (next != null) androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Btn(queueFill(), modifier = Modifier.weight(1f)) { ed.fillWithQueue() }
                 Btn(S.clear()) { ed.phonemeQueue = emptyList() }
             }

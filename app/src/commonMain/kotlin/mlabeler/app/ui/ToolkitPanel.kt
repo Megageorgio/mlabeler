@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package mlabeler.app.ui
 
 import androidx.compose.foundation.background
@@ -78,7 +80,7 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
         if (tk.status == Status.Failed && tk.lastError.isNotBlank()) {
             Text(tk.lastError, color = c.danger, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 5, modifier = Modifier.padding(top = 4.dp))
         }
-        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             when {
                 tk.status == Status.Missing && LocalToolkit.supported -> Btn(installBtn(), primary = true) { tk.install() }
                 tk.status == Status.Failed && LocalToolkit.supported && LocalToolkit.findMvt(app.settings.toolkit.mvtPath) == null ->
