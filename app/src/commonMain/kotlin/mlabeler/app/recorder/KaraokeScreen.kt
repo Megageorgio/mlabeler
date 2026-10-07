@@ -108,6 +108,7 @@ private val keysT = L("R records from the current place, Space plays and stops, 
     "R — запись с текущего места, пробел — играть и стоп, стрелки вверх и вниз — по строкам, Home — к первым словам.")
 private val inT = L("in {0} s", "через {0} с")
 private val cancelWorkT = L("Stop", "Остановить")
+private val tidyT = L("Tidy the lines", "Почистить строки")
 private val loopT = L("Repeat the line", "Повторять строку")
 private val keyT = L("Key", "Тональность")
 private val keyDownT = L("A semitone lower", "На полтона ниже")
@@ -340,6 +341,7 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 Text(mlabeler.app.ui.formatTime(k.position, precise = false) + " / " + mlabeler.app.ui.formatTime(k.duration, precise = false), color = c.muted, fontSize = 12.sp)
                 Chip(loopT(), k.loopLine) { k.loopLine = !k.loopLine }
                 Spacer(Modifier.weight(1f))
+                if (editing && !k.recording) Btn(tidyT()) { k.tidyLines() }
                 if (editing && !k.recording) Btn(pasteT()) { pasting = true }
                 Btn(if (editing) doneT() else editT(), primary = editing, enabled = !k.recording) { editing = !editing; if (!editing) focus.requestFocus() }
             }

@@ -576,6 +576,15 @@ class KaraokeState(
 
     fun addLineAt(t: Double) = change(lines + LyricLine(t.coerceIn(0.0, duration), ""))
 
+    /** Drops invented credits and cuts long lines (each keeps its start; the next line's start is its end). */
+    fun tidyLines() {
+        val out = lines.flatMapIndexed { i, l ->
+            val end = lines.getOrNull(i + 1)?.time ?: duration
+            mlabeler.core.format.Lyrics.split(l.time, end, mlabeler.core.format.Lyrics.clean(l.text)).map { (t, x) -> LyricLine(t, x) }
+        }
+        change(out)
+    }
+
     fun remove(i: Int) { if (i in lines.indices) change(lines.filterIndexed { k, _ -> k != i }) }
 
     /** Replaces the lyrics with [text]: times kept for the first lines, the rest spread to the end. */
@@ -696,11 +705,13 @@ class KaraokeState(
             val job = client.transcribe(id, language.trim().ifEmpty { null }, lines.joinToString(" ") { it.text }.take(400).ifBlank { null })
             val res = try { client.await(job) { p, stage -> progress = p; stageText = stage } } catch (e: kotlinx.coroutines.CancellationException) { client.cancel(job); throw e }
             val segs = itemOf(res)["data"]?.jsonObject?.get("transcription")?.jsonObject?.get("segments")?.jsonArray.orEmpty()
-            val got = segs.mapNotNull { s ->
+            // credits the recognizer invents over music are dropped, long phrases are cut into screen lines
+            val got = segs.flatMap { s ->
                 val o = s.jsonObject
-                val t = o["start"]?.jsonPrimitive?.doubleOrNull ?: return@mapNotNull null
-                val text = (o["text"] as? JsonPrimitive)?.content?.trim().orEmpty()
-                if (text.isEmpty()) null else LyricLine(t, text)
+                val t = o["start"]?.jsonPrimitive?.doubleOrNull ?: return@flatMap emptyList()
+                val e = o["end"]?.jsonPrimitive?.doubleOrNull ?: t
+                val text = mlabeler.core.format.Lyrics.clean((o["text"] as? JsonPrimitive)?.content.orEmpty())
+                mlabeler.core.format.Lyrics.split(t, e, text).map { (at, line) -> LyricLine(at, line) }
             }
             if (got.isEmpty()) { app.message(nothingHeard(), error = true); return@work }
             if (song == name) {
