@@ -834,6 +834,7 @@ private fun AboutPage() {
     SectionTitle(AboutTitles.thanks())
     person("HHS_kt", listOf("YouTube" to "https://www.youtube.com/@HHS_kt", "Telegram" to "https://t.me/hhs_kt_666"))
     person("Gitreti", emptyList())
+    person("XHR0ME", listOf("X" to "https://x.com/ExChroma", "Telegram" to "https://t.me/xhr0m1", "YouTube" to "https://www.youtube.com/@chr0ma313"))
 }
 
 private object DangerTitles {
