@@ -109,6 +109,17 @@ private val keysT = L("R records from the current place, Space plays and stops, 
 private val inT = L("in {0} s", "через {0} с")
 private val cancelWorkT = L("Stop", "Остановить")
 private val loopT = L("Repeat the line", "Повторять строку")
+private val keyT = L("Key", "Тональность")
+private val keyDownT = L("A semitone lower", "На полтона ниже")
+private val keyUpT = L("A semitone higher", "На полтона выше")
+private val tempoT = L("Tempo", "Темп")
+private val preparingT = L("Preparing the backing…", "Готовлю минус…")
+private val splitT = L("Each line to its own file", "Каждая строка — отдельный файл")
+private val latencyT = L("Sound card delay, ms", "Задержка звука, мс")
+private val practiceT = L("Practice", "Репетиция")
+private val practicingT = L("Practice: nothing is saved", "Репетиция: ничего не сохраняется")
+private val leakT = L("The backing track is heard in this take: sing in headphones, or turn the speakers down.", "В дубле слышен минус: пойте в наушниках или сделайте колонки тише.")
+private val takesT = L("Takes (click to listen):", "Дубли (щёлкните, чтобы послушать):")
 private val scoreT = L("In tune {0}% of the time · {1} ¢ off on average", "В ноты: {0}% времени · в среднем мимо на {1} ¢")
 private val octDownT = L("an octave lower than the song", "октавой ниже песни")
 private val octUpT = L("an octave higher than the song", "октавой выше песни")
@@ -119,7 +130,7 @@ private val pitchHint = L("Grey: the song's melody; colour: your voice (an octav
 @Composable
 private fun PitchLane(k: KaraokeState) {
     val c = T.c
-    val ref = k.refPitch
+    val ref = k.refPitch?.let { r -> val st = k.semitones; if (st == 0) r else remember(r, st) { FloatArray(r.size) { r[it] + st } } }
     @Suppress("UNUSED_VARIABLE") val tick = k.liveTick
     val measurer = androidx.compose.ui.text.rememberTextMeasurer(cacheSize = 32)
     val labelStyle = TextStyle(color = c.muted, fontSize = 10.sp)
@@ -258,6 +269,24 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 Field(k.language, { k.updateLanguage(it) }, Modifier.width(56.dp), placeholder = "ru")
                 Btn(recogniseT(), enabled = k.busy == null && k.audio != null && !k.recording) { k.recognise() }
             }
+            // key, tempo and what to do with a take
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(keyT(), color = c.muted, fontSize = 12.sp)
+                IconBtn(Icons.nudgeLeft, keyDownT(), size = 30.dp, enabled = !k.recording) { k.updateKey(k.semitones - 1) }
+                Text((if (k.semitones > 0) "+" else "") + k.semitones, color = if (k.semitones != 0) c.accent else c.text, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
+                IconBtn(Icons.nudgeRight, keyUpT(), size = 30.dp, enabled = !k.recording) { k.updateKey(k.semitones + 1) }
+                Spacer(Modifier.width(10.dp))
+                Text(tempoT(), color = c.muted, fontSize = 12.sp)
+                for (v in listOf(1.0, 0.9, 0.8, 0.7)) Chip("${(v * 100).toInt()}%", kotlin.math.abs(k.speed - v) < 0.001) { if (!k.recording) k.updateSpeed(v) }
+                if (k.preparing) Text(preparingT(), color = c.accent, fontSize = 12.sp)
+                Spacer(Modifier.width(10.dp))
+                Chip(splitT(), k.splitLines) { k.splitLines = !k.splitLines }
+                Spacer(Modifier.width(10.dp))
+                Text(latencyT(), color = c.muted, fontSize = 12.sp)
+                var lat by remember { mutableStateOf(k.latencyMs.toString()) }
+                Field(lat, { lat = it; it.toIntOrNull()?.let { v -> k.updateLatency(v) } }, Modifier.width(64.dp))
+            }
             k.busy?.let { b ->
                 Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -277,6 +306,13 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                     color = if (sc.inTune >= 0.7) c.ok else if (sc.inTune >= 0.45) c.warn else c.danger, fontSize = 13.sp,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
             }
+            if (k.leaked) Text(leakT(), color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp))
+            if (k.takes.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(takesT(), color = c.muted, fontSize = 12.sp)
+                val best = k.takes.maxByOrNull { it.score?.inTune ?: -1.0 }
+                for (t in k.takes.asReversed()) Chip(t.name + (t.score?.let { " · ${(it.inTune * 100).toInt()}%" } ?: "") + (if (t === best && t.score != null) " ★" else ""), false) { k.playTake(t.audio) }
+            }
             Divider()
             Bar(k)
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -294,6 +330,8 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                         Box(Modifier.size(if (k.recording) 18.dp else 22.dp).clip(if (k.recording) RoundedCornerShape(3.dp) else CircleShape).background(androidx.compose.ui.graphics.Color.White))
                     }
                 }
+                if (!k.recording) Btn(practiceT(), enabled = k.audio != null) { k.record(practiceOnly = true) }
+                else if (k.practice) Text(practicingT(), color = c.accent, fontSize = 12.sp)
                 if (k.recording) Box(Modifier.width(90.dp).height(8.dp).clip(RoundedCornerShape(4.dp)).background(c.panelAlt)) {
                     val db = if (k.level > 0f) 20 * kotlin.math.log10(k.level.toDouble()) else -90.0
                     val lv = ((db + 60) / 60).toFloat().coerceIn(0f, 1f)

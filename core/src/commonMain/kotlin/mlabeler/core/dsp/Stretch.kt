@@ -2,56 +2,77 @@ package mlabeler.core.dsp
 
 import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.max
-import kotlin.math.min
+import kotlin.math.pow
 
-/** Time stretching that keeps pitch (WSOLA), for slow playback. */
+/** Changing the tempo and the key of a recording independently (WSOLA time-stretch + resampling), for practice. */
 object Stretch {
-    /** Returns [x] played at [speed] (0.25..1): longer by 1/speed, same pitch. */
-    fun wsola(x: FloatArray, sampleRate: Int, speed: Double): FloatArray {
-        if (speed >= 0.999 || x.size < 4096) return x
-        val n = (sampleRate * 0.04).toInt().let { var p = 256; while (p < it) p *= 2; p } // ~40 ms frames
-        val hs = n / 2
-        val ha = hs * speed
-        val tol = n / 4
-        val win = FloatArray(n) { (0.5 - 0.5 * cos(2 * PI * it / n)).toFloat() }
-        val outLen = (x.size / speed).toInt() + n
+    /**
+     * [x] played at [speed] (0.5 = half as fast) and [semitones] higher or lower. Good enough for a backing track to
+     * sing along; not for the dataset itself.
+     */
+    fun process(x: FloatArray, sampleRate: Int, speed: Double = 1.0, semitones: Double = 0.0): FloatArray {
+        if (speed == 1.0 && semitones == 0.0) return x
+        val f = 2.0.pow(semitones / 12.0)
+        val stretched = wsola(x, sampleRate, speed / f)
+        return if (f == 1.0) stretched else resample(stretched, f)
+    }
+
+    /** Reads [x] [step] samples at a time with linear interpolation (step > 1: shorter and higher). */
+    fun resample(x: FloatArray, step: Double): FloatArray {
+        val n = (x.size / step).toInt()
+        return FloatArray(n) { i ->
+            val p = i * step
+            val a = p.toInt()
+            val t = (p - a).toFloat()
+            val va = x.getOrElse(a) { 0f }
+            val vb = x.getOrElse(a + 1) { va }
+            va + (vb - va) * t
+        }
+    }
+
+    /** Time-stretch without changing the pitch: [rate] < 1 makes it longer (slower), > 1 shorter. */
+    fun wsola(x: FloatArray, sampleRate: Int, rate: Double): FloatArray {
+        if (rate == 1.0 || x.isEmpty()) return x
+        val n = (sampleRate * 0.04).toInt().let { it - it % 2 }      // frame
+        val hopOut = n / 2
+        val hopIn = hopOut * rate
+        val delta = (sampleRate * 0.01).toInt()                       // how far a frame may move to fit
+        val window = FloatArray(n) { (0.5 - 0.5 * cos(2 * PI * it / n)).toFloat() }
+        val outLen = (x.size / rate).toInt() + n
         val out = FloatArray(outLen)
         val norm = FloatArray(outLen)
-        var prevEnd = 0 // where the natural continuation of the last frame starts in x
+        var prevStart = 0
         var k = 0
+        val cmp = n / 4
         while (true) {
-            val outPos = k * hs
-            val target = (k * ha).toInt()
-            if (target + n + tol >= x.size || outPos + n >= outLen) break
-            var best = target
+            val outPos = k * hopOut
+            val nominal = (k * hopIn).toInt()
+            if (nominal + n >= x.size || outPos + n >= outLen) break
+            var best = nominal
             if (k > 0) {
-                // pick the offset whose frame best continues the previous one
-                var bestScore = -Double.MAX_VALUE
-                val lo = max(0, target - tol)
-                val hi = min(x.size - n, target + tol)
-                var d = lo
-                while (d <= hi) {
-                    var s = 0.0
-                    var i = 0
-                    while (i < hs) {
-                        s += x[d + i] * x[prevEnd + i]
-                        i += 4
+                // the frame start that continues the previous frame best (its natural next half-frame)
+                val natural = prevStart + hopOut
+                var bestScore = Double.NEGATIVE_INFINITY
+                var d = -delta
+                while (d <= delta) {
+                    val s = nominal + d
+                    if (s >= 0 && s + n < x.size && natural + cmp < x.size) {
+                        var c = 0.0
+                        var j = 0
+                        while (j < cmp) { c += x[s + j] * x[natural + j]; j += 4 }
+                        if (c > bestScore) { bestScore = c; best = s }
                     }
-                    if (s > bestScore) { bestScore = s; best = d }
                     d += 2
                 }
             }
-            for (i in 0 until n) {
-                out[outPos + i] += x[best + i] * win[i]
-                norm[outPos + i] += win[i]
+            for (j in 0 until n) {
+                out[outPos + j] += x[best + j] * window[j]
+                norm[outPos + j] += window[j]
             }
-            prevEnd = min(x.size - n, best + hs)
+            prevStart = best
             k++
         }
-        val len = k * hs + hs
-        val res = FloatArray(min(len, outLen))
-        for (i in res.indices) res[i] = if (norm[i] > 1e-3f) out[i] / norm[i] else 0f
-        return res
+        val len = (x.size / rate).toInt().coerceAtMost(outLen)
+        return FloatArray(len) { i -> if (norm[i] > 1e-3f) out[i] / norm[i] else out[i] }
     }
 }

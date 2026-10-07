@@ -151,6 +151,40 @@ class KaraokeState(
     var score by mutableStateOf<Score?>(null)
         private set
 
+    /** Key of the backing track, semitones (the melody line and the score follow it). */
+    var semitones by androidx.compose.runtime.mutableIntStateOf(0)
+        private set
+    /** Tempo of the backing track: 1 = as recorded, 0.75 = slower. */
+    var speed by mutableDoubleStateOf(1.0)
+        private set
+    /** Sound card delay (output + input), ms: the voice in a take comes this much after the music. */
+    var latencyMs by androidx.compose.runtime.mutableIntStateOf(0)
+        private set
+    /** Singing with the pitch shown but nothing saved. */
+    var practice by mutableStateOf(false)
+        private set
+    /** Each line of the take goes to its own file. */
+    var splitLines by mutableStateOf(false)
+    /** Takes of this session with their scores, to compare. */
+    data class TakeInfo(val name: String, val audio: Audio, val score: Score?, val leak: Boolean)
+    var takes by mutableStateOf<List<TakeInfo>>(emptyList())
+        private set
+    /** Set when the last take seems to contain the backing track (sung without headphones). */
+    var leaked by mutableStateOf(false)
+        private set
+    /** True while the backing track is being made slower or higher. */
+    var preparing by mutableStateOf(false)
+        private set
+    private var prepared: Pair<List<Any>, Audio>? = null
+    private val latencyPath = Paths.join(songsDir, "latency.txt")
+
+    fun updateKey(st: Int) { semitones = st.coerceIn(-12, 12); prepared = null; if (playing && !recording) play() }
+    fun updateSpeed(v: Double) { speed = v.coerceIn(0.5, 1.0); prepared = null; if (playing && !recording) play() }
+    fun updateLatency(ms: Int) {
+        latencyMs = ms.coerceIn(0, 1000)
+        runCatching { fs.write(latencyPath, latencyMs.toString().encodeToByteArray()) }
+    }
+
     /** While playing (not recording), go back to the start of the current line when the next one begins. */
     var loopLine by mutableStateOf(false)
     private var loopFrom = -1
@@ -177,7 +211,7 @@ class KaraokeState(
         val hz = if (peak < 0.02f) 0f else mlabeler.core.dsp.Pitch.yin(buf, recRate, hop = 1.0, fmin = 65.0, fmax = 1100.0).values.lastOrNull { it > 0f } ?: 0f
         val m = if (hz > 0f) mlabeler.core.dsp.Pitch.hzToMidi(hz.toDouble()).toFloat() else 0f
         liveNote = m
-        val i = (position / PITCH_HOP).toInt()
+        val i = ((position - latencyMs / 1000.0) / PITCH_HOP).toInt()
         val arr = livePitch
         if (i in arr.indices) {
             arr[i] = if (m > 0f) m else Float.NaN
@@ -189,7 +223,8 @@ class KaraokeState(
 
     /** Share of sung frames within half a semitone of the song's voice; an octave up or down counts as right. */
     private fun scoreTake(from: Double, to: Double): Score? {
-        val ref = refPitch ?: return null
+        val ref0 = refPitch ?: return null
+        val ref = FloatArray(ref0.size) { ref0[it] + semitones }
         val live = livePitch
         val a = (from / PITCH_HOP).toInt().coerceAtLeast(0)
         val b = minOf((to / PITCH_HOP).toInt(), ref.size, live.size)
@@ -220,6 +255,7 @@ class KaraokeState(
 
     init {
         fs.mkdirs(songsDir)
+        latencyMs = runCatching { fs.read(latencyPath).decodeToString().trim().toInt() }.getOrDefault(0)
         language = runCatching { fs.read(languagePath).decodeToString().trim() }.getOrNull()?.takeIf { it.isNotEmpty() }
             ?: mlabeler.app.i18n.Lang.current
         reloadSongs()
@@ -293,7 +329,7 @@ class KaraokeState(
     }
 
     /** What plays in the headphones: the backing track with some of the song's voice, or the whole song. */
-    private fun backing(): Audio? {
+    private fun mixed(): Audio? {
         val m = music ?: return audio
         val v = voice
         val g = guideLevel
@@ -302,30 +338,49 @@ class KaraokeState(
         return Audio(m.sampleRate, out)
     }
 
+    /** The backing as heard: mixed, then in the chosen key and tempo (made once per setting). */
+    private suspend fun backing(): Audio? {
+        val key = listOf(music ?: audio ?: return null, voice ?: 0, guideLevel, semitones, speed)
+        prepared?.let { (k, a) -> if (k == key) return a }
+        val base = mixed() ?: return null
+        val a = if (semitones == 0 && speed == 1.0) base else {
+            preparing = true
+            try { withContext(Dispatchers.Default) { Audio(base.sampleRate, mlabeler.core.dsp.Stretch.process(base.samples, base.sampleRate, speed, semitones.toDouble())) } }
+            finally { preparing = false }
+        }
+        prepared = key to a
+        return a
+    }
+
+    /** Song time of a sample of the played (maybe slower) backing, and back. */
+    private fun songTime(sample: Int, a: Audio) = sample.toDouble() / a.sampleRate * speed
+    private fun sampleAt(t: Double, a: Audio) = (t / speed * a.sampleRate).toInt()
+
     // ---------- playback ----------
 
     private var playing0: Audio? = null
 
     fun play(from: Double = position) {
-        val a = backing() ?: return
-        val start = (from.coerceIn(0.0, a.duration) * a.sampleRate).toInt()
-        if (a.samples.size - start < a.sampleRate / 20) return
         playJob?.cancel()
-        runCatching { output.play(a, start, a.samples.size, false) }.onFailure { return }
-        playing0 = a
-        position = from
-        playing = true
         playJob = scope.launch {
+            val a = backing() ?: return@launch
+            val start = sampleAt(from.coerceIn(0.0, duration), a)
+            if (a.samples.size - start < a.sampleRate / 20) { if (recording) stopRecording(); return@launch }
+            output.stop()
+            runCatching { output.play(a, start, a.samples.size, false) }.onFailure { return@launch }
+            playing0 = a
+            position = from
+            playing = true
             delay(30)
-            loopFrom = if (loopLine && !recording) current else -1
+            loopFrom = if (loopLine && (!recording || practice)) current else -1
             while (isActive && output.isPlaying) {
                 val p = output.position()
-                if (p >= 0) position = p.toDouble() / a.sampleRate
+                if (p >= 0) position = songTime(p, a)
                 val lf = loopFrom
-                if (loopLine && !recording && lf >= 0 && lf + 1 < lines.size && position >= lines[lf + 1].time) {
+                if (loopLine && (!recording || practice) && lf >= 0 && lf + 1 < lines.size && position >= lines[lf + 1].time) {
                     val back = (lines[lf].time - minOf(lead, 1.0)).coerceAtLeast(0.0)
                     output.stop()
-                    runCatching { output.play(a, (back * a.sampleRate).toInt(), a.samples.size, false) }
+                    runCatching { output.play(a, sampleAt(back, a), a.samples.size, false) }
                     position = back
                     delay(60)
                     continue
@@ -381,8 +436,9 @@ class KaraokeState(
     // ---------- recording ----------
 
     /** Starts the backing track from the current place and records the microphone until stopped (or the song ends). */
-    fun record() {
+    fun record(practiceOnly: Boolean = false) {
         if (recording || audio == null) return
+        practice = practiceOnly
         stop()
         input.requestPermission { ok ->
             if (!ok) { app.message(noMic(), error = true); return@requestPermission }
@@ -405,6 +461,7 @@ class KaraokeState(
                 recStart = position
                 livePitch = FloatArray((duration / PITCH_HOP).toInt() + 2)
                 score = null
+                leaked = false
                 recording = true
                 play(position)
             }
@@ -423,7 +480,8 @@ class KaraokeState(
         val parts = ArrayList<FloatArray>()
         while (true) parts += chunks.tryReceive().getOrNull() ?: break
         val data = FloatArray(parts.sumOf { it.size }).also { out -> var p = 0; for (c in parts) { c.copyInto(out, p); p += c.size } }
-        if (data.size < recRate / 2) return
+        if (data.size < recRate / 2 || practice) { practice = false; return }
+        val played = playing0
         val name = takeName.trim().removeSuffix(".wav").ifEmpty { song?.let { nextTakeName(it) } ?: "take" }
         // the words sung in the recorded part go next to the take (autolabel can use them)
         val words = lines.filterIndexed { i, l ->
@@ -431,24 +489,72 @@ class KaraokeState(
             until > recStart + 0.3 && l.time < end - 0.3
         }.joinToString("\n") { it.text }.trim()
         val take = Audio(recRate, data)
+        val start = recStart
+        val sc = score
+        val split = splitLines
+        val lat = latencyMs / 1000.0
         scope.launch {
+            val leak = withContext(Dispatchers.Default) { played != null && leakage(take, played, sampleAt(start, played)) }
             withContext(Dispatchers.Default) {
-                val path = Paths.join(folder, "$name.wav")
-                if (fs.exists(path)) runCatching { fs.copy(path, Paths.join(Paths.join(Paths.join(folder, ".mlabeler"), "takes"), "$name.${mlabeler.core.io.Workspace.timestamp()}.wav")) }
-                fs.write(path, Wav.encode16(take))
-                if (words.isNotEmpty()) fs.write(Paths.join(folder, "$name.txt"), (words + "\n").encodeToByteArray())
+                fun save(n: String, a: Audio, text: String) {
+                    val path = Paths.join(folder, "$n.wav")
+                    if (fs.exists(path)) runCatching { fs.copy(path, Paths.join(Paths.join(Paths.join(folder, ".mlabeler"), "takes"), "$n.${mlabeler.core.io.Workspace.timestamp()}.wav")) }
+                    fs.write(path, Wav.encode16(a))
+                    if (text.isNotEmpty()) fs.write(Paths.join(folder, "$n.txt"), (text + "\n").encodeToByteArray())
+                }
+                if (!split) save(name, take, words)
+                else {
+                    // each line from a little before it starts (in the take: later by the sound card delay) to the next
+                    val rate = take.sampleRate.toDouble() / speed
+                    for ((i, l) in lines.withIndex()) {
+                        val until = lines.getOrNull(i + 1)?.time ?: duration
+                        val a = ((l.time - start + lat - 0.15) * rate).toInt().coerceAtLeast(0)
+                        val b = ((until - start + lat - 0.05) * rate).toInt().coerceAtMost(take.samples.size)
+                        if (b - a < take.sampleRate / 3) continue
+                        save("${name}_${(i + 1).toString().padStart(2, '0')}", Audio(take.sampleRate, take.samples.copyOfRange(a, b)), l.text)
+                    }
+                }
             }
             lastTake = take
             lastTakeName = name
-            app.message(takeSaved.format("$name.wav", Paths.name(folder)))
+            leaked = leak
+            takes = (takes + TakeInfo(name, take, sc, leak)).takeLast(12)
+            app.message(takeSaved.format(if (split) "${name}_NN.wav" else "$name.wav", Paths.name(folder)))
             song?.let { takeName = nextTakeName(it) }
         }
     }
 
-    fun playLastTake() {
-        val t = lastTake ?: return
+    fun playLastTake() { lastTake?.let { playTake(it) } }
+
+    fun playTake(t: Audio) {
         stop()
         runCatching { output.play(t, 0, t.samples.size, false) }
+    }
+
+    /**
+     * Whether the take has the backing track in it: the loudness of the take follows the loudness of what was played
+     * (at a delay of up to 0.3 s) much more closely than a voice would.
+     */
+    private fun leakage(take: Audio, played: Audio, from: Int): Boolean {
+        val step = take.sampleRate / 100
+        fun env(x: FloatArray, start: Int, n: Int) = DoubleArray(n) { k ->
+            var e = 0.0
+            for (j in 0 until step) { val v = x.getOrElse(start + k * step + j) { 0f }; e += v * v }
+            kotlin.math.ln(1e-6 + e / step)
+        }
+        val n = minOf(take.samples.size / step, (played.samples.size - from) / step) - 40
+        if (n < 300) return false
+        val t = env(take.samples, 0, n + 30)
+        val p = env(played.samples, from, n)
+        fun corr(lag: Int): Double {
+            var sa = 0.0; var sb = 0.0
+            for (i in 0 until n) { sa += t[i + lag]; sb += p[i] }
+            val ma = sa / n; val mb = sb / n
+            var c = 0.0; var va = 0.0; var vb = 0.0
+            for (i in 0 until n) { val a = t[i + lag] - ma; val b = p[i] - mb; c += a * b; va += a * a; vb += b * b }
+            return if (va <= 0 || vb <= 0) 0.0 else c / kotlin.math.sqrt(va * vb)
+        }
+        return (0..30).maxOf { corr(it) } > 0.6
     }
 
     // ---------- editing the lyrics ----------
