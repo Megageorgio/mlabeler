@@ -321,22 +321,22 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     }
 
     companion object {
-        val checking = L("Checking the toolkit…", "Проверяю тулкит…")
+        val checking = L("Checking the toolkit…", "Проверка тулкита…")
         val ready = L("mVocalToolkit {0} is ready", "mVocalToolkit {0} готов")
         val startedHere = L("started by mLabeler", "запущен mLabeler")
-        val starting = L("Starting the toolkit… (the first time takes up to a minute)", "Запускаю тулкит… (в первый раз — до минуты)")
-        val installingT = L("Installing the toolkit… this downloads a few hundred MB", "Устанавливаю тулкит… скачается несколько сотен МБ")
+        val starting = L("The toolkit is starting…", "Тулкит запускается…")
+        val installingT = L("Installing the toolkit… this downloads a few hundred MB", "Тулкит устанавливается… будет скачано несколько сотен МБ")
         val missing = L("mVocalToolkit isn't installed on this computer", "mVocalToolkit не установлен на этом компьютере")
         val offHere = L("The toolkit isn't running; it starts by itself when needed", "Тулкит не запущен; он запустится сам, когда понадобится")
         val offRemote = L("No answer from the toolkit at this address", "Тулкит по этому адресу не отвечает")
         val failed = L("The toolkit couldn't start", "Тулкит не смог запуститься")
         val notStarted = L("The toolkit stopped right after start", "Тулкит остановился сразу после запуска")
-        val gettingUv = L("Installing uv (Python package manager)…", "Устанавливаю uv (менеджер пакетов Python)…")
+        val gettingUv = L("Installing uv (Python package manager)…", "Устанавливается uv (менеджер пакетов Python)…")
         val noUv = L("Couldn't install uv. Install it from astral.sh/uv and try again.", "Не получилось установить uv. Установите его с astral.sh/uv и попробуйте снова.")
         val installFailed = L("Installation failed; see the log below", "Установка не удалась, подробности в журнале ниже")
         val installed = L("Installed", "Установлено")
         val updating = L("The toolkit is updating itself to a newer version and will start again…", "Тулкит обновляется до новой версии и запустится снова…")
-        val startingAgain = L("The update is installed; starting the toolkit…", "Обновление установлено, запускаю тулкит…")
+        val startingAgain = L("The update is installed; starting the toolkit…", "Обновление установлено, тулкит запускается…")
         val updateFailed = L("The toolkit didn't come back after updating; see the log", "Тулкит не запустился после обновления, подробности в журнале")
         const val EXIT_UPDATING = 75
     }

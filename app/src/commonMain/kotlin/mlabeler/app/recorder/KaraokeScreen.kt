@@ -114,7 +114,7 @@ private val keyT = L("Key", "Тональность")
 private val keyDownT = L("A semitone lower", "На полтона ниже")
 private val keyUpT = L("A semitone higher", "На полтона выше")
 private val tempoT = L("Tempo", "Темп")
-private val preparingT = L("Preparing the backing…", "Готовлю минус…")
+private val preparingT = L("Preparing the backing…", "Минус готовится…")
 private val splitT = L("Each line to its own file", "Каждая строка — отдельный файл")
 private val latencyT = L("Sound card delay, ms", "Задержка звука, мс")
 private val practiceT = L("Practice", "Репетиция")
@@ -342,7 +342,7 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 Chip(loopT(), k.loopLine) { k.loopLine = !k.loopLine }
                 Spacer(Modifier.weight(1f))
                 if (editing && !k.recording) Btn(tidyT()) { k.tidyLines() }
-                if (editing && !k.recording) Btn(pasteT()) { pasting = true }
+                if (editing && !k.recording) Btn(pasteT() + "…") { pasting = true }
                 Btn(if (editing) doneT() else editT(), primary = editing, enabled = !k.recording) { editing = !editing; if (!editing) focus.requestFocus() }
             }
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

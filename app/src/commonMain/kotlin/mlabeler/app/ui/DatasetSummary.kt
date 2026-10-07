@@ -39,7 +39,7 @@ import mlabeler.core.model.LabelDoc
 import kotlin.math.roundToInt
 
 private val title = L("Dataset summary", "Сводка по датасету")
-private val reading = L("Reading the labels: {0} of {1}…", "Читаю разметку: {0} из {1}…")
+private val reading = L("Reading the labels: {0} of {1}…", "Чтение разметки: {0} из {1}…")
 private val filesT = L("Recordings", "Записи")
 private val filesLine = L("{0} in the folder · {1} labelled · {2} done", "{0} в папке · {1} размечено · {2} готово")
 private val lengthT = L("Length", "Длительность")

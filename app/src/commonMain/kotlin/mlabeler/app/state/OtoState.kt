@@ -373,5 +373,5 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     }
 }
 
-private val readingT = mlabeler.app.i18n.L("Reading {0} of {1}", "Читаю {0} из {1}")
-private val uploadingT = mlabeler.app.i18n.L("Sending {0} of {1} to the toolkit", "Передаю тулкиту {0} из {1}")
+private val readingT = mlabeler.app.i18n.L("Reading {0} of {1}", "Чтение: {0} из {1}")
+private val uploadingT = mlabeler.app.i18n.L("Sending {0} of {1} to the toolkit", "Передача тулкиту: {0} из {1}")

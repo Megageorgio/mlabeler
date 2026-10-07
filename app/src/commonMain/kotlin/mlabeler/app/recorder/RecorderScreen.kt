@@ -151,7 +151,7 @@ fun RecorderScreen(app: AppState, rec: RecorderState) {
                 }
                 Btn(karaokeTitle()) { val f = rec.folder; app.openKaraoke(f) }
                 Spacer(Modifier.width(6.dp))
-                Btn(editList()) { editing = true }
+                Btn(editList() + "…") { editing = true }
                 Spacer(Modifier.width(6.dp))
                 IconBtn(Icons.settings, S.settings()) { showSettings = true }
                 IconBtn(Icons.file, openInEditor()) { val f = rec.folder; app.closeRecorder(); app.openFolder(f) }
@@ -168,7 +168,7 @@ fun RecorderScreen(app: AppState, rec: RecorderState) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(emptyList(), color = c.muted, fontSize = 14.sp)
                                 Spacer(Modifier.height(12.dp))
-                                Btn(editList(), primary = true) { editing = true }
+                                Btn(editList() + "…", primary = true) { editing = true }
                             }
                         }
                     } else {

@@ -49,7 +49,7 @@ private val phoneHint = L(
     "On a phone or tablet the toolkit runs on a computer. On the computer: open mLabeler, Settings → Autolabel, turn on \"Let phones connect\" — then type the address and token shown there into the fields below.",
     "На телефоне или планшете тулкит работает на компьютере. На компьютере: mLabeler → Настройки → Авторазметка → включите «Разрешить подключение с телефона» и введите сюда показанные там адрес и токен.",
 )
-private val showLog = L("Log", "Журнал")
+private val showLog = L("Log…", "Журнал…")
 
 /** Status of the toolkit with the buttons that fix it (install, start, retry). */
 @Composable

@@ -36,7 +36,7 @@ import kotlin.math.roundToInt
 private val title = L("Check the recordings", "Проверка звука")
 private val about = L("Looks for what spoils training: clipping, too quiet takes, noise in the pauses, an offset of the zero line, long silence at the ends, a different sample rate, stereo. Nothing is changed.",
     "Ищет то, что портит обучение: перегруз, слишком тихие дубли, шум в паузах, смещение нуля, длинную тишину по краям, другую частоту дискретизации, стерео. Ничего не меняет.")
-private val checking = L("Checking {0} of {1}…", "Проверяю {0} из {1}…")
+private val checking = L("Checking {0} of {1}…", "Проверка: {0} из {1}…")
 private val allClean = L("Nothing found in {0} recordings", "В {0} записях ничего не найдено")
 private val found = L("Found something in {0} of {1} recordings. Click to open the place.", "Есть замечания в {0} из {1} записей. Нажмите, чтобы открыть место.")
 private val clipping = L("clipping ×{0}", "перегруз ×{0}")

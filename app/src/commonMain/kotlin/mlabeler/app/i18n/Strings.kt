@@ -169,7 +169,7 @@ object S {
     val pitch = L("Pitch", "Высота тона")
     val pitchOver = L("Pitch over the spectrogram", "Высота тона поверх спектрограммы")
     val power = L("Loudness", "Громкость")
-    val uploading = L("Sending audio…", "Отправка звука…")
+    val uploading = L("Preparing the recording…", "Подготовка записи…")
     val autolabelDone = L("Autolabel finished", "Авторазметка готова")
     val toolkit = L("Autolabel", "Авторазметка")
     val toolkitUrl = L("mVocalToolkit address", "Адрес mVocalToolkit")

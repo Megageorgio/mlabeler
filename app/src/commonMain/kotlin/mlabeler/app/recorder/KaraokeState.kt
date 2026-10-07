@@ -34,12 +34,12 @@ import mlabeler.core.io.decodeGuess
 /** One line of lyrics: when it starts (s) and what is sung. */
 data class LyricLine(val time: Double, val text: String)
 
-private val loadingT = L("Reading {0}…", "Читаю {0}…")
+private val loadingT = L("Reading {0}…", "Чтение {0}…")
 private val cantRead = L("Can't read {0}", "Не удалось прочитать {0}")
-private val uploadingT = L("Sending the song to the toolkit…", "Передаю песню тулкиту…")
-private val separatingT = L("Separating the voice and the music…", "Отделяю голос от музыки…")
-private val recognisingT = L("Recognising the words…", "Распознаю слова…")
-private val fetchingT = L("Taking the results…", "Забираю результаты…")
+private val uploadingT = L("Sending the song to the toolkit…", "Песня передаётся тулкиту на этом компьютере…")
+private val separatingT = L("Separating the voice and the music…", "Голос отделяется от музыки…")
+private val recognisingT = L("Recognising the words…", "Распознавание слов…")
+private val fetchingT = L("Taking the results…", "Получение результатов…")
 private val separatedT = L("The backing track is ready", "Минус готов")
 private val recognisedT = L("{0} lines recognised; check them, the times are approximate", "Распознано строк: {0}; проверьте их, время примерное")
 private val nothingHeard = L("No words were recognised", "Слов не распознано")

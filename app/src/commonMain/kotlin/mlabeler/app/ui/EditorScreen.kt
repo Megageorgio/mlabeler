@@ -516,7 +516,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
 }
 
 object ErrorTitles {
-    val more = mlabeler.app.i18n.L("Details", "Подробнее")
+    val more = mlabeler.app.i18n.L("Details…", "Подробнее…")
     val title = mlabeler.app.i18n.L("Error details", "Подробности ошибки")
     val copy = mlabeler.app.i18n.L("Copy", "Копировать")
     val copied = mlabeler.app.i18n.L("Copied", "Скопировано")
