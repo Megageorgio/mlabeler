@@ -1132,6 +1132,8 @@ class EditorState(
 
     fun selectInterval(ref: IntervalRef, reveal: Boolean = true) {
         selection = Selection.Interval(ref)
+        // one selection at a time: a selected phoneme replaces a selected part
+        range = null
         activeTier = ref.tier
         if (reveal) tier(ref.tier)?.let { reveal(it.startOf(ref.index), it.endOf(ref.index)) }
     }

@@ -204,7 +204,7 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     val w = size.width.toFloat()
     val h = size.height.toFloat()
     val ruler = 22f * density
-    val tierH = max(layout.tierHeight.coerceIn(28f, 96f), layout.labelFontSize.coerceIn(8f, 48f) * 2.1f + 6f) * density * (if (Platform.isMobile) 1.15f else 1f)
+    val tierH = max(layout.tierHeight.coerceIn(14f, 96f), layout.labelFontSize.coerceIn(8f, 48f) * 1.3f + 2f) * density * (if (Platform.isMobile) 1.15f else 1f)
     val minAudio = 48f * density
     val overlay = layout.overlay
     var tiersH = tierH * tiers
@@ -454,7 +454,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     if (g.tierCount > 0) {
                                         // the labels grow when the line moves away from them
                                         val grow = if (b == "labels") -dy else dy
-                                        onLayoutState.value(l.copy(tierHeight = (l.tierHeight + grow / density / g.tierCount).coerceIn(28f, 96f)))
+                                        onLayoutState.value(l.copy(tierHeight = (l.tierHeight + grow / density / g.tierCount).coerceIn(14f, 96f)))
                                     }
                                 } else {
                                     val shown = g.lanes.keys.filter { it != "labels" && it != "main" }
@@ -561,6 +561,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                         if (otoMarker != null && !first.buttons.isTertiaryPressed) {
                             val e = ed.oto.current()!!
                             val offset = ed.oto.absolute(e).get(otoMarker) / 1000 - downTime
+                            // with a mouse the marker goes right under the pointer; a finger would hide it, so it keeps its distance
+                            val follow = if (touch) offset else 0.0
                             ed.oto.beginDrag()
                             var moved = false
                             while (true) {
@@ -569,9 +571,9 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 if (!chg.pressed) break
                                 if (chg.positionChange() != Offset.Zero) {
                                     moved = true
-                                    ed.oto.dragTo(otoMarker, timeAt(chg.position.x) + offset, ev.keyboardModifiers.isShiftPressed)
-                                    ed.cursor = timeAt(chg.position.x)
-                                    ed.previewAt(timeAt(chg.position.x) + offset)
+                                    ed.oto.dragTo(otoMarker, timeAt(chg.position.x) + follow, ev.keyboardModifiers.isShiftPressed)
+                                    ed.cursor = timeAt(chg.position.x) + follow
+                                    ed.previewAt(timeAt(chg.position.x) + follow)
                                     chg.consume()
                                 }
                             }
@@ -607,6 +609,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             // drag a boundary
                             val tier = ed.doc?.tiers?.get(bound.tier) as? IntervalTier
                             val offset = (tier?.bounds?.get(bound.bound) ?: downTime) - downTime
+                            // with a mouse the boundary goes right under the pointer; a finger would hide it, so it keeps its distance
+                            val follow = if (touch) offset else 0.0
                             ed.beginDrag(bound)
                             var moved = false
                             while (true) {
@@ -616,9 +620,9 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 if (chg.positionChange() != Offset.Zero) {
                                     moved = true
                                     val m = ev.keyboardModifiers
-                                    ed.dragTo(bound, timeAt(chg.position.x) + offset, m.isShiftPressed, m.isAltPressed)
-                                    ed.cursor = timeAt(chg.position.x)
-                                    ed.previewAt(timeAt(chg.position.x) + offset)
+                                    ed.dragTo(bound, timeAt(chg.position.x) + follow, m.isShiftPressed, m.isAltPressed)
+                                    ed.cursor = timeAt(chg.position.x) + follow
+                                    ed.previewAt(timeAt(chg.position.x) + follow)
                                     chg.consume()
                                 }
                             }
