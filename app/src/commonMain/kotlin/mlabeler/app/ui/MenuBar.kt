@@ -82,7 +82,7 @@ object MenuTitles {
     val entriesPanel = L("Entries", "Записи")
     val recent = L("Open recent", "Открыть недавние")
     val otoHeader = L("Large alias over the picture", "Крупный псевдоним над картинкой")
-    val followPlay = L("View follows playback", "Вид следует за воспроизведением")
+    val followPlay = L("View during playback", "Вид при воспроизведении")
     val entriesSeparate = L("Entries as a panel of their own", "Записи отдельной панелью")
     val entriesRight = L("Entries panel on the right", "Панель записей справа")
     val menuBar = L("Menu bar", "Строка меню")
@@ -218,7 +218,11 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
         add(item(Commands.namesOnAudio, ed, app, checked = l.namesOnAudio))
         add(toggle(MenuTitles.specFirst(), l.spectrogramFirst) { it.copy(layout = it.layout.copy(spectrogramFirst = !it.layout.spectrogramFirst, laneOrder = emptyList())) })
-        add(toggle(MenuTitles.followPlay(), s.edit.follow != "off") { it.copy(edit = it.edit.copy(follow = if (it.edit.follow == "off") "page" else "off")) })
+        add(MSub(MenuTitles.followPlay(), listOf(
+            toggle(PlayTitles.followOff(), s.edit.follow == "off") { it.copy(edit = it.edit.copy(follow = "off")) },
+            toggle(PlayTitles.followPage(), s.edit.follow == "page") { it.copy(edit = it.edit.copy(follow = "page")) },
+            toggle(PlayTitles.followKeep(), s.edit.follow == "keep") { it.copy(edit = it.edit.copy(follow = "keep")) },
+        )))
         if (ed.mode == mlabeler.app.state.Mode.Oto) add(toggle(MenuTitles.otoHeader(), s.layout.otoHeader) { it.copy(layout = it.layout.copy(otoHeader = !it.layout.otoHeader)) })
         add(MSep)
         add(item(Commands.labelsBigger, ed, app))

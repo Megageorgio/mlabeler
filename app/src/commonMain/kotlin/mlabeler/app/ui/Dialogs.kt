@@ -78,13 +78,13 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import kotlinx.coroutines.launch
 
 /** Dim background with a centred card; full screen on narrow windows. */
-private object PlayTitles {
+internal object PlayTitles {
     val playback = mlabeler.app.i18n.L("Playback", "Воспроизведение")
     val volume = mlabeler.app.i18n.L("Volume", "Громкость")
     val follow = mlabeler.app.i18n.L("While playing, the view", "Во время воспроизведения вид")
     val followOff = mlabeler.app.i18n.L("Stays put", "Не двигается")
     val followPage = mlabeler.app.i18n.L("Turns the page at the edge", "Перелистывается у края")
-    val followKeep = mlabeler.app.i18n.L("Moves with the playhead", "Едет за курсором")
+    val followKeep = mlabeler.app.i18n.L("Scrolls smoothly, the playhead stays in place", "Плавно едет, курсор стоит на месте")
     val followAt = mlabeler.app.i18n.L("Where the playhead stays (from the left)", "Где держится курсор (от левого края)")
 }
 

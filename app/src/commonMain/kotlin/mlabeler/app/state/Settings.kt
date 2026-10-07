@@ -90,7 +90,7 @@ data class EditSettings(
     val loop: Boolean = false,
     val nudgeMs: Float = 5f,
     /** The view during playback: "off", "page" (turns the page at the edge) or "keep" (the playhead stays at [followAt]). */
-    val follow: String = "page",
+    val follow: String = "off",
     val followAt: Float = 0.5f,
     /** Playback volume, 0..1. */
     val volume: Float = 1f,

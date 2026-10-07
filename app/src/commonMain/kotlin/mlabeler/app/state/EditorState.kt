@@ -1624,18 +1624,27 @@ class EditorState(
         playing = true
         playJob = scope.launch {
             delay(30)
+            // the sound card reports its position in buffer-sized steps: between steps the playhead runs on the clock,
+            // so the picture moves evenly (needed when the view rides along with the playhead)
+            var lastRaw = Double.NaN
+            var lastAt = 0L
+            val rate = if (slow) speed.toDouble() else 1.0
+            val clock = kotlin.time.TimeSource.Monotonic.markNow()
             while (isActive && player.isPlaying) {
                 val p = player.position()
                 if (p >= 0) {
-                    val t = when {
+                    val raw = when {
                         slow -> (s + p * speed) / sr
                         copy -> (s + p).toDouble() / sr
                         else -> p.toDouble() / sr
                     }
+                    val now = clock.elapsedNow().inWholeNanoseconds
+                    if (raw != lastRaw) { lastRaw = raw; lastAt = now }
+                    val t = (raw + (now - lastAt) / 1e9 * rate).coerceAtMost(raw + 0.25)
                     playhead = t
                     followPlayhead(t)
                 }
-                delay(16)
+                delay(8)
             }
             playing = false
             playhead = null
