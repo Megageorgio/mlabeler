@@ -1097,11 +1097,20 @@ private fun DrawScope.drawTimeline(
             if (g.overlay) {
                 drawLine(Color.Black.copy(alpha = 0.3f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom), (if (selected) 4f else 2.5f) * px)
                 drawLine(if (selected) c.boundSelected else c.bound.copy(alpha = 0.85f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom), if (selected) 2f * px else px)
-            } else drawLine(
-                if (selected) c.boundSelected else c.bound.copy(alpha = 0.45f), Offset(xx, g.audioTop), Offset(xx, g.audioBottom),
-                if (selected) 2 * px else px,
-                pathEffect = if (selected) null else PathEffect.dashPathEffect(floatArrayOf(4 * px, 3 * px)),
-            )
+            } else {
+                // the theme decides how boundaries look over the audio
+                val lw = c.boundWidth.coerceIn(0.5f, 6f) * px
+                drawLine(
+                    if (selected) c.boundSelected else if (c.boundLine != Color.Unspecified) c.boundLine else c.bound.copy(alpha = 0.55f),
+                    Offset(xx, g.audioTop), Offset(xx, g.audioBottom),
+                    if (selected) lw + px else lw,
+                    pathEffect = when {
+                        selected || c.boundStyle == "solid" -> null
+                        c.boundStyle == "dot" -> PathEffect.dashPathEffect(floatArrayOf(lw, 2 * lw + px))
+                        else -> PathEffect.dashPathEffect(floatArrayOf(4 * px + lw, 3 * px))
+                    },
+                )
+            }
         }
         if (sel is Selection.Interval && sel.ref.tier == ed.guideTier && sel.ref.index < guide.size) {
             val a = x(guide.startOf(sel.ref.index))

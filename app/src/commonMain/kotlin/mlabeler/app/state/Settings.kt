@@ -56,6 +56,8 @@ data class LayoutSettings(
     val otoHeader: Boolean = true,
     /** The floating notepad: shown, where (dp from the picture's top left), size, text size. */
     val showNotepad: Boolean = false,
+    /** An ordinary scroll bar under the picture. */
+    val scrollbar: Boolean = true,
     val notepadX: Float = 40f,
     val notepadY: Float = 40f,
     val notepadW: Float = 320f,
@@ -285,6 +287,8 @@ data class AppSettings(
     val mouse: MouseSettings = MouseSettings(),
     /** Interface font from the system; empty = the theme's. */
     val font: String = "",
+    /** No smoothing anywhere it can be turned off: square corners, text with hard pixel edges. */
+    val crisp: Boolean = false,
     val clean: CleanSettings = CleanSettings(),
 ) {
     companion object {

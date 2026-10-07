@@ -206,7 +206,7 @@ fun Field(
         value = value,
         onValueChange = onChange,
         singleLine = true,
-        textStyle = textStyle.copy(color = c.text, fontFamily = textStyle.fontFamily ?: T.font),
+        textStyle = androidx.compose.material3.LocalTextStyle.current.merge(textStyle.copy(color = c.text, fontFamily = textStyle.fontFamily ?: T.font)),
         cursorBrush = SolidColor(c.accent),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),

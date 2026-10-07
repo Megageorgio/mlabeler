@@ -53,6 +53,12 @@ private val borderT = L("Border width", "Толщина рамок")
 private val squareT = L("Flat pressed buttons", "Плоские нажатые кнопки")
 private val monoT = L("Monospace font", "Моноширинный шрифт")
 private val deleteT = L("Delete theme", "Удалить тему")
+private val boundsT = L("Boundaries over the audio", "Границы поверх звука")
+private val boundLineT = L("Colour", "Цвет")
+private val boundWidthT = L("Thickness", "Толщина")
+private val dashT = L("Dashed", "Пунктир")
+private val dotT = L("Dotted", "Точки")
+private val solidT = L("Solid", "Сплошная")
 private val folderT = L("Themes folder…", "Папка тем…")
 private val reloadT = L("Reload from files", "Перечитать файлы")
 private val groupUi = L("Interface", "Интерфейс")
@@ -163,6 +169,12 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
             ColorRow(colorNames[k]?.invoke() ?: k, get(tokens)) { change(ThemeFiles.withColor(tokens, k, it)) }
         }
     }
+    SectionTitle(boundsT())
+    ColorRow(boundLineT(), if (tokens.boundLine != Color.Unspecified) tokens.boundLine else tokens.bound.copy(alpha = 0.55f)) { change(tokens.copy(boundLine = it)) }
+    ValueSlider(boundWidthT(), tokens.boundWidth, 0.5f..4f, "px", decimals = 1) { change(tokens.copy(boundWidth = ((it * 2).toInt().coerceAtLeast(1) / 2f))) }
+    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((k, t) in listOf("dash" to dashT, "dot" to dotT, "solid" to solidT)) Chip(t(), tokens.boundStyle == k) { change(tokens.copy(boundStyle = k)) }
+    }
     SectionTitle(tierColorsT())
     ColorList(tokens.tierColors, minCount = 1) { change(tokens.copy(tierColors = it)) }
     SectionTitle(spectrogramT())
@@ -240,6 +252,9 @@ private fun toHsv(c: Color): FloatArray {
     return floatArrayOf(h, s, mx)
 }
 
+private val crispT = L("No smoothing (hard pixel edges)", "Без сглаживания (чёткие пиксели)")
+private val crispNote = L("Square corners and text without smoothing, as in old programs. Text stays smooth on Android.",
+    "Углы без скругления, текст без сглаживания, как в старых программах. На Android текст останется сглаженным.")
 private val fontT = L("Interface font", "Шрифт интерфейса")
 private val fontTheme = L("As in the theme", "Как в теме")
 private val fontSearch = L("Find a font", "Найти шрифт")
@@ -275,6 +290,8 @@ private fun FontPicker(app: AppState) {
         if (cur.isNotEmpty()) Btn(fontTheme()) { app.update { it.copy(font = "") } }
     }
     Text(fontSample(), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+    SwitchLine(crispT(), app.settings.crisp) { v -> app.update { it.copy(crisp = v) } }
+    Text(crispNote(), color = c.muted, fontSize = 11.sp)
     if (!open || names.isEmpty()) return
     Field(query, { query = it }, Modifier.fillMaxWidth().padding(top = 8.dp), placeholder = fontSearch())
     val shown = remember(query, names) { names.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) } }

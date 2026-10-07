@@ -198,6 +198,7 @@ private fun EditorBody(app: AppState, ed: EditorState) {
             }
         }
     }
+    if (ed.item != null && ed.audio != null && app.settings.layout.scrollbar) TimeScrollBar(ed)
     }
 }
 

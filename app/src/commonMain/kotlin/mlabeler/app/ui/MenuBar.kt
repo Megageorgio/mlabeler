@@ -81,6 +81,7 @@ object MenuTitles {
     val detailsPanel = L("Details", "Подробности")
     val entriesPanel = L("Entries", "Записи")
     val recent = L("Open recent", "Открыть недавние")
+    val scrollbar = L("Scroll bar under the picture", "Полоса прокрутки под картинкой")
     val otoHeader = L("Large alias over the picture", "Крупный псевдоним над картинкой")
     val followPlay = L("View during playback", "Вид при воспроизведении")
     val entriesSeparate = L("Entries as a panel of their own", "Записи отдельной панелью")
@@ -223,6 +224,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             toggle(PlayTitles.followPage(), s.edit.follow == "page") { it.copy(edit = it.edit.copy(follow = "page")) },
             toggle(PlayTitles.followKeep(), s.edit.follow == "keep") { it.copy(edit = it.edit.copy(follow = "keep")) },
         )))
+        add(toggle(MenuTitles.scrollbar(), s.layout.scrollbar) { it.copy(layout = it.layout.copy(scrollbar = !it.layout.scrollbar)) })
         add(toggle(notepadTitle(), s.layout.showNotepad) { it.copy(layout = it.layout.copy(showNotepad = !it.layout.showNotepad)) })
         if (ed.mode == mlabeler.app.state.Mode.Oto) add(toggle(MenuTitles.otoHeader(), s.layout.otoHeader) { it.copy(layout = it.layout.copy(otoHeader = !it.layout.otoHeader)) })
         add(MSep)

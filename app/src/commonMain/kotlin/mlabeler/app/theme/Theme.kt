@@ -56,6 +56,11 @@ data class Tokens(
     val borderWidth: Dp,
     val square: Boolean,
     val mono: Boolean = false,
+    /** Boundaries drawn over the waveform and spectrogram: colour (Unspecified = [bound], half see-through), width, style. */
+    val boundLine: Color = Color.Unspecified,
+    val boundWidth: Float = 1f,
+    /** "dash", "dot" or "solid". */
+    val boundStyle: String = "dash",
 )
 
 private fun hex(v: Long) = Color(v or 0xFF000000)
@@ -155,11 +160,13 @@ private fun scheme(t: Tokens): ColorScheme {
 }
 
 @Composable
-fun AppTheme(tokens: Tokens, font: FontFamily? = null, content: @Composable () -> Unit) {
+fun AppTheme(tokens0: Tokens, font: FontFamily? = null, crisp: Boolean = false, content: @Composable () -> Unit) {
+    // without smoothing: square corners (a rounded edge can only be drawn smoothed) and text with hard pixel edges
+    val tokens = if (crisp) tokens0.copy(radius = 0.dp) else tokens0
     val r = RoundedCornerShape(tokens.radius)
     val shapes = Shapes(extraSmall = r, small = r, medium = r, large = r, extraLarge = r)
     val family = font ?: if (tokens.mono) FontFamily.Monospace else FontFamily.Default
-    val base = TextStyle(fontFamily = family)
+    val base = TextStyle(fontFamily = family, platformStyle = if (crisp) crispTextStyle() else null)
     val typography = Typography(
         bodyLarge = base.copy(fontSize = 15.sp, lineHeight = 21.sp),
         bodyMedium = base.copy(fontSize = 14.sp, lineHeight = 19.sp),

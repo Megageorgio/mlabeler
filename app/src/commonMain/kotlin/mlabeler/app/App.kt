@@ -37,7 +37,7 @@ fun App(app: AppState = rememberAppState()) {
         mlabeler.app.ui.LocalKeepBarsFree provides (!Platform.isMobile || !st.fullscreen || st.avoidCutout),
     ) {
         val font = androidx.compose.runtime.remember(st.font) { systemFontFamily(st.font) }
-        AppTheme(Themes.byId(app.settings.theme), font) {
+        AppTheme(Themes.byId(app.settings.theme), font, crisp = app.settings.crisp) {
             StorageAccess {
                 Box(Modifier.fillMaxSize()) {
                     val ed = app.editor

@@ -56,6 +56,9 @@ object ThemeFiles {
         put("borderWidth", t.borderWidth.value)
         put("square", t.square)
         put("mono", t.mono)
+        if (t.boundLine != Color.Unspecified) put("boundLine", hex(t.boundLine))
+        put("boundWidth", t.boundWidth)
+        put("boundStyle", t.boundStyle)
         put("colors", buildJsonObject { for ((k, f) in colorKeys) put(k, hex(f(t))) })
         put("tierColors", JsonArray(t.tierColors.map { JsonPrimitive(hex(it)) }))
         put("spectrogram", JsonArray(t.spectrogram.map { JsonPrimitive(hex(it)) }))
@@ -82,6 +85,9 @@ object ThemeFiles {
             borderWidth = (o["borderWidth"]?.jsonPrimitive?.floatOrNull ?: base.borderWidth.value).dp,
             square = o["square"]?.jsonPrimitive?.booleanOrNull ?: base.square,
             mono = o["mono"]?.jsonPrimitive?.booleanOrNull ?: base.mono,
+            boundLine = o["boundLine"]?.jsonPrimitive?.content?.let { color(it) } ?: base.boundLine,
+            boundWidth = o["boundWidth"]?.jsonPrimitive?.floatOrNull ?: base.boundWidth,
+            boundStyle = o["boundStyle"]?.jsonPrimitive?.content ?: base.boundStyle,
         )
         t to (o["name"]?.jsonPrimitive?.content ?: t.id)
     }.getOrNull()
