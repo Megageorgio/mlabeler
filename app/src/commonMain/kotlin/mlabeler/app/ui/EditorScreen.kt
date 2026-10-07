@@ -191,6 +191,7 @@ private fun EditorBody(app: AppState, ed: EditorState) {
             else -> Timeline(ed, app.settings.layout, app.settings.view, { nl -> app.update { it.copy(layout = nl) } }, Modifier.fillMaxSize())
         }
         if (dropHover) DropHint(dropOpen())
+        if (app.settings.layout.showNotepad) FloatingNotepad(app, ed)
         if (ed.loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 2.dp)

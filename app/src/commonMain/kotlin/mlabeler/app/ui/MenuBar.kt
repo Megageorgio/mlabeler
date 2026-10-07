@@ -223,6 +223,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             toggle(PlayTitles.followPage(), s.edit.follow == "page") { it.copy(edit = it.edit.copy(follow = "page")) },
             toggle(PlayTitles.followKeep(), s.edit.follow == "keep") { it.copy(edit = it.edit.copy(follow = "keep")) },
         )))
+        add(toggle(notepadTitle(), s.layout.showNotepad) { it.copy(layout = it.layout.copy(showNotepad = !it.layout.showNotepad)) })
         if (ed.mode == mlabeler.app.state.Mode.Oto) add(toggle(MenuTitles.otoHeader(), s.layout.otoHeader) { it.copy(layout = it.layout.copy(otoHeader = !it.layout.otoHeader)) })
         add(MSep)
         add(item(Commands.labelsBigger, ed, app))

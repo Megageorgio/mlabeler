@@ -249,15 +249,18 @@ fun AutolabelDialog(app: AppState) {
                     }
                 } else {
                     SectionTitle(textTitle())
-                    Field(text, { text = it }, Modifier.fillMaxWidth(), placeholder = if (phonemes) phonemesHint() else wordsHint())
-                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Chip(asText(), !phonemes) { phonemes = false }
-                        Chip(asPhonemes(), phonemes) { phonemes = true }
+                    // the text and where it can come from in one row; what the text is (a choice) below it
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Field(text, { text = it }, Modifier.weight(1f), placeholder = if (phonemes) phonemesHint() else wordsHint())
                         TextFromFile(ed.workspace.root) { raw ->
                             val asPh = phonemes || mlabeler.core.format.TextImport.looksLikeLab(raw)
                             phonemes = asPh
                             text = mlabeler.core.format.TextImport.clean(raw, asPh)
                         }
+                    }
+                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Chip(asText(), !phonemes) { phonemes = false }
+                        Chip(asPhonemes(), phonemes) { phonemes = true }
                     }
                 }
                 if (!(batch && batchSource == mlabeler.app.state.EditorState.BatchText.Labels)) {

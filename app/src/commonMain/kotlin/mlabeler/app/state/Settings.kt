@@ -54,6 +54,13 @@ data class LayoutSettings(
     val waveGain: Float = 1f,
     /** oto: the selected alias in large type over the picture (renamed in place). */
     val otoHeader: Boolean = true,
+    /** The floating notepad: shown, where (dp from the picture's top left), size, text size. */
+    val showNotepad: Boolean = false,
+    val notepadX: Float = 40f,
+    val notepadY: Float = 40f,
+    val notepadW: Float = 320f,
+    val notepadH: Float = 220f,
+    val notepadFont: Float = 14f,
     /** Sections of the details panel: their order and the folded ones. */
     val inspectorOrder: List<String> = emptyList(),
     val inspectorFolded: Set<String> = emptySet(),
