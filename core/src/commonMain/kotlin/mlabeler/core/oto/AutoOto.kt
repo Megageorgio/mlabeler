@@ -58,6 +58,11 @@ object Kana {
 
     fun isKana(c: Char) = c in '぀'..'ヿ'
 
+    /** Small kana that change the sound of the one before (しょ, づぁ, ヴィ). */
+    private val smallVowel = mapOf('ぁ' to "a", 'ぃ' to "i", 'ぅ' to "u", 'ぇ' to "e", 'ぉ' to "o", 'ゃ' to "ya", 'ゅ' to "yu", 'ょ' to "yo", 'ゎ' to "wa")
+    private fun small(c: Char): String? = smallVowel[if (c in 'ァ'..'ヶ') c - 0x60 else c]
+    fun isSmall(c: Char) = small(c) != null
+
     /** Splits kana text into syllables (longest match, so きゃ is one). */
     fun split(text: String): List<String> {
         val out = mutableListOf<String>()
@@ -66,6 +71,8 @@ object Kana {
             val two = if (i + 1 < text.length) text.substring(i, i + 2) else ""
             when {
                 two.isNotEmpty() && two in table -> { out += two; i += 2 }
+                // any kana with a small one after it is one syllable, also pairs the table doesn't list (づぁ, ぐぃ)
+                two.isNotEmpty() && text[i].toString() in table && isSmall(text[i + 1]) -> { out += two; i += 2 }
                 text[i].toString() in table -> { out += text[i].toString(); i++ }
                 text[i] == 'ー' || text[i] == '・' -> i++
                 else -> i++
@@ -74,7 +81,18 @@ object Kana {
         return out
     }
 
-    fun romaji(kana: String): String? = table[kana]
+    fun romaji(kana: String): String? = table[kana] ?: run {
+        // a kana and a small one: the consonant of the first and the sound of the small one
+        if (kana.length != 2) return@run null
+        val base = table[kana[0].toString()] ?: return@run null
+        val add = small(kana[1]) ?: return@run null
+        val cons = base.dropLastWhile { it in "aiueo" }
+        when {
+            add.startsWith("y") && (cons.endsWith("sh") || cons.endsWith("ch") || cons == "j") -> cons + add.drop(1)
+            add.startsWith("y") && cons.isEmpty() -> add
+            else -> cons + add
+        }
+    }
 }
 
 object Syllables {

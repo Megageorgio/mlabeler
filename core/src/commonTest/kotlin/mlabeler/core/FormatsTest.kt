@@ -268,6 +268,13 @@ class AutoOtoTest {
         assertEquals("ky", syl[3].consonant)
         assertEquals("a", syl[3].vowel)
         assertEquals(listOf("ma", "mo"), mlabeler.core.oto.Syllables.fromName("ma_mo").map { it.text })
+        // small vowels: one syllable with the vowel of the small kana, also for pairs the table doesn't list
+        val dz = mlabeler.core.oto.Syllables.fromName("_づぁんづぁづぁづぃづぁづづぁ")
+        assertEquals(listOf("づぁ", "ん", "づぁ", "づぁ", "づぃ", "づぁ", "づ", "づぁ"), dz.map { it.text })
+        assertEquals(listOf("a", "n", "a", "a", "i", "a", "u", "a"), dz.map { it.vowel })
+        assertEquals(listOf("しょ", "ん", "しょ", "しょ", "しゃ", "しょ", "し", "しょ"), mlabeler.core.oto.Syllables.fromName("_しょんしょしょしゃしょししょ").map { it.text })
+        assertEquals(listOf("ヴィ", "ぐぇ"), mlabeler.core.oto.Syllables.fromName("ヴィぐぇ").map { it.text })
+        assertEquals("e", mlabeler.core.oto.Syllables.fromName("ぐぇ")[0].vowel)
         val sr = 22050
         val x = synth(sr, listOf(
             Triple(0.4, 0.0, -1), Triple(0.08, 0.0, 0), Triple(0.45, 220.0, 1), Triple(0.12, 0.0, 0),
