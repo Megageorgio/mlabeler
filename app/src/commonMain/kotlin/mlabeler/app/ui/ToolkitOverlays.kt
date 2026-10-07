@@ -37,7 +37,6 @@ import mlabeler.app.theme.T
 private val working = L("Autolabel is running", "Идёт авторазметка")
 private val waitHint = L("While autolabel runs, the labels can't be changed, so the result lands exactly where it belongs.",
     "Пока идёт авторазметка, разметку менять нельзя: так результат встанет точно на своё место.")
-private val localHint = L("The toolkit works on this computer: the recording doesn't leave it.", "Тулкит работает на этом компьютере: запись никуда не отправляется.")
 private val elapsed = L("{0} so far", "прошло {0}")
 private val stopT = L("Stop", "Остановить")
 private val modelResult = L("Model result", "Результат модели")
@@ -79,7 +78,6 @@ fun AutolabelBusy(ed: EditorState) {
             val pct = if (p != null && p > 0) "${(p * 100).toInt()}%  ·  " else ""
             Text(pct + elapsed.format("${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             Text(waitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
-            if (ed.app.toolkit.isLocalAddress) Text(localHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {
                 Btn(stopT()) { ed.cancelToolkit() }
             }

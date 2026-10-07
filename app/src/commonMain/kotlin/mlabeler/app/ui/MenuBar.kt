@@ -159,12 +159,6 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.nudgeLeft, ed, app))
             add(item(Commands.nudgeRight, ed, app))
             add(MSep)
-            if (s.edit.tools) {
-                add(item(Commands.toolCursor, ed, app, checked = s.edit.tool == "cursor"))
-                add(item(Commands.toolCut, ed, app, checked = s.edit.tool == "cut"))
-                add(item(Commands.toolPan, ed, app, checked = s.edit.tool == "pan"))
-                add(item(Commands.toolPlay, ed, app, checked = s.edit.tool == "play"))
-            }
             add(item(Commands.playOnDrag, ed, app, checked = s.edit.playOnDrag))
             add(MSep)
             add(item(Commands.ripple, ed, app, checked = s.edit.ripple))

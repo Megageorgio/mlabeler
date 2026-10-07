@@ -245,7 +245,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, toolCursor, toolCut, toolPan, toolPlay, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

@@ -170,7 +170,6 @@ object EnvContents {
             lanes() to ln,
             toolbar() to tb,
             bars() to b.joinToString(", "),
-            tools() to if (e.tools) withTools() else cursorOnly(),
         )
     }
 }

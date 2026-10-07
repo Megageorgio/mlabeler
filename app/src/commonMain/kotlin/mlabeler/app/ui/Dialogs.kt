@@ -662,7 +662,8 @@ private fun swapAt(l: MutableList<String>, a: Int, b: Int) {
 
 object MouseTitles {
     val page = L("Mouse", "Мышь")
-    val tool = L("Tool", "Инструмент")
+    val tool = L("Clicks", "Щелчки")
+    val click = L("Click", "Щелчок")
     val toolsOn = L("Mouse tools (scissors, hand, play) — keys 1–4 and a toolbar button",
         "Инструменты мыши (ножницы, рука, проигрывание) — клавиши 1–4 и кнопка на панели")
     val toolsOff = L("Off: the left button always works as the cursor. Right and middle clicks keep their own actions below.",
@@ -681,8 +682,8 @@ object MouseTitles {
         "Рядом с границей оба инструмента её двигают. Shift+клик и протягивание по звуку выделяют кусок в обоих.")
     val askName = L("Type the name of the new part right away", "Сразу вводить название новой части")
     val playIt = L("Play the part before a new boundary", "Проигрывать часть перед новой границей")
-    val leftHint = L("A plain left click does what the tool above says (keys 1–4); below are the other clicks.",
-        "Обычный левый клик делает то, что задаёт инструмент выше (клавиши 1–4); ниже — остальные клики.")
+    val leftHint = L("Near a boundary a press always drags it; Shift+click and dragging over the audio select a part. Each click below can be set to select, split, play and more.",
+        "Рядом с границей нажатие всегда её тянет; Shift+щелчок и протягивание по звуку выделяют кусок. Каждому щелчку ниже можно задать: выбрать, разрезать, проиграть и другое.")
     val onLabels = L("On label lanes", "На полосах разметки")
     val onAudio = L("On the waveform and spectrogram", "На волне и спектрограмме")
     val double = L("Double click", "Двойной клик")
@@ -721,20 +722,7 @@ private fun MousePage(app: AppState) {
     val c = T.c
     val s = app.settings
     SectionTitle(MouseTitles.tool())
-    SwitchRow(MouseTitles.toolsOn(), s.edit.tools) { v -> app.update { it.copy(edit = it.edit.copy(tools = v)) } }
-    if (!s.edit.tools) Text(MouseTitles.toolsOff(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
-    if (s.edit.tools) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip(MouseTitles.cursor(), s.edit.tool == "cursor") { app.update { it.copy(edit = it.edit.copy(tool = "cursor")) } }
-        Chip(MouseTitles.cut(), s.edit.tool == "cut") { app.update { it.copy(edit = it.edit.copy(tool = "cut")) } }
-        Chip(MouseTitles.pan(), s.edit.tool == "pan") { app.update { it.copy(edit = it.edit.copy(tool = "pan")) } }
-        Chip(MouseTitles.playTool(), s.edit.tool == "play") { app.update { it.copy(edit = it.edit.copy(tool = "play")) } }
-    }
-    if (s.edit.tools) {
-        Text(MouseTitles.toolHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-        SwitchRow(MouseTitles.cutOnLanes(), s.edit.cutOnLanes) { v -> app.update { it.copy(edit = it.edit.copy(cutOnLanes = v)) } }
-        SwitchRow(MouseTitles.askName(), s.edit.cutAskName) { v -> app.update { it.copy(edit = it.edit.copy(cutAskName = v)) } }
-        SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
-    }
+    SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
     SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
     SwitchRow(MouseTitles.selectAfterDrag(), s.edit.selectAfterDrag) { v -> app.update { it.copy(edit = it.edit.copy(selectAfterDrag = v)) } }
     SwitchRow(MouseTitles.audioDeselects(), s.edit.audioClickDeselects) { v -> app.update { it.copy(edit = it.edit.copy(audioClickDeselects = v)) } }
@@ -745,14 +733,16 @@ private fun MousePage(app: AppState) {
         Chip(MouseTitles.wheelScroll(), m.wheel != "phonemes") { set { it.copy(wheel = "scroll") } }
         Chip(MouseTitles.wheelPhonemes(), m.wheel == "phonemes") { set { it.copy(wheel = "phonemes") } }
     }
-    if (s.edit.tools) Text(MouseTitles.leftHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+    Text(MouseTitles.leftHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
     SectionTitle(MouseTitles.onLabels())
+    ActionRow(MouseTitles.click(), m.tierClick) { v -> set { it.copy(tierClick = v) } }
     ActionRow(MouseTitles.double(), m.tierDouble) { v -> set { it.copy(tierDouble = v) } }
     ActionRow(MouseTitles.right(), m.tierRight) { v -> set { it.copy(tierRight = v) } }
     ActionRow(MouseTitles.middle(), m.tierMiddle) { v -> set { it.copy(tierMiddle = v) } }
     ActionRow(MouseTitles.ctrl(), m.tierCtrl) { v -> set { it.copy(tierCtrl = v) } }
     ActionRow(MouseTitles.alt(), m.tierAlt) { v -> set { it.copy(tierAlt = v) } }
     SectionTitle(MouseTitles.onAudio())
+    ActionRow(MouseTitles.click(), m.audioClick) { v -> set { it.copy(audioClick = v) } }
     ActionRow(MouseTitles.double(), m.audioDouble) { v -> set { it.copy(audioDouble = v) } }
     ActionRow(MouseTitles.right(), m.audioRight) { v -> set { it.copy(audioRight = v) } }
     ActionRow(MouseTitles.middle(), m.audioMiddle) { v -> set { it.copy(audioMiddle = v) } }

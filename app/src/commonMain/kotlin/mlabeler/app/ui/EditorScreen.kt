@@ -142,6 +142,7 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
             if (l.showFiles) (if (l.filesSide == "right") right else left) += SidePanelId.Files
             if (l.entriesSeparate && l.showEntries && ed.mode != Mode.Oto) (if (l.entriesSide == "right") right else left) += SidePanelId.Entries
             if (l.showInspector && wc == WidthClass.Expanded) (if (l.inspectorSide == "left") left else right) += SidePanelId.Details
+            if (l.showNotepad && l.notepadDocked) (if (l.notepadSide == "left") left else right) += SidePanelId.Notepad
             if (l.leftCollapsed) left.clear()
             if (l.rightCollapsed) right.clear()
             Row(Modifier.fillMaxSize()) {
@@ -191,7 +192,7 @@ private fun EditorBody(app: AppState, ed: EditorState) {
             else -> Timeline(ed, app.settings.layout, app.settings.view, { nl -> app.update { it.copy(layout = nl) } }, Modifier.fillMaxSize())
         }
         if (dropHover) DropHint(dropOpen())
-        if (app.settings.layout.showNotepad) FloatingNotepad(app, ed)
+        if (app.settings.layout.showNotepad && !app.settings.layout.notepadDocked) FloatingNotepad(app, ed)
         if (ed.loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(Modifier.size(28.dp), color = c.accent, strokeWidth = 2.dp)
@@ -446,12 +447,13 @@ fun MessageToast(app: AppState, bottom: Dp) {
     }
 }
 
-enum class SidePanelId { Files, Entries, Details }
+enum class SidePanelId { Files, Entries, Details, Notepad }
 
 private val panelNames = mapOf(
     SidePanelId.Files to mlabeler.app.i18n.L("Files and entries", "Файлы и записи"),
     SidePanelId.Entries to mlabeler.app.i18n.L("Entries", "Записи"),
     SidePanelId.Details to mlabeler.app.i18n.L("Details", "Подробности"),
+    SidePanelId.Notepad to notepadTitle,
 )
 private val toOtherSide = mlabeler.app.i18n.L("Move to the other side", "Перенести на другую сторону")
 private val hidePanel = mlabeler.app.i18n.L("Hide", "Скрыть")
@@ -466,7 +468,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
     val current = panels[tab.coerceIn(0, panels.size - 1)]
     val arranging = app.arrangePanels
     Column(modifier.background(c.panel)) {
-        if (panels.size > 1 || arranging) {
+        if (panels.size > 1 || arranging || current == SidePanelId.Notepad) {
             Row(Modifier.fillMaxWidth().background(if (arranging) c.accent.copy(alpha = 0.12f) else c.panel).padding(horizontal = 6.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -478,6 +480,13 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                             .clickable { tab = k }.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
+                }
+                if (current == SidePanelId.Notepad && !arranging) {
+                    IconBtn(Icons.layers, toOtherSide(), size = 28.dp) {
+                        app.update { st -> st.copy(layout = st.layout.copy(notepadSide = if (st.layout.notepadSide == "right") "left" else "right")) }
+                    }
+                    IconBtn(Icons.panelLeft, toWindowT(), size = 28.dp) { app.update { st -> st.copy(layout = st.layout.copy(notepadDocked = false)) } }
+                    IconBtn(Icons.close, hidePanel(), size = 28.dp) { app.update { st -> st.copy(layout = st.layout.copy(showNotepad = false)) } }
                 }
                 if (arranging) {
                     if (current == SidePanelId.Files && ed.mode != Mode.Oto && !app.settings.layout.entriesSeparate) IconBtn(Icons.panelRight, splitEntries(), size = 28.dp) {
@@ -493,6 +502,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                                 SidePanelId.Files -> st.layout.copy(filesSide = flip(st.layout.filesSide))
                                 SidePanelId.Entries -> st.layout.copy(entriesSide = flip(st.layout.entriesSide))
                                 SidePanelId.Details -> st.layout.copy(inspectorSide = flip(st.layout.inspectorSide))
+                                SidePanelId.Notepad -> st.layout.copy(notepadSide = flip(st.layout.notepadSide))
                             })
                         }
                     }
@@ -502,6 +512,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                                 SidePanelId.Files -> st.layout.copy(showFiles = false)
                                 SidePanelId.Entries -> st.layout.copy(showEntries = false)
                                 SidePanelId.Details -> st.layout.copy(showInspector = false)
+                                SidePanelId.Notepad -> st.layout.copy(showNotepad = false)
                             })
                         }
                     }
@@ -513,6 +524,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
             SidePanelId.Files -> SidePanel(ed, Modifier.weight(1f).fillMaxWidth())
             SidePanelId.Entries -> EntriesPanel(ed, Modifier.weight(1f).fillMaxWidth().background(c.panel)) {}
             SidePanelId.Details -> Inspector(ed, Modifier.weight(1f).fillMaxWidth())
+            SidePanelId.Notepad -> NotepadText(app, ed, Modifier.weight(1f).fillMaxWidth())
         }
     }
 }

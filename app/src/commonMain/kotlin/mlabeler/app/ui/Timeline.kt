@@ -702,6 +702,9 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     cutByLastTap.value = true
                                     return@awaitEachGesture
                                 }
+                                // a plain click set to do something else than selecting (split, play…)
+                                !touch && !mods.isShiftPressed && mouseFor(ed, region, Gesture.Click).let { it != null && it != MouseActions.SELECT } ->
+                                    mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Click))
                                 else -> onTap(ed, region, downTime, double && ed.app.settings.edit.activeTool != "cut", touch, mods.isShiftPressed)
                             }
                             cutByLastTap.value = false
@@ -819,13 +822,14 @@ private fun hitBound(ed: EditorState, g: Geom, region: Region?, x: Float, grab: 
     return BoundRef(k, b)
 }
 
-private enum class Gesture { Double, Right, Middle, Ctrl, Alt }
+private enum class Gesture { Click, Double, Right, Middle, Ctrl, Alt }
 
 /** The configured action for [g] where the pointer is (label lane or audio). */
 private fun mouseFor(ed: EditorState, region: Region?, g: Gesture): String {
     val m = ed.app.settings.mouse
     val tier = region is Region.Tier
     return when (g) {
+        Gesture.Click -> if (tier) m.tierClick else m.audioClick
         Gesture.Double -> if (tier) m.tierDouble else m.audioDouble
         Gesture.Right -> if (tier) m.tierRight else m.audioRight
         Gesture.Middle -> if (tier) m.tierMiddle else m.audioMiddle

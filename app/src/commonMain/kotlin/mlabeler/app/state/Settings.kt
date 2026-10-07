@@ -63,6 +63,9 @@ data class LayoutSettings(
     val notepadW: Float = 320f,
     val notepadH: Float = 220f,
     val notepadFont: Float = 14f,
+    /** The notepad as a side panel (on [notepadSide]) instead of a window over the picture. */
+    val notepadDocked: Boolean = false,
+    val notepadSide: String = "right",
     /** Sections of the details panel: their order and the folded ones. */
     val inspectorOrder: List<String> = emptyList(),
     val inspectorFolded: Set<String> = emptySet(),
@@ -134,12 +137,16 @@ data class EditSettings(
     /** Mouse tools 1–4 (cursor, scissors, hand, play); off = the cursor always. */
     val tools: Boolean = true,
 ) {
-    val activeTool: String get() = if (tools) tool else "cursor"
+    /** Tool modes are gone: what a click does is set per gesture in [MouseSettings]. */
+    val activeTool: String get() = "cursor"
 }
 
 /** What mouse gestures do, on label lanes and on the waveform/spectrogram. Values are [MouseActions] ids. */
 @Serializable
 data class MouseSettings(
+    /** A plain click on a label lane / on the audio: select, split, play… */
+    val tierClick: String = MouseActions.SELECT,
+    val audioClick: String = MouseActions.SELECT,
     val tierDouble: String = MouseActions.RENAME,
     val tierRight: String = MouseActions.PLAY,
     val tierMiddle: String = MouseActions.PLAY,
@@ -330,17 +337,20 @@ fun LayoutSettings.panelsOn(side: String): List<String> = buildList {
     if (filesSide == side) add("files")
     if (entriesSeparate && entriesSide == side) add("entries")
     if (inspectorSide == side) add("details")
+    if (notepadDocked && notepadSide == side) add("notepad")
 }
 
 private fun LayoutSettings.shown(p: String) = when (p) {
     "files" -> showFiles
     "entries" -> showEntries
+    "notepad" -> showNotepad
     else -> showInspector
 }
 
 private fun LayoutSettings.withShown(p: String, on: Boolean) = when (p) {
     "files" -> copy(showFiles = on)
     "entries" -> copy(showEntries = on)
+    "notepad" -> copy(showNotepad = on)
     else -> copy(showInspector = on)
 }
 

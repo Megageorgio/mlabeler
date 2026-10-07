@@ -1,6 +1,10 @@
 package mlabeler.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.scrollBy
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -46,15 +50,11 @@ import kotlin.math.roundToInt
 val notepadTitle = L("Notepad", "Блокнот")
 private val notepadHint = L("Any text: lyrics, notes… Kept with the folder.", "Любой текст: слова песни, заметки… Хранится вместе с папкой.")
 
-/**
- * A plain text window over the picture: no buttons, only the text. Dragged by its top strip, resized by the corner,
- * kept in the folder (.mlabeler/notepad.txt).
- */
+/** The notepad's text with its own scroll bar; kept in the folder (.mlabeler/notepad.txt) as it is typed. */
 @Composable
-fun FloatingNotepad(app: AppState, ed: EditorState) {
+fun NotepadText(app: AppState, ed: EditorState, modifier: Modifier) {
     val c = T.c
     val l = app.settings.layout
-    val density = LocalDensity.current
     val path = remember(ed.workspace.root) { Paths.join(Paths.join(ed.workspace.root, ".mlabeler"), "notepad.txt") }
     var text by remember(path) { mutableStateOf(runCatching { PlatformFs.read(path).decodeToString() }.getOrDefault("")) }
     LaunchedEffect(text) {
@@ -66,6 +66,54 @@ fun FloatingNotepad(app: AppState, ed: EditorState) {
             }
         }
     }
+    val scroll = rememberScrollState()
+    Box(modifier) {
+        Box(Modifier.fillMaxSize().verticalScroll(scroll).padding(start = 8.dp, top = 6.dp, end = 14.dp, bottom = 6.dp)) {
+            BasicTextField(
+                text, { text = it },
+                textStyle = androidx.compose.material3.LocalTextStyle.current.merge(TextStyle(color = c.text, fontSize = l.notepadFont.sp, fontFamily = T.font)),
+                cursorBrush = SolidColor(c.accent),
+                modifier = Modifier.fillMaxWidth().trackTextFocus(),
+                decorationBox = { inner ->
+                    Box {
+                        if (text.isEmpty()) Text(notepadHint(), color = c.muted, fontSize = 12.sp)
+                        inner()
+                    }
+                },
+            )
+        }
+        // scroll bar: shown when the text is longer than the window, the thumb can be dragged
+        if (scroll.maxValue > 0) {
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            androidx.compose.foundation.Canvas(
+                Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(10.dp).padding(vertical = 4.dp, horizontal = 2.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures { ch, d ->
+                            ch.consume()
+                            val total = scroll.maxValue + size.height
+                            scope.launch { scroll.scrollBy(d.y * total / size.height) }
+                        }
+                    },
+            ) {
+                val total = scroll.maxValue + size.height
+                val th = (size.height * size.height / total).coerceAtLeast(16f)
+                val ty = scroll.value.toFloat() / scroll.maxValue * (size.height - th)
+                drawRoundRect(c.muted.copy(alpha = 0.5f), androidx.compose.ui.geometry.Offset(0f, ty),
+                    androidx.compose.ui.geometry.Size(size.width, th), androidx.compose.ui.geometry.CornerRadius(if (c.square) 0f else size.width / 2))
+            }
+        }
+    }
+}
+
+/**
+ * The notepad as a window over the picture: dragged by its top strip, resized by the corner. The strip also has a
+ * button to put it into a side panel.
+ */
+@Composable
+fun FloatingNotepad(app: AppState, ed: EditorState) {
+    val c = T.c
+    val l = app.settings.layout
+    val density = LocalDensity.current
     var x by remember { mutableStateOf(l.notepadX) }
     var y by remember { mutableStateOf(l.notepadY) }
     var w by remember { mutableStateOf(l.notepadW) }
@@ -77,9 +125,8 @@ fun FloatingNotepad(app: AppState, ed: EditorState) {
             .size(w.dp, h.dp).shadow(8.dp, shape).clip(shape).background(c.panel).border(c.borderWidth, c.border, shape),
     ) {
         Column(Modifier.fillMaxSize()) {
-            // the strip to drag it by, with a close mark
             Row(
-                Modifier.fillMaxWidth().height(14.dp).background(c.panelAlt)
+                Modifier.fillMaxWidth().height(24.dp).background(c.panelAlt)
                     .pointerInput(Unit) {
                         detectDragGestures(onDragEnd = { keep() }) { ch, d ->
                             ch.consume()
@@ -89,24 +136,12 @@ fun FloatingNotepad(app: AppState, ed: EditorState) {
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.weight(1f))
-                Text("×", color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 6.dp)
-                    .clickable { app.update { it.copy(layout = it.layout.copy(showNotepad = false)) } })
+                Text(notepadTitle(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp).weight(1f), maxLines = 1)
+                IconBtn(Icons.panelRight, toPanelT(), size = 24.dp) { app.update { it.copy(layout = it.layout.copy(notepadDocked = true)) } }
+                IconBtn(Icons.close, mlabeler.app.i18n.S.close(), size = 24.dp) { app.update { it.copy(layout = it.layout.copy(showNotepad = false)) } }
             }
-            BasicTextField(
-                text, { text = it },
-                textStyle = TextStyle(color = c.text, fontSize = l.notepadFont.sp, fontFamily = T.font),
-                cursorBrush = SolidColor(c.accent),
-                modifier = Modifier.fillMaxSize().padding(8.dp).verticalScroll(rememberScrollState()).trackTextFocus(),
-                decorationBox = { inner ->
-                    Box {
-                        if (text.isEmpty()) Text(notepadHint(), color = c.muted, fontSize = 12.sp)
-                        inner()
-                    }
-                },
-            )
+            NotepadText(app, ed, Modifier.weight(1f).fillMaxWidth())
         }
-        // corner to resize
         Box(
             Modifier.align(Alignment.BottomEnd).size(14.dp)
                 .pointerInput(Unit) {
@@ -120,3 +155,5 @@ fun FloatingNotepad(app: AppState, ed: EditorState) {
     }
 }
 
+val toPanelT = L("Into a side panel", "В боковую панель")
+val toWindowT = L("Into a window over the picture", "В окно поверх картинки")
