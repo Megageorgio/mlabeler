@@ -13,7 +13,8 @@ targets:
       path: iosApp/Info.plist
       properties:
         CFBundleDisplayName: mLabeler
-        CFBundleShortVersionString: "0.1.0"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         UIFileSharingEnabled: true
         NSMicrophoneUsageDescription: mLabeler records samples for voicebanks and datasets.
@@ -24,6 +25,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.megageorgio.mlabeler
+        # CI passes the real values from gradle.properties
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         OTHER_LDFLAGS: ["-framework", "MLabeler"]
         FRAMEWORK_SEARCH_PATHS: ["$(SRCROOT)/../app/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"]
