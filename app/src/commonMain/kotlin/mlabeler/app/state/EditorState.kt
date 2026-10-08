@@ -712,12 +712,15 @@ class EditorState(
     private suspend fun computeSpectrogram(a: Audio) {
         val v = settings.view
         specKey = currentSpecKey()
-        val hop = if (v.hopMs > 0) v.hopMs / 1000.0 else if (a.duration <= 120) 0.0025 else 0.005
+        val hop = if (v.hopMs > 0) v.hopMs / 1000.0 else if (a.duration <= (if (mlabeler.app.Platform.isMobile) 120 else 900)) 0.0025 else 0.005
         val builder = Spectrogram.Builder(
             a.samples, a.sampleRate, hopSeconds = hop, windowSeconds = v.windowMs / 1000.0, bands = v.bands,
             maxFreq = 16000.0, minDb = v.minDb, maxDb = v.maxDb,
         )
         val spec = builder.result
+        // a new picture starts from nothing; without this, reading the same file again keeps the old count and the
+        // view is never redrawn past the first (empty) frame
+        spectrogramProgress = 0
         spectrogram = spec
         // every core works on its own piece of each batch; the picture is refreshed a few times a second at most
         val workers = mlabeler.app.Platform.cores.coerceIn(1, 16)
@@ -816,6 +819,7 @@ class EditorState(
     fun rescan() {
         val id = item?.id
         items = workspace.scan()
+        labelIndex = null
         readLabelTimes()
         index = items.indexOfFirst { it.id == id }
         if (index < 0 && items.isNotEmpty()) open(0)
@@ -887,6 +891,7 @@ class EditorState(
         }
         if (settings.edit.saveOnSwitch && labelsDirty) saveLabels(quiet = true)
         rememberView()
+        carriedZoom = if (audio != null) pixelsPerSecond else null
         stop()
         index = i
         val it = items[i]
@@ -927,6 +932,7 @@ class EditorState(
 
     /** Reads the open recording again (after it was changed on disk); labels, undo history and view stay. */
     fun reloadAudio() {
+        if (workspace.audioChanged()) rescan()
         val it = item ?: return
         finishEditing()
         rememberView()
@@ -938,6 +944,8 @@ class EditorState(
 
     private var pendingSelection: Selection? = null
     private var lastLoadedPath = ""
+    /** Scale of the previously open file, carried to the next one when [EditSettings.keepZoom] is on. */
+    private var carriedZoom: Double? = null
 
     private fun load(item: Item) {
         loadJob?.cancel()
@@ -989,7 +997,14 @@ class EditorState(
             }
             audio = a
             val st = workspace.itemState(item.id)
-            if (st.pixelsPerSecond > 0) {
+            val carried = carriedZoom
+            carriedZoom = null
+            if (carried != null && settings.edit.keepZoom) {
+                // the same scale as the file before; the place in this file where it was left (or its start)
+                pixelsPerSecond = carried
+                viewStart = if (st.pixelsPerSecond > 0) st.viewStart else 0.0
+                clampView()
+            } else if (st.pixelsPerSecond > 0) {
                 pixelsPerSecond = st.pixelsPerSecond
                 viewStart = st.viewStart
             } else {
@@ -1190,6 +1205,9 @@ class EditorState(
     }
 
     fun selectedInterval(): IntervalRef? = (selection as? Selection.Interval)?.ref
+
+    /** Start and end of the selected interval, seconds. */
+    fun selectedSpan(): Pair<Double, Double>? = (selection as? Selection.Interval)?.ref?.let { r -> tier(r.tier)?.let { it.startOf(r.index) to it.endOf(r.index) } }
 
     /** What is typed in the label field right now, and for which interval. */
     var editingDraft: Pair<IntervalRef, String>? = null

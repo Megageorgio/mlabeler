@@ -56,6 +56,7 @@ object ThemeFiles {
         put("borderWidth", t.borderWidth.value)
         put("square", t.square)
         put("mono", t.mono)
+        put("checkboxes", t.checkboxes)
         if (t.boundLine != Color.Unspecified) put("boundLine", hex(t.boundLine))
         put("boundWidth", t.boundWidth)
         put("boundStyle", t.boundStyle)
@@ -85,6 +86,7 @@ object ThemeFiles {
             borderWidth = (o["borderWidth"]?.jsonPrimitive?.floatOrNull ?: base.borderWidth.value).dp,
             square = o["square"]?.jsonPrimitive?.booleanOrNull ?: base.square,
             mono = o["mono"]?.jsonPrimitive?.booleanOrNull ?: base.mono,
+            checkboxes = o["checkboxes"]?.jsonPrimitive?.booleanOrNull ?: base.checkboxes,
             boundLine = o["boundLine"]?.jsonPrimitive?.content?.let { color(it) } ?: base.boundLine,
             boundWidth = o["boundWidth"]?.jsonPrimitive?.floatOrNull ?: base.boundWidth,
             boundStyle = o["boundStyle"]?.jsonPrimitive?.content ?: base.boundStyle,

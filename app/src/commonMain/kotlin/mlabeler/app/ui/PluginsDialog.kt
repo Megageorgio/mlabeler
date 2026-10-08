@@ -130,10 +130,7 @@ private fun PluginForm(app: AppState, p: Plugin, modifier: Modifier, onRun: () -
             fun set(x: JsonElement) { values = values + (param.name to x) }
             SectionTitle(label)
             when (param.type) {
-                "boolean" -> Switch(
-                    (v as? JsonPrimitive)?.booleanOrNull == true, { set(JsonPrimitive(it)) },
-                    colors = SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent),
-                )
+                "boolean" -> Toggle((v as? JsonPrimitive)?.booleanOrNull == true, { set(JsonPrimitive(it)) })
                 "enum" -> FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (o in param.options) Chip(o, (v as? JsonPrimitive)?.content == o) { set(JsonPrimitive(o)) }
                 }

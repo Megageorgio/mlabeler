@@ -46,10 +46,14 @@ data class LayoutSettings(
     val entriesSeparate: Boolean = false,
     val entriesSide: String = "left",
     val showEntries: Boolean = true,
+    /** The entries list scrolls to the phoneme selected on the timeline. */
+    val entriesFollow: Boolean = true,
     /** Lanes from top to bottom ("wave", "spec", "pitch", "power", "labels"); empty = the usual order. */
     val laneOrder: List<String> = emptyList(),
     /** Share of the audio area per lane (dragged at the lines between lanes); missing = the usual share. */
     val laneWeights: Map<String, Float> = emptyMap(),
+    /** Sizes of lanes and panels are fixed: their dividing lines can't be dragged. */
+    val locked: Boolean = false,
     /** Vertical zoom of the waveform (Alt+wheel over it). */
     val waveGain: Float = 1f,
     /** oto: the selected alias in large type over the picture (renamed in place). */
@@ -132,6 +136,8 @@ data class EditSettings(
     val audioClickDeselects: Boolean = true,
     /** Playback speed, 0.25..1, pitch kept. */
     val speed: Float = 1f,
+    /** Opening another file keeps the scale (pixels per second) instead of the one remembered for that file. */
+    val keepZoom: Boolean = true,
     /** Save every N seconds when there are changes; 0 = off. */
     val autosaveSeconds: Int = 0,
     /** Mouse tools 1–4 (cursor, scissors, hand, play); off = the cursor always. */
@@ -296,6 +302,9 @@ data class AppSettings(
     val font: String = "",
     /** No smoothing anywhere it can be turned off: square corners, text with hard pixel edges. */
     val crisp: Boolean = false,
+    /** The program behind the settings window is darkened (off: colours of a theme are seen as they are). */
+    val settingsDim: Boolean = true,
+    val status: StatusSettings = StatusSettings(),
     val clean: CleanSettings = CleanSettings(),
 ) {
     companion object {
@@ -313,6 +322,31 @@ data class AppSettings(
             } catch (_: Exception) {
             }
         }
+    }
+}
+
+/** Items of the status bar (ids of [mlabeler.app.ui.StatusItems]) on each side, in order; the others are hidden. */
+@Serializable
+data class StatusSettings(
+    val left: List<String> = listOf("entry", "range"),
+    val right: List<String> = listOf("work", "problems", "help", "zoom"),
+    val percent: Boolean = true,
+) {
+    /** Puts [id] at the end of [side] ("left", "right"; "" hides it). */
+    fun place(id: String, side: String) = StatusSettings(
+        left = (left - id).let { if (side == "left") it + id else it },
+        right = (right - id).let { if (side == "right") it + id else it },
+        percent = percent,
+    )
+
+    fun move(id: String, step: Int): StatusSettings {
+        fun shift(l: List<String>): List<String> {
+            val i = l.indexOf(id)
+            if (i < 0) return l
+            val j = (i + step).coerceIn(0, l.size - 1)
+            return l.toMutableList().also { it.removeAt(i); it.add(j, id) }
+        }
+        return copy(left = shift(left), right = shift(right))
     }
 }
 

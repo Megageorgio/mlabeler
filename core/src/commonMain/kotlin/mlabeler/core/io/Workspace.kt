@@ -46,6 +46,9 @@ data class WorkspaceState(
     val dictionary: String = "",
     /** Last DiffSinger export folder. */
     val exportFolder: String = "",
+    /** The file list grouped by subfolder (otherwise one flat list), and the folded subfolders. */
+    val tree: Boolean = false,
+    val folded: Set<String> = emptySet(),
 )
 
 /** One audio file and where its labels are. [id] is the audio path relative to the workspace root. */
@@ -84,8 +87,25 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
 
     fun itemState(id: String) = state.items[id] ?: ItemState()
 
-    /** Scans the folder (two levels deep, skipping hidden folders). */
+    /** Scans the folder (three levels deep, skipping hidden folders). */
     fun scan(): List<Item> {
+        val audio = listAudio()
+        loadCsvs()
+        items = audio.map { path ->
+            val (label, fmt) = findLabels(path)
+            Item(relative(path), path, label, fmt)
+        }.sortedWith(compareBy(naturalOrder()) { it.id.lowercase() })
+        return items
+    }
+
+    /** True when audio files were added, removed or renamed since the last [scan] (only lists folders). */
+    fun audioChanged(): Boolean {
+        val now = listAudio().mapTo(HashSet()) { relative(it) }
+        return now.size != items.size || items.any { it.id !in now }
+    }
+
+    /** Audio files of the folder, three levels deep, hidden folders skipped. */
+    fun listAudio(): List<String> {
         val audio = mutableListOf<String>()
         fun walk(dir: String, depth: Int) {
             val children = try { fs.list(dir) } catch (_: Exception) { emptyList() }
@@ -93,19 +113,14 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                 val n = Paths.name(c)
                 if (n.startsWith(".")) continue
                 if (fs.isDirectory(c)) {
-                    if (depth < 2) walk(c, depth + 1)
+                    if (depth < 3) walk(c, depth + 1)
                 } else if (Paths.ext(c) in AUDIO_EXTENSIONS) {
                     audio += c
                 }
             }
         }
         walk(root, 0)
-        loadCsvs()
-        items = audio.map { path ->
-            val (label, fmt) = findLabels(path)
-            Item(relative(path), path, label, fmt)
-        }.sortedWith(compareBy(naturalOrder()) { it.id.lowercase() })
-        return items
+        return audio
     }
 
     fun relative(path: String): String = path.removePrefix(root).trimStart('/', '\\').replace('\\', '/')
@@ -123,18 +138,25 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
         return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "ds", "txt").map { Paths.join(d, "$stem.$it") } }
     }
 
-    /** transcriptions.csv files of the folder (root and two levels down), parsed. */
+    /** transcriptions.csv files of the folder (root and three levels down), parsed. */
     private val csvRows = mutableMapOf<String, MutableList<mlabeler.core.format.DsCsv.Row>>()
+    /** The same files as read, cell by cell, so writing one row leaves every other row and column untouched. */
+    private val csvLines = mutableMapOf<String, List<List<String>>>()
 
     private fun loadCsvs() {
         csvRows.clear()
+        csvLines.clear()
         fun walk(dir: String, depth: Int) {
             val children = try { fs.list(dir) } catch (_: Exception) { emptyList() }
             for (c in children) {
                 if (Paths.name(c).startsWith(".")) continue
-                if (fs.isDirectory(c)) { if (depth < 2) walk(c, depth + 1) }
+                if (fs.isDirectory(c)) { if (depth < 3) walk(c, depth + 1) }
                 else if (Paths.name(c).equals("transcriptions.csv", ignoreCase = true)) {
-                    runCatching { csvRows[c] = mlabeler.core.format.DsCsv.read(decodeGuess(fs.read(c), "UTF-8").first).toMutableList() }
+                    runCatching {
+                        val text = decodeGuess(fs.read(c), "UTF-8").first
+                        csvRows[c] = mlabeler.core.format.DsCsv.read(text).toMutableList()
+                        csvLines[c] = mlabeler.core.format.Csv.parse(text)
+                    }
                 }
             }
         }
@@ -232,7 +254,9 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                 val k = rows.indexOfFirst { it.name == item.name }
                 val row = mlabeler.core.format.DsCsv.Row(item.name, doc)
                 if (k >= 0) rows[k] = row else rows += row
-                mlabeler.core.format.DsCsv.write(rows)
+                val lines = mlabeler.core.format.DsCsv.update(csvLines[path] ?: emptyList(), item.name, doc)
+                csvLines[path] = lines
+                mlabeler.core.format.Csv.write(lines)
             }
         }
         fs.write(path, text.encodeToByteArray())

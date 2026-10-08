@@ -233,6 +233,14 @@ object Commands {
     }
     val playOnDrag = Command("play-on-drag", S.playOnDrag, emptyList()) { _, a -> a.update { it.copy(edit = it.edit.copy(playOnDrag = !it.edit.playOnDrag)) } }
     val cleanup = Command("cleanup", L("Clean the recording…", "Чистка записи…"), listOf(ch('C', ctrl = true, shift = true))) { _, a -> a.showCleanup = true }
+    val mute = Command("mute", L("Silence the selection in the recording", "Заглушить выделенное в записи"), listOf(ch('M', ctrl = true, shift = true))) { e, a ->
+        val r = e.range ?: e.selectedSpan()
+        if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите кусок или фонему")())
+        else e.cleanup.silence(r)
+    }
+    val lockLayout = Command("lock-layout", L("Lock lane and panel sizes", "Закрепить размеры полос и панелей"), emptyList()) { _, a ->
+        a.update { it.copy(layout = it.layout.copy(locked = !it.layout.locked)) }
+    }
     val reloadAudio = Command("reload-audio", L("Read the recording again", "Перечитать запись"), listOf(Chord(Key.F5))) { e, _ -> e.reloadAudio() }
     val deselect = Command("deselect", L("Clear the selection", "Снять выделение"), listOf(Chord(Key.Escape))) { e, _ ->
         e.selection = mlabeler.app.state.Selection.None; e.range = null
@@ -245,7 +253,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

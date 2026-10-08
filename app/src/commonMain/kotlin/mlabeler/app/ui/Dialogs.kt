@@ -103,10 +103,23 @@ private object CheckTitles {
     val none = mlabeler.app.i18n.L("No scripts yet", "Скриптов пока нет")
     val example = mlabeler.app.i18n.L("Create an example", "Создать пример")
     val reload = mlabeler.app.i18n.L("Read again", "Перечитать")
+    val fromDict = mlabeler.app.i18n.L("Take the set from a dictionary:", "Взять набор из словаря:")
+    val anyPhoneme = mlabeler.app.i18n.L("Any (not checked)", "Любые (не проверять)")
     val written = mlabeler.app.i18n.L("Example saved: {0}", "Пример сохранён: {0}")
 }
 
 private val scaleButtonT = mlabeler.app.i18n.L("Interface size button (in percent) on the toolbar", "Кнопка размера интерфейса (в процентах) на панели")
+private val detailT = mlabeler.app.i18n.L("Detail", "Чёткость")
+private val detailHint = mlabeler.app.i18n.L("Sharper pictures take longer to build and more memory; the values below can be set by hand too.",
+    "Более чёткая картинка дольше строится и занимает больше памяти; значения ниже можно задать и вручную.")
+/** Window ms, step ms (0 = by length), bands. */
+private val detailPresets = listOf(
+    mlabeler.app.i18n.L("Low", "Низкая") to Triple(30f, 8f, 128),
+    mlabeler.app.i18n.L("Normal", "Обычная") to Triple(25f, 0f, 192),
+    mlabeler.app.i18n.L("High", "Высокая") to Triple(20f, 1.5f, 288),
+    mlabeler.app.i18n.L("Highest", "Максимальная") to Triple(20f, 1f, 384),
+)
+private val keepZoomT = mlabeler.app.i18n.L("Keep the scale when going to another file", "Сохранять масштаб при переходе к другому файлу")
 private val namesOnAudioT = mlabeler.app.i18n.L("Phoneme names on the waveform and spectrogram too", "Имена фонем ещё и на волне и спектрограмме")
 private val namesWhereT = mlabeler.app.i18n.L("Where inside each phoneme: drag the dot or click the grid", "Где внутри каждой фонемы: перетащите точку или щёлкните по сетке")
 
@@ -149,10 +162,10 @@ private fun PlacementPad(x: Float, y: Float, onChange: (Float, Float) -> Unit) {
 private val whatToShow = mlabeler.app.i18n.L("What to show", "Что показывать")
 
 @Composable
-fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, dim: Boolean = true, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     val c = T.c
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.6f))
+        Modifier.fillMaxSize().background(c.bg.copy(alpha = if (dim) 0.6f else 0f))
             .clickable(remember { MutableInteractionSource() }, null) { onDismiss() }
             .windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .onPreviewKeyEvent { if (it.type == KeyEventType.KeyDown && it.key == Key.Escape) { onDismiss(); true } else false },
@@ -282,7 +295,7 @@ fun SettingsDialog(app: AppState) {
         mutableStateOf(Section.entries.firstOrNull { it.name.equals(app.settingsPage, ignoreCase = true) } ?: Section.General)
     }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { app.settingsPage = "" } }
-    Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820) {
+    Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820, dim = app.settings.settingsDim) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(S.settings(), color = c.text, fontSize = 18.sp, modifier = Modifier.weight(1f))
             IconBtn(Icons.close, S.close()) { app.showSettings = false }
@@ -355,6 +368,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             Section.View -> {
                 ValueSlider(S.interfaceScale(), s.scale, 0.5f..2f, "%", factor = 100f, default = dScale, live = false) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
                 SwitchRow(scaleButtonT(), s.toolbar.scaleButton ?: mlabeler.app.Platform.isMobile) { v -> app.update { it.copy(toolbar = it.toolbar.copy(scaleButton = v)) } }
+                SwitchRow(keepZoomT(), s.edit.keepZoom) { v -> app.update { it.copy(edit = it.edit.copy(keepZoom = v)) } }
                 SectionTitle(whatToShow())
                 SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
                 SwitchRow(namesOnAudioT(), s.layout.namesOnAudio) { v -> app.update { it.copy(layout = it.layout.copy(namesOnAudio = v)) } }
@@ -383,6 +397,16 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 ValueSlider(S.brightness(), s.view.brightness, -0.5f..0.5f, factor = 100f, default = dV.brightness) { v -> app.update { it.copy(view = it.view.copy(brightness = v)) } }
                 ValueSlider(S.contrast(), s.view.contrast, 0.5f..3f, "%", factor = 100f, default = dV.contrast) { v -> app.update { it.copy(view = it.view.copy(contrast = v)) } }
+                SectionTitle(detailT())
+                Text(detailHint(), color = c.muted, fontSize = 12.sp)
+                FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((name, preset) in detailPresets) {
+                        val (w, hop, bands) = preset
+                        Chip(name(), s.view.windowMs == w && s.view.hopMs == hop && s.view.bands == bands) {
+                            app.update { it.copy(view = it.view.copy(windowMs = w, hopMs = hop, bands = bands)) }
+                        }
+                    }
+                }
                 ValueSlider(S.windowMs(), s.view.windowMs, 5f..80f, S.msUnit(), default = dV.windowMs) { v -> app.update { it.copy(view = it.view.copy(windowMs = v.roundToInt().toFloat())) } }
                 ValueSlider(S.hopMs(), s.view.hopMs, 0f..20f, S.msUnit(), decimals = 1, default = dV.hopMs) { v -> app.update { it.copy(view = it.view.copy(hopMs = (v * 2).roundToInt() / 2f)) } }
                 ValueSlider(S.bands(), s.view.bands.toFloat(), 64f..384f, default = dV.bands.toFloat()) { v -> app.update { it.copy(view = it.view.copy(bands = (v / 32).roundToInt() * 32)) } }
@@ -429,6 +453,20 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     phonemes = v
                     app.update { it.copy(checks = it.checks.copy(phonemeSet = v.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }.toSet())) }
                 }, Modifier.fillMaxWidth())
+                Text(CheckTitles.fromDict(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (d in remember { mlabeler.app.state.Dictionaries.all() }.filter { it.vowels.isNotEmpty() }) {
+                        val set = (d.rests + d.vowels + d.semivowels + d.special + d.consonants).distinct()
+                        Chip(d.name, s.checks.phonemeSet == set.toSet()) {
+                            phonemes = set.joinToString(" ")
+                            app.update { it.copy(checks = it.checks.copy(phonemeSet = set.toSet())) }
+                        }
+                    }
+                    Chip(CheckTitles.anyPhoneme(), s.checks.phonemeSet.isEmpty()) {
+                        phonemes = ""
+                        app.update { it.copy(checks = it.checks.copy(phonemeSet = emptySet())) }
+                    }
+                }
                 ValueSlider(CheckTitles.maxLen(), s.checks.maxDurationMs.toFloat(), 0f..3000f, S.msUnit(), default = 0f) { v ->
                     app.update { it.copy(checks = it.checks.copy(maxDurationMs = ((v / 10).roundToInt() * 10).toDouble())) }
                 }
@@ -502,7 +540,7 @@ private fun SwitchRow(title: String, value: Boolean, onChange: (Boolean) -> Unit
     Row(Modifier.fillMaxWidth().clickable { onChange(!value) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(12.dp))
-        Switch(value, onChange, colors = SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
+        Toggle(value, onChange)
     }
 }
 
@@ -637,6 +675,10 @@ private fun InterfacePage(app: AppState) {
     SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }
     SwitchRow(MenuTitles.filesPanel(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
     SwitchRow(MenuTitles.detailsPanel(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
+    if (s.statusBar) {
+        SectionTitle(MenuTitles.statusBar())
+        StatusBarSettings(app) { t, v, f -> SwitchRow(t, v, f) }
+    }
     SectionTitle(MenuTitles.toolbar())
     SwitchRow(MenuTitles.buttonLabels(), s.toolbar.labels) { v -> app.update { it.copy(toolbar = it.toolbar.copy(labels = v)) } }
     SwitchRow(MenuTitles.bigButtons(), s.toolbar.big) { v -> app.update { it.copy(toolbar = it.toolbar.copy(big = v)) } }
@@ -646,7 +688,8 @@ private fun InterfacePage(app: AppState) {
     for ((i, g) in order.withIndex()) {
         val on = g in s.toolbar.groups
         Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.Checkbox(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } },
+            if (c.checkboxes) Toggle(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } }, Modifier.padding(horizontal = 12.dp, vertical = 12.dp))
+            else androidx.compose.material3.Checkbox(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } },
                 colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.muted, checkmarkColor = c.onAccent))
             Text(ToolLabels.group(g)(), color = if (on) c.text else c.muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
             IconBtn(Icons.up, S.moveUp(), enabled = i > 0, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, -1)) } }

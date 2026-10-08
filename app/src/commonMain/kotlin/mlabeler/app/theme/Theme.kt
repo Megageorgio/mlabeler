@@ -56,6 +56,8 @@ data class Tokens(
     val borderWidth: Dp,
     val square: Boolean,
     val mono: Boolean = false,
+    /** On/off settings drawn as square check boxes instead of sliding switches. */
+    val checkboxes: Boolean = false,
     /** Boundaries drawn over the waveform and spectrogram: colour (Unspecified = [bound], half see-through), width, style. */
     val boundLine: Color = Color.Unspecified,
     val boundWidth: Float = 1f,
@@ -107,7 +109,7 @@ object Themes {
         bound = hex(0x000000), boundSelected = hex(0xc00000), intervalSelected = Color(0x40000080), intervalHover = Color(0x18000000),
         playhead = hex(0xff0000), cursor = Color(0xaa000000), selectionRange = Color(0x30000080),
         tierText = hex(0x000000), tierColors = listOf(hex(0x000080), hex(0x006000), hex(0x806000), hex(0x800080), hex(0x008080)),
-        spectrogram = gray.reversed(), radius = 0.dp, borderWidth = 1.dp, square = true, mono = true,
+        spectrogram = gray.reversed(), radius = 0.dp, borderWidth = 1.dp, square = true, mono = true, checkboxes = true,
     )
 
     val contrast = Tokens(

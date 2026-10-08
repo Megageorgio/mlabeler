@@ -373,6 +373,42 @@ object DsCsv {
         return Csv.write(out)
     }
 
+    /**
+     * [lines] (a parsed transcriptions.csv, header first) with the row of [name] set from [doc]. Only ph_seq and
+     * ph_dur, and ph_num and the note columns where the file has them, are written; every other column and every
+     * other row stay as they were.
+     */
+    fun update(lines: List<List<String>>, name: String, doc: LabelDoc): List<List<String>> {
+        val header = (lines.firstOrNull() ?: listOf("name", "ph_seq", "ph_dur")).toMutableList()
+        for (c in listOf("name", "ph_seq", "ph_dur")) if (c !in header) header += c
+        val ph = doc.tiers[doc.phonemeTierIndex()] as IntervalTier
+        val values = mutableMapOf(
+            "name" to name,
+            "ph_seq" to ph.texts.joinToString(" ") { it.ifBlank { "SP" } },
+            "ph_dur" to (0 until ph.size).joinToString(" ") { formatNumber(ph.durationOf(it), 6) },
+        )
+        if ("ph_num" in header && doc.wordTierIndex() >= 0) values["ph_num"] = phNum(doc).joinToString(" ")
+        doc.tiers.filterIsInstance<NoteTier>().firstOrNull()?.let { n ->
+            if ("note_seq" in header) values["note_seq"] = n.notes.joinToString(" ") { NoteNames.format(it.pitch) }
+            if ("note_dur" in header) values["note_dur"] = n.notes.joinToString(" ") { formatNumber(it.end - it.start, 6) }
+            if ("note_slur" in header) values["note_slur"] = n.notes.joinToString(" ") { if (it.slur) "1" else "0" }
+        }
+        val cName = header.indexOf("name")
+        val out = mutableListOf<List<String>>(header)
+        var found = false
+        for (r in lines.drop(1)) {
+            if (r.getOrNull(cName)?.trim() == name && !found) {
+                found = true
+                val row = r.toMutableList()
+                while (row.size < header.size) row += ""
+                for ((k, v) in values) row[header.indexOf(k)] = v
+                out += row
+            } else out += r
+        }
+        if (!found) out += header.map { values[it] ?: "" }
+        return out
+    }
+
     /** Phoneme counts per word interval; phonemes are assigned to the word containing their middle. */
     fun phNum(doc: LabelDoc): List<Int> {
         val ph = doc.tiers[doc.phonemeTierIndex()] as IntervalTier

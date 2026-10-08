@@ -46,6 +46,10 @@ private val repairT = L("Repair the selected part", "Починить выдел
 private val repairHint = L("Select a click by hand (up to 100 ms) and rebuild it from both sides.",
     "Выделите щелчок вручную (до 100 мс) и восстановите его по звуку с обеих сторон.")
 private val repairBtn = L("Repair", "Починить")
+private val muteT = L("Silence", "Заглушить")
+private val muteHint = L("Turns the selected part of the recording into silence (Ctrl+Shift+M in the editor: the selection or the selected phoneme). Undo below.",
+    "Превращает выделенный кусок записи в тишину (в редакторе Ctrl+Shift+M: выделение или выбранная фонема). Отмена — ниже.")
+private val muteBtn = L("Silence the selection", "Заглушить выделенное")
 private val noiseT = L("Noise", "Шум")
 private val noiseHint = L(
     "Lowers steady noise (hum, hiss) where it's quieter than the voice. Unlike the tools above it changes the whole processed part: listen first.",
@@ -106,6 +110,10 @@ fun CleanupDialog(app: AppState) {
             SectionTitle(repairT())
             Text(repairHint(), color = c.muted, fontSize = 12.sp)
             Row(Modifier.padding(top = 6.dp)) { Btn(repairBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.repairRange(it) } } }
+
+            SectionTitle(muteT())
+            Text(muteHint(), color = c.muted, fontSize = 12.sp)
+            Row(Modifier.padding(top = 6.dp)) { Btn(muteBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.silence(it) } } }
 
             SectionTitle(noiseT())
             Text(noiseHint(), color = c.muted, fontSize = 12.sp)

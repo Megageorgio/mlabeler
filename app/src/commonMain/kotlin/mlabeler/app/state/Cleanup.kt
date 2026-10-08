@@ -82,6 +82,24 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         app.message(repairedPart.format(n))
     }
 
+    /** Replaces [range] with silence; 5 ms fades at both ends so no click is left. */
+    fun silence(range: Pair<Double, Double>) = run("silence") {
+        val n = modify { w, ch, _ ->
+            val (from, to) = frames(range, w)
+            val fade = minOf((w.sampleRate * 0.005).toInt(), (to - from) / 2).coerceAtLeast(1)
+            var c = 0
+            for (i in from until to) {
+                val edge = minOf(i - from, to - 1 - i)
+                val v = if (edge < fade) w.get(i, ch) * (1f - (edge + 1).toFloat() / (fade + 1)) else 0f
+                if (w.set(i, ch, v)) c++
+            }
+            c
+        }
+        if (n > 0) app.message(silenced.format(formatSeconds(range.second - range.first)))
+    }
+
+    private fun formatSeconds(s: Double) = "${kotlin.math.round(s * 1000).toInt()} ms"
+
     fun takeNoiseProfile(range: Pair<Double, Double>) = run("profile") {
         val w = withContext(Dispatchers.Default) { readEdit() } ?: return@run
         val from = (range.first * w.sampleRate).toInt().coerceIn(0, w.frames)
@@ -209,6 +227,7 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         val profileShort = L("Select at least 50 ms of noise only", "Выделите хотя бы 50 мс, где только шум")
         val profileTaken = L("Noise profile taken", "Профиль шума взят")
         val noiseDone = L("Noise lowered ({0} samples changed)", "Шум снижен (изменено сэмплов: {0})")
+        val silenced = L("Silenced in the recording: {0}. Undo: Tools → Clean the recording → Undo.", "Заглушено в записи: {0}. Отменить: Инструменты → Чистка записи → Отменить.")
         val undone = L("The recording is back as it was before the last change", "Запись возвращена как до последнего изменения")
         val restored = L("The original recording is back", "Исходная запись возвращена")
         val noOriginal = L("This recording wasn't cleaned here", "Эту запись здесь не чистили")

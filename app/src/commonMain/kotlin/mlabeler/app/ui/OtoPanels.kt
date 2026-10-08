@@ -217,7 +217,7 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
         // how dragging the red line behaves; also on the toolbar and key {oto-lock}
         Row(Modifier.fillMaxWidth().padding(top = 10.dp).clickable { Commands.otoLock.run(ed, ed.app) }, verticalAlignment = Alignment.CenterVertically) {
             Text(otoLockT() + "  (" + Commands.otoLock.keyLabel + ")", color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            androidx.compose.material3.Switch(ed.app.settings.edit.otoLockedDrag, { Commands.otoLock.run(ed, ed.app) })
+            Toggle(ed.app.settings.edit.otoLockedDrag, { Commands.otoLock.run(ed, ed.app) })
         }
         Text(otoLockHint(), color = c.muted, fontSize = 11.sp)
         OtoCompareSection(ed)

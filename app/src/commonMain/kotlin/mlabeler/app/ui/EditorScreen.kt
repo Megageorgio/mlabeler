@@ -89,6 +89,14 @@ fun EditorScreen(app: AppState, ed: EditorState) {
         kotlinx.coroutines.delay(400)
         if (ed.specNeedsUpdate()) ed.recomputeSpectrogram()
     }
+    // audio added to or removed from the folder (by a file manager, a recorder…) shows up without reopening it
+    LaunchedEffect(ed) {
+        while (true) {
+            kotlinx.coroutines.delay(3000)
+            val changed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { runCatching { ed.workspace.audioChanged() }.getOrDefault(false) }
+            if (changed) ed.rescan()
+        }
+    }
     // speed or loop changed while playing: apply at once
     LaunchedEffect(app.settings.edit.speed, app.settings.edit.loop) { ed.playbackSettingsChanged() }
     LaunchedEffect(ed) {
@@ -148,13 +156,13 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
             Row(Modifier.fillMaxSize()) {
                 if (left.isNotEmpty()) {
                     PanelStack(app, ed, left, Modifier.width(l.filesWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
-                    VSplitter { d -> app.update { it.copy(layout = it.layout.copy(filesWidth = (it.layout.filesWidth + d).coerceIn(180f, 520f))) } }
+                    VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(filesWidth = (it.layout.filesWidth + d).coerceIn(180f, 520f))) } }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     EditorBody(app, ed)
                 }
                 if (right.isNotEmpty()) {
-                    VSplitter { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(180f, 520f))) } }
+                    VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(180f, 520f))) } }
                     PanelStack(app, ed, right, Modifier.width(l.inspectorWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
                 }
             }
@@ -259,35 +267,6 @@ private fun Sep() {
 @Composable
 private fun TextIcon(text: String) {
     Text(text, color = T.c.muted, fontSize = 12.sp)
-}
-
-@Composable
-private fun StatusBar(app: AppState, ed: EditorState) {
-    val c = T.c
-    Row(
-        Modifier.fillMaxWidth().height(28.dp).background(c.panel).padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        val cur = ed.playhead ?: ed.cursor
-        StatusText(cur?.let { formatTime(it) } ?: "–", Modifier.width(80.dp))
-        ed.range?.let { (a, b) -> StatusText("${formatTime(a)} – ${formatTime(b)}  (${formatMs(b - a)})") }
-        Spacer(Modifier.weight(1f))
-        Text(Commands.help.title() + " · F1", color = c.muted, fontSize = 12.sp, modifier = Modifier.clickable { app.showHelp = true })
-        val spec = ed.spectrogram
-        if (ed.audio != null && (spec == null || spec.ready < spec.frames)) StatusText(S.analysing())
-        ed.toolkitBusy?.let { b ->
-            StatusText(S.toolkit() + ": " + b, color = c.accent)
-            Text("×", color = c.muted, fontSize = 14.sp, modifier = Modifier.clickable { ed.cancelToolkit() })
-        }
-        if (ed.problems.isNotEmpty()) StatusText("⚠ ${ed.problems.size}", color = c.warn)
-        StatusText("${(ed.visibleDuration).let { if (it < 10) ((it * 100).toLong() / 100.0).toString() else it.toLong().toString() }} s")
-    }
-}
-
-@Composable
-private fun StatusText(text: String, modifier: Modifier = Modifier, color: androidx.compose.ui.graphics.Color = T.c.muted) {
-    Text(text, color = color, fontSize = 12.sp, maxLines = 1, modifier = modifier)
 }
 
 // ---------------- phones ----------------

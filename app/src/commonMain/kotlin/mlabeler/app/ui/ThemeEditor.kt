@@ -52,6 +52,8 @@ private val radiusT = L("Corner rounding", "Скругление углов")
 private val borderT = L("Border width", "Толщина рамок")
 private val squareT = L("Flat pressed buttons", "Плоские нажатые кнопки")
 private val monoT = L("Monospace font", "Моноширинный шрифт")
+private val checkboxesT = L("Check boxes instead of switches", "Галочки вместо переключателей")
+private val dimT = L("Darken the program behind the settings", "Затемнять программу за окном настроек")
 private val deleteT = L("Delete theme", "Удалить тему")
 private val boundsT = L("Boundaries over the audio", "Границы поверх звука")
 private val boundLineT = L("Colour", "Цвет")
@@ -100,6 +102,7 @@ fun ThemesPage(app: AppState) {
         for (t in Themes.builtIn) ThemeSwatch(t, names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
         for (ct in Themes.custom) ThemeSwatch(ct.tokens, ct.name, s.theme == ct.tokens.id) { app.update { it.copy(theme = ct.tokens.id) } }
     }
+    SwitchLine(dimT(), s.settingsDim) { v -> app.update { it.copy(settingsDim = v) } }
     FontPicker(app)
     val current = Themes.custom.firstOrNull { it.tokens.id == s.theme }
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -162,6 +165,7 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
     ValueSlider(borderT(), tokens.borderWidth.value, 0f..3f, "dp", decimals = 1) { change(tokens.copy(borderWidth = ((it * 2).toInt() / 2f).dp)) }
     SwitchLine(squareT(), tokens.square) { change(tokens.copy(square = it)) }
     SwitchLine(monoT(), tokens.mono) { change(tokens.copy(mono = it)) }
+    SwitchLine(checkboxesT(), tokens.checkboxes) { change(tokens.copy(checkboxes = it)) }
     for ((title, keys) in groups) {
         SectionTitle(title())
         for (k in keys) {
@@ -193,7 +197,7 @@ private fun SwitchLine(title: String, value: Boolean, onChange: (Boolean) -> Uni
     val c = T.c
     Row(Modifier.fillMaxWidth().clickable { onChange(!value) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        androidx.compose.material3.Switch(value, onChange, colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
+        Toggle(value, onChange)
     }
 }
 

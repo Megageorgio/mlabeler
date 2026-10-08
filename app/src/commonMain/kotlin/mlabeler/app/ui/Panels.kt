@@ -67,6 +67,9 @@ fun FilesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> U
 @Composable
 private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit) {
     val c = T.c
+    val hasDirs = ed.items.any { '/' in it.id }
+    var tree by remember(ed.workspace) { mutableStateOf(ed.workspace.state.tree) }
+    var folded by remember(ed.workspace) { mutableStateOf(ed.workspace.state.folded) }
     // labels' last change, shown as "5 min" and refreshed every minute
     var now by remember { mutableStateOf(kotlin.time.Clock.System.now().toEpochMilliseconds()) }
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60_000); now = kotlin.time.Clock.System.now().toEpochMilliseconds() } }
@@ -83,12 +86,31 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                 Chip(S.notDone(), ed.filter == FileFilter.NotDone) { ed.filter = FileFilter.NotDone }
                 Chip(S.starred(), ed.filter == FileFilter.Starred) { ed.filter = FileFilter.Starred }
                 Chip(S.noLabels(), ed.filter == FileFilter.NoLabels) { ed.filter = FileFilter.NoLabels }
+                if (hasDirs) Tip(treeHint()) {
+                    Chip(treeT(), tree) { tree = !tree; ed.workspace.updateState { it.copy(tree = tree) } }
+                }
             }
         }
         val list = ed.filtered()
+        // grouped by subfolder: a heading row per folder (click folds it), its files below
+        val rows: List<FileRow> = remember(list, tree, folded, hasDirs) {
+            if (!tree || !hasDirs) list.map { FileRow(it.first, it.second) }
+            else buildList {
+                val groups = list.groupBy { it.second.id.substringBeforeLast('/', "") }
+                for (dir in groups.keys.sortedWith(compareBy(mlabeler.core.io.naturalOrder()) { it.lowercase() })) {
+                    val g = groups.getValue(dir)
+                    add(FileRow(-1, null, dir, g.size, g.count { ed.marks(it.second).done }))
+                    if (dir !in folded) for ((i, item) in g) add(FileRow(i, item))
+                }
+            }
+        }
         val state = rememberLazyListState()
         LaunchedEffect(ed.index) {
-            val pos = list.indexOfFirst { it.first == ed.index }
+            // the open file's folder unfolds
+            ed.item?.id?.substringBeforeLast('/', "")?.let { d -> if (tree && hasDirs && d in folded) { folded = folded - d; ed.workspace.updateState { it.copy(folded = folded) } } }
+        }
+        LaunchedEffect(ed.index, rows) {
+            val pos = rows.indexOfFirst { it.index == ed.index && it.item != null }
             if (pos >= 0 && (pos < state.firstVisibleItemIndex || pos > state.firstVisibleItemIndex + state.layoutInfo.visibleItemsInfo.size - 2)) {
                 state.animateScrollToItem(maxOf(0, pos - 3))
             }
@@ -99,7 +121,26 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
             Text(S.nothingFound(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state) {
-            items(list, key = { it.second.id }) { (i, item) ->
+            items(rows, key = { r -> r.item?.id ?: ("dir:" + r.dir) }) { r ->
+                if (r.item == null) {
+                    // a folder heading
+                    val open = r.dir !in folded
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = if (Platform.isMobile) 44.dp else 28.dp).background(c.panelAlt)
+                            .clickable { folded = if (open) folded + r.dir else folded - r.dir; ed.workspace.updateState { it.copy(folded = folded) } }
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(if (open) Icons.down else Icons.right, null, Modifier.size(14.dp), tint = c.muted)
+                        Spacer(Modifier.width(6.dp))
+                        Text(r.dir.ifEmpty { Paths.name(ed.workspace.root) }.replace("/", " / "), color = c.text, fontSize = 13.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text("${r.done}/${r.count}", color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(start = 6.dp))
+                    }
+                    return@items
+                }
+                val i = r.index
+                val item = r.item
                 val marks = ed.marks(item)
                 val current = i == ed.index
                 Row(
@@ -125,7 +166,7 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                         Text(Paths.name(item.id), color = fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val sub = buildList {
                             val dir = item.id.substringBeforeLast('/', "")
-                            if (dir.isNotEmpty()) add(dir)
+                            if (dir.isNotEmpty() && !(tree && hasDirs)) add(dir)
                             if (marks.tag.isNotEmpty()) add("#" + marks.tag)
                         }
                         if (sub.isNotEmpty()) Text(sub.joinToString("  "), color = if (current && c.square) c.onAccent else c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -150,6 +191,11 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
     }
 }
 
+/** A row of the file list: a file ([item]) or, in the folder view, a folder heading ([dir] with its counts). */
+private data class FileRow(val index: Int, val item: mlabeler.core.io.Item?, val dir: String = "", val count: Int = 0, val done: Int = 0)
+
+private val treeT = L("Folders", "По папкам")
+private val treeHint = L("Group the files by subfolder; a click on a folder folds it", "Сгруппировать файлы по подпапкам; щелчок по папке сворачивает её")
 private val probLong = L("Too long", "Слишком длинная")
 private val probLongPause = L("Pause too long", "Слишком длинная пауза")
 private val probLongPhrase = L("Too long without a pause", "Слишком долго без паузы")

@@ -146,6 +146,8 @@ private class Geom(
     val lanes: Map<String, Pair<Float, Float>> = emptyMap(),
     /** Height shared by the audio lanes (for dragging their lines). */
     val audioArea: Float = 0f,
+    /** Lane sizes can't be changed (no grips, the lines between lanes are not grabbed). */
+    val locked: Boolean = false,
 ) {
     val tiersBottom: Float get() = tiersTop + tierH * tierCount
     val audioTop: Float get() = min(waveTop, specTop)
@@ -155,11 +157,11 @@ private class Geom(
 
     fun region(y: Float, grab: Float): Region? {
         if (y < ruler) return Region.Ruler
-        for ((ly, a, b) in splits) if (abs(y - ly) < grab / 2) return Region.LaneSplit(a, b)
+        if (!locked) for ((ly, a, b) in splits) if (abs(y - ly) < grab / 2) return Region.LaneSplit(a, b)
         if (tierCount > 0 && y >= tiersTop && y < tiersBottom) {
             return Region.Tier(((y - tiersTop) / tierH).toInt().coerceIn(0, tierCount - 1))
         }
-        for ((ly, a, b) in splits) if (abs(y - ly) < grab / 2) return Region.LaneSplit(a, b)
+        if (!locked) for ((ly, a, b) in splits) if (abs(y - ly) < grab / 2) return Region.LaneSplit(a, b)
         if (y in specTop..specBottom && specBottom > specTop) return Region.Spec
         if (y in waveTop..waveBottom) return Region.Wave
         if (y in pitchTop..pitchBottom && pitchBottom > pitchTop) return Region.Spec
@@ -241,7 +243,7 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
         return Geom(w, h, ruler, audioTop, if (showW) audioTop + mainH else audioTop, audioTop, if (showS) audioTop + mainH else audioTop,
             tiersTop, tierHeight, tiers, pt, pb, wt, wb, true, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f),
             layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f), layout.namesOnAudio, layout.namesX.coerceIn(0f, 1f), layout.namesY.coerceIn(0f, 1f),
-            splits, lanes + ("main" to (audioTop to audioTop + mainH)), audioH)
+            splits, lanes + ("main" to (audioTop to audioTop + mainH)), audioH, layout.locked)
     }
     // stacked lanes in the user's order
     val visible = laneOrder(layout).filter { id ->
@@ -271,7 +273,7 @@ private fun geom(size: IntSize, density: Float, layout: LayoutSettings, tiers: I
     return Geom(w, h, ruler, top("wave"), bottom("wave"), top("spec"), bottom("spec"), tiersTop, tierHeight, tiers,
         top("pitch"), bottom("pitch"), top("power"), bottom("power"), false, layout.tiersOnTop, layout.overlayDim.coerceIn(0f, 0.8f),
         layout.overlayWaveFillAlpha.coerceIn(0.05f, 1f), layout.namesOnAudio, layout.namesX.coerceIn(0f, 1f), layout.namesY.coerceIn(0f, 1f),
-        splits, lanes, audioH)
+        splits, lanes, audioH, layout.locked)
 }
 
 /** Colour lookup for spectrogram values 0..255 with brightness and contrast applied. */
@@ -321,6 +323,16 @@ private fun renderSpectrogram(spec: Spectrogram, viewStart: Double, pps: Double,
                     f += step
                 }
                 pixels[(h - 1 - b) * widthPx + x] = lut[m]
+            }
+        } else if (f1 - f0 == 1 && pps > framesPerSec) {
+            // zoomed in past one column per pixel: blend the two nearest columns instead of repeating one
+            val pos = ((t0 + t1) / 2) * framesPerSec - 0.5
+            val a = floor(pos).toInt().coerceIn(0, spec.ready - 1)
+            val b1 = min(a + 1, spec.ready - 1)
+            val k = (pos - a).toFloat().coerceIn(0f, 1f)
+            for (b in 0 until bands) {
+                val v = (spec.value(a, b) * (1 - k) + spec.value(b1, b) * k).toInt().coerceIn(0, 255)
+                pixels[(h - 1 - b) * widthPx + x] = lut[v]
             }
         } else {
             for (b in 0 until bands) {
@@ -618,6 +630,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
                                 if (!chg.pressed) break
                                 if (chg.positionChange() != Offset.Zero) {
+                                    // a part selected by hand goes away as soon as a boundary is moved
+                                    if (!moved) ed.range = null
                                     moved = true
                                     val m = ev.keyboardModifiers
                                     ed.dragTo(bound, timeAt(chg.position.x) + follow, m.isShiftPressed, m.isAltPressed)
@@ -703,8 +717,18 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     return@awaitEachGesture
                                 }
                                 // a plain click set to do something else than selecting (split, play…)
-                                !touch && !mods.isShiftPressed && mouseFor(ed, region, Gesture.Click).let { it != null && it != MouseActions.SELECT } ->
-                                    mouseAction(ed, region, downTime, mouseFor(ed, region, Gesture.Click))
+                                !touch && !mods.isShiftPressed && mouseFor(ed, region, Gesture.Click).let { it != null && it != MouseActions.SELECT } -> {
+                                    val action = mouseFor(ed, region, Gesture.Click)!!
+                                    // a click clears what was selected before, as a selecting click does (the part always; the
+                                    // phoneme too when a click on the audio deselects); renaming and removing act on the phoneme
+                                    if (action != MouseActions.RENAME && action != MouseActions.DELETE) {
+                                        ed.range = null
+                                        if ((region == Region.Wave || region == Region.Spec) && ed.app.settings.edit.audioClickDeselects &&
+                                            ed.selection !is Selection.Note) ed.selection = Selection.None
+                                        if (region == Region.Wave || region == Region.Spec) ed.cursor = downTime.coerceIn(0.0, ed.duration)
+                                    }
+                                    mouseAction(ed, region, downTime, action)
+                                }
                                 else -> onTap(ed, region, downTime, double && ed.app.settings.edit.activeTool != "cut", touch, mods.isShiftPressed)
                             }
                             cutByLastTap.value = false
@@ -724,6 +748,12 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
         Canvas(Modifier.fillMaxSize().clipToBounds()) {
             val g = geom(size, density, layout, tierCount)
             drawCursor(ed, g, c) { t -> ((t - ed.viewStart) * ed.pixelsPerSecond).toFloat() }
+        }
+        // the lock in the corner of the ruler fixes the sizes of lanes and side panels
+        Box(Modifier.align(Alignment.TopEnd).padding(end = 2.dp)) {
+            IconBtn(if (layout.locked) Icons.lock else Icons.unlock, Commands.lockLayout.title(), size = 22.dp, tint = if (layout.locked) c.accent else c.muted) {
+                Commands.lockLayout.run(ed, ed.app)
+            }
         }
         // piano roll controls in the corner of the pitch lane
         val gl = geom(size, LocalDensity.current.density, layout, tierCount)
@@ -1051,7 +1081,7 @@ private fun DrawScope.drawTimeline(
     // the lines between lanes can be dragged: a visible grip says so
     for ((ly, _, _) in g.splits) {
         if (!g.overlay) drawRect(c.border, Offset(0f, ly - px), Size(w, 2 * px))
-        drawRoundRect(c.muted.copy(alpha = 0.8f), Offset(w / 2 - 18 * px, ly - 2 * px), Size(36 * px, 4 * px), androidx.compose.ui.geometry.CornerRadius(2 * px))
+        if (!g.locked) drawRoundRect(c.muted.copy(alpha = 0.8f), Offset(w / 2 - 18 * px, ly - 2 * px), Size(36 * px, 4 * px), androidx.compose.ui.geometry.CornerRadius(2 * px))
     }
 
     drawCurves(ed, g, c, measurer, smallStyle, ::x)

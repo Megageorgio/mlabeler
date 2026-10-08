@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +45,8 @@ private val selectT = L("Select", "Выбрать")
 private val allShown = L("All shown", "Все видимые")
 private val mergeLeft = L("Remove (join with the previous one)", "Удалить (присоединить к предыдущему)")
 private val countLine = L("{0} entries", "записей: {0}")
+private val followT = L("Follow", "Следовать")
+private val followHint = L("The list scrolls to the phoneme selected on the timeline", "Список прокручивается к фонеме, выбранной на дорожке")
 
 /** One interval somewhere in the folder. */
 private data class Entry(val item: Int, val file: String, val tier: String, val index: Int, val text: String, val start: Double, val end: Double)
@@ -98,6 +101,11 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                 Chip(allFiles(), all) { all = true }
                 Chip(summary(), counts) { counts = !counts }
                 if (!all) Chip(selectT(), picking) { picking = !picking; picked = emptySet() }
+                Tip(followHint()) {
+                    Chip(followT(), ed.app.settings.layout.entriesFollow) {
+                        ed.app.update { st -> st.copy(layout = st.layout.copy(entriesFollow = !st.layout.entriesFollow)) }
+                    }
+                }
             }
         }
         if (all && everything == null) Text(S.loading(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
@@ -117,8 +125,19 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
             }
         } else {
             val sel = (ed.selection as? Selection.Interval)?.ref
-            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-                items(list, key = { "${it.item}/${it.tier}/${it.index}" }) { e ->
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            val selTier = sel?.let { doc?.tiers?.getOrNull(it.tier)?.name }
+            val activeRow = if (sel == null) -1 else list.indexOfFirst { it.item == ed.index && it.index == sel.index && it.tier == selTier }
+            // the selected phoneme is brought into view: when it changes, and when the list is shown again
+            LaunchedEffect(activeRow, counts, all) {
+                if (activeRow < 0 || !ed.app.settings.layout.entriesFollow) return@LaunchedEffect
+                val info = listState.layoutInfo
+                val visible = info.visibleItemsInfo
+                val shown = visible.size > 2 && activeRow > visible.first().index && activeRow < visible.last().index
+                if (!shown) listState.scrollToItem((activeRow - (visible.size / 2).coerceAtLeast(3)).coerceAtLeast(0))
+            }
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
+                itemsIndexed(list, key = { _, it -> "${it.item}/${it.tier}/${it.index}" }) { pos, e ->
                     val active = e.item == ed.index && sel != null && sel.index == e.index &&
                         doc?.tiers?.getOrNull(sel.tier)?.name == e.tier
                     Row(
@@ -136,7 +155,8 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                             if (e.index in picked) Icons.check else Icons.circle, null,
                             Modifier.padding(end = 6.dp).width(14.dp), tint = if (e.index in picked) c.accent else c.muted,
                         )
-                        Text(e.text.ifEmpty { "∅" }, color = fg, fontSize = 13.sp, modifier = Modifier.width(70.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text((pos + 1).toString(), color = if (active && c.square) c.onAccent else c.muted, fontSize = 11.sp, modifier = Modifier.width(38.dp), maxLines = 1)
+                        Text(e.text.ifEmpty { "∅" }, color = fg, fontSize = 13.sp, modifier = Modifier.width(62.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             if (all) Paths.stem(e.file) else formatTime(e.start), color = if (active && c.square) c.onAccent else c.muted,
                             fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,

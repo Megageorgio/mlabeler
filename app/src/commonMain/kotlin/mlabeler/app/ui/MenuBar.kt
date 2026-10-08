@@ -201,6 +201,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(MSep)
             if (!Platform.isMobile) add(toggle(MenuTitles.menuBar(), s.menuBar) { it.copy(menuBar = !it.menuBar) })
             add(toggle(MenuTitles.statusBar(), s.statusBar) { it.copy(statusBar = !it.statusBar) })
+            add(toggle(Commands.lockLayout.title(), s.layout.locked) { it.copy(layout = it.layout.copy(locked = !it.layout.locked)) })
         }))
         add(MSub(MenuTitles.toolbar(), toolbar))
         add(MSep)
@@ -268,6 +269,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     val tools = buildList {
         if (oto) add(item(Commands.autoOto, ed, app)) else add(item(Commands.autolabel, ed, app))
         add(item(Commands.cleanup, ed, app))
+        add(item(Commands.mute, ed, app))
         add(item(Commands.soundCheck, ed, app))
         if (!oto) add(item(Commands.summary, ed, app))
         add(MSep)

@@ -266,7 +266,7 @@ fun AutolabelDialog(app: AppState) {
                 if (!(batch && batchSource == mlabeler.app.state.EditorState.BatchText.Labels)) {
                     Row(Modifier.fillMaxWidth().padding(top = 8.dp).clickable { whisper = !whisper }, verticalAlignment = Alignment.CenterVertically) {
                         Text(whisperT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        androidx.compose.material3.Switch(whisper, { whisper = it })
+                        Toggle(whisper, { whisper = it })
                     }
                 }
             }

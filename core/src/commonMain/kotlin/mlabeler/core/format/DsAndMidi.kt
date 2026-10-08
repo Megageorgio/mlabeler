@@ -15,7 +15,7 @@ import mlabeler.core.model.Note
 import mlabeler.core.model.NoteTier
 import mlabeler.core.model.Tier
 
-/** DiffSinger .ds: a JSON list of sentences with offsets; read as one timeline, written back as one sentence. */
+/** DiffSinger .ds: a JSON list of sentences with offsets; read as one timeline, written back into the same sentences. */
 object DsFile {
     private val json = Json { isLenient = true; ignoreUnknownKeys = true; prettyPrint = true }
 
@@ -74,30 +74,61 @@ object DsFile {
 
     private fun fmt(v: Double) = formatNumber(v, 6)
 
-    /** One sentence from offset 0, keeping f0 and other fields of [previous] when given. */
+    private val managed = setOf("offset", "ph_seq", "ph_dur", "ph_num", "note_seq", "note_dur", "note_slur")
+
+    /**
+     * Writes [doc] back into the sentences of [previous] (when given): each sentence keeps its offset and every
+     * field mlabeler doesn't edit (f0, text, gender…), and gets the phonemes, groups and notes that lie in its time
+     * span. Without [previous], one sentence that starts at the first phoneme.
+     */
     fun write(doc: LabelDoc, previous: String? = null): String {
         val ph = doc.tiers[doc.phonemeTierIndex()] as IntervalTier
-        val fields = LinkedHashMap<String, JsonElement>()
-        previous?.let { p ->
+        val words = doc.wordTierIndex().takeIf { it >= 0 }?.let { doc.tiers[it] as IntervalTier }
+        val notes = doc.tiers.filterIsInstance<NoteTier>().firstOrNull()
+        val old: List<JsonObject> = previous?.let { p ->
             runCatching {
                 val r = json.parseToJsonElement(p)
-                val first = if (r is JsonArray) r.first().jsonObject else r.jsonObject
-                for ((k, v) in first) if (k !in setOf("offset", "ph_seq", "ph_dur", "ph_num", "note_seq", "note_dur", "note_slur")) fields[k] = v
-            }
+                if (r is JsonArray) r.map { it.jsonObject } else listOf(r.jsonObject)
+            }.getOrNull()
+        }.orEmpty().sortedBy { (it["offset"] as? JsonPrimitive)?.doubleOrNull ?: 0.0 }
+        val firstNamed = (0 until ph.size).firstOrNull { ph.texts[it].isNotBlank() }?.let { ph.startOf(it) } ?: 0.0
+        val sentences = old.ifEmpty { listOf(JsonObject(mapOf("offset" to JsonPrimitive(firstNamed)))) }
+        val offsets = sentences.map { (it["offset"] as? JsonPrimitive)?.doubleOrNull ?: 0.0 }
+        val out = sentences.mapIndexed { si, sentence ->
+            val from = if (si == 0) Double.NEGATIVE_INFINITY else offsets[si]
+            val to = offsets.getOrNull(si + 1) ?: Double.POSITIVE_INFINITY
+            val off = offsets[si]
+            // phonemes whose middle is in this sentence; gaps at its ends are left out, gaps inside become SP
+            val idx = (0 until ph.size).filter { val m = (ph.startOf(it) + ph.endOf(it)) / 2; m >= from && m < to }
+            val first = idx.indexOfFirst { ph.texts[it].isNotBlank() }
+            val last = idx.indexOfLast { ph.texts[it].isNotBlank() }
+            val take = if (first < 0) emptyList() else idx.subList(first, last + 1)
+            val seq = take.map { ph.texts[it].ifBlank { "SP" } }
+            val dur = take.mapIndexed { k, i -> ph.endOf(i) - (if (k == 0) off else ph.startOf(i)) }.map { it.coerceAtLeast(0.0) }
+            val fields = LinkedHashMap<String, JsonElement>()
+            fields["offset"] = JsonPrimitive(off)
+            sentence["text"]?.let { fields["text"] = it }
+            fields["ph_seq"] = JsonPrimitive(seq.joinToString(" "))
+            fields["ph_dur"] = JsonPrimitive(dur.joinToString(" ") { fmt(it) })
+            if (words != null && (sentence.containsKey("ph_num") || old.isEmpty())) {
+                val nums = ArrayList<Int>()
+                var lastWord = -2
+                for (i in take) {
+                    val w = words.indexAt((ph.startOf(i) + ph.endOf(i)) / 2)
+                    if (w != lastWord || nums.isEmpty()) { nums += 1; lastWord = w } else nums[nums.size - 1]++
+                }
+                fields["ph_num"] = JsonPrimitive(nums.joinToString(" "))
+            } else sentence["ph_num"]?.let { fields["ph_num"] = it }
+            if (notes != null && (sentence.containsKey("note_seq") || old.isEmpty())) {
+                val ns = notes.notes.filter { val m = (it.start + it.end) / 2; m >= from && m < to }
+                fields["note_seq"] = JsonPrimitive(ns.joinToString(" ") { NoteNames.format(it.pitch) })
+                fields["note_dur"] = JsonPrimitive(ns.mapIndexed { k, n -> n.end - (if (k == 0) off else n.start) }.joinToString(" ") { fmt(it.coerceAtLeast(0.0)) })
+                fields["note_slur"] = JsonPrimitive(ns.joinToString(" ") { if (it.slur) "1" else "0" })
+            } else for (k in listOf("note_seq", "note_dur", "note_slur")) sentence[k]?.let { fields[k] = it }
+            for ((k, v) in sentence) if (k !in managed && k != "text") fields[k] = v
+            JsonObject(fields)
         }
-        val out = LinkedHashMap<String, JsonElement>()
-        out["offset"] = JsonPrimitive(0.0)
-        fields["text"]?.let { out["text"] = it }
-        out["ph_seq"] = JsonPrimitive(ph.texts.joinToString(" "))
-        out["ph_dur"] = JsonPrimitive((0 until ph.size).joinToString(" ") { fmt(ph.durationOf(it)) })
-        if (doc.wordTierIndex() >= 0) out["ph_num"] = JsonPrimitive(DsCsv.phNum(doc).joinToString(" "))
-        doc.tiers.filterIsInstance<NoteTier>().firstOrNull()?.let { n ->
-            out["note_seq"] = JsonPrimitive(n.notes.joinToString(" ") { NoteNames.format(it.pitch) })
-            out["note_dur"] = JsonPrimitive(n.notes.joinToString(" ") { fmt(it.end - it.start) })
-            out["note_slur"] = JsonPrimitive(n.notes.joinToString(" ") { if (it.slur) "1" else "0" })
-        }
-        for ((k, v) in fields) if (k != "text") out[k] = v
-        return json.encodeToString(JsonElement.serializer(), JsonArray(listOf(JsonObject(out))))
+        return json.encodeToString(JsonElement.serializer(), JsonArray(out))
     }
 }
 

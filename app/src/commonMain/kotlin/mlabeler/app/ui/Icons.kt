@@ -76,5 +76,7 @@ object Icons {
     val layers = icon("layers", "M12 4l8 4-8 4-8-4z", "M4 12l8 4 8-4", "M4 16l8 4 8-4")
     val magic = icon("magic", "M4 20L15 9", "M14 4v3", "M19 9h-3", "M17.5 5.5l-2 2", "M20 14v.01", "M10 4v.01")
     val plugin = icon("plugin", "M9 3v4", "M15 3v4", "M6 7h12v4a6 6 0 0 1-12 0z", "M12 17v4")
+    val lock = icon("lock", "M6 11h12v9H6z", "M8.5 11V8a3.5 3.5 0 0 1 7 0v3")
+    val unlock = icon("unlock", "M6 11h12v9H6z", "M8.5 11V8a3.5 3.5 0 0 1 6.8-1.2")
     val home = icon("home", "M4 11l8-7 8 7", "M6 9.5V20h12V9.5")
 }

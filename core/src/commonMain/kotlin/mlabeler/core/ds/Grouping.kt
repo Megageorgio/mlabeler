@@ -77,13 +77,13 @@ data class PhonemeDict(
                 "s", "sh", "t", "th", "v", "z", "zh", "q"),
             semivowels = listOf("w", "y"),
         )
+        /** The phoneme set of Russian DiffSinger datasets (soft consonants with "y", й = j, reduced vowels ax, x, ex). */
         val russian = PhonemeDict(
             "Russian",
-            vowels = listOf("a", "e", "i", "o", "u", "y", "ja", "je", "jo", "ju", "aa", "ee", "ii", "oo", "uu", "yy"),
-            consonants = listOf("b", "b'", "bb", "v", "v'", "vv", "g", "g'", "gg", "d", "d'", "dd", "zh", "z", "z'", "zz",
-                "k", "k'", "kk", "l", "l'", "ll", "m", "m'", "mm", "n", "n'", "nn", "p", "p'", "pp", "r", "r'", "rr",
-                "s", "s'", "ss", "t", "t'", "tt", "f", "f'", "ff", "h", "h'", "hh", "c", "ch", "sh", "sch", "shch", "x"),
-            semivowels = listOf("j", "j'"),
+            vowels = listOf("a", "i", "u", "e", "o", "y", "ax", "x", "ex", "exh"),
+            consonants = listOf("b", "v", "g", "d", "z", "k", "l", "m", "n", "p", "r", "s", "t", "f", "h", "sh", "ts", "zh",
+                "by", "vy", "gy", "dy", "zy", "ky", "ly", "my", "ny", "py", "ry", "sy", "ty", "fy", "hy", "shy", "ch", "cl", "vf"),
+            semivowels = listOf("j"),
         )
         /** Guesses only. */
         val auto = PhonemeDict("Auto")

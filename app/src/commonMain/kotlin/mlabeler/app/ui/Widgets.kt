@@ -246,8 +246,12 @@ fun KeyValue(key: String, value: String, modifier: Modifier = Modifier) {
 
 /** A vertical drag handle between panels; reports the drag in dp. */
 @Composable
-fun VSplitter(onDrag: (Float) -> Unit) {
+fun VSplitter(enabled: Boolean = true, onDrag: (Float) -> Unit) {
     val c = T.c
+    if (!enabled) {
+        Box(Modifier.width(c.borderWidth).fillMaxHeight().background(c.border))
+        return
+    }
     val density = LocalDensity.current
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
@@ -408,5 +412,39 @@ fun DropHint(text: String) {
         contentAlignment = Alignment.Center,
     ) {
         Text(text, color = c.text, fontSize = 15.sp, modifier = Modifier.clip(RoundedCornerShape(c.radius)).background(c.panel).padding(horizontal = 14.dp, vertical = 8.dp))
+    }
+}
+
+
+/**
+ * An on/off control: a switch, or a square check box when the theme asks for it (a white box with a dark frame
+ * and a tick, as in classic desktop forms).
+ */
+@Composable
+fun Toggle(value: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val c = T.c
+    if (!c.checkboxes) {
+        androidx.compose.material3.Switch(value, onChange, modifier,
+            colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
+        return
+    }
+    val box = if (c.dark) c.panelAlt else androidx.compose.ui.graphics.Color.White
+    val tick = if (c.dark) c.text else androidx.compose.ui.graphics.Color.Black
+    androidx.compose.foundation.Canvas(
+        modifier.size(16.dp).clickable(remember { MutableInteractionSource() }, null) { onChange(!value) },
+    ) {
+        val px = size.width / 16f
+        // sunken frame: dark top-left, light bottom-right
+        drawRect(c.border)
+        drawRect(androidx.compose.ui.graphics.Color.White, androidx.compose.ui.geometry.Offset(px, px), androidx.compose.ui.geometry.Size(size.width - px, size.height - px))
+        drawRect(box, androidx.compose.ui.geometry.Offset(px, px), androidx.compose.ui.geometry.Size(size.width - 2 * px, size.height - 2 * px))
+        drawRect(c.border.copy(alpha = 0.6f), androidx.compose.ui.geometry.Offset(px, px), androidx.compose.ui.geometry.Size(size.width - 2 * px, px))
+        drawRect(c.border.copy(alpha = 0.6f), androidx.compose.ui.geometry.Offset(px, px), androidx.compose.ui.geometry.Size(px, size.height - 2 * px))
+        if (value) {
+            val p = androidx.compose.ui.graphics.Path().apply {
+                moveTo(4 * px, 8 * px); lineTo(7 * px, 11 * px); lineTo(12.5f * px, 4.5f * px)
+            }
+            drawPath(p, tick, style = androidx.compose.ui.graphics.drawscope.Stroke(2.2f * px))
+        }
     }
 }
