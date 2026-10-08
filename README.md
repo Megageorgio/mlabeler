@@ -17,6 +17,19 @@ Ready builds for every platform are on the [Releases](https://github.com/Megageo
 - **Android** — `.apk`;
 - **iOS** — unsigned `.ipa` (see below).
 
+### System requirements
+
+| System | Minimum |
+|---|---|
+| Windows | Windows 10 or 11, 64-bit |
+| macOS | macOS 12 or newer, a Mac with Apple Silicon (M1 or newer) |
+| Linux | a current 64-bit (x86-64) distribution |
+| Android | Android 8.0 or newer |
+| iOS / iPadOS | iOS 15 or newer: iPhone 6s, iPhone SE (1st generation) and newer; iPad (5th generation), iPad Air 2, iPad mini 4 and newer |
+
+Automatic labelling (the toolkit) needs a computer with Windows 10+, macOS or Linux. Phones and tablets can use the
+toolkit of a computer in the same network.
+
 There are three release channels: **stable**, **beta** (new features a little earlier) and **alpha** (the latest
 development builds). The program can check for a newer version at start and always asks before downloading;
 the channel is chosen on the first start or in Settings → About. On Android the new `.apk` is downloaded and
