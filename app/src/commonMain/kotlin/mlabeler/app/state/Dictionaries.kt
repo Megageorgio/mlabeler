@@ -25,7 +25,7 @@ object Dictionaries {
 
     /** Writes a copy of [d] to the folder so it can be edited; returns its path. */
     fun saveCopy(d: PhonemeDict, name: String): String {
-        val path = Paths.join(dir(), name.replace(Regex("[^\\p{L}\\p{N}_ -]"), "_") + ".json")
+        val path = Paths.join(dir(), name.map { if (it.isLetterOrDigit() || it == '_' || it == ' ' || it == '-') it else '_' }.joinToString("") + ".json")
         PlatformFs.mkdirs(dir())
         PlatformFs.write(path, Workspace.json.encodeToString(PhonemeDict.serializer(), d.copy(name = name)).encodeToByteArray())
         return path
