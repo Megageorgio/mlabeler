@@ -1,6 +1,6 @@
 package mlabeler.app.theme
 
-import androidx.compose.foundation.shape.RoundedCornerShape
+import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -56,6 +56,8 @@ data class Tokens(
     val borderWidth: Dp,
     val square: Boolean,
     val mono: Boolean = false,
+    /** Set by the app (not stored in theme files): nothing is smoothed — text, corners, sliders. */
+    val crisp: Boolean = false,
     /** On/off settings drawn as square check boxes instead of sliding switches. */
     val checkboxes: Boolean = false,
     /** Boundaries drawn over the waveform and spectrogram: colour (Unspecified = [bound], half see-through), width, style. */
@@ -163,8 +165,9 @@ private fun scheme(t: Tokens): ColorScheme {
 
 @Composable
 fun AppTheme(tokens0: Tokens, font: FontFamily? = null, crisp: Boolean = false, content: @Composable () -> Unit) {
-    // without smoothing: square corners (a rounded edge can only be drawn smoothed) and text with hard pixel edges
-    val tokens = if (crisp) tokens0.copy(radius = 0.dp) else tokens0
+    // without smoothing: corners keep their radius but are drawn as pixel steps, text has hard pixel edges
+    CrispShapes.on = crisp
+    val tokens = if (crisp) tokens0.copy(crisp = true) else tokens0
     val r = RoundedCornerShape(tokens.radius)
     val shapes = Shapes(extraSmall = r, small = r, medium = r, large = r, extraLarge = r)
     val family = font ?: if (tokens.mono) FontFamily.Monospace else FontFamily.Default

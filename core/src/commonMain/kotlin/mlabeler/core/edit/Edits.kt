@@ -3,6 +3,7 @@ package mlabeler.core.edit
 import mlabeler.core.model.IntervalTier
 import mlabeler.core.model.LabelDoc
 import mlabeler.core.model.NoteTier
+import mlabeler.core.model.PointTier
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -163,6 +164,44 @@ object Edits {
         val t = l.removeAt(from)
         l.add(to, t)
         return doc.copy(tiers = l)
+    }
+
+    /**
+     * Removes the time span [from, to] from every tier: what was inside goes, later times move back by its length.
+     * Intervals that end up empty are dropped (their neighbours meet at [from]).
+     */
+    fun removeTime(doc: LabelDoc, from: Double, to: Double): LabelDoc {
+        val len = to - from
+        if (len <= 0) return doc
+        fun map(t: Double) = when { t <= from -> t; t >= to -> t - len; else -> from }
+        return doc.copy(tiers = doc.tiers.map { t ->
+            when (t) {
+                is IntervalTier -> {
+                    val nb = ArrayList<Double>()
+                    val nt = ArrayList<String>()
+                    val nc = if (t.confidence != null) ArrayList<Float?>() else null
+                    nb += map(t.bounds[0])
+                    for (i in 0 until t.size) {
+                        val e = map(t.bounds[i + 1])
+                        if (e - nb.last() < SAME_TIME) {
+                            // collapsed: an interval cut away keeps nothing; one that ended inside the cut gives its
+                            // place to the next one
+                            continue
+                        }
+                        nb += e
+                        nt += t.texts[i]
+                        nc?.add(t.confidence?.getOrNull(i))
+                    }
+                    if (nt.isEmpty()) t.copy(bounds = listOf(nb[0], map(t.bounds.last())), texts = listOf(""), confidence = null)
+                    else IntervalTier(t.name, nb, nt, nc)
+                }
+                is NoteTier -> NoteTier(t.name, t.notes.mapNotNull { n ->
+                    val s = map(n.start); val e = map(n.end)
+                    if (e - s < SAME_TIME) null else n.copy(start = s, end = e)
+                })
+                is PointTier -> PointTier(t.name, t.points.filter { it.time !in from..to }.map { it.copy(time = map(it.time)) })
+            }
+        })
     }
 
     /** Makes interval tiers end exactly at [duration]: the last interval is stretched or a pause added. */

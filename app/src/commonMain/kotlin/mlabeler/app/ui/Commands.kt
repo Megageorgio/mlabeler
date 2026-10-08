@@ -238,6 +238,11 @@ object Commands {
         if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите кусок или фонему")())
         else e.cleanup.silence(r)
     }
+    val cutAudio = Command("cut-audio", L("Cut the selection out of the recording", "Вырезать выделенное из записи"), listOf(ch('X', ctrl = true))) { e, a ->
+        val r = e.range ?: e.selectedSpan()
+        if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите кусок или фонему")())
+        else e.cleanup.cut(r)
+    }
     val lockLayout = Command("lock-layout", L("Lock lane and panel sizes", "Закрепить размеры полос и панелей"), emptyList()) { _, a ->
         a.update { it.copy(layout = it.layout.copy(locked = !it.layout.locked)) }
     }
@@ -253,7 +258,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,

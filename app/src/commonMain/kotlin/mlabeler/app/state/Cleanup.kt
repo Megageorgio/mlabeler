@@ -42,9 +42,8 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         private set
     var profileFrom by mutableStateOf<Pair<Double, Double>?>(null)
         private set
-    /** File contents before the last change in this session, for "undo". */
-    private var previous: Pair<String, ByteArray>? = null
-    val canUndo: Boolean get() = previous?.first == ed.item?.audioPath
+    /** Changes of the recording are undone like label changes (Ctrl+Z). */
+    val canUndo: Boolean get() = ed.canUndoAudio
 
     private fun readEdit(): WavEdit? {
         val it = ed.item ?: return null
@@ -137,12 +136,39 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
     }
 
     fun undo() = run("undo") {
-        val (path, bytes) = previous ?: return@run
-        if (path != ed.item?.audioPath) return@run
-        withContext(Dispatchers.Default) { ed.workspace.fs.write(path, bytes) }
-        previous = null
-        ed.reloadAudio()
-        app.message(undone())
+        if (ed.undoAudio()) app.message(undone())
+    }
+
+    /**
+     * Removes [range] from the recording: the file gets shorter, labels after it move back, labels inside go.
+     * The join is crossfaded over 5 ms.
+     */
+    fun cut(range: Pair<Double, Double>) = run("cut") {
+        val it = ed.item ?: return@run
+        if (ed.mode == Mode.Oto) { app.message(cutOto(), error = true); return@run }
+        val w = withContext(Dispatchers.Default) { readEdit() } ?: return@run
+        val (from, to) = frames(range, w)
+        if (to - from < 1) return@run
+        if (to - from >= w.frames) { app.message(cutAll(), error = true); return@run }
+        val before = w.bytes.copyOf()
+        val after = withContext(Dispatchers.Default) { w.withoutFrames(from, to, (w.sampleRate * 0.005).toInt()) }
+        val newDuration = (w.frames - (to - from)).toDouble() / w.sampleRate
+        val labels = ed.doc?.let { d ->
+            mlabeler.core.edit.Edits.fitToDuration(mlabeler.core.edit.Edits.removeTime(d, from.toDouble() / w.sampleRate, to.toDouble() / w.sampleRate), newDuration)
+        }
+        keepOriginal(it.audioPath, before)
+        ed.range = null
+        ed.selection = Selection.None
+        ed.applyAudioEdit(it.audioPath, before, after, labels)
+        app.message(cutDone.format(formatSeconds((to - from).toDouble() / w.sampleRate)))
+    }
+
+    private suspend fun keepOriginal(path: String, bytes: ByteArray) = withContext(Dispatchers.Default) {
+        val b = backupPath(path)
+        if (!ed.workspace.fs.exists(b)) {
+            ed.workspace.fs.mkdirs(Paths.parent(b))
+            ed.workspace.fs.write(b, bytes)
+        }
     }
 
     /** Puts back the file as it was before the first cleaning. */
@@ -150,9 +176,9 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         val it = ed.item ?: return@run
         val b = backupPath(it.audioPath)
         if (!ed.workspace.fs.exists(b)) { app.message(noOriginal(), error = true); return@run }
-        withContext(Dispatchers.Default) { ed.workspace.fs.copy(b, it.audioPath) }
-        previous = null
-        ed.reloadAudio()
+        val now = withContext(Dispatchers.Default) { ed.workspace.fs.read(it.audioPath) }
+        val orig = withContext(Dispatchers.Default) { ed.workspace.fs.read(b) }
+        ed.applyAudioEdit(it.audioPath, now, orig, null)
         app.message(restored())
     }
 
@@ -188,16 +214,8 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         val before = w.bytes.copyOf()
         val changed = withContext(Dispatchers.Default) { (0 until w.channels).sumOf { ch -> f(w, ch, w.channel(ch)) } }
         if (changed == 0) return 0
-        withContext(Dispatchers.Default) {
-            val b = backupPath(it.audioPath)
-            if (!ed.workspace.fs.exists(b)) {
-                ed.workspace.fs.mkdirs(Paths.parent(b))
-                ed.workspace.fs.write(b, before)
-            }
-            ed.workspace.fs.write(it.audioPath, w.bytes)
-        }
-        previous = it.audioPath to before
-        ed.reloadAudio()
+        keepOriginal(it.audioPath, before)
+        ed.applyAudioEdit(it.audioPath, before, w.bytes, null)
         return changed
     }
 
@@ -227,7 +245,10 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         val profileShort = L("Select at least 50 ms of noise only", "Выделите хотя бы 50 мс, где только шум")
         val profileTaken = L("Noise profile taken", "Профиль шума взят")
         val noiseDone = L("Noise lowered ({0} samples changed)", "Шум снижен (изменено сэмплов: {0})")
-        val silenced = L("Silenced in the recording: {0}. Undo: Tools → Clean the recording → Undo.", "Заглушено в записи: {0}. Отменить: Инструменты → Чистка записи → Отменить.")
+        val cutDone = L("Cut out of the recording: {0}. Ctrl+Z puts it back.", "Вырезано из записи: {0}. Ctrl+Z вернёт.")
+        val cutOto = L("Cutting would move every oto marker after the cut; it works with labels only", "Вырезание сдвинуло бы все метки oto после него; оно работает только с разметкой")
+        val cutAll = L("The whole recording can't be cut out", "Нельзя вырезать всю запись")
+        val silenced = L("Silenced in the recording: {0}. Ctrl+Z puts it back.", "Заглушено в записи: {0}. Ctrl+Z вернёт.")
         val undone = L("The recording is back as it was before the last change", "Запись возвращена как до последнего изменения")
         val restored = L("The original recording is back", "Исходная запись возвращена")
         val noOriginal = L("This recording wasn't cleaned here", "Эту запись здесь не чистили")

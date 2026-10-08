@@ -229,7 +229,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
      * Writes labels in the item's format (or [format]) and returns the updated item.
      * The previous file is copied to .mlabeler/backup once per session.
      */
-    fun writeLabels(item: Item, doc: LabelDoc, duration: Double, format: LabelFormat? = null): Item {
+    fun writeLabels(item: Item, doc: LabelDoc, duration: Double, format: LabelFormat? = null, f0: ((Double) -> Float?)? = null): Item {
         val fmt = (format ?: item.labelFormat ?: state.defaultFormat).let { f ->
             if (f == LabelFormat.DsCsv && item.labelFormat != LabelFormat.DsCsv) LabelFormat.Lab else f
         }
@@ -247,7 +247,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.Lab -> HtkLab.write(doc)
             LabelFormat.TextGrid -> TextGridFormat.write(doc, duration)
             LabelFormat.Audacity -> AudacityLabels.write(doc)
-            LabelFormat.Ds -> mlabeler.core.format.DsFile.write(doc, if (fs.exists(path)) runCatching { fs.read(path).decodeToString() }.getOrNull() else null)
+            LabelFormat.Ds -> mlabeler.core.format.DsFile.write(doc, if (fs.exists(path)) runCatching { fs.read(path).decodeToString() }.getOrNull() else null, f0)
             LabelFormat.DsCsv -> {
                 // replace this recording's row, keep the others as they were
                 val rows = csvRows.getOrPut(path) { mutableListOf() }

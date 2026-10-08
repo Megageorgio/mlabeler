@@ -14,6 +14,7 @@ class WavEdit(original: ByteArray) {
     val bits: Int
     val format: Int
     private val dataStart: Int
+    private var rf64 = false
     val frames: Int
     private val bps: Int
 
@@ -43,7 +44,7 @@ class WavEdit(original: ByteArray) {
         if (fmt < 0 || start < 0 || ch <= 0 || rate <= 0) throw AudioException("WAV header is broken")
         val ok = (fmt == 1 && b in setOf(16, 24, 32)) || (fmt == 3 && b == 32)
         if (!ok) throw AudioException("Only 16/24/32-bit PCM and 32-bit float WAV can be cleaned (this one: format $fmt, $b bit)")
-        format = fmt; channels = ch; sampleRate = rate; bits = b; dataStart = start
+        format = fmt; channels = ch; sampleRate = rate; bits = b; dataStart = start; rf64 = ds64 >= 0
         bps = b / 8
         frames = (size / (bps * ch)).toInt()
     }
@@ -78,6 +79,35 @@ class WavEdit(original: ByteArray) {
             else -> put(i, (x * 2147483648.0).roundToLong().coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()), 4)
         }
         return (0 until bps).any { bytes[i + it] != before[it] }
+    }
+
+    /**
+     * The file without frames [from, to): the samples just before the cut are crossfaded with the last ones of the
+     * removed part over [fadeFrames], so the join doesn't click. Header and other chunks stay; sizes are updated.
+     */
+    fun withoutFrames(from: Int, to: Int, fadeFrames: Int): ByteArray {
+        if (rf64) throw AudioException("RF64 files can't be shortened")
+        val a = from.coerceIn(0, frames)
+        val b = to.coerceIn(a, frames)
+        if (b == a) return bytes.copyOf()
+        val n = minOf(fadeFrames, a, b - a).coerceAtLeast(0)
+        // crossfade in place: frames a-n..a fade into frames b-n..b
+        for (k in 0 until n) {
+            val w = (k + 1).toFloat() / (n + 1)
+            for (ch in 0 until channels) set(a - n + k, ch, get(a - n + k, ch) * (1 - w) + get(b - n + k, ch) * w)
+        }
+        val frameBytes = bps * channels
+        val cutStart = dataStart + a * frameBytes
+        val cutEnd = dataStart + b * frameBytes
+        val removed = cutEnd - cutStart
+        val out = ByteArray(bytes.size - removed)
+        bytes.copyInto(out, 0, 0, cutStart)
+        bytes.copyInto(out, cutStart, cutEnd, bytes.size)
+        fun put32(i: Int, v: Long) { for (k in 0 until 4) out[i + k] = (v shr (8 * k)).toByte() }
+        fun get32(i: Int) = (u8(i).toLong() or (u8(i + 1).toLong() shl 8) or (u8(i + 2).toLong() shl 16) or (u8(i + 3).toLong() shl 24))
+        put32(4, get32(4) - removed)
+        put32(dataStart - 4, get32(dataStart - 4) - removed)
+        return out
     }
 
     private fun put(i: Int, v: Long, n: Int) {

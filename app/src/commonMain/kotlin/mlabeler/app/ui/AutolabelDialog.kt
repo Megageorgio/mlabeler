@@ -303,7 +303,7 @@ fun AutolabelDialog(app: AppState) {
 @Composable
 fun Choice(title: String, sub: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val c = T.c
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(c.radius)
+    val shape = mlabeler.app.theme.RoundedCornerShape(c.radius)
     Column(
         modifier.clip(shape).background(if (selected) c.accent.copy(alpha = 0.16f) else c.panelAlt)
             .border(if (selected) 2.dp else c.borderWidth, if (selected) c.accent else c.border, shape)

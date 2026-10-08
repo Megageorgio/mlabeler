@@ -27,7 +27,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
@@ -270,6 +270,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         if (oto) add(item(Commands.autoOto, ed, app)) else add(item(Commands.autolabel, ed, app))
         add(item(Commands.cleanup, ed, app))
         add(item(Commands.mute, ed, app))
+        if (!oto) add(item(Commands.cutAudio, ed, app))
         add(item(Commands.soundCheck, ed, app))
         if (!oto) add(item(Commands.summary, ed, app))
         add(MSep)

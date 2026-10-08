@@ -42,6 +42,16 @@ class DsKeepTest {
     }
 
     @Test
+    fun drawnF0GoesIntoTheSentence() {
+        val doc = DsFile.read(ds, 5.0)
+        // second sentence starts at 3.0, step 5 ms: its middle point is at 3.005
+        val out = Json.parseToJsonElement(DsFile.write(doc, ds) { t -> if (kotlin.math.abs(t - 3.005) < 1e-6) 440f else null }).jsonArray
+        assertEquals("1 2 3", out[0].jsonObject["f0_seq"]!!.jsonPrimitive.content)
+        assertEquals("4 440 6", out[1].jsonObject["f0_seq"]!!.jsonPrimitive.content)
+        assertEquals(2, DsFile.readF0(ds).size)
+    }
+
+    @Test
     fun csvKeepsOtherColumnsAndRows() {
         val text = "name,ph_seq,ph_dur,ph_num,extra\nx,SP a SP,0.1 0.2 0.1,1 1 1,keep me\ny,SP o SP,0.1 0.3 0.1,1 1 1,me too\n"
         val rows = DsCsv.read(text)
@@ -53,5 +63,29 @@ class DsKeepTest {
         assertEquals(listOf("x", "SP a SP", "0.1 0.2 0.1", "1 1 1", "keep me"), out[1])
         assertEquals("SP u SP", out[2][1])
         assertEquals("me too", out[2][4])
+    }
+}
+
+class RemoveTimeTest {
+    @Test
+    fun cutsAndShifts() {
+        val t = IntervalTier("phones", listOf(0.0, 1.0, 2.0, 3.0), listOf("A", "B", "C"))
+        val d = mlabeler.core.edit.Edits.removeTime(mlabeler.core.model.LabelDoc(listOf(t)), 0.5, 2.5).tiers[0] as IntervalTier
+        assertEquals(listOf(0.0, 0.5, 1.0), d.bounds)
+        assertEquals(listOf("A", "C"), d.texts)
+        val e = mlabeler.core.edit.Edits.removeTime(mlabeler.core.model.LabelDoc(listOf(t)), 1.5, 2.5).tiers[0] as IntervalTier
+        assertEquals(listOf(0.0, 1.0, 1.5, 2.0), e.bounds)
+    }
+
+    @Test
+    fun wavShortens() {
+        val sr = 1000
+        val samples = FloatArray(1000) { if (it < 500) 0.5f else -0.5f }
+        val wav = mlabeler.core.audio.Wav.encode16(mlabeler.core.audio.Audio(sr, samples))
+        val out = mlabeler.core.audio.WavEdit(wav).withoutFrames(200, 700, 5)
+        val back = mlabeler.core.audio.Wav.decode(out)
+        assertEquals(500, back.samples.size)
+        assertEquals(0.5f, back.samples[100], 1e-3f)
+        assertEquals(-0.5f, back.samples[300], 1e-3f)
     }
 }

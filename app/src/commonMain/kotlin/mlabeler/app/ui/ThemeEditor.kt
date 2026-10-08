@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +51,7 @@ private val darkT = L("Dark theme (for system parts like scroll bars)", "Тём�
 private val radiusT = L("Corner rounding", "Скругление углов")
 private val borderT = L("Border width", "Толщина рамок")
 private val squareT = L("Flat pressed buttons", "Плоские нажатые кнопки")
+private val pipetteT = L("Take a colour from the screen (Esc cancels)", "Взять цвет с экрана (Esc — отмена)")
 private val monoT = L("Monospace font", "Моноширинный шрифт")
 private val checkboxesT = L("Check boxes instead of switches", "Галочки вместо переключателей")
 private val dimT = L("Darken the program behind the settings", "Затемнять программу за окном настроек")
@@ -226,6 +227,10 @@ fun ColorRow(title: String, color: Color, onRemove: (() -> Unit)? = null, onChan
                     .background(checker()).background(color).clickable { open = !open },
             )
             Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 10.dp).weight(1f))
+            // a pipette: take any colour from the screen
+            if (mlabeler.app.ScreenColor.supported) IconBtn(Icons.pipette, pipetteT(), size = 26.dp, tint = c.muted) {
+                mlabeler.app.ScreenColor.pick { argb -> if (argb != null) onChange(Color(argb or (0xFF shl 24)).copy(alpha = color.alpha)) }
+            }
             Field(text, { v -> text = v; ThemeFiles.color(v)?.let(onChange) }, Modifier.width(110.dp), textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp))
             if (onRemove != null) IconBtn(Icons.close, S.removeFromList(), size = 26.dp) { onRemove() }
         }
@@ -257,8 +262,8 @@ private fun toHsv(c: Color): FloatArray {
 }
 
 private val crispT = L("No smoothing (hard pixel edges)", "Без сглаживания (чёткие пиксели)")
-private val crispNote = L("Square corners and text without smoothing, as in old programs. Text stays smooth on Android.",
-    "Углы без скругления, текст без сглаживания, как в старых программах. На Android текст останется сглаженным.")
+private val crispNote = L("Corners keep their rounding but are drawn as pixel steps; text, sliders and switches without smoothing, as in old programs. On Android text stays smoothed.",
+    "Скругления остаются, но рисуются ступеньками пикселей; текст, ползунки и переключатели без сглаживания, как в старых программах. На Android текст останется сглаженным.")
 private val fontT = L("Interface font", "Шрифт интерфейса")
 private val fontTheme = L("As in the theme", "Как в теме")
 private val fontSearch = L("Find a font", "Найти шрифт")

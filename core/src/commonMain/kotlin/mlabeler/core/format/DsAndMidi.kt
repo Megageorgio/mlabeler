@@ -81,6 +81,38 @@ object DsFile {
      * field mlabeler doesn't edit (f0, text, gender…), and gets the phonemes, groups and notes that lie in its time
      * span. Without [previous], one sentence that starts at the first phoneme.
      */
+    /** f0 of each sentence that has one: start time (its offset), step and values in Hz (0 = unvoiced). */
+    fun readF0(text: String): List<Triple<Double, Double, FloatArray>> = runCatching {
+        val root = json.parseToJsonElement(text)
+        val sentences = if (root is JsonArray) root.map { it.jsonObject } else listOf(root.jsonObject)
+        sentences.mapNotNull { s ->
+            val step = (s["f0_timestep"] as? JsonPrimitive)?.content?.toDoubleOrNull() ?: return@mapNotNull null
+            val values = words(s["f0_seq"]).map { it.toFloatOrNull() ?: 0f }
+            if (values.isEmpty() || step <= 0) null
+            else Triple((s["offset"] as? JsonPrimitive)?.doubleOrNull ?: 0.0, step, values.toFloatArray())
+        }
+    }.getOrDefault(emptyList())
+
+    /**
+     * Writes [doc] back into the sentences of [previous] (see the other overload); where [f0] gives a value (Hz) for
+     * a point of a sentence's f0_seq, that point is replaced (drawn pitch).
+     */
+    fun write(doc: LabelDoc, previous: String?, f0: ((Double) -> Float?)?): String {
+        val text = write(doc, previous)
+        if (f0 == null) return text
+        val root = json.parseToJsonElement(text).jsonArray
+        return json.encodeToString(JsonElement.serializer(), JsonArray(root.map { el ->
+            val s = el.jsonObject
+            val step = (s["f0_timestep"] as? JsonPrimitive)?.content?.toDoubleOrNull()
+            val seq = words(s["f0_seq"])
+            if (step == null || step <= 0 || seq.isEmpty()) return@map s
+            val off = (s["offset"] as? JsonPrimitive)?.doubleOrNull ?: 0.0
+            var changed = false
+            val out = seq.mapIndexed { j, v -> f0(off + j * step)?.let { changed = true; formatNumber(it.toDouble(), 1) } ?: v }
+            if (!changed) s else JsonObject(s.toMutableMap().also { it["f0_seq"] = JsonPrimitive(out.joinToString(" ")) })
+        }))
+    }
+
     fun write(doc: LabelDoc, previous: String? = null): String {
         val ph = doc.tiers[doc.phonemeTierIndex()] as IntervalTier
         val words = doc.wordTierIndex().takeIf { it >= 0 }?.let { doc.tiers[it] as IntervalTier }

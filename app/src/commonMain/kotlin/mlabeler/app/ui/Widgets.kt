@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
+import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -47,6 +47,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -389,10 +392,13 @@ fun ValueSlider(
                 }
             }
         }
-        androidx.compose.material3.Slider(
+        val move: (Float) -> Unit = { editing = false; if (live) onChange(it) else { dragValue = it; text = shown(it) } }
+        val done: () -> Unit = { dragValue?.let { onChange(it) }; dragValue = null }
+        if (c.crisp || c.checkboxes) ClassicSlider((dragValue ?: value).coerceIn(range), range, move, done)
+        else androidx.compose.material3.Slider(
             value = (dragValue ?: value).coerceIn(range),
-            onValueChange = { editing = false; if (live) onChange(it) else { dragValue = it; text = shown(it) } },
-            onValueChangeFinished = { dragValue?.let { onChange(it) }; dragValue = null },
+            onValueChange = move,
+            onValueChangeFinished = done,
             valueRange = range,
             colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.border),
             modifier = Modifier.height(32.dp),
@@ -423,7 +429,7 @@ fun DropHint(text: String) {
 @Composable
 fun Toggle(value: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val c = T.c
-    if (!c.checkboxes) {
+    if (!c.checkboxes && !c.crisp) {
         androidx.compose.material3.Switch(value, onChange, modifier,
             colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
         return
@@ -435,7 +441,7 @@ fun Toggle(value: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Mod
     ) {
         val px = size.width / 16f
         // sunken frame: dark top-left, light bottom-right
-        drawRect(c.border)
+        drawRect(if (c.dark) c.border else c.muted)
         drawRect(androidx.compose.ui.graphics.Color.White, androidx.compose.ui.geometry.Offset(px, px), androidx.compose.ui.geometry.Size(size.width - px, size.height - px))
         drawRect(box, androidx.compose.ui.geometry.Offset(px, px), androidx.compose.ui.geometry.Size(size.width - 2 * px, size.height - 2 * px))
         drawRect(c.border.copy(alpha = 0.6f), androidx.compose.ui.geometry.Offset(px, px), androidx.compose.ui.geometry.Size(size.width - 2 * px, px))
@@ -446,5 +452,62 @@ fun Toggle(value: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Mod
             }
             drawPath(p, tick, style = androidx.compose.ui.graphics.drawscope.Stroke(2.2f * px))
         }
+    }
+}
+
+
+/**
+ * A slider of classic desktop forms: a thin sunken groove and a raised rectangular thumb, drawn on whole pixels
+ * without smoothing.
+ */
+@Composable
+fun ClassicSlider(value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit, onFinished: () -> Unit, modifier: Modifier = Modifier) {
+    val c = T.c
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val thumbW = kotlin.math.round(11 * density)
+    val span = (range.endInclusive - range.start).takeIf { it > 0f } ?: 1f
+    fun valueAt(x: Float, width: Float) = (range.start + ((x - thumbW / 2) / (width - thumbW).coerceAtLeast(1f)).coerceIn(0f, 1f) * span)
+    val light = androidx.compose.ui.graphics.Color.White
+    val dark = if (c.dark) c.border else c.muted
+    androidx.compose.foundation.Canvas(
+        modifier.fillMaxWidth().height(32.dp).pointerInput(range) {
+            awaitEachGesture {
+                val down = awaitFirstDown()
+                onChange(valueAt(down.position.x, size.width.toFloat()))
+                down.consume()
+                while (true) {
+                    val ev = awaitPointerEvent()
+                    val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!ch.pressed) break
+                    onChange(valueAt(ch.position.x, size.width.toFloat()))
+                    ch.consume()
+                }
+                onFinished()
+            }
+        },
+    ) {
+        val w = size.width
+        val px = kotlin.math.max(1f, kotlin.math.round(density))
+        val cy = kotlin.math.round(size.height / 2)
+        fun rect(color: androidx.compose.ui.graphics.Color, x: Float, y: Float, rw: Float, rh: Float) =
+            drawRect(color, androidx.compose.ui.geometry.Offset(kotlin.math.round(x), kotlin.math.round(y)), androidx.compose.ui.geometry.Size(kotlin.math.round(rw), kotlin.math.round(rh)))
+        // the groove: dark top and left, light bottom and right
+        val gy = cy - 2 * px
+        rect(dark, thumbW / 2, gy, w - thumbW, px)
+        rect(dark, thumbW / 2, gy, px, 4 * px)
+        rect(light, thumbW / 2, gy + 3 * px, w - thumbW, px)
+        rect(light, w - thumbW / 2 - px, gy, px, 4 * px)
+        // the thumb: raised, filled with the panel colour
+        val f = ((value - range.start) / span).coerceIn(0f, 1f)
+        val tx = kotlin.math.round(f * (w - thumbW))
+        val th = kotlin.math.round(20 * density)
+        val ty = cy - kotlin.math.round(th / 2)
+        rect(c.panel, tx, ty, thumbW, th)
+        rect(light, tx, ty, thumbW - px, px)
+        rect(light, tx, ty, px, th - px)
+        rect(dark, tx, ty + th - px, thumbW, px)
+        rect(dark, tx + thumbW - px, ty, px, th)
+        rect(dark.copy(alpha = 0.5f), tx + px, ty + th - 2 * px, thumbW - 2 * px, px)
+        rect(dark.copy(alpha = 0.5f), tx + thumbW - 2 * px, ty + px, px, th - 2 * px)
     }
 }

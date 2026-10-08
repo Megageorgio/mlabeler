@@ -402,6 +402,9 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                         r is Region.LaneSplit -> PointerIcon.Hand
                                         hitBound(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
                                         hitOto(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
+                                        // the selected part can be dragged with its boundaries
+                                        (r == Region.Wave || r == Region.Spec) && ed.mode == Mode.Labels &&
+                                            ed.range?.let { (a, b) -> t > a && t < b } == true -> PointerIcon.Hand
                                         else -> PointerIcon.Default
                                     }
                                 }
@@ -505,8 +508,11 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             if (ed.f0Pencil) {
                                 val erase = first.buttons.isSecondaryPressed
                                 ed.beginF0Stroke()
+                                // Shift: the drawn line keeps to the notes of the song's key
+                                val key = ed.detectedKey()
+                                fun snap(m: Double, shift: Boolean) = if (shift && key != null) ed.snapToKey(m, key) else m
                                 var lt = downTime
-                                var lm = midiAt(down.position.y)
+                                var lm = snap(midiAt(down.position.y), mods.isShiftPressed)
                                 ed.drawF0(lt, if (erase) null else lm, lt, if (erase) null else lm)
                                 while (true) {
                                     val ev = awaitPointerEvent()
@@ -514,7 +520,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     if (!chg.pressed) break
                                     if (chg.positionChange() != Offset.Zero) {
                                         val t = timeAt(chg.position.x)
-                                        val m = midiAt(chg.position.y.coerceIn(top, bottom))
+                                        val m = snap(midiAt(chg.position.y.coerceIn(top, bottom)), ev.keyboardModifiers.isShiftPressed)
                                         ed.drawF0(lt, if (erase) null else lm, t, if (erase) null else m)
                                         lt = t
                                         lm = m
@@ -527,7 +533,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             }
                             val noteK = ed.doc?.tiers?.indexOfFirst { it is NoteTier } ?: -1
                             val nt = ed.doc?.tiers?.getOrNull(noteK) as? NoteTier
-                            val hitI = if (nt == null || first.buttons.isSecondaryPressed) -1 else nt.notes.indexOfFirst { n ->
+                            val hitI = if (nt == null) -1 else nt.notes.indexOfFirst { n ->
                                 n.pitch != null && downTime in n.start..n.end && abs(yOf(n.pitch!!) - down.position.y) <= max(rowH / 2, 6 * density)
                             }
                             if (nt != null && hitI >= 0) {
@@ -537,6 +543,22 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     abs(down.position.x - ((n.end - ed.viewStart) * ed.pixelsPerSecond).toFloat()) <= grab -> false
                                     else -> null
                                 }
+                                // right click: on a border joins the two notes, inside puts the pitch back to the sung one
+                                if (!touch && first.buttons.isSecondaryPressed) {
+                                    when (edge) {
+                                        true -> ed.mergeNotes(noteK, hitI - 1)
+                                        false -> ed.mergeNotes(noteK, hitI)
+                                        null -> ed.restoreNotePitch(noteK, hitI)
+                                    }
+                                    return@awaitEachGesture
+                                }
+                                // Ctrl+click inside a note cuts it there (the second part is a slur)
+                                val ctrlDown = if (Platform.isMac) mods.isMetaPressed else mods.isCtrlPressed
+                                if (!touch && ctrlDown && edge == null) {
+                                    ed.splitNoteAt(noteK, downTime)
+                                    return@awaitEachGesture
+                                }
+                                val key = ed.detectedKey()
                                 ed.selectNote(noteK, hitI)
                                 ed.beginNoteDrag()
                                 val base = n.pitch!!
@@ -550,8 +572,13 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                         if (edge != null) ed.noteDragTo(noteK, hitI, edge, timeAt(chg.position.x))
                                         else {
                                             val raw = base + (down.position.y - chg.position.y) / rowH
-                                            // semitones; with Alt in cents
-                                            ed.notePitchDragTo(noteK, hitI, if (ev.keyboardModifiers.isAltPressed) kotlin.math.round(raw * 100) / 100 else kotlin.math.round(raw))
+                                            // semitones; with Alt in cents; with Shift only the notes of the key
+                                            val km = ev.keyboardModifiers
+                                            ed.notePitchDragTo(noteK, hitI, when {
+                                                km.isAltPressed -> kotlin.math.round(raw * 100) / 100
+                                                km.isShiftPressed && key != null -> ed.snapToKey(raw, key)
+                                                else -> kotlin.math.round(raw)
+                                            })
                                         }
                                         chg.consume()
                                     }
@@ -641,6 +668,34 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 }
                             }
                             if (moved) ed.endDrag(bound) else ed.cancelDrag(bound)
+                            return@awaitEachGesture
+                        }
+
+                        // a press inside the selected part (on the audio) drags all boundaries in it together
+                        val inRange = ed.range?.let { (a, b) -> downTime > a && downTime < b } == true
+                        if (!touch && !pan && inRange && ed.mode == Mode.Labels && (region == Region.Wave || region == Region.Spec) &&
+                            !mods.isShiftPressed && ed.beginGroupDrag()) {
+                            var moved = false
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!chg.pressed) break
+                                if (!moved && hypot((chg.position - down.position).x, (chg.position - down.position).y) <= viewConfiguration.touchSlop) continue
+                                moved = true
+                                ed.groupDragBy(timeAt(chg.position.x) - downTime)
+                                ed.cursor = timeAt(chg.position.x)
+                                chg.consume()
+                            }
+                            ed.endGroupDrag()
+                            if (moved) return@awaitEachGesture
+                            // a click without moving: as any click (clears the part, then does what a click is set to do)
+                            ed.range = null
+                            val act = mouseFor(ed, region, Gesture.Click)
+                            if (act != null && act != MouseActions.SELECT && act != MouseActions.RENAME && act != MouseActions.DELETE) {
+                                ed.cursor = downTime.coerceIn(0.0, ed.duration)
+                                if (ed.app.settings.edit.audioClickDeselects && ed.selection !is Selection.Note) ed.selection = Selection.None
+                                mouseAction(ed, region, downTime, act)
+                            } else onTap(ed, region, downTime, false, false, false)
                             return@awaitEachGesture
                         }
 
@@ -765,7 +820,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                 if (tb.second - tb.first < 24 * d.density) continue
                 Row(
                     Modifier.offset { IntOffset((8 * d.density).toInt(), tb.first.toInt() + (4 * d.density).toInt()) }
-                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).background(c.accent.copy(alpha = 0.9f)).padding(horizontal = 6.dp),
+                        .clip(mlabeler.app.theme.RoundedCornerShape(c.radius)).background(c.accent.copy(alpha = 0.9f)).padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(LaneTitles.name(id), color = c.onAccent, fontSize = 12.sp)
@@ -791,7 +846,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
             val d = LocalDensity.current
             Row(
                 Modifier.align(Alignment.TopEnd).offset { IntOffset(-(8 * d.density).toInt(), gl.pitchTop.toInt() + (4 * d.density).toInt()) }
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).background(c.panel.copy(alpha = 0.85f)),
+                    .clip(mlabeler.app.theme.RoundedCornerShape(c.radius)).background(c.panel.copy(alpha = 0.85f)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconBtn(Icons.edit, PianoTitles.pencil(), Commands.f0Pencil.keyLabel, active = ed.f0Pencil, size = 28.dp) { ed.f0Pencil = !ed.f0Pencil }

@@ -67,7 +67,7 @@ import mlabeler.app.theme.T
 import mlabeler.app.theme.Themes
 import mlabeler.core.format.LabelFormat
 import kotlin.math.roundToInt
-import androidx.compose.foundation.shape.RoundedCornerShape
+import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
@@ -893,13 +893,13 @@ private object DangerTitles {
 private fun DangerZone(app: AppState) {
     val c = T.c
     var asked by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(top = 28.dp).border(c.borderWidth, c.danger.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).padding(12.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 28.dp).border(c.borderWidth, c.danger.copy(alpha = 0.6f), mlabeler.app.theme.RoundedCornerShape(c.radius)).padding(12.dp)) {
         Text(DangerTitles.title(), color = c.danger, fontSize = 14.sp)
         Text(DangerTitles.about(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!asked) Btn(DangerTitles.title()) { asked = true }
             else {
-                Box(Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(c.radius)).background(c.danger)
+                Box(Modifier.clip(mlabeler.app.theme.RoundedCornerShape(c.radius)).background(c.danger)
                     .clickable { app.deleteAllProgramData() }.padding(horizontal = 14.dp, vertical = 8.dp)) {
                     Text(DangerTitles.sure(), color = c.bg, fontSize = 13.sp)
                 }

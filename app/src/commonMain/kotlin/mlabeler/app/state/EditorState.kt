@@ -229,8 +229,8 @@ class EditorState(
 
     val labelsDirty: Boolean get() { docVersion; return history?.dirty == true }
     val dirty: Boolean get() = if (mode == Mode.Oto) oto.dirty else labelsDirty
-    val canUndo: Boolean get() { docVersion; return if (mode == Mode.Oto) oto.canUndo else history?.canUndo == true }
-    val canRedo: Boolean get() { docVersion; return if (mode == Mode.Oto) oto.canRedo else history?.canRedo == true }
+    val canUndo: Boolean get() { docVersion; return audioStepToUndo() != null || if (mode == Mode.Oto) oto.canUndo else history?.canUndo == true }
+    val canRedo: Boolean get() { docVersion; return audioStepToRedo() != null || if (mode == Mode.Oto) oto.canRedo else history?.canRedo == true }
 
     var selection by mutableStateOf<Selection>(Selection.None)
     var activeTier by mutableIntStateOf(0)
@@ -1024,9 +1024,9 @@ class EditorState(
             loadReferences()
             peaks = withContext(Dispatchers.Default) { Peaks.build(a.samples, a.sampleRate) }
             power = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.power(a.samples, a.sampleRate) }
-            if (settings.layout.showPitch) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
+            if (settings.layout.showPitch) pitch = withContext(Dispatchers.Default) { pitchOf(item, a) }
             computeSpectrogram(a)
-            if (pitch == null) pitch = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
+            if (pitch == null) pitch = withContext(Dispatchers.Default) { pitchOf(item, a) }
             loadF0Edits()
             fitPitchRange()
         }
@@ -1071,13 +1071,66 @@ class EditorState(
     fun commit(newDoc: LabelDoc) {
         lastEdit = now()
         val h = history ?: return
+        audioRedo.clear()
         h.push(newDoc)
         committed = h.current
         dragDoc = null
         docChanged()
     }
 
+    // ---------- changes of the recording itself, undone with Ctrl+Z in order with label changes ----------
+
+    /** A change of the audio file: its bytes before and after, whether labels were changed with it, and the label
+     *  version right after it (the step is next to undo only while the labels are still at that version). */
+    private class AudioStep(val path: String, val before: ByteArray, val after: ByteArray, val labels: Boolean, var version: Long)
+    private val audioUndo = ArrayDeque<AudioStep>()
+    private val audioRedo = ArrayDeque<AudioStep>()
+
+    /** Writes [after] to [path] (the open recording) and, when given, [labels] as one undo step. */
+    fun applyAudioEdit(path: String, before: ByteArray, after: ByteArray, labels: LabelDoc?) {
+        workspace.fs.write(path, after)
+        val v0 = history?.version
+        if (labels != null) commit(labels)
+        audioRedo.clear()
+        audioUndo.addLast(AudioStep(path, before, after, history?.version != v0, history?.version ?: 0))
+        // kept in memory: a few steps, at most ~400 MB
+        while (audioUndo.size > 1 && (audioUndo.size > 20 || audioUndo.sumOf { it.before.size.toLong() + it.after.size } > 400L shl 20)) audioUndo.removeFirst()
+        reloadAudio()
+    }
+
+    private fun audioStepToUndo(): AudioStep? = audioUndo.lastOrNull()?.takeIf { it.path == item?.audioPath && it.version == (history?.version ?: 0) }
+    private fun audioStepToRedo(): AudioStep? = audioRedo.lastOrNull()?.takeIf { it.path == item?.audioPath && it.version == (history?.version ?: 0) }
+    val canUndoAudio: Boolean get() { docVersion; return audioStepToUndo() != null }
+
+    /** Undoes the last change of the recording (and the label change made with it). */
+    fun undoAudio(): Boolean {
+        val s = audioStepToUndo() ?: return false
+        audioUndo.removeLast()
+        workspace.fs.write(s.path, s.before)
+        val h = history
+        if (s.labels && h != null && h.undo()) { committed = h.current; fixSelection(); docChanged() }
+        s.version = history?.version ?: 0
+        audioRedo.addLast(s)
+        reloadAudio()
+        docVersion++
+        return true
+    }
+
+    private fun redoAudio(): Boolean {
+        val s = audioStepToRedo() ?: return false
+        audioRedo.removeLast()
+        workspace.fs.write(s.path, s.after)
+        val h = history
+        if (s.labels && h != null && h.redo()) { committed = h.current; fixSelection(); docChanged() }
+        s.version = history?.version ?: 0
+        audioUndo.addLast(s)
+        reloadAudio()
+        docVersion++
+        return true
+    }
+
     fun undo() {
+        if (runCatching { undoAudio() }.getOrElse { app.message(it.message ?: it.toString(), error = true); true }) return
         if (mode == Mode.Oto) return oto.undo()
         val h = history ?: return
         if (h.undo()) {
@@ -1088,6 +1141,7 @@ class EditorState(
     }
 
     fun redo() {
+        if (runCatching { redoAudio() }.getOrElse { app.message(it.message ?: it.toString(), error = true); true }) return
         if (mode == Mode.Oto) return oto.redo()
         val h = history ?: return
         if (h.redo()) {
@@ -1115,12 +1169,41 @@ class EditorState(
         saveLabels(quiet)
     }
 
+    /**
+     * Pitch of the recording: analysed here, and where a .ds has its own f0 (from the dataset's pitch extractor),
+     * that f0 instead.
+     */
+    private fun pitchOf(item: Item, a: Audio): mlabeler.core.dsp.Curve {
+        val own = mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate)
+        val path = item.labelPath
+        if (item.labelFormat != mlabeler.core.format.LabelFormat.Ds || path == null) return own
+        val ds = runCatching { mlabeler.core.format.DsFile.readF0(workspace.fs.read(path).decodeToString()) }.getOrDefault(emptyList())
+        if (ds.isEmpty()) return own
+        val v = own.values.copyOf()
+        for (i in v.indices) {
+            val t = i * own.hop
+            for ((off, step, f0) in ds) {
+                val j = kotlin.math.round((t - off) / step).toInt()
+                if (j in f0.indices) { v[i] = f0[j]; break }
+            }
+        }
+        return mlabeler.core.dsp.Curve(own.hop, v)
+    }
+
+    /** Drawn f0 at a time (Hz), for writing it into a .ds; null where nothing was drawn. */
+    private fun drawnF0At(time: Double): Float? {
+        val e = f0Edits ?: return null
+        val hop = pitch?.hop ?: return null
+        return e.getOrNull(kotlin.math.round(time / hop).toInt())?.takeIf { !it.isNaN() }
+    }
+
     private fun saveLabels(quiet: Boolean) {
         val it = item ?: return
         val d = committed ?: return
         val h = history ?: return
         try {
-            val updated = workspace.writeLabels(it, d, duration, if (it.labelFormat == null) (workspace.state.defaultFormat) else null)
+            val updated = workspace.writeLabels(it, d, duration, if (it.labelFormat == null) (workspace.state.defaultFormat) else null,
+                f0 = if (f0Edits != null) ::drawnF0At else null)
             items = items.map { x -> if (x.id == it.id) updated else x }
             h.markSaved()
             labelIndex = null
@@ -1292,6 +1375,41 @@ class EditorState(
         return true
     }
 
+    /** Dragging every boundary inside the selected part together: the labels and the part as they were at the start. */
+    private var groupDrag: Triple<LabelDoc, Int, List<Int>>? = null
+    private var groupRange: Pair<Double, Double>? = null
+
+    /** True when the selected part has boundaries in it and they can be dragged together. */
+    fun beginGroupDrag(): Boolean {
+        val d = committed ?: return false
+        val (k, inside) = rangeBounds() ?: return false
+        groupDrag = Triple(d, k, inside)
+        groupRange = range
+        return true
+    }
+
+    /** Moves the boundaries by [seconds] from where they were at [beginGroupDrag], not past their neighbours. */
+    fun groupDragBy(seconds: Double) {
+        val (d, k, inside) = groupDrag ?: return
+        val t = d.tiers[k] as? IntervalTier ?: return
+        val gap = settings.edit.minIntervalMs / 1000.0
+        val lo = t.bounds[inside.first() - 1] + gap
+        val hi = t.bounds[inside.last() + 1] - gap
+        val dt = seconds.coerceIn(lo - t.bounds[inside.first()], hi - t.bounds[inside.last()])
+        val nb = t.bounds.toMutableList()
+        for (b in inside) nb[b] = nb[b] + dt
+        dragDoc = d.replace(k, t.copy(bounds = nb))
+        range = groupRange?.let { (a, b) -> a + dt to b + dt }
+        docVersion++
+    }
+
+    fun endGroupDrag() {
+        val d = dragDoc
+        groupDrag = null
+        groupRange = null
+        if (d != null) commit(d) else dragDoc = null
+    }
+
     fun nudge(steps: Int) {
         if (selection == Selection.None && range != null && nudgeRange(steps * settings.edit.nudgeMs / 1000.0)) return
         val ref = (selection as? Selection.Bound)?.ref ?: return
@@ -1345,6 +1463,53 @@ class EditorState(
         val k = s?.tier ?: doc?.tiers?.indexOfFirst { it is mlabeler.core.model.NoteTier } ?: -1
         val t = noteTier(k) ?: return
         updateDoc { it.replace(k, mlabeler.core.edit.NoteEdits.pitchFromCurve(t, f0, round, if (all) null else setOfNotNull(s?.index))) }
+    }
+
+    /** Note [i] gets its pitch from the analysed f0 again (rounded to a semitone). */
+    fun restoreNotePitch(tier: Int, i: Int) {
+        val f0 = pitchCurve ?: return app.message(S.pitchNotReady())
+        val t = noteTier(tier) ?: return
+        updateDoc { it.replace(tier, mlabeler.core.edit.NoteEdits.pitchFromCurve(t, f0, true, setOf(i))) }
+        selectNote(tier, i)
+    }
+
+    /** Cuts note [i] at [time]; the right part is sung on the same syllable (a slur). */
+    fun splitNoteAt(tier: Int, time: Double) {
+        val t = noteTier(tier) ?: return
+        val (nt, k) = mlabeler.core.edit.NoteEdits.split(t, time) ?: return
+        val right = nt.notes.getOrNull(k)
+        val withSlur = if (right != null && k > 0) mlabeler.core.edit.NoteEdits.setSlur(nt, k, true) else nt
+        updateDoc { it.replace(tier, withSlur) }
+        selectNote(tier, k)
+    }
+
+    /** Joins note [i] with the next one. */
+    fun mergeNotes(tier: Int, i: Int) {
+        val t = noteTier(tier) ?: return
+        if (i !in 0 until t.notes.size - 1) return
+        updateDoc { it.replace(tier, mlabeler.core.edit.NoteEdits.mergeNext(t, i)) }
+        selectNote(tier, i)
+    }
+
+    /**
+     * The major key that fits the notes of this file best (by sung time per pitch class): 0 = C … 11 = B, or null
+     * without notes. Its minor relative has the same notes.
+     */
+    fun detectedKey(): Int? {
+        val t = doc?.tiers?.filterIsInstance<mlabeler.core.model.NoteTier>()?.firstOrNull() ?: return null
+        val weight = DoubleArray(12)
+        for (n in t.notes) n.pitch?.let { p -> weight[((kotlin.math.round(p).toInt() % 12) + 12) % 12] += n.end - n.start }
+        if (weight.sum() <= 0) return null
+        val major = intArrayOf(0, 2, 4, 5, 7, 9, 11)
+        return (0 until 12).maxByOrNull { k -> major.sumOf { weight[(k + it) % 12] } }
+    }
+
+    /** [midi] moved to the nearest note of [key] (major; same notes as its minor relative). */
+    fun snapToKey(midi: Double, key: Int): Double {
+        val major = setOf(0, 2, 4, 5, 7, 9, 11)
+        val base = kotlin.math.round(midi).toInt()
+        val cands = (base - 2..base + 2).filter { ((it - key) % 12 + 12) % 12 in major }
+        return (cands.minByOrNull { kotlin.math.abs(it - midi) } ?: base).toDouble()
     }
 
     /** Writes the notes tier to <name>.mid next to the recording. */

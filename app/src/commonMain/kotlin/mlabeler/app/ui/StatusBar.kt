@@ -32,6 +32,7 @@ object StatusItems {
     val names: Map<String, L> = linkedMapOf(
         "entry" to L("Phoneme number (167 / 1040)", "Номер фонемы (167 / 1040)"),
         "file" to L("File number (3 / 12)", "Номер файла (3 / 12)"),
+        "done" to L("Files marked done (7 / 12)", "Файлы, отмеченные готовыми (7 / 12)"),
         "phoneme" to L("Selected phoneme and its length", "Выбранная фонема и её длина"),
         "cursor" to L("Time under the mouse", "Время под мышью"),
         "range" to L("Selected part", "Выделенный кусок"),
@@ -44,6 +45,7 @@ object StatusItems {
     val helpT = L("Help", "Справка")
     val zoomT = L("Scale", "Масштаб")
     val fileT = L("File", "Файл")
+    val doneT = L("Done", "Готово")
 }
 
 @Composable
@@ -90,6 +92,10 @@ private fun StatusItem(app: AppState, ed: EditorState, id: String, st: StatusSet
         "file" -> if (ed.items.isNotEmpty()) {
             val n = ed.index + 1
             StatusText(StatusItems.fileT() + " ${if (n > 0) n else "–"} / ${ed.items.size}" + if (n > 0 && st.percent) " (${n * 100 / ed.items.size}%)" else "")
+        }
+        "done" -> if (ed.items.isNotEmpty()) {
+            val n = ed.items.count { ed.marks(it).done }
+            StatusText(StatusItems.doneT() + " $n / ${ed.items.size}" + if (st.percent) " (${n * 100 / ed.items.size}%)" else "")
         }
         "phoneme" -> (ed.selection as? Selection.Interval)?.ref?.let { r ->
             (ed.doc?.tiers?.getOrNull(r.tier) as? IntervalTier)?.takeIf { r.index < it.size }?.let { t ->

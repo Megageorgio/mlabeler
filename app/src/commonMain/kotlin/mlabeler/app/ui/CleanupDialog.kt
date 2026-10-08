@@ -46,9 +46,10 @@ private val repairT = L("Repair the selected part", "Починить выдел
 private val repairHint = L("Select a click by hand (up to 100 ms) and rebuild it from both sides.",
     "Выделите щелчок вручную (до 100 мс) и восстановите его по звуку с обеих сторон.")
 private val repairBtn = L("Repair", "Починить")
-private val muteT = L("Silence", "Заглушить")
-private val muteHint = L("Turns the selected part of the recording into silence (Ctrl+Shift+M in the editor: the selection or the selected phoneme). Undo below.",
-    "Превращает выделенный кусок записи в тишину (в редакторе Ctrl+Shift+M: выделение или выбранная фонема). Отмена — ниже.")
+private val muteT = L("Silence or cut out", "Заглушить или вырезать")
+private val muteHint = L("Silencing keeps the length (Ctrl+Shift+M in the editor); cutting out makes the recording shorter and moves the labels after it back (Ctrl+X). Both work on the selection or the selected phoneme and are undone with Ctrl+Z.",
+    "Заглушение сохраняет длину (в редакторе Ctrl+Shift+M); вырезание укорачивает запись и сдвигает разметку после куска назад (Ctrl+X). Оба действуют на выделение или выбранную фонему и отменяются через Ctrl+Z.")
+private val cutBtn = L("Cut out", "Вырезать")
 private val muteBtn = L("Silence the selection", "Заглушить выделенное")
 private val noiseT = L("Noise", "Шум")
 private val noiseHint = L(
@@ -113,7 +114,10 @@ fun CleanupDialog(app: AppState) {
 
             SectionTitle(muteT())
             Text(muteHint(), color = c.muted, fontSize = 12.sp)
-            Row(Modifier.padding(top = 6.dp)) { Btn(muteBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.silence(it) } } }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Btn(muteBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.silence(it) } }
+                Btn(cutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.cut(it) } }
+            }
 
             SectionTitle(noiseT())
             Text(noiseHint(), color = c.muted, fontSize = 12.sp)

@@ -2,7 +2,7 @@
 
 package mlabeler.app.ui
 
-import androidx.compose.foundation.shape.RoundedCornerShape
+import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -184,7 +184,7 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
         val done = ed.items.count { ed.marks(it).done }
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Text(S.doneCount.format(done, ed.items.size), color = c.muted, fontSize = 12.sp)
-            if (ed.items.isNotEmpty()) Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(4.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(2.dp)).background(c.panelAlt)) {
+            if (ed.items.isNotEmpty()) Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(4.dp).clip(mlabeler.app.theme.RoundedCornerShape(2.dp)).background(c.panelAlt)) {
                 Box(Modifier.fillMaxWidth(done.toFloat() / ed.items.size).height(4.dp).background(c.ok))
             }
         }
@@ -468,7 +468,7 @@ private fun TierRow(ed: EditorState, k: Int, name: String, active: Boolean, inde
     var editing by remember { mutableStateOf(false) }
     var value by remember(name) { mutableStateOf(name) }
     Row(
-        Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(c.radius))
+        Modifier.fillMaxWidth().clip(mlabeler.app.theme.RoundedCornerShape(c.radius))
             .background(if (active) c.panelAlt else c.panel)
             .clickable { ed.activeTier = k }.padding(start = 6.dp, top = 2.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
