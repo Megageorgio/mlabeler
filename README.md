@@ -5,6 +5,8 @@ One codebase for Windows, macOS, Linux, Android and iOS (Kotlin, Compose Multipl
 
 English · [中文](README.zh.md) · [Русский](README.ru.md)
 
+![mLabeler: waveform, spectrogram and phoneme labels](docs/screenshot.png)
+
 ## Download
 
 Ready builds for every platform are on the [Releases](https://github.com/Megageorgio/mlabeler/releases) page:

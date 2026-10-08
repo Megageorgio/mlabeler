@@ -5,6 +5,8 @@
 
 [English](README.md) · 中文 · [Русский](README.ru.md)
 
+![mLabeler：波形、频谱图和音素标注](docs/screenshot.png)
+
 ## 下载
 
 所有平台的安装包均位于 [Releases](https://github.com/Megageorgio/mlabeler/releases) 页面：

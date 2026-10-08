@@ -5,6 +5,8 @@
 
 [English](README.md) · [中文](README.zh.md) · Русский
 
+![mLabeler: волна, спектрограмма и разметка фонем](docs/screenshot.png)
+
 ## Скачать
 
 Готовые сборки для всех платформ лежат на странице [Releases](https://github.com/Megageorgio/mlabeler/releases):
