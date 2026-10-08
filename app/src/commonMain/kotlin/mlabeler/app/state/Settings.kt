@@ -190,7 +190,8 @@ object MouseActions {
 
 @Serializable
 data class ToolkitSettings(
-    val url: String = "http://127.0.0.1:8765",
+    /** The fully portable build has its own toolkit on its own port, so it never uses one installed elsewhere. */
+    val url: String = if (mlabeler.app.Platform.portableDir != null) "http://127.0.0.1:8766" else "http://127.0.0.1:8765",
     val token: String = "",
     val lastModel: String = "",
     val lastLanguage: String = "",
