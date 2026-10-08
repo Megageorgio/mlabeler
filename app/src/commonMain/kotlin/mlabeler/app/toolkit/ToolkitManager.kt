@@ -43,6 +43,9 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     var lastError by mutableStateOf("")
         private set
     val log = mutableStateListOf<String>()
+    /** The `mvt` launcher is there but what it starts was removed (its folders were deleted): installing again fixes it. */
+    var damaged by mutableStateOf(false)
+        private set
     /** Changes when models are added or removed, so the lists of models are read again. */
     var modelsVersion by androidx.compose.runtime.mutableIntStateOf(0)
     private val lock = Mutex()
@@ -88,7 +91,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
             lastError = e.message ?: ""
             if (status == Status.Checking || status == Status.Ready) status = when {
                 !canRunHere -> Status.Off
-                LocalToolkit.findMvt(settings.mvtPath) == null -> Status.Missing
+                damaged || LocalToolkit.findMvt(settings.mvtPath) == null -> Status.Missing
                 else -> Status.Off
             }
             false
@@ -99,7 +102,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     suspend fun ensure(): Boolean = lock.withLock {
         if (check()) return true
         if (!canRunHere || !settings.autoStart) return false
-        if (LocalToolkit.findMvt(settings.mvtPath) == null) { status = Status.Missing; return false }
+        if (damaged || LocalToolkit.findMvt(settings.mvtPath) == null) { status = Status.Missing; return false }
         startLocked()
     }
 
@@ -149,7 +152,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
     private var oldToolkit = false
 
     private suspend fun startLocked(): Boolean {
-        val mvt = LocalToolkit.findMvt(settings.mvtPath) ?: run { status = Status.Missing; return false }
+        val mvt = LocalToolkit.findMvt(settings.mvtPath)?.takeIf { !damaged } ?: run { status = Status.Missing; return false }
         busy(Status.Starting)
         networkToken = ""
         val full = startCommand(mvt)
@@ -164,6 +167,16 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
                 // the toolkit found a newer version of itself: it updates and starts again on its own
                 if (LocalToolkit.lastExitCode() == EXIT_UPDATING) return waitForUpdate(cmd)
                 if (LocalToolkit.lastExitCode() == 2 && !oldToolkit) { oldToolkit = true; return startLocked() }
+                // (the process's last lines reach the log a moment after it exits)
+                delay(300)
+                val said = log.drop(log.indexOfLast { it.startsWith("> ") } + 1)
+                if (said.any { line -> DAMAGED.any { it in line } }) {
+                    damaged = true
+                    status = Status.Missing
+                    lastError = ""
+                    ownProcess = false
+                    return false
+                }
                 status = Status.Failed
                 lastError = startFailed()
                 ownProcess = false
@@ -349,6 +362,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
                     return false
                 }
                 addLog(installed())
+                damaged = false
                 return true
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -369,7 +383,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         Status.Ready -> ready.format(version.ifEmpty { "?" }) + if (ownProcess) " · " + startedHere() else ""
         Status.Starting -> starting()
         Status.Installing -> if (updatingNow) updating() else installingT()
-        Status.Missing -> missing()
+        Status.Missing -> if (damaged) damagedT() else missing()
         Status.Off -> if (canRunHere) offHere() else offRemote()
         Status.Failed -> failed()
     }
@@ -392,6 +406,15 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         val updating = L("The toolkit is updating itself to a newer version and will start again…", "Тулкит обновляется до новой версии и запустится снова…")
         val startingAgain = L("The update is installed; starting the toolkit…", "Обновление установлено, тулкит запускается…")
         val updateFailed = L("The toolkit didn't come back after updating; see the log", "Тулкит не запустился после обновления, подробности в журнале")
+        val damagedT = L(
+            "mVocalToolkit's files were removed, only its launcher is left; install it again",
+            "Файлы mVocalToolkit удалены, остался только его ярлык запуска; установите его заново",
+        )
+        /** What a launcher whose program is gone says: uv's trampoline, the Windows py launcher, Python itself. */
+        private val DAMAGED = listOf(
+            "trampoline", "canonicalize", "No Python at", "Unable to create process",
+            "No module named 'mvocaltoolkit'", "No module named mvocaltoolkit",
+        )
         const val EXIT_UPDATING = 75
     }
 }
