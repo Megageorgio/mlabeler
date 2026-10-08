@@ -50,6 +50,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showSettings) SettingsDialog(app)
                     if (!app.settings.setupDone && rec == null && kar == null) mlabeler.app.ui.SetupDialog(app)
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
+                    if (app.showSegments && ed != null) mlabeler.app.ui.SegmentDialog(app)
                     if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)
                     if (app.showAutolabel && ed != null) mlabeler.app.ui.AutolabelDialog(app)
                     if (app.showCleanup && ed != null) mlabeler.app.ui.CleanupDialog(app)

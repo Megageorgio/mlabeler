@@ -4,6 +4,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
+import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -23,6 +25,11 @@ data class CleanSettings(
     val noiseReductionDb: Float = 12f,
     val noiseSensitivityDb: Float = 6f,
     val noiseSmoothing: Int = 3,
+    /** Peak level after normalising, dB below full scale. */
+    val normalizeDb: Float = -1f,
+    /** Trimming silence at the ends: what counts as silence (dB below the loudest part) and how much of it stays. */
+    val trimThresholdDb: Float = -45f,
+    val trimPadMs: Float = 200f,
 )
 
 /**
@@ -98,6 +105,88 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
     }
 
     private fun formatSeconds(s: Double) = "${kotlin.math.round(s * 1000).toInt()} ms"
+
+    /** Raises or lowers [range] (or the whole file) so its loudest sample is at [CleanSettings.normalizeDb]. */
+    fun normalize(range: Pair<Double, Double>?) = run("normalize") {
+        val target = 10.0.pow(app.settings.clean.normalizeDb / 20.0).toFloat()
+        var gainShown = 0.0
+        val n = modify { w, ch, x ->
+            val (from, to) = frames(range, w)
+            // one gain for all channels, so their balance stays
+            var peak = 0f
+            for (c in 0 until w.channels) for (i in from until to) peak = maxOf(peak, kotlin.math.abs(w.get(i, c)))
+            if (peak <= 1e-6f) return@modify 0
+            val g = target / peak
+            gainShown = 20 * kotlin.math.log10(g.toDouble())
+            var changed = 0
+            for (i in from until to) if (w.set(i, ch, x[i] * g)) changed++
+            changed
+        }
+        if (n > 0) app.message(normalized.format(((gainShown * 10).roundToInt() / 10.0).toString()))
+    }
+
+    /** Fades [range] in (from silence) or out (to silence) along a smooth curve. */
+    fun fade(range: Pair<Double, Double>, fadeIn: Boolean) = run("fade") {
+        modify { w, ch, x ->
+            val (from, to) = frames(range, w)
+            val len = (to - from).coerceAtLeast(1)
+            var changed = 0
+            for (i in from until to) {
+                val p = (i - from + 0.5) / len
+                val g = kotlin.math.sin((if (fadeIn) p else 1 - p) * kotlin.math.PI / 2).let { it * it }.toFloat()
+                if (w.set(i, ch, x[i] * g)) changed++
+            }
+            changed
+        }
+    }
+
+    /**
+     * Cuts silence off both ends of the file, keeping [CleanSettings.trimPadMs] of it; labels move with the sound.
+     */
+    fun trimSilence() = run("trim") {
+        val it = ed.item ?: return@run
+        if (ed.mode == Mode.Oto) { app.message(cutOto(), error = true); return@run }
+        val w = withContext(Dispatchers.Default) { readEdit() } ?: return@run
+        val s = app.settings.clean
+        val (first, last) = withContext(Dispatchers.Default) {
+            // loudness per 10 ms against the loudest part
+            val hop = (w.sampleRate / 100).coerceAtLeast(1)
+            val n = w.frames / hop
+            val level = DoubleArray(n) { k ->
+                var sum = 0.0
+                for (i in k * hop until (k + 1) * hop) for (c in 0 until w.channels) { val v = w.get(i, c); sum += v * v }
+                kotlin.math.sqrt(sum / (hop * w.channels))
+            }
+            val top = level.maxOrNull() ?: 0.0
+            val limit = top * 10.0.pow(s.trimThresholdDb / 20.0)
+            val a = level.indexOfFirst { it > limit }
+            val b = level.indexOfLast { it > limit }
+            if (a < 0) -1 to -1 else a * hop to minOf(w.frames, (b + 1) * hop)
+        }
+        if (first < 0) { app.message(trimNothing()); return@run }
+        val pad = (s.trimPadMs / 1000 * w.sampleRate).toInt()
+        val cutStart = (first - pad).coerceAtLeast(0)
+        val cutEnd = (last + pad).coerceAtMost(w.frames)
+        if (cutStart == 0 && cutEnd == w.frames) { app.message(trimNothing()); return@run }
+        val before = w.bytes.copyOf()
+        val sr = w.sampleRate.toDouble()
+        val after = withContext(Dispatchers.Default) {
+            val tail = if (cutEnd < w.frames) w.withoutFrames(cutEnd, w.frames, 0) else w.bytes.copyOf()
+            if (cutStart > 0) WavEdit(tail).withoutFrames(0, cutStart, 0) else tail
+        }
+        val newDuration = (cutEnd - cutStart) / sr
+        val labels = ed.doc?.let { d ->
+            var x = d
+            if (cutEnd < w.frames) x = mlabeler.core.edit.Edits.removeTime(x, cutEnd / sr, w.frames / sr)
+            if (cutStart > 0) x = mlabeler.core.edit.Edits.removeTime(x, 0.0, cutStart / sr)
+            mlabeler.core.edit.Edits.fitToDuration(x, newDuration)
+        }
+        keepOriginal(it.audioPath, before)
+        ed.range = null
+        ed.selection = Selection.None
+        ed.applyAudioEdit(it.audioPath, before, after, labels)
+        app.message(trimmed.format(formatSeconds(cutStart / sr), formatSeconds((w.frames - cutEnd) / sr)))
+    }
 
     fun takeNoiseProfile(range: Pair<Double, Double>) = run("profile") {
         val w = withContext(Dispatchers.Default) { readEdit() } ?: return@run
@@ -245,6 +334,9 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         val profileShort = L("Select at least 50 ms of noise only", "Выделите хотя бы 50 мс, где только шум")
         val profileTaken = L("Noise profile taken", "Профиль шума взят")
         val noiseDone = L("Noise lowered ({0} samples changed)", "Шум снижен (изменено сэмплов: {0})")
+        val normalized = L("Level changed by {0} dB. Ctrl+Z puts it back.", "Громкость изменена на {0} дБ. Ctrl+Z вернёт.")
+        val trimNothing = L("No silence to trim at the ends", "По краям нечего обрезать")
+        val trimmed = L("Trimmed: {0} at the start, {1} at the end. Ctrl+Z puts it back.", "Обрезано: {0} в начале, {1} в конце. Ctrl+Z вернёт.")
         val cutDone = L("Cut out of the recording: {0}. Ctrl+Z puts it back.", "Вырезано из записи: {0}. Ctrl+Z вернёт.")
         val cutOto = L("Cutting would move every oto marker after the cut; it works with labels only", "Вырезание сдвинуло бы все метки oto после него; оно работает только с разметкой")
         val cutAll = L("The whole recording can't be cut out", "Нельзя вырезать всю запись")

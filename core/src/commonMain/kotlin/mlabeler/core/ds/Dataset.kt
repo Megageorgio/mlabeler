@@ -238,3 +238,35 @@ object Dataset {
     /** f0 of a whole recording for note estimation. */
     fun f0(a: Audio): Curve = Pitch.yin(a.samples, a.sampleRate, hop = 0.01)
 }
+
+/** Finding the sounding parts of a recording without labels. */
+object Silence {
+    /**
+     * Parts louder than [thresholdDb] below the loudest 10 ms; quieter gaps shorter than [minPause] are bridged,
+     * parts shorter than [minSound] dropped, [pad] of silence kept around each (never into the neighbour).
+     */
+    fun sounding(samples: FloatArray, sampleRate: Int, thresholdDb: Double = -40.0, minPause: Double = 0.3, minSound: Double = 0.2, pad: Double = 0.15): List<Pair<Double, Double>> {
+        val hop = (sampleRate / 100).coerceAtLeast(1)
+        val n = samples.size / hop
+        if (n == 0) return emptyList()
+        val level = DoubleArray(n) { k -> var s = 0.0; for (i in k * hop until (k + 1) * hop) s += samples[i] * samples[i]; kotlin.math.sqrt(s / hop) }
+        val limit = (level.maxOrNull() ?: 0.0) * kotlin.math.exp(thresholdDb / 20.0 * kotlin.math.ln(10.0))
+        val runs = ArrayList<IntArray>()
+        var k = 0
+        while (k < n) {
+            if (level[k] <= limit) { k++; continue }
+            var j = k
+            while (j + 1 < n && level[j + 1] > limit) j++
+            val last = runs.lastOrNull()
+            if (last != null && (k - last[1]) * 0.01 < minPause) last[1] = j + 1 else runs += intArrayOf(k, j + 1)
+            k = j + 1
+        }
+        val dur = samples.size.toDouble() / sampleRate
+        val parts = runs.filter { (it[1] - it[0]) * 0.01 >= minSound }.map { it[0] * 0.01 to it[1] * 0.01 }
+        return parts.mapIndexed { i, (a, b) ->
+            val lo = if (i > 0) (parts[i - 1].second + a) / 2 else 0.0
+            val hi = if (i < parts.size - 1) (b + parts[i + 1].first) / 2 else dur
+            maxOf(lo, a - pad) to minOf(hi, b + pad)
+        }
+    }
+}

@@ -38,6 +38,7 @@ class AppState(private val scope: CoroutineScope) {
     var settingsPage by mutableStateOf("")
     var showCommands by mutableStateOf(false)
     var showBatchRename by mutableStateOf(false)
+    var showSegments by mutableStateOf(false)
     var showWorkspace by mutableStateOf(false)
     var showAutolabel by mutableStateOf(false)
     var showCleanup by mutableStateOf(false)

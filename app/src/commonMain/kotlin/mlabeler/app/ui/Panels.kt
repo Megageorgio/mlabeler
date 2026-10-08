@@ -455,11 +455,13 @@ private fun problemTitle(p: Problem) = when (p.kind) {
     Problem.Kind.BelowFrame -> probFrame() + " (${p.detail})"
     Problem.Kind.SpaceInPhoneme -> probSpace() + " «${p.detail}»"
     Problem.Kind.TwoPauses -> probTwoPauses() + " (${p.detail})"
+    Problem.Kind.NotesLength -> probNotes() + " (${p.detail})"
 }
 
 private val probZero = L("Zero length", "Нулевая длина")
 private val probFrame = L("Shorter than one DiffSinger frame", "Короче одного кадра DiffSinger")
 private val probSpace = L("Space inside the phoneme", "Пробел внутри фонемы")
+private val probNotes = L("Notes don't last as long as the phonemes of this sentence", "Ноты не совпадают по длине с фонемами этого предложения")
 private val probTwoPauses = L("Two same pauses in a row", "Две одинаковые паузы подряд")
 
 @Composable

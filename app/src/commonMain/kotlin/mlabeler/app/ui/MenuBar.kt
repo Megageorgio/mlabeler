@@ -148,6 +148,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             for (c in listOf(Commands.otoLeft, Commands.otoOverlap, Commands.otoPreu, Commands.otoCons, Commands.otoRight)) add(item(c, ed, app))
             add(MSep)
             add(item(Commands.otoLock, ed, app, checked = s.edit.otoLockedDrag))
+            add(item(Commands.batchRename, ed, app))
         } else {
             add(item(Commands.split, ed, app))
             add(item(Commands.merge, ed, app))
@@ -168,6 +169,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
                 item(Commands.groupPhonemes, ed, app), item(Commands.notesFromGroups, ed, app), MSep,
                 item(Commands.pitchUp, ed, app), item(Commands.pitchDown, ed, app), item(Commands.notesFromAudio, ed, app),
                 MSep, item(Commands.midiIn, ed, app), item(Commands.midiOut, ed, app),
+                MSep, item(Commands.resynthWorld, ed, app), item(Commands.resynthNsf, ed, app),
             )))
             add(item(Commands.fillQueue, ed, app))
             add(item(Commands.batchRename, ed, app))
@@ -209,6 +211,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.spectrogram, ed, app, checked = l.showSpectrogram))
         add(item(Commands.pitchLane, ed, app, checked = l.showPitch))
         add(item(Commands.powerLane, ed, app, checked = l.showPower))
+        add(item(Commands.formants, ed, app, checked = l.showFormants))
         add(MSep)
         add(item(Commands.overlay, ed, app, checked = l.overlay, title = MenuTitles.overlay()))
         add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
@@ -271,6 +274,9 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.cleanup, ed, app))
         add(item(Commands.mute, ed, app))
         if (!oto) add(item(Commands.cutAudio, ed, app))
+        add(item(Commands.normalize, ed, app))
+        if (!oto) add(item(Commands.trimSilence, ed, app))
+        if (!oto) add(item(Commands.segments, ed, app))
         add(item(Commands.soundCheck, ed, app))
         if (!oto) add(item(Commands.summary, ed, app))
         add(MSep)

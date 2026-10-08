@@ -29,6 +29,8 @@ data class LayoutSettings(
     val namesY: Float = 0.5f,
     val showPitch: Boolean = false,
     val showPower: Boolean = false,
+    /** First three formants as dots over the spectrogram. */
+    val showFormants: Boolean = false,
     /** Pitch drawn over the spectrogram instead of its own lane. */
     val pitchOverSpectrogram: Boolean = true,
     val pitchShare: Float = 0.3f,
@@ -136,6 +138,8 @@ data class EditSettings(
     val audioClickDeselects: Boolean = true,
     /** Playback speed, 0.25..1, pitch kept. */
     val speed: Float = 1f,
+    /** Boundaries placed or dragged by hand jump to the nearest zero crossing of the waveform (within 3 ms). */
+    val snapToZero: Boolean = false,
     /** Opening another file keeps the scale (pixels per second) instead of the one remembered for that file. */
     val keepZoom: Boolean = true,
     /** Save every N seconds when there are changes; 0 = off. */
@@ -328,7 +332,7 @@ data class AppSettings(
 /** Items of the status bar (ids of [mlabeler.app.ui.StatusItems]) on each side, in order; the others are hidden. */
 @Serializable
 data class StatusSettings(
-    val left: List<String> = listOf("entry", "range"),
+    val left: List<String> = listOf("entry", "done", "range"),
     val right: List<String> = listOf("work", "problems", "help", "zoom"),
     val percent: Boolean = true,
 ) {

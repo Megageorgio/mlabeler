@@ -157,6 +157,11 @@ object Commands {
     val spectrogram = Command("spectrogram", S.spectrogram, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showSpectrogram = !it.layout.showSpectrogram)) } }
     val pitchLane = Command("pitch", S.pitch, listOf(ch('P'))) { _, a -> a.update { it.copy(layout = it.layout.copy(showPitch = !it.layout.showPitch)) } }
     val powerLane = Command("power", S.power, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showPower = !it.layout.showPower)) } }
+    val formants = Command("formants", L("Formants over the spectrogram", "Форманты на спектрограмме"), emptyList()) { _, a ->
+        a.update { it.copy(layout = it.layout.copy(showFormants = !it.layout.showFormants)) }
+    }
+    val trimSilence = Command("trim-silence", L("Trim silence at the ends", "Обрезать тишину по краям"), emptyList()) { e, _ -> e.cleanup.trimSilence() }.only(Mode.Labels)
+    val normalize = Command("normalize", L("Normalise the level", "Нормализовать громкость"), emptyList()) { e, _ -> e.cleanup.normalize(e.range ?: e.selectedSpan()) }
     val palette = Command("commands", S.commands, listOf(ch('K', ctrl = true))) { _, a -> a.showCommands = true }
     val settings = Command("settings", S.settings, listOf(Chord(Key.Comma, ctrl = true))) { _, a -> a.showSettings = true }
     val openFolder = Command("open", S.openFolder, listOf(ch('O', ctrl = true))) { _, a -> a.leaveFolderThen { a.closeFolder() } }
@@ -176,7 +181,14 @@ object Commands {
     val otoLock = Command("oto-lock", L("Preutterance moves all markers", "Preutterance двигает все маркеры"), listOf(ch('G'))) { _, a ->
         a.update { it.copy(edit = it.edit.copy(otoLockedDrag = !it.edit.otoLockedDrag)) }
     }.only(Mode.Oto)
-    val batchRename = Command("batch-rename", L("Rename by pattern…", "Переименовать по шаблону…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
+    val resynthWorld = Command("resynth-world", L("Listen with the drawn pitch (quick)", "Послушать с нарисованной высотой (быстро)"), emptyList()) { e, _ -> e.playResynth("world") }.only(Mode.Labels)
+    val resynthNsf = Command("resynth-nsf", L("Listen with the drawn pitch (DiffSinger vocoder)", "Послушать с нарисованной высотой (вокодер DiffSinger)"), emptyList()) { e, a ->
+        a.message(L("The vocoder is NSF-HiFiGAN by OpenVPI (CC BY-NC-SA 4.0: non-commercial use only); it is downloaded on first use.",
+            "Вокодер — NSF-HiFiGAN от OpenVPI (CC BY-NC-SA 4.0: только некоммерческое использование); скачивается при первом запуске.")())
+        e.playResynth("nsf")
+    }.only(Mode.Labels)
+    val segments = Command("segments", L("Cut into pieces…", "Нарезка на куски…"), emptyList()) { _, a -> a.showSegments = true }.only(Mode.Labels)
+    val batchRename = Command("batch-rename", L("Rename in bulk…", "Пакетное переименование…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
     val overlay = Command("overlay", S.overlayShort, listOf(ch('V'))) { _, a -> a.update { it.copy(layout = it.layout.copy(overlay = !it.layout.overlay)) } }
     val namesOnAudio = Command("names-on-audio", L("Phoneme names on the picture", "Имена фонем на картинке"), emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(namesOnAudio = !it.layout.namesOnAudio)) } }
     val tiersOnTop = Command("tiers-top", S.tiersOnTop, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(tiersOnTop = !it.layout.tiersOnTop, laneOrder = emptyList())) } }
@@ -261,7 +273,7 @@ object Commands {
         leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
-        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane,
+        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, segments, resynthWorld, resynthNsf,
         palette, settings, openFolder,
     )
 

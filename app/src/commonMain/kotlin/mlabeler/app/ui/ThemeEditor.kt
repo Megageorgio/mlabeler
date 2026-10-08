@@ -47,18 +47,18 @@ private val makeCopy = L("Make an editable copy", "Сделать копию д�
 private val builtInNote = L("Built-in themes can't be changed; make a copy and change anything in it.",
     "Встроенные темы не меняются: сделайте копию и меняйте в ней что угодно.")
 private val nameT = L("Name", "Название")
-private val darkT = L("Dark theme (for system parts like scroll bars)", "Тёмная тема (для системных элементов)")
-private val radiusT = L("Corner rounding", "Скругление углов")
-private val borderT = L("Border width", "Толщина рамок")
-private val squareT = L("Flat pressed buttons", "Плоские нажатые кнопки")
+internal val darkT = L("Dark theme (for system parts like scroll bars)", "Тёмная тема (для системных элементов)")
+internal val radiusT = L("Corner rounding", "Скругление углов")
+internal val borderT = L("Border width", "Толщина рамок")
+internal val squareT = L("Flat pressed buttons", "Плоские нажатые кнопки")
 private val pipetteT = L("Take a colour from the screen (Esc cancels)", "Взять цвет с экрана (Esc — отмена)")
-private val monoT = L("Monospace font", "Моноширинный шрифт")
-private val checkboxesT = L("Check boxes instead of switches", "Галочки вместо переключателей")
-private val dimT = L("Darken the program behind the settings", "Затемнять программу за окном настроек")
+internal val monoT = L("Monospace font", "Моноширинный шрифт")
+internal val checkboxesT = L("Check boxes instead of switches", "Галочки вместо переключателей")
+internal val dimT = L("Darken the program behind the settings", "Затемнять программу за окном настроек")
 private val deleteT = L("Delete theme", "Удалить тему")
 private val boundsT = L("Boundaries over the audio", "Границы поверх звука")
 private val boundLineT = L("Colour", "Цвет")
-private val boundWidthT = L("Thickness", "Толщина")
+internal val boundWidthT = L("Thickness", "Толщина")
 private val dashT = L("Dashed", "Пунктир")
 private val dotT = L("Dotted", "Точки")
 private val solidT = L("Solid", "Сплошная")
@@ -196,8 +196,11 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
 @Composable
 private fun SwitchLine(title: String, value: Boolean, onChange: (Boolean) -> Unit) {
     val c = T.c
-    Row(Modifier.fillMaxWidth().clickable { onChange(!value) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth().settingFocus(title).clickable { onChange(!value) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))
+            SettingHelpMark(title)
+        }
         Toggle(value, onChange)
     }
 }
@@ -261,7 +264,7 @@ private fun toHsv(c: Color): FloatArray {
     return floatArrayOf(h, s, mx)
 }
 
-private val crispT = L("No smoothing (hard pixel edges)", "Без сглаживания (чёткие пиксели)")
+internal val crispT = L("No smoothing (hard pixel edges)", "Без сглаживания (чёткие пиксели)")
 private val crispNote = L("Corners keep their rounding but are drawn as pixel steps; text, sliders and switches without smoothing, as in old programs. On Android text stays smoothed.",
     "Скругления остаются, но рисуются ступеньками пикселей; текст, ползунки и переключатели без сглаживания, как в старых программах. На Android текст останется сглаженным.")
 private val fontT = L("Interface font", "Шрифт интерфейса")

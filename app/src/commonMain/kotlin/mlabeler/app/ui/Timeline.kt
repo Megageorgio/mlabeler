@@ -1513,6 +1513,25 @@ private fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer: 
     val w = size.width
     val v0 = ed.viewStart
     val v1 = v0 + w / ed.pixelsPerSecond
+    // formants: F1 F2 F3 as small squares over the spectrogram
+    val fm = ed.formants
+    if (layout.showFormants && fm != null && g.specBottom > g.specTop) {
+        val spec = ed.spectrogram
+        val maxF = min(ed.app.settings.view.maxFreq.toDouble(), spec?.maxFreq ?: 8000.0)
+        val melTop = Spectrogram.hzToMel(maxF)
+        val colors = listOf(Color(0xFFFF4D4D), Color(0xFFFFB020), Color(0xFF7CFF6B))
+        val d = 2.5f * px
+        val i0 = max(0, (v0 / fm.hop).toInt() - 1)
+        for ((k, track) in fm.f.withIndex()) {
+            val i1 = min(track.size - 1, (v1 / fm.hop).toInt() + 1)
+            for (i in i0..i1) {
+                val f = track[i]
+                if (f.isNaN() || f > maxF) continue
+                val yy = (g.specBottom - Spectrogram.hzToMel(f.toDouble()) / melTop * (g.specBottom - g.specTop)).toFloat()
+                drawRect(colors[k], Offset(x(i * fm.hop) - d / 2, yy - d / 2), Size(d, d))
+            }
+        }
+    }
     val pitch = ed.pitchCurve
     if (layout.showPitch && pitch != null) {
         val over = layout.pitchOverSpectrogram && g.specBottom > g.specTop

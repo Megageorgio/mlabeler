@@ -89,3 +89,37 @@ class RemoveTimeTest {
         assertEquals(-0.5f, back.samples[300], 1e-3f)
     }
 }
+
+class FormantsTest {
+    @Test
+    fun findsResonances() {
+        // a buzz at 120 Hz through two resonances (700 and 1200 Hz) — a rough "a"
+        val sr = 22050
+        val n = sr / 2
+        val src = FloatArray(n) { if (it % (sr / 120) == 0) 1f else 0f }
+        fun reson(x: FloatArray, f: Double, bw: Double): FloatArray {
+            val r = kotlin.math.exp(-kotlin.math.PI * bw / sr)
+            val c = 2 * r * kotlin.math.cos(2 * kotlin.math.PI * f / sr)
+            val y = FloatArray(x.size)
+            for (i in x.indices) y[i] = (x[i] + c * (if (i > 0) y[i - 1] else 0f) - r * r * (if (i > 1) y[i - 2] else 0f)).toFloat()
+            return y
+        }
+        val v = reson(reson(src, 700.0, 80.0), 1200.0, 90.0)
+        val t = mlabeler.core.dsp.Formants.track(v, sr)
+        val mid = t.f[0].size / 2
+        val f1 = t.f[0][mid]; val f2 = t.f[1][mid]
+        kotlin.test.assertTrue(kotlin.math.abs(f1 - 700) < 120, "F1 $f1")
+        kotlin.test.assertTrue(kotlin.math.abs(f2 - 1200) < 150, "F2 $f2")
+    }
+}
+
+class NotesLengthTest {
+    @Test
+    fun notesMustCoverTheSentence() {
+        val ph = IntervalTier("phones", listOf(0.0, 0.2, 0.5, 0.8), listOf("SP", "a", "SP"))
+        fun doc(end: Double) = mlabeler.core.model.LabelDoc(listOf(ph, mlabeler.core.model.NoteTier("notes",
+            listOf(mlabeler.core.model.Note(0.0, 0.2, null), mlabeler.core.model.Note(0.2, end, 60.0)))))
+        assertEquals(0, mlabeler.core.check.Checks.notesLength(doc(0.8), ph, 0).size)
+        assertEquals(1, mlabeler.core.check.Checks.notesLength(doc(0.7), ph, 0).size)
+    }
+}

@@ -10,7 +10,7 @@ object Lang {
 }
 
 /** A UI string in every bundled language. Reading it inside a composable follows language changes. */
-class L(private val en: String, private val ru: String) {
+class L(val en: String, val ru: String) {
     operator fun invoke(): String = if (Lang.current == "ru") ru else en
     fun format(vararg args: Any?): String {
         var s = invoke()

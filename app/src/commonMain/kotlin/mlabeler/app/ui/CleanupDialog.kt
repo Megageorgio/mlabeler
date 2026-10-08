@@ -50,6 +50,16 @@ private val muteT = L("Silence or cut out", "Заглушить или выре�
 private val muteHint = L("Silencing keeps the length (Ctrl+Shift+M in the editor); cutting out makes the recording shorter and moves the labels after it back (Ctrl+X). Both work on the selection or the selected phoneme and are undone with Ctrl+Z.",
     "Заглушение сохраняет длину (в редакторе Ctrl+Shift+M); вырезание укорачивает запись и сдвигает разметку после куска назад (Ctrl+X). Оба действуют на выделение или выбранную фонему и отменяются через Ctrl+Z.")
 private val cutBtn = L("Cut out", "Вырезать")
+private val levelT = L("Level and edges", "Громкость и края")
+private val levelHint = L("Normalising works on the chosen part (above) or the whole file; fades on the selection. Trimming cuts silence off both ends of the file and moves the labels with the sound. All are undone with Ctrl+Z.",
+    "Нормализация действует на выбранное выше (кусок или весь файл), плавные края — на выделение. Обрезка убирает тишину с обоих концов файла и сдвигает разметку вместе со звуком. Всё отменяется через Ctrl+Z.")
+private val normDbT = L("Loudest point after normalising", "Самая громкая точка после нормализации")
+private val normalizeBtn = L("Normalise", "Нормализовать")
+private val fadeInBtn = L("Fade in", "Плавное начало")
+private val fadeOutBtn = L("Fade out", "Плавный конец")
+private val trimDbT = L("Silence is quieter than (from the loudest part)", "Тишина — тише чем (от самого громкого)")
+private val trimPadT = L("Silence kept at each end", "Оставить тишины с каждого края")
+private val trimBtn = L("Trim silence at the ends", "Обрезать тишину по краям")
 private val muteBtn = L("Silence the selection", "Заглушить выделенное")
 private val noiseT = L("Noise", "Шум")
 private val noiseHint = L(
@@ -118,6 +128,18 @@ fun CleanupDialog(app: AppState) {
                 Btn(muteBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.silence(it) } }
                 Btn(cutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.cut(it) } }
             }
+
+            SectionTitle(levelT())
+            Text(levelHint(), color = c.muted, fontSize = 12.sp)
+            ValueSlider(normDbT(), cs.normalizeDb, -12f..0f, "dB", decimals = 1, default = dflt.normalizeDb) { v -> set { it.copy(normalizeDb = (v * 10).toInt() / 10f) } }
+            FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Btn(normalizeBtn(), enabled = !cl.busy) { cl.normalize(scope) }
+                Btn(fadeInBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, true) } }
+                Btn(fadeOutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, false) } }
+            }
+            ValueSlider(trimDbT(), cs.trimThresholdDb, -70f..-20f, "dB", default = dflt.trimThresholdDb) { v -> set { it.copy(trimThresholdDb = v.toInt().toFloat()) } }
+            ValueSlider(trimPadT(), cs.trimPadMs, 0f..1000f, mlabeler.app.i18n.S.msUnit(), default = dflt.trimPadMs) { v -> set { it.copy(trimPadMs = ((v / 10).toInt() * 10).toFloat()) } }
+            Row(Modifier.padding(top = 6.dp)) { Btn(trimBtn(), enabled = !cl.busy) { cl.trimSilence() } }
 
             SectionTitle(noiseT())
             Text(noiseHint(), color = c.muted, fontSize = 12.sp)

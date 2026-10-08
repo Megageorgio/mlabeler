@@ -204,6 +204,14 @@ object Edits {
         })
     }
 
+    /** Only [from, to] of the labels, moved to start at zero. */
+    fun crop(doc: LabelDoc, from: Double, to: Double, duration: Double): LabelDoc {
+        var d = doc
+        if (to < duration) d = removeTime(d, to, duration)
+        if (from > 0) d = removeTime(d, 0.0, from)
+        return fitToDuration(d, to - from)
+    }
+
     /** Makes interval tiers end exactly at [duration]: the last interval is stretched or a pause added. */
     fun fitToDuration(doc: LabelDoc, duration: Double): LabelDoc = doc.copy(tiers = doc.tiers.map { t ->
         if (t !is IntervalTier || duration <= 0) return@map t

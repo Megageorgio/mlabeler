@@ -207,6 +207,17 @@ class EditorState(
         val t = base.tiers[tier] as? mlabeler.core.model.NoteTier ?: return
         dragDoc = base.replace(tier, mlabeler.core.edit.NoteEdits.setPitch(t, i, pitch))
     }
+    /** Formants of the open recording, worked out when they are shown. */
+    var formants by mutableStateOf<mlabeler.core.dsp.FormantTrack?>(null)
+        private set
+    private var formantsJob: Job? = null
+
+    fun ensureFormants() {
+        val a = audio ?: return
+        if (formants != null || formantsJob?.isActive == true) return
+        formantsJob = scope.launch { formants = withContext(Dispatchers.Default) { mlabeler.core.dsp.Formants.track(a.samples, a.sampleRate) } }
+    }
+
     var power by mutableStateOf<mlabeler.core.dsp.Curve?>(null)
         private set
     var loading by mutableStateOf(false)
@@ -494,6 +505,48 @@ class EditorState(
     var toolkitJob: Job? = null
     /** Coroutine scope of this folder (background work that stops when the folder closes). */
     val workScope: CoroutineScope get() = scope
+
+    /**
+     * Plays the selection (or the phoneme, or what is on screen) sung with the pitch as it is now — the analysed
+     * f0 with what was drawn — through the toolkit: "world" (quick) or "nsf" (the vocoder of DiffSinger).
+     */
+    fun playResynth(method: String) {
+        val a = audio ?: return
+        val curve = pitchCurve ?: return app.message(S.pitchNotReady())
+        val (from, to) = range ?: selectedSpan() ?: (viewStart to viewStart + visibleDuration)
+        toolkitJob?.cancel()
+        toolkitJob = scope.launch {
+            val client = app.toolkit.client()
+            var serverJob: String? = null
+            try {
+                beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+                if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+                toolkitBusy = S.uploading()
+                val s0 = (from.coerceAtLeast(0.0) * a.sampleRate).toInt().coerceIn(0, a.samples.size)
+                val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
+                val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
+                val k0 = (s0.toDouble() / a.sampleRate / curve.hop).toInt()
+                val k1 = (s1.toDouble() / a.sampleRate / curve.hop).toInt() + 1
+                val f0 = FloatArray((k1 - k0).coerceAtLeast(1)) { i -> curve.values.getOrNull(k0 + i)?.takeIf { v -> !v.isNaN() } ?: 0f }
+                val fileId = client.upload((item?.name ?: "part") + "_resynth.wav", wav)
+                val job = client.resynth(fileId, f0, curve.hop, method)
+                serverJob = job
+                val result = client.await(job) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
+                val path = (result["file"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: throw mlabeler.app.toolkit.ToolkitException("no file in the result")
+                val bytes = client.download(path)
+                val out = withContext(Dispatchers.Default) { Wav.decode(bytes) }
+                playBuffer(out)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
+                throw e
+            } catch (e: Exception) {
+                app.message(e.message ?: e.toString(), error = true)
+            } finally {
+                toolkitBusy = null
+                toolkitProgress = null
+            }
+        }
+    }
 
     /**
      * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown
@@ -958,6 +1011,8 @@ class EditorState(
         f0Edits = null
         f0Pencil = false
         power = null
+        formantsJob?.cancel()
+        formants = null
         references = emptyList()
         spectrogram = null
         loadError = null
@@ -1314,7 +1369,7 @@ class EditorState(
 
     fun dragTo(ref: BoundRef, time: Double, invertRipple: Boolean, invertLinked: Boolean) {
         val base = dragBase ?: return
-        dragDoc = Edits.moveBound(base, ref, time.coerceIn(0.0, duration), duration, moveOptions(invertRipple, invertLinked))
+        dragDoc = Edits.moveBound(base, ref, snapToZero(time).coerceIn(0.0, duration), duration, moveOptions(invertRipple, invertLinked))
     }
 
     fun endDrag(bound: BoundRef? = null) {
@@ -1512,6 +1567,44 @@ class EditorState(
         return (cands.minByOrNull { kotlin.math.abs(it - midi) } ?: base).toDouble()
     }
 
+    /**
+     * Renames labels of the tier named [tierName] in every file of the folder. The open file and files edited in this
+     * session change in their undo history (saved as usual); the others are read, changed and written at once (the
+     * previous file goes to .mlabeler/backup). Returns files and labels changed.
+     */
+    fun renameEverywhere(tierName: String, rename: (String) -> String): Pair<Int, Int> {
+        var files = 0
+        var labels = 0
+        for (it in items) {
+            val h = histories[it.id]
+            val doc = if (it.id == item?.id) committed else h?.current ?: runCatching { workspace.readLabels(it, 0.0) }.getOrNull()
+            if (doc == null || it.labelPath == null && h == null && it.id != item?.id) continue
+            val k = doc.tierIndex(tierName).takeIf { k -> doc.tiers.getOrNull(k) is IntervalTier } ?: continue
+            val t = doc.tiers[k] as IntervalTier
+            val n = t.texts.count { x -> rename(x) != x }
+            if (n == 0) continue
+            val nd = Edits.setTexts(doc, (0 until t.size).map { i -> IntervalRef(k, i) }, rename)
+            when {
+                it.id == item?.id -> commit(nd)
+                // a file edited earlier in this session: the change goes into its history and is written right away
+                h != null -> { h.push(nd); runCatching { workspace.writeLabels(it, nd, t.end); h.markSaved() } }
+                else -> runCatching { workspace.writeLabels(it, nd, t.end) }.onFailure { e -> app.message(e.message ?: e.toString(), error = true); return files to labels }
+            }
+            files++
+            labels += n
+        }
+        labelIndex = null
+        docVersion++
+        return files to labels
+    }
+
+    /** What [renameEverywhere] would change: file, old → new (read only). */
+    fun previewEverywhere(tierName: String, rename: (String) -> String): List<Triple<String, String, String>> = items.flatMap { it ->
+        val doc = if (it.id == item?.id) committed else histories[it.id]?.current ?: runCatching { workspace.readLabels(it, 0.0) }.getOrNull()
+        val t = doc?.let { d -> d.tiers.getOrNull(d.tierIndex(tierName)) as? IntervalTier } ?: return@flatMap emptyList()
+        t.texts.mapNotNull { x -> rename(x).takeIf { y -> y != x }?.let { y -> Triple(it.name, x, y) } }
+    }
+
     /** Writes the notes tier to <name>.mid next to the recording. */
     fun exportMidi() {
         val it = item ?: return
@@ -1534,6 +1627,20 @@ class EditorState(
         }
     }
 
+    /** With [EditSettings.snapToZero]: the nearest place within 3 ms where the waveform crosses zero. */
+    fun snapToZero(time: Double): Double {
+        if (!settings.edit.snapToZero) return time
+        val a = audio ?: return time
+        val x = a.samples
+        val c = (time * a.sampleRate).toInt()
+        val reach = (a.sampleRate * 0.003).toInt()
+        for (d in 0..reach) for (i in intArrayOf(c - d, c + d)) {
+            if (i <= 0 || i >= x.size) continue
+            if ((x[i - 1] <= 0f && x[i] >= 0f) || (x[i - 1] >= 0f && x[i] <= 0f)) return i.toDouble() / a.sampleRate
+        }
+        return time
+    }
+
     fun splitAt(time: Double = editTime(), tierIndex: Int? = null, askName: Boolean = !Platform.isMobile, playLeft: Boolean = false) {
         val d = committed ?: return
         if (tierIndex != null && tier(tierIndex) != null) activeTier = tierIndex
@@ -1547,7 +1654,7 @@ class EditorState(
         // the new phoneme is the one the new boundary belongs to: before it ("end", default) or after it
         val newLeft = settings.edit.boundaryOwner == "end"
         val queued = phonemeQueue.firstOrNull()
-        val r = Edits.split(d, k, time, queued ?: "", settings.edit.minIntervalMs / 1000.0, newOnLeft = newLeft) ?: return
+        val r = Edits.split(d, k, snapToZero(time), queued ?: "", settings.edit.minIntervalMs / 1000.0, newOnLeft = newLeft) ?: return
         commit(r.first)
         val fresh = IntervalRef(k, if (newLeft) r.second.bound - 1 else r.second.bound)
         selectInterval(fresh, reveal = false)

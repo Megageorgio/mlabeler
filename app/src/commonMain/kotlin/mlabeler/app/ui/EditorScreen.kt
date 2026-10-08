@@ -97,6 +97,7 @@ fun EditorScreen(app: AppState, ed: EditorState) {
             if (changed) ed.rescan()
         }
     }
+    LaunchedEffect(app.settings.layout.showFormants, ed.audio) { if (app.settings.layout.showFormants) ed.ensureFormants() }
     // speed or loop changed while playing: apply at once
     LaunchedEffect(app.settings.edit.speed, app.settings.edit.loop) { ed.playbackSettingsChanged() }
     LaunchedEffect(ed) {

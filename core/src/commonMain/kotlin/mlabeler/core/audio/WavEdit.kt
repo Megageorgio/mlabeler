@@ -110,6 +110,14 @@ class WavEdit(original: ByteArray) {
         return out
     }
 
+    /** A new file with only frames [from, to) of this one (same format and other chunks). */
+    fun slice(from: Int, to: Int): ByteArray {
+        val a = from.coerceIn(0, frames)
+        val b = to.coerceIn(a, frames)
+        val tail = withoutFrames(b, frames, 0)
+        return WavEdit(tail).withoutFrames(0, a, 0)
+    }
+
     private fun put(i: Int, v: Long, n: Int) {
         for (k in 0 until n) bytes[i + k] = (v shr (8 * k)).toByte()
     }

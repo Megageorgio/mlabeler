@@ -47,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.border
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -108,6 +109,7 @@ private object CheckTitles {
     val written = mlabeler.app.i18n.L("Example saved: {0}", "Пример сохранён: {0}")
 }
 
+private val searchSettingsT = mlabeler.app.i18n.L("Search settings", "Поиск настроек")
 private val scaleButtonT = mlabeler.app.i18n.L("Interface size button (in percent) on the toolbar", "Кнопка размера интерфейса (в процентах) на панели")
 private val detailT = mlabeler.app.i18n.L("Detail", "Чёткость")
 private val detailHint = mlabeler.app.i18n.L("Sharper pictures take longer to build and more memory; the values below can be set by hand too.",
@@ -119,6 +121,7 @@ private val detailPresets = listOf(
     mlabeler.app.i18n.L("High", "Высокая") to Triple(20f, 1.5f, 288),
     mlabeler.app.i18n.L("Highest", "Максимальная") to Triple(20f, 1f, 384),
 )
+private val snapZeroT = mlabeler.app.i18n.L("Boundaries jump to where the waveform crosses zero", "Границы прилипают к переходу волны через ноль")
 private val keepZoomT = mlabeler.app.i18n.L("Keep the scale when going to another file", "Сохранять масштаб при переходе к другому файлу")
 private val namesOnAudioT = mlabeler.app.i18n.L("Phoneme names on the waveform and spectrogram too", "Имена фонем ещё и на волне и спектрограмме")
 private val namesWhereT = mlabeler.app.i18n.L("Where inside each phoneme: drag the dot or click the grid", "Где внутри каждой фонемы: перетащите точку или щёлкните по сетке")
@@ -295,20 +298,37 @@ fun SettingsDialog(app: AppState) {
         mutableStateOf(Section.entries.firstOrNull { it.name.equals(app.settingsPage, ignoreCase = true) } ?: Section.General)
     }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { app.settingsPage = "" } }
+    var query by remember { mutableStateOf("") }
+    var focusTitle by remember { mutableStateOf<String?>(null) }
     Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820, dim = app.settings.settingsDim) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(S.settings(), color = c.text, fontSize = 18.sp, modifier = Modifier.weight(1f))
+            Field(query, { query = it }, Modifier.width(220.dp), placeholder = searchSettingsT())
             IconBtn(Icons.close, S.close()) { app.showSettings = false }
         }
         Divider()
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 240.dp)) {
             val narrow = maxWidth < 560.dp
+            if (query.isNotBlank()) {
+                // what was found: a click opens the page with the setting highlighted
+                val found = SettingsHelp.search(query)
+                Column(Modifier.fillMaxWidth().heightIn(max = minOf(800.dp, maxHeight)).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp)) {
+                    if (found.isEmpty()) Text(S.nothingFound(), color = c.muted, fontSize = 13.sp)
+                    for (e in found) {
+                        val sec = Section.entries.firstOrNull { it.name == e.section } ?: continue
+                        Column(Modifier.fillMaxWidth().clickable { section = sec; focusTitle = e.title(); query = "" }.padding(vertical = 6.dp)) {
+                            Text(sectionTitle(sec) + " · " + e.title(), color = c.text, fontSize = 13.sp)
+                            Text(e.hint(), color = c.muted, fontSize = 12.sp)
+                        }
+                    }
+                }
+            } else androidx.compose.runtime.CompositionLocalProvider(LocalSettingFocus provides focusTitle) {
             if (narrow) {
                 Column {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) { for (s in Section.entries) Chip(sectionTitle(s), s == section) { section = s } }
+                    ) { for (s in Section.entries) Chip(sectionTitle(s), s == section) { section = s; focusTitle = null } }
                     Divider()
                     SettingsPage(app, section, Modifier.fillMaxWidth().weight(1f, fill = false))
                 }
@@ -323,13 +343,14 @@ fun SettingsDialog(app: AppState) {
                                 fontSize = 14.sp,
                                 modifier = Modifier.fillMaxWidth()
                                     .background(if (sel) c.accent.copy(alpha = if (c.square) 1f else 0.14f) else androidx.compose.ui.graphics.Color.Transparent)
-                                    .clickable { section = s }.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    .clickable { section = s; focusTitle = null }.padding(horizontal = 16.dp, vertical = 10.dp),
                             )
                         }
                     }
                     Divider(vertical = true)
                     SettingsPage(app, section, Modifier.weight(1f))
                 }
+            }
             }
         }
     }
@@ -386,6 +407,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SwitchRow(S.pitch(), s.layout.showPitch) { v -> app.update { it.copy(layout = it.layout.copy(showPitch = v)) } }
                 if (s.layout.showPitch) SwitchRow(S.pitchOver(), s.layout.pitchOverSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(pitchOverSpectrogram = v)) } }
                 SwitchRow(S.power(), s.layout.showPower) { v -> app.update { it.copy(layout = it.layout.copy(showPower = v)) } }
+                SwitchRow(Commands.formants.title(), s.layout.showFormants) { v -> app.update { it.copy(layout = it.layout.copy(showFormants = v)) } }
                 SwitchRow(S.toggleFiles(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
                 SwitchRow(S.toggleInspector(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
             }
@@ -421,6 +443,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SwitchRow(S.ripple() + " — " + S.rippleHint(), s.edit.ripple) { v -> app.update { it.copy(edit = it.edit.copy(ripple = v)) } }
                 SwitchRow(S.linked() + " — " + S.linkedHint(), s.edit.linked) { v -> app.update { it.copy(edit = it.edit.copy(linked = v)) } }
                 SwitchRow(S.loop(), s.edit.loop) { v -> app.update { it.copy(edit = it.edit.copy(loop = v)) } }
+                SwitchRow(snapZeroT(), s.edit.snapToZero) { v -> app.update { it.copy(edit = it.edit.copy(snapToZero = v)) } }
                 SectionTitle(PlayTitles.playback())
                 ValueSlider(PlayTitles.volume(), s.edit.volume, 0f..1f, "%", factor = 100f, default = dE.volume) { v -> app.update { it.copy(edit = it.edit.copy(volume = v)) } }
                 Text(PlayTitles.follow(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
@@ -537,8 +560,11 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
 @Composable
 private fun SwitchRow(title: String, value: Boolean, onChange: (Boolean) -> Unit) {
     val c = T.c
-    Row(Modifier.fillMaxWidth().clickable { onChange(!value) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth().settingFocus(title).clickable { onChange(!value) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))
+            SettingHelpMark(title)
+        }
         Spacer(Modifier.width(12.dp))
         Toggle(value, onChange)
     }
@@ -907,4 +933,168 @@ private fun DangerZone(app: AppState) {
             }
         }
     }
+}
+
+// ---------------- explanations of settings and search over them ----------------
+
+/** A setting: its page, its title as shown and a longer explanation (a "?" next to it, and what search finds). */
+internal class SettingHelp(val section: String, val title: L, val hint: L)
+
+private fun h(section: String, title: L, en: String, ru: String) = SettingHelp(section, title, L(en, ru))
+
+internal object SettingsHelp {
+    val all: List<SettingHelp> by lazy {
+        listOf(
+            h("General", S.language, "Language of the whole program. Changes at once.", "Язык всей программы. Меняется сразу."),
+            h("General", S.saveOnSwitch, "Going to another file saves the labels of this one first. Off: changes stay in memory until you save; leaving the folder asks about them.",
+                "При переходе к другому файлу разметка текущего сначала сохраняется. Выключено: изменения живут в памяти до сохранения, при выходе из папки программа спросит."),
+            h("General", S.otherAudio, "Lists compressed formats too. On computers they are read with ffmpeg, which must be installed. Labels and cleaning work only on WAV.",
+                "Показывать и сжатые форматы. На компьютере они читаются через ffmpeg, его нужно установить. Чистка записи работает только с WAV."),
+            h("General", S.autosave, "Saves the labels on its own every N seconds when something changed. 0 turns it off.",
+                "Сохранять разметку самостоятельно каждые N секунд, если что-то изменилось. 0 — выключено."),
+            h("General", S.fullscreen, "Phones and tablets: the status and navigation bars are hidden.", "Телефоны и планшеты: скрыть строку состояния и навигации."),
+            h("General", S.avoidCutout, "Phones: nothing is drawn under the camera cutout.", "Телефоны: ничего не рисуется под вырезом камеры."),
+
+            h("Interface", MenuTitles.menuBar, "File, Edit, View… menus at the top of the window.", "Меню «Файл», «Правка», «Вид»… вверху окна."),
+            h("Interface", MenuTitles.statusBar, "The line at the bottom: phoneme number, done files, scale and more; below it you choose what it shows.",
+                "Строка внизу окна: номер фонемы, готовые файлы, масштаб и прочее; ниже настраивается, что в ней показывать."),
+            h("Interface", MenuTitles.filesPanel, "The panel with the list of files and the list of all labels.", "Панель со списком файлов и списком всех меток."),
+            h("Interface", MenuTitles.detailsPanel, "The panel with details of the selection, checks and comparison.", "Панель со свойствами выбранного, проверками и сравнением."),
+            h("Interface", MenuTitles.buttonLabels, "Names of the toolbar buttons under their icons.", "Названия кнопок панели инструментов под значками."),
+            h("Interface", MenuTitles.bigButtons, "Larger toolbar buttons, easier to hit with a finger or a pen.", "Кнопки панели крупнее — проще попадать пальцем или пером."),
+
+            h("Themes", dimT, "Off: the program behind the settings stays as bright as usual, so colours of a theme can be judged while editing it.",
+                "Выключено: программа за окном настроек не темнеет, и цвета темы видно как есть, пока вы их правите."),
+            h("Themes", crispT, "Text, corners, sliders and switches are drawn with hard pixel edges, like in old programs. Corners keep their rounding as pixel steps.",
+                "Текст, углы, ползунки и переключатели рисуются чёткими пикселями, как в старых программах. Скругления остаются, но ступеньками."),
+            h("Themes", checkboxesT, "Square boxes with a tick instead of sliding switches, and classic sliders.", "Квадратики с галочкой вместо ползунков-переключателей и классические ползунки."),
+            h("Themes", radiusT, "How round the corners of buttons, fields and windows are; 0 = square.", "Насколько скруглены углы кнопок, полей и окон; 0 — прямые."),
+            h("Themes", borderT, "Thickness of frames around buttons and fields.", "Толщина рамок вокруг кнопок и полей."),
+            h("Themes", squareT, "A pressed button is filled with one colour instead of a soft highlight.", "Нажатая кнопка заливается одним цветом, а не мягкой подсветкой."),
+            h("Themes", monoT, "Every letter takes the same width, as in a terminal.", "Все буквы одной ширины, как в терминале."),
+            h("Themes", darkT, "Tells the system parts (scroll bars, text cursor) that the theme is dark.", "Сообщает системным элементам (полосы прокрутки, текстовый курсор), что тема тёмная."),
+
+            h("View", S.interfaceScale, "Size of everything: text, buttons, panels. Applied when the slider is let go.", "Размер всего: текста, кнопок, панелей. Применяется, когда отпускаете ползунок."),
+            h("View", scaleButtonT, "A button with the interface size in percent on the toolbar, for quick changes.", "Кнопка с размером интерфейса в процентах на панели — для быстрой смены."),
+            h("View", keepZoomT, "Opening another file keeps the scale you set. Off: each file opens with the scale it had last time (or whole).",
+                "Другой файл открывается в том же масштабе. Выключено: каждый файл открывается в своём последнем масштабе (или целиком)."),
+            h("View", S.overlay, "The waveform is drawn over the spectrogram and the labels over both, in one picture instead of separate lanes.",
+                "Волна рисуется поверх спектрограммы, а разметка поверх обоих — одна картинка вместо отдельных полос."),
+            h("View", namesOnAudioT, "Names of the phonemes are also written over the waveform and the spectrogram, where you choose inside each phoneme.",
+                "Имена фонем пишутся ещё и поверх волны и спектрограммы — в выбранном месте каждой фонемы."),
+            h("View", S.labelFontSize, "Size of the label text on the lanes; the lanes grow to fit it.", "Размер текста меток на полосах; полосы подстраиваются по высоте."),
+            h("View", S.overlayWaveFillAlpha, "How solid the waveform is over the spectrogram in the overlaid view.", "Насколько плотная волна поверх спектрограммы в наложенном виде."),
+            h("View", S.overlayDim, "Darkens the spectrogram in the overlaid view so labels and the waveform stay readable.", "Затемняет спектрограмму в наложенном виде, чтобы разметку и волну было видно."),
+            h("View", S.tiersOnTop, "Label lanes above the waveform and spectrogram instead of below.", "Полосы разметки над волной и спектрограммой, а не под ними."),
+            h("View", S.waveform, "Shows the waveform lane.", "Показывать полосу волны."),
+            h("View", S.spectrogram, "Shows the spectrogram lane.", "Показывать полосу спектрограммы."),
+            h("View", S.pitch, "Pitch of the voice: a curve over the spectrogram or a piano roll lane with notes.", "Высота голоса: кривая поверх спектрограммы или полоса-пианоролл с нотами."),
+            h("View", S.pitchOver, "On: the pitch curve over the spectrogram. Off: its own lane, a piano roll where notes can be edited.",
+                "Включено: кривая высоты поверх спектрограммы. Выключено: отдельная полоса-пианоролл, где можно править ноты."),
+            h("View", S.power, "A lane with the loudness of the recording.", "Полоса с громкостью записи."),
+            h("View", Commands.formants.title, "The first three resonances of the voice (F1 red, F2 orange, F3 green) as dots over the spectrogram. They help to tell similar vowels apart (a / ax, i / e).",
+                "Первые три резонанса голоса (F1 красный, F2 оранжевый, F3 зелёный) точками поверх спектрограммы. Помогают различать похожие гласные (a / ax, i / e)."),
+
+            h("Spectrogram", S.brightness, "Lifts or lowers all colours of the spectrogram.", "Делает все цвета спектрограммы светлее или темнее."),
+            h("Spectrogram", S.contrast, "Spreads the colours: higher makes quiet and loud parts differ more.", "Растягивает цвета: больше — сильнее различаются тихое и громкое."),
+            h("Spectrogram", S.windowMs, "Length of the piece analysed for each column. Longer: sharper harmonics, blurrier in time. Shorter: sharper in time.",
+                "Длина куска, по которому считается каждый столбец. Длиннее — чётче гармоники, но размыто по времени. Короче — чётче по времени."),
+            h("Spectrogram", S.hopMs, "Time between columns. Smaller is sharper when zoomed in but takes longer and more memory. 0 picks it by the length of the file.",
+                "Время между столбцами. Меньше — чётче при приближении, но дольше и больше памяти. 0 — по длине файла."),
+            h("Spectrogram", S.bands, "How many rows of frequency the picture has. More is finer, slower.", "Сколько строк по частоте в картинке. Больше — детальнее, но медленнее."),
+            h("Spectrogram", S.dbRange, "Anything quieter is drawn as the darkest colour. Lower shows more of the quiet sound and noise.",
+                "Всё тише этого рисуется самым тёмным цветом. Ниже — видно больше тихих звуков и шума."),
+            h("Spectrogram", S.dbTop, "Anything louder is drawn as the brightest colour.", "Всё громче этого рисуется самым ярким цветом."),
+            h("Spectrogram", S.maxFrequency, "The top of the spectrogram. Singing is mostly below 8 kHz; consonants like s and sh go higher.",
+                "Верх спектрограммы. Пение в основном ниже 8 кГц, согласные вроде s и sh — выше."),
+
+            h("Editing", S.nudgeStep, "How far the arrow keys move a selected boundary (Shift: more).", "На сколько стрелки сдвигают выбранную границу (с Shift — больше)."),
+            h("Editing", S.minInterval, "A boundary can't come closer than this to its neighbours, so no part becomes empty.", "Граница не подойдёт к соседней ближе этого, чтобы ни одна часть не стала пустой."),
+            h("Editing", S.ripple, "Moving a boundary moves every boundary after it by the same amount. Shift switches it while dragging.",
+                "При сдвиге границы все границы после неё сдвигаются на столько же. Shift переключает во время перетаскивания."),
+            h("Editing", S.linked, "Boundaries at the same time on other lanes (phonemes and words) move together. Alt switches it while dragging.",
+                "Границы в то же время на других полосах (фонемы и слова) двигаются вместе. Alt переключает во время перетаскивания."),
+            h("Editing", S.loop, "Playing a part repeats it until stopped.", "Проигрывание куска повторяется, пока не остановите."),
+            h("Editing", snapZeroT, "A boundary placed or dragged by hand moves to the nearest point within 3 ms where the waveform crosses zero, so cut pieces don't click.",
+                "Граница, поставленная или сдвинутая вручную, переезжает в ближайшую точку (до 3 мс), где волна проходит через ноль, — нарезанные куски не щёлкают."),
+            h("Editing", PlayTitles.volume, "Playback volume of the program (the files don't change).", "Громкость воспроизведения в программе (файлы не меняются)."),
+            h("Editing", PlayTitles.followAt, "Where the playhead stays when the view scrolls smoothly during playback.", "Где стоит курсор воспроизведения, когда вид плавно едет за ним."),
+            h("Editing", S.speedSetting, "Slower playback with the same pitch, to hear fast phonemes.", "Замедленное воспроизведение без изменения высоты — чтобы расслышать быстрые фонемы."),
+            h("Editing", S.playOnDrag, "A short piece around the boundary plays while it is dragged.", "Во время перетаскивания границы звучит короткий кусок вокруг неё."),
+            h("Editing", S.otoLocked, "oto: dragging the preutterance moves all markers of the entry together. Shift switches it.",
+                "oto: перетаскивание preutterance двигает все маркеры записи вместе. Shift — наоборот."),
+            h("Editing", MouseTitles.spaceRestarts, "Space during playback starts the part again instead of stopping.", "Пробел во время воспроизведения начинает кусок заново, а не останавливает."),
+            h("Editing", MouseTitles.owner, "Which phoneme Delete removes and Space plays when a boundary is selected, and which part gets the name of a new boundary.",
+                "Какую фонему удаляет Delete и играет пробел при выбранной границе, и какой части достаётся имя новой границы."),
+
+            h("Mouse", MouseTitles.wheel, "What the wheel does over the picture: scroll in time, or step through phonemes.", "Что делает колесо над картинкой: прокрутка по времени или переход по фонемам."),
+            h("Mouse", MouseTitles.playIt, "After a boundary is added with the mouse, the part before it plays.", "После добавления границы мышью проигрывается часть перед ней."),
+            h("Mouse", MouseTitles.selectAfterDrag, "Pressing or moving a boundary selects its phoneme, so Space plays it right away.", "Нажатие или сдвиг границы выбирает её фонему — пробел сразу её играет."),
+            h("Mouse", MouseTitles.audioDeselects, "A click on the audio clears the selected phoneme; Space then plays from the click.", "Щелчок по звуку снимает выбор фонемы; пробел тогда играет с места щелчка."),
+            h("Mouse", MouseTitles.onLabels, "What each click does on the label lanes: select, play, rename, split…", "Что делает каждый щелчок на полосах разметки: выбрать, проиграть, переименовать, разрезать…"),
+            h("Mouse", MouseTitles.onAudio, "What each click does on the waveform and spectrogram.", "Что делает каждый щелчок на волне и спектрограмме."),
+
+            h("Checks", S.shortThreshold, "Phonemes shorter than this are marked (pauses are not).", "Фонемы короче этого отмечаются (паузы — нет)."),
+            h("Checks", S.phonemeSet, "Phonemes outside this set are marked as unknown. Empty: any name is allowed. The buttons below fill it from a dictionary.",
+                "Фонемы не из этого набора отмечаются как незнакомые. Пусто — подходит любое имя. Кнопки ниже заполняют набор из словаря."),
+            h("Checks", CheckTitles.maxLen, "A phoneme (not a pause) longer than this is marked. 0 = not checked.", "Фонема (не пауза) длиннее этого отмечается. 0 — не проверять."),
+            h("Checks", CheckTitles.maxPause, "A pause or an unnamed part longer than this is marked. 0 = not checked.", "Пауза или неподписанный кусок длиннее этого отмечается. 0 — не проверять."),
+            h("Checks", CheckTitles.maxPhrase, "Singing without a long enough pause for longer than this is marked: DiffSinger is trained on pieces up to about 15 s.",
+                "Пение без достаточной паузы дольше этого отмечается: DiffSinger учится на кусках примерно до 15 с."),
+            h("Checks", CheckTitles.phrasePause, "How long a pause must be to count as a place where a piece can end.", "Какой длины пауза считается местом, где может закончиться кусок."),
+            h("Checks", CheckTitles.diffsinger, "Things DiffSinger fails on: phonemes shorter than one frame, spaces inside a name, two same pauses in a row, zero length, notes not as long as the phonemes of their sentence.",
+                "То, на чём DiffSinger падает: фонемы короче кадра, пробелы в имени, две одинаковые паузы подряд, нулевая длина, ноты не той длины, что фонемы предложения."),
+            h("Checks", CheckTitles.runScripts, "Runs your own checks written as small JavaScript files after every change.", "Запускать свои проверки (маленькие файлы на JavaScript) после каждого изменения."),
+
+            h("Toolkit", S.toolkitAutoStart, "The toolkit starts by itself when a tool needs it and stops when the program closes.", "Тулкит запускается сам, когда он нужен инструменту, и закрывается вместе с программой."),
+            h("Toolkit", S.toolkitShare, "Phones and tablets in the same network can use the toolkit of this computer. A token protects it.",
+                "Телефоны и планшеты в той же сети могут пользоваться тулкитом этого компьютера. Доступ защищён токеном."),
+        )
+    }
+
+    private var cacheLang = ""
+    private var byTitle: Map<String, SettingHelp> = emptyMap()
+
+    /** The explanation of the setting shown with [title] (titles with " — …" after them too). */
+    fun forTitle(title: String): SettingHelp? {
+        if (cacheLang != mlabeler.app.i18n.Lang.current) {
+            byTitle = all.associateBy { it.title() }
+            cacheLang = mlabeler.app.i18n.Lang.current
+        }
+        return byTitle[title] ?: byTitle[title.substringBefore(" — ")]
+    }
+
+    /** Settings whose title or explanation has every word of [query] (in either language). */
+    fun search(query: String): List<SettingHelp> {
+        val words = query.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return emptyList()
+        return all.filter { e ->
+            val text = (e.title.en + " " + e.title.ru + " " + e.hint.en + " " + e.hint.ru).lowercase()
+            words.all { it in text }
+        }.sortedBy { e -> if (words.all { it in (e.title.en + " " + e.title.ru).lowercase() }) 0 else 1 }
+    }
+}
+
+/** The title of the setting the search jumped to: it is highlighted and scrolled into view. */
+internal val LocalSettingFocus = androidx.compose.runtime.compositionLocalOf<String?> { null }
+
+/** A small "?" with the explanation of a setting as a tooltip; nothing when there is none. */
+@Composable
+internal fun SettingHelpMark(title: String) {
+    val help = SettingsHelp.forTitle(title) ?: return
+    Tip(help.hint()) {
+        Text("?", color = T.c.muted, fontSize = 11.sp,
+            modifier = Modifier.padding(start = 6.dp).border(T.c.borderWidth, T.c.border.copy(alpha = 0.6f), RoundedCornerShape(8.dp)).padding(horizontal = 5.dp))
+    }
+}
+
+/** Highlight and scroll for the setting a search result points at. */
+@Composable
+internal fun Modifier.settingFocus(title: String): Modifier {
+    val focus = LocalSettingFocus.current
+    val hit = focus != null && (focus == title || title.startsWith("$focus — "))
+    if (!hit) return this
+    val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    androidx.compose.runtime.LaunchedEffect(focus) { kotlinx.coroutines.delay(150); requester.bringIntoView() }
+    return this.bringIntoViewRequester(requester).background(T.c.accent.copy(alpha = 0.18f))
 }

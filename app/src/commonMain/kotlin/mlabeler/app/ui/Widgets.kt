@@ -229,11 +229,14 @@ fun Field(
 @Composable
 fun SectionTitle(text: String, modifier: Modifier = Modifier, trailing: @Composable RowScope.() -> Unit = {}) {
     val c = T.c
-    Row(modifier.fillMaxWidth().padding(top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            if (c.square) text.uppercase() else text, color = c.muted, fontSize = 11.sp,
-            letterSpacing = if (c.square) 1.sp else 0.3.sp, modifier = Modifier.weight(1f),
-        )
+    Row(modifier.fillMaxWidth().settingFocus(text).padding(top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                if (c.square) text.uppercase() else text, color = c.muted, fontSize = 11.sp,
+                letterSpacing = if (c.square) 1.sp else 0.3.sp, modifier = Modifier.weight(1f, fill = false),
+            )
+            SettingHelpMark(text)
+        }
         trailing()
     }
 }
@@ -372,9 +375,12 @@ fun ValueSlider(
         if (v != null) onChange((v / factor).coerceIn(range))
         text = shown(value)
     }
-    Column(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+    Column(Modifier.fillMaxWidth().settingFocus(title).padding(top = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))
+                SettingHelpMark(title)
+            }
             Field(
                 text, { text = it; editing = true },
                 Modifier.width(72.dp).onFocusChanged { if (!it.isFocused && editing) commit() },

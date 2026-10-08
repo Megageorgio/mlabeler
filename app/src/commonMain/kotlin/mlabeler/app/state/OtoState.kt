@@ -63,7 +63,10 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     /** The oto.ini of the current item's folder, read on first use; empty when the file does not exist yet. */
     fun book(): OtoBook? {
         val item = ed.item ?: return null
-        val path = bookPath(item)
+        return bookAt(bookPath(item))
+    }
+
+    private fun bookAt(path: String): OtoBook {
         return books.getOrPut(path) {
             val fs = ed.workspace.fs
             if (fs.exists(path)) {
@@ -228,6 +231,25 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         val at = (entriesOfItem().lastOrNull()?.first ?: (entries.size - 1)) + 1
         commit(entries.toMutableList().also { it.add(at, e) })
         selected = at
+    }
+
+    /** Every oto.ini of the folder (one per subfolder with recordings) whose aliases [rename] changes: path, old → new. */
+    fun previewEverywhere(rename: (String) -> String): List<Pair<String, String>> =
+        ed.items.map { bookPath(it) }.distinct().filter { ed.workspace.fs.exists(it) }.flatMap { p ->
+            bookAt(p).entries.mapNotNull { e -> rename(e.alias).takeIf { it != e.alias }?.let { e.alias to it } }
+        }
+
+    /** Renames aliases in every oto.ini of the folder (each file one undo step, saved with the others); returns how many. */
+    fun renameEverywhere(rename: (String) -> String): Int {
+        var n = 0
+        for (p in ed.items.map { bookPath(it) }.distinct().filter { ed.workspace.fs.exists(it) }) {
+            val b = bookAt(p)
+            var k = 0
+            val list = b.entries.map { e -> rename(e.alias).let { a -> if (a != e.alias) { k++; e.copy(alias = a) } else e } }
+            if (k > 0) { b.history.push(list); n += k }
+        }
+        version++
+        return n
     }
 
     /** Renames aliases with a regex in one undo step; returns how many changed. */

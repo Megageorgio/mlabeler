@@ -8,7 +8,7 @@ import mlabeler.core.model.LabelDoc
 enum class Severity { Warning, Error }
 
 data class Problem(val kind: Kind, val ref: IntervalRef, val severity: Severity = Severity.Warning, val detail: String = "") {
-    enum class Kind { Short, Empty, UnknownPhoneme, LowConfidence, NoPauseAtEdge, Long, LongPause, LongPhrase, Script, ZeroLength, SpaceInPhoneme, TwoPauses, BelowFrame }
+    enum class Kind { Short, Empty, UnknownPhoneme, LowConfidence, NoPauseAtEdge, Long, LongPause, LongPhrase, Script, ZeroLength, SpaceInPhoneme, TwoPauses, BelowFrame, NotesLength }
 }
 
 @Serializable
@@ -39,6 +39,36 @@ data class CheckSettings(
 
 object Checks {
     private fun sec(v: Double) = "${kotlin.math.round(v * 10) / 10} s"
+
+    /**
+     * DiffSinger needs the notes of a sentence to last exactly as long as its phonemes (sum of note_dur = sum of
+     * ph_dur). A sentence is a run of named phonemes (an unnamed gap separates .ds sentences); the notes in it must
+     * start and end with it and leave no holes. Reported on the first phoneme of the sentence.
+     */
+    fun notesLength(doc: LabelDoc, t: IntervalTier, k: Int, tolerance: Double = 0.002): List<Problem> {
+        val notes = doc.tiers.filterIsInstance<mlabeler.core.model.NoteTier>().firstOrNull()?.notes ?: return emptyList()
+        if (notes.isEmpty()) return emptyList()
+        val out = mutableListOf<Problem>()
+        var i = 0
+        while (i < t.size) {
+            if (t.texts[i].isEmpty()) { i++; continue }
+            var j = i
+            while (j + 1 < t.size && t.texts[j + 1].isNotEmpty()) j++
+            val a = t.startOf(i)
+            val b = t.endOf(j)
+            val inside = notes.filter { it.end > a + tolerance && it.start < b - tolerance }.sortedBy { it.start }
+            val ok = inside.isNotEmpty() &&
+                kotlin.math.abs(inside.first().start - a) <= tolerance && kotlin.math.abs(inside.last().end - b) <= tolerance &&
+                inside.zipWithNext().all { (x, y) -> kotlin.math.abs(y.start - x.end) <= tolerance }
+            if (!ok) {
+                val noteLen = inside.sumOf { it.end - it.start }
+                out += Problem(Problem.Kind.NotesLength, IntervalRef(k, i), Severity.Error,
+                    "${kotlin.math.round((noteLen - (b - a)) * 1000).toInt()} ms")
+            }
+            i = j + 1
+        }
+        return out
+    }
 
     fun run(doc: LabelDoc, s: CheckSettings = CheckSettings()): List<Problem> {
         val out = mutableListOf<Problem>()
@@ -93,6 +123,7 @@ object Checks {
                     if (i > 0 && text.isNotEmpty() && text in s.pauses && t.texts[i - 1] == text) out += Problem(Problem.Kind.TwoPauses, ref, detail = text)
                 }
             }
+            if (k == ph && s.diffsinger) out += notesLength(doc, t, k)
             if (k == ph && s.pauseAtEdges && t.size > 0) {
                 if (t.texts.first() !in s.pauses) out += Problem(Problem.Kind.NoPauseAtEdge, IntervalRef(k, 0))
                 if (t.texts.last() !in s.pauses) out += Problem(Problem.Kind.NoPauseAtEdge, IntervalRef(k, t.size - 1))

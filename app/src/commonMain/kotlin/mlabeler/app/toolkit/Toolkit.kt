@@ -211,6 +211,17 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return call("POST", "/transcribe", req).jsonObject["id"]!!.jsonPrimitive.content
     }
 
+    /** Starts singing an uploaded recording again with [f0] (Hz every [hop] s, 0 = none): "world" or "nsf". */
+    suspend fun resynth(fileId: String, f0: FloatArray, hop: Double, method: String): String {
+        val req = buildJsonObject {
+            putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) }) }
+            put("f0", buildJsonArray { for (v in f0) add(JsonPrimitive(if (v.isNaN() || v < 0f) 0f else v)) })
+            put("hop", hop)
+            put("method", method)
+        }
+        return call("POST", "/resynth", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
     /** Downloads a result file of a job. */
     suspend fun download(path: String): ByteArray {
         val enc = buildString {
