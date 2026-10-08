@@ -1961,7 +1961,7 @@ class EditorState(
             val rate = if (slow) speed.toDouble() else 1.0
             val clock = kotlin.time.TimeSource.Monotonic.markNow()
             while (isActive && player.isPlaying) {
-                val p = player.position()
+                val p = runCatching { player.position() }.getOrDefault(-1)
                 if (p >= 0) {
                     val raw = when {
                         slow -> (s + p * speed) / sr

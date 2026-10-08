@@ -27,9 +27,13 @@ actual class AudioIn actual constructor() {
         rec = r
         thread = Thread {
             val buf = ShortArray(1024)
-            while (rec === r) {
-                val n = r.read(buf, 0, buf.size)
-                if (n > 0) onChunk(FloatArray(n) { buf[it] / 32768f })
+            // a recorder released while reading answers with an error: recording has simply ended
+            try {
+                while (rec === r) {
+                    val n = r.read(buf, 0, buf.size)
+                    if (n > 0) onChunk(FloatArray(n) { buf[it] / 32768f })
+                }
+            } catch (_: Exception) {
             }
         }.apply { isDaemon = true; start() }
     }

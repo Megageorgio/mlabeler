@@ -128,6 +128,8 @@ actual class AudioOut actual constructor() {
     @Volatile private var start = 0
     @Volatile private var length = 0
     @Volatile private var loopMode = false
+    /** Guards the track: the player thread releases it while the interface may still be asking for the position. */
+    private val lock = Any()
 
     actual fun play(audio: Audio, from: Int, to: Int, loop: Boolean) {
         stop()
@@ -159,29 +161,32 @@ actual class AudioOut actual constructor() {
                     }
                 } while (loop && !stopFlag)
                 // wait until the written audio has been played
-                while (!stopFlag && t.playbackHeadPosition.toLong() and 0xFFFFFFFFL < written) Thread.sleep(10)
+                while (!stopFlag && (runCatching { t.playbackHeadPosition.toLong() and 0xFFFFFFFFL }.getOrNull() ?: written) < written) Thread.sleep(10)
             } catch (_: Exception) {
             } finally {
-                runCatching { t.stop(); t.release() }
-                if (track === t) track = null
+                synchronized(lock) {
+                    if (track === t) track = null
+                    runCatching { t.stop(); t.release() }
+                }
             }
         }.apply { isDaemon = true; start() }
     }
 
     actual fun stop() {
         stopFlag = true
-        track?.let { runCatching { it.pause(); it.flush() } }
+        synchronized(lock) { track?.let { runCatching { it.pause(); it.flush() } } }
         thread?.join(300)
         thread = null
-        track = null
+        synchronized(lock) { track = null }
     }
 
     actual val isPlaying: Boolean get() = track != null
 
-    actual fun position(): Int {
+    actual fun position(): Int = synchronized(lock) {
         val t = track ?: return -1
         if (length <= 0) return -1
-        val played = t.playbackHeadPosition.toLong() and 0xFFFFFFFFL
+        // a track released a moment ago answers with an error: it is simply no longer playing
+        val played = runCatching { t.playbackHeadPosition.toLong() and 0xFFFFFFFFL }.getOrNull() ?: return -1
         val p = if (loopMode) (played % length).toInt() else minOf(played, length.toLong()).toInt()
         return start + p
     }

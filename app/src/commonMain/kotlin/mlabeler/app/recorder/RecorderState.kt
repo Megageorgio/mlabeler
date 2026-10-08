@@ -431,7 +431,7 @@ class RecorderState(val folder: String, private val app: AppState, private val s
         playJob = scope.launch {
             delay(30)
             while (isActive && output.isPlaying) {
-                val p = output.position()
+                val p = runCatching { output.position() }.getOrDefault(-1)
                 if (p >= 0) playhead = p.toDouble() / t.sampleRate
                 delay(30)
             }

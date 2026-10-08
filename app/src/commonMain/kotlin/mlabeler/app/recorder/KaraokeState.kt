@@ -374,7 +374,7 @@ class KaraokeState(
             delay(30)
             loopFrom = if (loopLine && (!recording || practice)) current else -1
             while (isActive && output.isPlaying) {
-                val p = output.position()
+                val p = runCatching { output.position() }.getOrDefault(-1)
                 if (p >= 0) position = songTime(p, a)
                 val lf = loopFrom
                 if (loopLine && (!recording || practice) && lf >= 0 && lf + 1 < lines.size && position >= lines[lf + 1].time) {
