@@ -72,6 +72,9 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
     var folded by remember(ed.workspace) { mutableStateOf(ed.workspace.state.folded) }
     // labels' last change, shown as "5 min" and refreshed every minute
     var now by remember { mutableStateOf(kotlin.time.Clock.System.now().toEpochMilliseconds()) }
+    // a file's menu (right click or long press) and the dialogs it opens
+    var menuFor by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(60_000); now = kotlin.time.Clock.System.now().toEpochMilliseconds() } }
     Column(modifier.background(c.panel)) {
         Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 10.dp)) {
@@ -143,11 +146,15 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                 val item = r.item
                 val marks = ed.marks(item)
                 val current = i == ed.index
+                Box {
+                MenuPopup(menuFor == item.id, onDismiss = { menuFor = null }, focusable = true) {
+                    FileMenu(ed, i, item, onOpened, onRename = { ed.app.renamingFile = i }, onTrash = { ed.app.trashingFile = i }) { menuFor = null }
+                }
                 Row(
                     Modifier.fillMaxWidth()
                         .heightIn(min = if (Platform.isMobile) 52.dp else 34.dp)
-                        .background(if (current) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else c.panel)
-                        .clickable { ed.open(i); onOpened() }
+                        .background(if (current) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else if (menuFor == item.id) c.panelAlt else c.panel)
+                        .withContextMenu(onMenu = { menuFor = item.id }) { ed.open(i); onOpened() }
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -177,6 +184,7 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                         }
                     }
                     if (marks.star) Icon(Icons.starOn, null, Modifier.size(14.dp), tint = c.warn)
+                }
                 }
             }
         }

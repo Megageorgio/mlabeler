@@ -868,6 +868,65 @@ class EditorState(
         app.message(reviewPos.format(next + 1, q.size))
     }
 
+    /** What renaming the recording at [i] would touch (files, oto entries, csv rows) and why it can't be done. */
+    fun planRename(i: Int, newStem: String): Workspace.FilePlan? = items.getOrNull(i)?.let { workspace.planRename(it, newStem.trim()) }
+
+    /**
+     * Renames the recording at [i] with every file named after it (labels, .trans, MIDI, UTAU caches), its oto
+     * entries, its transcriptions.csv rows, marks and drawn pitch. Changes are saved first.
+     */
+    fun renameFile(i: Int, newStem: String) {
+        val it = items.getOrNull(i) ?: return
+        finishEditing()
+        if (dirty) save(quiet = true)
+        val openId = item?.id
+        val wasOpen = i == index
+        stop()
+        try {
+            val f0Old = f0Path(it.id)
+            val renamed = workspace.rename(it, newStem.trim()) ?: return
+            if (workspace.fs.exists(f0Old)) runCatching {
+                workspace.fs.copy(f0Old, f0Path(renamed.id)); workspace.fs.delete(f0Old)
+            }
+            histories.remove(it.id)
+            oto.forget()
+            items = workspace.items
+            labelIndex = null
+            readLabelTimes()
+            marksVersion++
+            val target = if (wasOpen) renamed.id else openId
+            index = items.indexOfFirst { x -> x.id == target }
+            if (wasOpen && index >= 0) load(items[index])
+            app.message(renamedFileT.format(Paths.name(it.audioPath), Paths.name(renamed.audioPath)))
+        } catch (e: Exception) {
+            app.message(fileOpFailedT.format(e.message ?: e.toString()), error = true)
+        }
+    }
+
+    /** Moves the recording at [i] and its files into .mlabeler/trash and takes its entries out of oto.ini and csv. */
+    fun trashFile(i: Int) {
+        val it = items.getOrNull(i) ?: return
+        finishEditing()
+        if (dirty) save(quiet = true)
+        val openId = item?.id
+        val wasOpen = i == index
+        stop()
+        try {
+            val dest = workspace.trash(it)
+            histories.remove(it.id)
+            oto.forget()
+            items = workspace.items
+            labelIndex = null
+            readLabelTimes()
+            marksVersion++
+            index = if (wasOpen) -1 else items.indexOfFirst { x -> x.id == openId }
+            if (wasOpen && items.isNotEmpty()) open(i.coerceAtMost(items.size - 1))
+            app.message(trashedT.format(Paths.name(it.audioPath), workspace.relative(dest)))
+        } catch (e: Exception) {
+            app.message(fileOpFailedT.format(e.message ?: e.toString()), error = true)
+        }
+    }
+
     /** Scans the folder again, keeping the open file. */
     fun rescan() {
         val id = item?.id
@@ -2027,3 +2086,7 @@ private val noText = L("no text (a .txt with the same name, or Whisper)", "не�
 private val reviewNothing = L("Nothing to look at in this file", "В этом файле нечего проверять")
 private val reviewEnd = L("That was the last of {0} places in this file; PgDn opens the next file", "Это было последнее из {0} мест в этом файле; PgDn — следующий файл")
 private val reviewPos = L("Place {0} of {1}", "Место {0} из {1}")
+
+private val renamedFileT = mlabeler.app.i18n.L("Renamed: {0} → {1}", "Переименовано: {0} → {1}")
+private val trashedT = mlabeler.app.i18n.L("{0} was moved to {1}", "{0} перемещён в {1}")
+private val fileOpFailedT = mlabeler.app.i18n.L("Couldn't do it: {0}", "Не получилось: {0}")

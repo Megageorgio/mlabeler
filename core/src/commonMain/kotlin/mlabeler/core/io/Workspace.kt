@@ -285,6 +285,150 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
         return updated
     }
 
+    /**
+     * Files that belong to a recording besides itself: everything named after it next to it and in the label
+     * folders (labels of any format, .trans, MIDI, UTAU caches such as "name_wav.frq").
+     */
+    fun companions(item: Item): List<String> {
+        val stem = Paths.stem(item.audioPath)
+        val dirs = (listOf(Paths.parent(item.audioPath)) + candidates(item.audioPath).map { Paths.parent(it) }).distinct()
+        val out = mutableListOf<String>()
+        for (d in dirs) {
+            val children = try { fs.list(d) } catch (_: Exception) { emptyList() }
+            for (c in children) {
+                if (c == item.audioPath || fs.isDirectory(c)) continue
+                val n = Paths.name(c)
+                val rest = when {
+                    n.startsWith("$stem.") -> n.removePrefix("$stem.")
+                    n.startsWith(stem + "_wav.") -> n.removePrefix(stem + "_wav.")
+                    else -> continue
+                }
+                // "a.b.wav" is another recording, not a file of "a"
+                if ('.' in rest || rest.lowercase() in ALL_AUDIO_EXTENSIONS) continue
+                out += c
+            }
+        }
+        return out.distinct()
+    }
+
+    /** What renaming or removing a recording touches. [problems] not empty: it can't be done as asked. */
+    data class FilePlan(val files: List<Pair<String, String>>, val otoEntries: Int, val csvRows: Int, val problems: List<String>)
+
+    private fun otoOf(item: Item): String? = Paths.join(Paths.parent(item.audioPath), "oto.ini").takeIf { fs.exists(it) }
+
+    private fun otoLines(path: String): Pair<List<String>, String> {
+        val (text, charset) = decodeGuess(fs.read(path), "Shift_JIS")
+        return text.split("\n") to charset
+    }
+
+    private fun otoSample(line: String) = line.substringBefore('=', "").trim()
+
+    /** Renaming [item] to [newStem]: every file named after it gets the new name; oto.ini and transcriptions.csv follow. */
+    fun planRename(item: Item, newStem: String): FilePlan {
+        val stem = Paths.stem(item.audioPath)
+        val problems = mutableListOf<String>()
+        if (newStem.isBlank() || newStem.any { it in "/\\:*?\"<>|" }) problems += "name"
+        val ext = Paths.ext(item.audioPath)
+        val files = (listOf(item.audioPath) + companions(item)).map { f ->
+            val n = Paths.name(f)
+            f to Paths.join(Paths.parent(f), newStem + n.removePrefix(stem).let { if (f == item.audioPath) ".$ext" else it })
+        }
+        for ((_, to) in files) if (fs.exists(to)) problems += Paths.name(to)
+        val wav = Paths.name(item.audioPath)
+        val oto = otoOf(item)
+        var otoN = 0
+        if (oto != null) {
+            val (lines, charset) = otoLines(oto)
+            otoN = lines.count { otoSample(it).equals(wav, ignoreCase = true) }
+            // a name the file's encoding can't hold would be broken there
+            val newWav = newStem + "." + ext
+            if (otoN > 0 && decodeText(encodeText(newWav, charset), charset) != newWav) problems += "oto.ini ($charset)"
+        }
+        val csvN = csvRows.entries.filter { (path, rows) -> Paths.parent(path).let { d -> d == Paths.parent(item.audioPath) || d == Paths.parent(Paths.parent(item.audioPath)) } }
+            .sumOf { (_, rows) -> rows.count { it.name == stem } }
+        return FilePlan(files, otoN, csvN, problems)
+    }
+
+    /** Renames as [planRename] says; returns the renamed item (after a [scan]). */
+    fun rename(item: Item, newStem: String): Item? {
+        val plan = planRename(item, newStem)
+        if (plan.problems.isNotEmpty()) throw IllegalStateException(plan.problems.joinToString(", "))
+        val stem = Paths.stem(item.audioPath)
+        for ((from, to) in plan.files) move(from, to)
+        val oldWav = Paths.name(item.audioPath)
+        val newWav = newStem + "." + Paths.ext(item.audioPath)
+        otoOf(item)?.let { path -> editOto(path) { line -> if (otoSample(line).equals(oldWav, ignoreCase = true)) newWav + line.substring(line.indexOf('=')) else line } }
+        editCsvs(item) { row -> if (row == stem) newStem else row }
+        val newId = relative(plan.files.first().second)
+        updateState { s ->
+            val st = s.items[item.id]
+            s.copy(items = if (st == null) s.items else s.items - item.id + (newId to st), lastItem = if (s.lastItem == item.id) newId else s.lastItem)
+        }
+        return scan().firstOrNull { it.id == newId }
+    }
+
+    /**
+     * Moves [item] and its files into .mlabeler/trash/<time>/ (as they lay in the folder) and takes its entries out
+     * of oto.ini and transcriptions.csv (whose previous versions go there too). Returns the trash folder.
+     */
+    fun trash(item: Item): String {
+        val dest = Paths.join(Paths.join(metaDir, "trash"), timestamp())
+        fun keep(path: String) = Paths.join(dest, relative(path))
+        val stem = Paths.stem(item.audioPath)
+        val oldWav = Paths.name(item.audioPath)
+        otoOf(item)?.let { path ->
+            val (lines, _) = otoLines(path)
+            if (lines.any { otoSample(it).equals(oldWav, ignoreCase = true) }) {
+                copyTo(path, keep(path))
+                editOto(path) { line -> if (otoSample(line).equals(oldWav, ignoreCase = true)) null else line }
+            }
+        }
+        editCsvs(item, backup = { copyTo(it, keep(it)) }) { row -> if (row == stem) null else row }
+        for (f in listOf(item.audioPath) + companions(item)) {
+            copyTo(f, keep(f))
+            if (!fs.delete(f)) throw IllegalStateException(Paths.name(f))
+        }
+        updateState { s -> s.copy(items = s.items - item.id) }
+        scan()
+        return dest
+    }
+
+    private fun copyTo(from: String, to: String) { fs.mkdirs(Paths.parent(to)); fs.copy(from, to) }
+
+    private fun move(from: String, to: String) {
+        fs.copy(from, to)
+        if (!fs.delete(from)) { fs.delete(to); throw IllegalStateException(Paths.name(from)) }
+    }
+
+    /** Rewrites oto.ini line by line in its own encoding and line endings; null drops a line. */
+    private fun editOto(path: String, change: (String) -> String?) {
+        val (lines, charset) = otoLines(path)
+        val out = lines.mapNotNull { raw ->
+            val cr = raw.endsWith("\r")
+            change(raw.removeSuffix("\r"))?.let { if (cr) it + "\r" else it }
+        }
+        fs.write(path, encodeText(out.joinToString("\n"), charset))
+    }
+
+    /** Changes (null: removes) the rows of [item] in the transcriptions.csv files that list it. */
+    private fun editCsvs(item: Item, backup: (String) -> Unit = {}, change: (String) -> String?) {
+        val dir = Paths.parent(item.audioPath)
+        for ((path, lines) in csvLines.toMap()) {
+            val d = Paths.parent(path)
+            if (d != dir && d != Paths.parent(dir)) continue
+            val col = lines.firstOrNull()?.indexOf("name") ?: continue
+            if (col < 0) continue
+            val stem = Paths.stem(item.audioPath)
+            if (lines.drop(1).none { it.getOrNull(col) == stem }) continue
+            backup(path)
+            val out = listOf(lines.first()) + lines.drop(1).mapNotNull { row ->
+                val v = row.getOrNull(col) ?: return@mapNotNull row
+                change(v)?.let { nv -> row.toMutableList().also { it[col] = nv } }
+            }
+            fs.write(path, mlabeler.core.format.Csv.write(out).encodeToByteArray())
+        }
+    }
+
     companion object {
         val json = Json { ignoreUnknownKeys = true; prettyPrint = true; encodeDefaults = false }
         var timestamp: () -> String = { kotlin.time.Clock.System.now().toEpochMilliseconds().toString() }

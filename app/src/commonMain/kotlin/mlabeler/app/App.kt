@@ -54,6 +54,8 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showSettings) SettingsDialog(app)
                     if (!app.settings.setupDone && rec == null && kar == null) mlabeler.app.ui.SetupDialog(app)
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
+                    if (ed != null) app.renamingFile?.let { i -> mlabeler.app.ui.RenameFileDialog(ed, i) { app.renamingFile = null } }
+                    if (ed != null) app.trashingFile?.let { i -> mlabeler.app.ui.TrashFileDialog(ed, i) { app.trashingFile = null } }
                     if (app.showSegments && ed != null) mlabeler.app.ui.SegmentDialog(app)
                     if (app.updater.offer != null) mlabeler.app.ui.UpdateOfferDialog(app)
                     if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)

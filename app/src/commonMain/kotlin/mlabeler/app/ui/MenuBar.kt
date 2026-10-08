@@ -102,6 +102,16 @@ object MenuTitles {
     val keys = L("Keyboard shortcuts…", "Горячие клавиши…")
     val about = L("About", "О программе")
     val notes = L("Notes", "Ноты")
+    val importExport = L("Import and export", "Импорт и экспорт")
+    val recording = L("Recording", "Запись")
+    val markersAtCursor = L("Marker at the cursor", "Маркер на курсор")
+    val boundaries = L("Boundaries", "Границы")
+    val lanes = L("Lanes", "Полосы")
+    val labelsView = L("Labels on the picture", "Разметка на картинке")
+    val withinFile = L("Within the file", "Внутри файла")
+    val soundTools = L("Sound", "Звук")
+    val datasetTools = L("Checking the dataset", "Проверка датасета")
+    val pluginsMenu = L("Plugins", "Плагины")
 }
 
 /** The whole menu tree; the same on the menu bar, behind the ☰ button and on phones. */
@@ -110,6 +120,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     val s = app.settings
     val l = s.layout
     val oto = ed.mode == Mode.Oto
+    // long lists are grouped into submenus: the top level keeps what is used all the time
     val file = buildList {
         add(MItem(MenuTitles.openFolder(), Commands.openFolder.keyLabel) {
             app.pickFolder(S.openFolder()) { app.leaveFolderThen { app.openFolder(it) } }
@@ -123,15 +134,13 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MSep)
         add(item(Commands.save, ed, app))
         add(item(Commands.reloadAudio, ed, app))
-        add(MSep)
-        add(item(Commands.prevFile, ed, app))
-        add(item(Commands.nextFile, ed, app))
-        add(MSep)
         add(item(Commands.workspace, ed, app))
-        add(item(Commands.importLbp, ed, app))
-        if (!oto) add(item(Commands.exportDs, ed, app))
-        add(item(Commands.record, ed, app))
-        add(item(Commands.karaoke, ed, app))
+        add(MSep)
+        add(MSub(MenuTitles.importExport(), buildList {
+            add(item(Commands.importLbp, ed, app))
+            if (!oto) add(item(Commands.exportDs, ed, app))
+        }))
+        add(MSub(MenuTitles.recording(), listOf(item(Commands.record, ed, app), item(Commands.karaoke, ed, app))))
         add(MSep)
         add(item(Commands.settings, ed, app, title = S.settings()))
     }
@@ -144,26 +153,21 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.otoAdd, ed, app))
             add(item(Commands.otoDuplicate, ed, app))
             add(item(Commands.otoDelete, ed, app))
-            add(MSep)
-            for (c in listOf(Commands.otoLeft, Commands.otoOverlap, Commands.otoPreu, Commands.otoCons, Commands.otoRight)) add(item(c, ed, app))
-            add(MSep)
+            add(MSub(MenuTitles.markersAtCursor(), listOf(Commands.otoLeft, Commands.otoOverlap, Commands.otoPreu, Commands.otoCons, Commands.otoRight).map { item(it, ed, app) }))
             add(item(Commands.otoLock, ed, app, checked = s.edit.otoLockedDrag))
+            add(MSep)
             add(item(Commands.batchRename, ed, app))
         } else {
             add(item(Commands.split, ed, app))
             add(item(Commands.merge, ed, app))
             add(item(Commands.delete, ed, app))
             add(item(Commands.rename, ed, app))
-            add(MSep)
-            add(item(Commands.setLeft, ed, app))
-            add(item(Commands.setRight, ed, app))
-            add(item(Commands.nudgeLeft, ed, app))
-            add(item(Commands.nudgeRight, ed, app))
-            add(MSep)
-            add(item(Commands.playOnDrag, ed, app, checked = s.edit.playOnDrag))
-            add(MSep)
-            add(item(Commands.ripple, ed, app, checked = s.edit.ripple))
-            add(item(Commands.linked, ed, app, checked = s.edit.linked))
+            add(MSub(MenuTitles.boundaries(), listOf(
+                item(Commands.setLeft, ed, app), item(Commands.setRight, ed, app), MSep,
+                item(Commands.nudgeLeft, ed, app), item(Commands.nudgeRight, ed, app), MSep,
+                item(Commands.ripple, ed, app, checked = s.edit.ripple), item(Commands.linked, ed, app, checked = s.edit.linked),
+                item(Commands.playOnDrag, ed, app, checked = s.edit.playOnDrag),
+            )))
             add(MSep)
             add(MSub(MenuTitles.notes(), listOf(
                 item(Commands.groupPhonemes, ed, app), item(Commands.notesFromGroups, ed, app), MSep,
@@ -194,47 +198,50 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.files, ed, app, checked = l.showFiles, title = MenuTitles.filesPanel()))
             if (l.entriesSeparate) add(toggle(MenuTitles.entriesPanel(), l.showEntries) { it.copy(layout = it.layout.togglePanel("entries")) })
             add(item(Commands.inspector, ed, app, checked = l.showInspector, title = MenuTitles.detailsPanel()))
+            add(toggle(notepadTitle(), s.layout.showNotepad) { it.copy(layout = it.layout.copy(showNotepad = !it.layout.showNotepad)) })
             // which side each panel is on, and entries as a panel of their own, are set on the panels themselves
             add(MItem(MenuTitles.arrange(), checked = app.arrangePanels) { app.arrangePanels = !app.arrangePanels })
             add(MSep)
             if (!Platform.isMobile) add(toggle(MenuTitles.menuBar(), s.menuBar) { it.copy(menuBar = !it.menuBar) })
             add(toggle(MenuTitles.statusBar(), s.statusBar) { it.copy(statusBar = !it.statusBar) })
+            add(toggle(MenuTitles.scrollbar(), s.layout.scrollbar) { it.copy(layout = it.layout.copy(scrollbar = !it.layout.scrollbar)) })
             add(toggle(Commands.lockLayout.title(), s.layout.locked) { it.copy(layout = it.layout.copy(locked = !it.layout.locked)) })
         }))
         add(MSub(MenuTitles.toolbar(), toolbar))
-        add(MSep)
-        add(item(Commands.wave, ed, app, checked = l.showWaveform))
-        add(item(Commands.spectrogram, ed, app, checked = l.showSpectrogram))
-        add(item(Commands.pitchLane, ed, app, checked = l.showPitch))
-        add(item(Commands.powerLane, ed, app, checked = l.showPower))
-        add(item(Commands.formants, ed, app, checked = l.showFormants))
-        add(MSep)
-        add(item(Commands.overlay, ed, app, checked = l.overlay, title = MenuTitles.overlay()))
-        add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
-        add(item(Commands.namesOnAudio, ed, app, checked = l.namesOnAudio))
-        add(toggle(MenuTitles.specFirst(), l.spectrogramFirst) { it.copy(layout = it.layout.copy(spectrogramFirst = !it.layout.spectrogramFirst, laneOrder = emptyList())) })
-        add(MSub(MenuTitles.followPlay(), listOf(
-            toggle(PlayTitles.followOff(), s.edit.follow == "off") { it.copy(edit = it.edit.copy(follow = "off")) },
-            toggle(PlayTitles.followPage(), s.edit.follow == "page") { it.copy(edit = it.edit.copy(follow = "page")) },
-            toggle(PlayTitles.followKeep(), s.edit.follow == "keep") { it.copy(edit = it.edit.copy(follow = "keep")) },
-        )))
-        add(toggle(MenuTitles.scrollbar(), s.layout.scrollbar) { it.copy(layout = it.layout.copy(scrollbar = !it.layout.scrollbar)) })
-        add(toggle(notepadTitle(), s.layout.showNotepad) { it.copy(layout = it.layout.copy(showNotepad = !it.layout.showNotepad)) })
-        if (ed.mode == mlabeler.app.state.Mode.Oto) add(toggle(MenuTitles.otoHeader(), s.layout.otoHeader) { it.copy(layout = it.layout.copy(otoHeader = !it.layout.otoHeader)) })
-        add(MSep)
-        add(item(Commands.labelsBigger, ed, app))
-        add(item(Commands.labelsSmaller, ed, app))
-        add(MSep)
-        add(item(Commands.zoomIn, ed, app))
-        add(item(Commands.zoomOut, ed, app))
-        add(item(Commands.zoomFit, ed, app))
-        add(item(Commands.zoomSel, ed, app))
-        add(MSep)
         add(MSub(S.environment(), buildList {
             for (e in mlabeler.app.state.Environments.all()) add(MItem(e.title, checked = e.id == s.environment) { app.applyEnvironment(e.id) })
             add(MSep)
             add(MItem(S.environmentSaveAs()) { app.settingsPage = "interface"; app.showSettings = true })
         }))
+        add(MSep)
+        add(MSub(MenuTitles.lanes(), listOf(
+            item(Commands.wave, ed, app, checked = l.showWaveform),
+            item(Commands.spectrogram, ed, app, checked = l.showSpectrogram),
+            item(Commands.pitchLane, ed, app, checked = l.showPitch),
+            item(Commands.powerLane, ed, app, checked = l.showPower),
+            item(Commands.formants, ed, app, checked = l.showFormants),
+            MSep,
+            toggle(MenuTitles.specFirst(), l.spectrogramFirst) { it.copy(layout = it.layout.copy(spectrogramFirst = !it.layout.spectrogramFirst, laneOrder = emptyList())) },
+        )))
+        add(MSub(MenuTitles.labelsView(), buildList {
+            add(item(Commands.overlay, ed, app, checked = l.overlay, title = MenuTitles.overlay()))
+            add(item(Commands.tiersOnTop, ed, app, checked = l.tiersOnTop, title = MenuTitles.labelsOnTop()))
+            add(item(Commands.namesOnAudio, ed, app, checked = l.namesOnAudio))
+            if (ed.mode == mlabeler.app.state.Mode.Oto) add(toggle(MenuTitles.otoHeader(), s.layout.otoHeader) { it.copy(layout = it.layout.copy(otoHeader = !it.layout.otoHeader)) })
+            add(MSep)
+            add(item(Commands.labelsBigger, ed, app))
+            add(item(Commands.labelsSmaller, ed, app))
+        }))
+        add(MSub(MenuTitles.followPlay(), listOf(
+            toggle(PlayTitles.followOff(), s.edit.follow == "off") { it.copy(edit = it.edit.copy(follow = "off")) },
+            toggle(PlayTitles.followPage(), s.edit.follow == "page") { it.copy(edit = it.edit.copy(follow = "page")) },
+            toggle(PlayTitles.followKeep(), s.edit.follow == "keep") { it.copy(edit = it.edit.copy(follow = "keep")) },
+        )))
+        add(MSep)
+        add(item(Commands.zoomIn, ed, app))
+        add(item(Commands.zoomOut, ed, app))
+        add(item(Commands.zoomFit, ed, app))
+        add(item(Commands.zoomSel, ed, app))
     }
     val go = buildList {
         add(item(Commands.togglePlay, ed, app))
@@ -242,47 +249,44 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(item(Commands.loop, ed, app, checked = s.edit.loop))
         add(item(Commands.speed, ed, app))
         add(MSep)
+        add(item(Commands.prevFile, ed, app))
+        add(item(Commands.nextFile, ed, app))
+        add(MSep)
         if (oto) {
             add(item(Commands.prevEntry, ed, app))
             add(item(Commands.nextEntry, ed, app))
         } else {
-            add(item(Commands.prevBound, ed, app))
-            add(item(Commands.nextBound, ed, app))
-            add(item(Commands.prevInterval, ed, app))
-            add(item(Commands.nextInterval, ed, app))
-            add(item(Commands.tierUp, ed, app))
-            add(item(Commands.tierDown, ed, app))
-        }
-        add(MSep)
-        add(item(Commands.home, ed, app))
-        add(item(Commands.end, ed, app))
-        add(MSep)
-        add(item(Commands.prevFile, ed, app))
-        add(item(Commands.nextFile, ed, app))
-        if (!oto) {
+            add(MSub(MenuTitles.withinFile(), listOf(
+                item(Commands.prevBound, ed, app), item(Commands.nextBound, ed, app),
+                item(Commands.prevInterval, ed, app), item(Commands.nextInterval, ed, app),
+                item(Commands.tierUp, ed, app), item(Commands.tierDown, ed, app), MSep,
+                item(Commands.home, ed, app), item(Commands.end, ed, app),
+            )))
             add(MSep)
             add(item(Commands.reviewNext, ed, app))
             add(item(Commands.reviewPrev, ed, app))
         }
+        if (oto) { add(MSep); add(item(Commands.home, ed, app)); add(item(Commands.end, ed, app)) }
     }
     val tools = buildList {
         if (oto) add(item(Commands.autoOto, ed, app)) else add(item(Commands.autolabel, ed, app))
-        if (!oto) add(item(Commands.soundMode, ed, app, checked = ed.soundMode))
-        add(item(Commands.cleanup, ed, app))
-        add(item(Commands.mute, ed, app))
-        if (!oto) add(item(Commands.cutAudio, ed, app))
-        add(item(Commands.normalize, ed, app))
-        if (!oto) add(item(Commands.trimSilence, ed, app))
-        if (!oto) add(item(Commands.segments, ed, app))
-        add(item(Commands.soundCheck, ed, app))
-        if (!oto) add(item(Commands.summary, ed, app))
-        add(MSep)
-        add(item(Commands.plugins, ed, app))
+        add(MSub(MenuTitles.soundTools(), buildList {
+            if (!oto) add(item(Commands.soundMode, ed, app, checked = ed.soundMode))
+            add(item(Commands.cleanup, ed, app))
+            add(item(Commands.mute, ed, app))
+            if (!oto) add(item(Commands.cutAudio, ed, app))
+            add(item(Commands.normalize, ed, app))
+            if (!oto) add(item(Commands.trimSilence, ed, app))
+            if (!oto) add(item(Commands.segments, ed, app))
+        }))
+        add(MSub(MenuTitles.datasetTools(), buildList {
+            add(item(Commands.soundCheck, ed, app))
+            if (!oto) add(item(Commands.summary, ed, app))
+        }))
         val slots = listOf(Commands.slot1, Commands.slot2, Commands.slot3, Commands.slot4)
-        for ((k, c) in slots.withIndex()) {
-            val name = s.pluginSlots.getOrNull(k)?.takeIf { it.isNotEmpty() } ?: continue
-            add(item(c, ed, app, title = name))
-        }
+        val named = slots.withIndex().mapNotNull { (k, c) -> s.pluginSlots.getOrNull(k)?.takeIf { it.isNotEmpty() }?.let { item(c, ed, app, title = it) } }
+        if (named.isEmpty()) add(item(Commands.plugins, ed, app))
+        else add(MSub(MenuTitles.pluginsMenu(), listOf(item(Commands.plugins, ed, app), MSep) + named))
         add(MSep)
         add(item(Commands.palette, ed, app))
         add(MItem(MenuTitles.keys()) { app.settingsPage = "keys"; app.showSettings = true })

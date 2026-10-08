@@ -53,9 +53,10 @@ private val renamedFiles = L("Renamed: {0} in {1} files", "Переименов�
 fun BatchRenameDialog(app: AppState) {
     val ed = app.editor ?: return
     val c = T.c
-    var mode by remember { mutableStateOf(0) }
-    var everywhere by remember { mutableStateOf(false) }
-    var from by remember { mutableStateOf("") }
+    val preset = remember { app.batchRenameFrom.also { app.batchRenameFrom = null } }
+    var mode by remember { mutableStateOf(if (preset != null) 1 else 0) }
+    var everywhere by remember { mutableStateOf(preset != null) }
+    var from by remember { mutableStateOf(preset ?: "") }
     var to by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("") }
     val oto = ed.mode == Mode.Oto

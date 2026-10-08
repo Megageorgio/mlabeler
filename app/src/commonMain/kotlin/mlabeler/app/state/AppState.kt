@@ -42,6 +42,11 @@ class AppState(private val scope: CoroutineScope) {
     var settingsPage by mutableStateOf("")
     var showCommands by mutableStateOf(false)
     var showBatchRename by mutableStateOf(false)
+    /** The recording whose rename or removal is being asked about (index in the file list). */
+    var renamingFile by mutableStateOf<Int?>(null)
+    var trashingFile by mutableStateOf<Int?>(null)
+    /** A name to rename everywhere, filled into the bulk renaming when it opens from an entry's menu. */
+    var batchRenameFrom: String? = null
     var showSegments by mutableStateOf(false)
     var showWorkspace by mutableStateOf(false)
     var showAutolabel by mutableStateOf(false)

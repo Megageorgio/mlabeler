@@ -44,6 +44,9 @@ private val searchHint = L("text, or name: file: tier:", "текст, или nam
 private val selectT = L("Select", "Выбрать")
 private val allShown = L("All shown", "Все видимые")
 private val mergeLeft = L("Remove (join with the previous one)", "Удалить (присоединить к предыдущему)")
+private val goT = L("Go to it", "Перейти")
+private val renameAllT = L("Rename every «{0}»…", "Переименовать все «{0}»…")
+private val onlyT = L("Show only «{0}»", "Показать только «{0}»")
 private val countLine = L("{0} entries", "записей: {0}")
 private val followT = L("Follow", "Следовать")
 private val followHint = L("The list scrolls to the phoneme selected on the timeline", "Список прокручивается к фонеме, выбранной на дорожке")
@@ -75,6 +78,7 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
     var picking by remember { mutableStateOf(false) }
     var picked by remember(ed.index) { mutableStateOf(emptySet<Int>()) }
     var newText by remember { mutableStateOf("") }
+    var menuFor by remember { mutableStateOf<String?>(null) }
     val doc = ed.doc
     val current: List<Entry> = remember(doc, ed.index, ed.activeTier) {
         val t = doc?.tiers?.getOrNull(ed.activeTier) as? IntervalTier ?: return@remember emptyList()
@@ -140,10 +144,29 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                 itemsIndexed(list, key = { _, it -> "${it.item}/${it.tier}/${it.index}" }) { pos, e ->
                     val active = e.item == ed.index && sel != null && sel.index == e.index &&
                         doc?.tiers?.getOrNull(sel.tier)?.name == e.tier
+                    val key = "${e.item}/${e.tier}/${e.index}"
+                    androidx.compose.foundation.layout.Box {
+                    MenuPopup(menuFor == key, onDismiss = { menuFor = null }, focusable = true) {
+                        MenuItems(buildList {
+                            add(MItem(goT()) { ed.openInterval(e.item, e.tier, e.index); onOpened() })
+                            add(MItem(S.rename()) { ed.openInterval(e.item, e.tier, e.index); ed.selectedInterval()?.let { r -> if (e.item == ed.index) ed.editingText = r } })
+                            if (e.text.isNotEmpty()) {
+                                add(MItem(renameAllT.format(e.text)) { ed.app.batchRenameFrom = e.text; ed.app.showBatchRename = true })
+                                add(MItem(onlyT.format(e.text)) { query = "name:=" + e.text })
+                            }
+                            if (e.item == ed.index && e.index > 0) {
+                                add(MSep)
+                                add(MItem(mergeLeft()) {
+                                    val k = doc?.tierIndex(e.tier) ?: -1
+                                    if (k >= 0) ed.updateDoc { d -> mlabeler.core.edit.Edits.removeBound(d, mlabeler.core.edit.BoundRef(k, e.index)) }
+                                })
+                            }
+                        }) { menuFor = null }
+                    }
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = if (Platform.isMobile) 44.dp else 26.dp)
-                            .background(if (active) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else c.panel)
-                            .clickable {
+                            .background(if (active) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else if (menuFor == key) c.panelAlt else c.panel)
+                            .withContextMenu(onMenu = { menuFor = key }) {
                                 if (picking && !all) picked = if (e.index in picked) picked - e.index else picked + e.index
                                 else { ed.openInterval(e.item, e.tier, e.index); onOpened() }
                             }
@@ -162,6 +185,7 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                             fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         Text(formatMs(e.end - e.start), color = if (active && c.square) c.onAccent else c.muted, fontSize = 11.sp)
+                    }
                     }
                 }
             }

@@ -374,6 +374,14 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     fun undo() { if (book()?.history?.undo() == true) version++ }
     fun redo() { if (book()?.history?.redo() == true) version++ }
 
+    /** Forgets the oto.ini files read so far (they changed on disk); they are read again when needed. */
+    fun forget() {
+        books.clear()
+        selected = null
+        version++
+        onItemOpened()
+    }
+
     fun save(quiet: Boolean = false) {
         val fs = ed.workspace.fs
         for (b in books.values) {
