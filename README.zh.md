@@ -10,7 +10,8 @@
 所有平台的安装包均位于 [Releases](https://github.com/Megageorgio/mlabeler/releases) 页面：
 
 - **Windows**：免安装 `.zip`（解压后运行 `mLabeler.exe`）或 `.msi` 安装程序；
-- **macOS**：`.dmg`；**Linux**：`.deb`；
+- **macOS**：`.dmg`；
+- **Linux**：适用于 Debian 和 Ubuntu 的 `.deb`，或适用于任何发行版的 `.tar.gz`（解压后运行 `bin/mLabeler`）；
 - **Android**：`.apk`；
 - **iOS**：未签名的 `.ipa`（见下文）。
 

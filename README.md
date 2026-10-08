@@ -10,7 +10,8 @@ English · [中文](README.zh.md) · [Русский](README.ru.md)
 Ready builds for every platform are on the [Releases](https://github.com/Megageorgio/mlabeler/releases) page:
 
 - **Windows** — the portable `.zip` (unpack and run `mLabeler.exe`) or the `.msi` installer;
-- **macOS** — `.dmg`; **Linux** — `.deb`;
+- **macOS** — `.dmg`;
+- **Linux** — `.deb` for Debian and Ubuntu, or a `.tar.gz` for any distribution (unpack and run `bin/mLabeler`);
 - **Android** — `.apk`;
 - **iOS** — unsigned `.ipa` (see below).
 

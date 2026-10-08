@@ -126,7 +126,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
             os.contains("win") -> find("windows", ".zip") ?: find(".msi")
             os.contains("mac") -> find(".dmg")
             os == "ios" -> null
-            else -> find(".deb") ?: find("linux")
+            else -> null // Linux: .deb or the portable archive, the person picks on the release page
         }
         return Release(v, tag, (o["html_url"] as? JsonPrimitive)?.content ?: "https://github.com/$REPO/releases", file,
             (o["name"] as? JsonPrimitive)?.content ?: tag)

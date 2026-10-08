@@ -46,9 +46,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest, task: packageMsi, out: "app/build/compose/binaries/main/msi/*.msi", name: windows }
-          - { os: macos-latest, task: packageDmg, out: "app/build/compose/binaries/main/dmg/*.dmg", name: macos }
-          - { os: ubuntu-latest, task: packageDeb, out: "app/build/compose/binaries/main/deb/*.deb", name: linux }
+          - { os: windows-latest, task: packageMsi, dir: msi, ext: msi, name: windows-x64 }
+          - { os: macos-latest, task: packageDmg, dir: dmg, ext: dmg, name: macos }
+          - { os: ubuntu-latest, task: packageDeb, dir: deb, ext: deb, name: linux-x64 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -56,10 +56,33 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :app:${{ matrix.task }}
+      # installer file names carry the app version, not the internal package version
+      - shell: bash
+        run: |
+          V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
+          mkdir -p out
+          mv app/build/compose/binaries/main/${{ matrix.dir }}/*.${{ matrix.ext }} "out/mLabeler-$V-${{ matrix.name }}.${{ matrix.ext }}"
       - uses: actions/upload-artifact@v4
         with:
-          name: mLabeler-${{ matrix.name }}
-          path: ${{ matrix.out }}
+          name: mLabeler-${{ matrix.name }}-${{ matrix.ext }}
+          path: out/*
+
+  # any Linux distribution: unpack and run bin/mLabeler (Java included)
+  linux-portable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew :app:createDistributable
+      - run: |
+          V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
+          tar -C app/build/compose/binaries/main/app -czf "mLabeler-$V-linux-x64.tar.gz" mLabeler
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mLabeler-linux-portable
+          path: mLabeler-*-linux-x64.tar.gz
 
   windows-portable:
     runs-on: ubuntu-latest
@@ -118,7 +141,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, android, desktop, windows-portable, ios-ipa]
+    needs: [test, android, desktop, windows-portable, linux-portable, ios-ipa]
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:
