@@ -83,15 +83,6 @@ private val bandsT = L("bands", "полос")
 fun CleanupDialog(app: AppState) {
     val ed = app.editor ?: return
     val c = T.c
-    val cl = ed.cleanup
-    val cs = app.settings.clean
-    fun set(f: (CleanSettings) -> CleanSettings) = app.update { it.copy(clean = f(it.clean)) }
-    val dflt = CleanSettings()
-    val selected: Pair<Double, Double>? = ed.range ?: ed.selectedInterval()?.let { r ->
-        (ed.doc?.tiers?.getOrNull(r.tier) as? IntervalTier)?.let { it.startOf(r.index) to it.endOf(r.index) }
-    }
-    var whole by remember { mutableStateOf(selected == null) }
-    val scope = if (whole) null else selected
     fun close() { app.showCleanup = false; ed.requestFocus() }
     Overlay({ close() }, 640) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
@@ -100,68 +91,102 @@ fun CleanupDialog(app: AppState) {
                 IconBtn(Icons.close, S.close()) { close() }
             }
             Text(promise(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-
-            SectionTitle(whereT())
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (selected != null) Chip(selectionT(), !whole) { whole = false }
-                Chip(wholeT(), whole || selected == null) { whole = true }
-                scope?.let { Text("${formatTime(it.first)} – ${formatTime(it.second)}", color = c.muted, fontSize = 12.sp) }
-            }
-
-            SectionTitle(clicksT())
-            Text(clicksHint(), color = c.muted, fontSize = 12.sp)
-            ValueSlider(sensitivityT(), cs.clickSensitivity, 1f..10f, decimals = 1, default = dflt.clickSensitivity) { v -> set { it.copy(clickSensitivity = v) } }
-            ValueSlider(maxWidthT(), cs.clickMaxMs, 0.5f..20f, S.msUnit(), decimals = 1, default = dflt.clickMaxMs) { v -> set { it.copy(clickMaxMs = v) } }
-            FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Btn(findT(), enabled = !cl.busy) { cl.findClicks(scope) }
-                Btn(repairFoundT.format(cl.found.size), primary = true, enabled = cl.found.isNotEmpty() && !cl.busy) { cl.repairFound() }
-                if (cl.found.isNotEmpty()) Btn(clearT()) { cl.clearFound() }
-            }
-
-            SectionTitle(repairT())
-            Text(repairHint(), color = c.muted, fontSize = 12.sp)
-            Row(Modifier.padding(top = 6.dp)) { Btn(repairBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.repairRange(it) } } }
-
-            SectionTitle(muteT())
-            Text(muteHint(), color = c.muted, fontSize = 12.sp)
-            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn(muteBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.silence(it) } }
-                Btn(cutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.cut(it) } }
-            }
-
-            SectionTitle(levelT())
-            Text(levelHint(), color = c.muted, fontSize = 12.sp)
-            ValueSlider(normDbT(), cs.normalizeDb, -12f..0f, "dB", decimals = 1, default = dflt.normalizeDb) { v -> set { it.copy(normalizeDb = (v * 10).toInt() / 10f) } }
-            FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Btn(normalizeBtn(), enabled = !cl.busy) { cl.normalize(scope) }
-                Btn(fadeInBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, true) } }
-                Btn(fadeOutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, false) } }
-            }
-            ValueSlider(trimDbT(), cs.trimThresholdDb, -70f..-20f, "dB", default = dflt.trimThresholdDb) { v -> set { it.copy(trimThresholdDb = v.toInt().toFloat()) } }
-            ValueSlider(trimPadT(), cs.trimPadMs, 0f..1000f, mlabeler.app.i18n.S.msUnit(), default = dflt.trimPadMs) { v -> set { it.copy(trimPadMs = ((v / 10).toInt() * 10).toFloat()) } }
-            Row(Modifier.padding(top = 6.dp)) { Btn(trimBtn(), enabled = !cl.busy) { cl.trimSilence() } }
-
-            SectionTitle(noiseT())
-            Text(noiseHint(), color = c.muted, fontSize = 12.sp)
-            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Btn(profileT(), enabled = selected != null && !cl.busy) { selected?.let { cl.takeNoiseProfile(it) } }
-            }
-            val pf = cl.profileFrom
-            Text(if (pf != null) profileFromT.format(formatTime(pf.first), formatTime(pf.second)) else noProfile(), color = c.muted, fontSize = 12.sp,
-                modifier = Modifier.padding(top = 4.dp))
-            ValueSlider(reductionT(), cs.noiseReductionDb, 0f..40f, "dB", default = dflt.noiseReductionDb) { v -> set { it.copy(noiseReductionDb = v) } }
-            ValueSlider(noiseSensT(), cs.noiseSensitivityDb, 0f..24f, "dB", decimals = 1, default = dflt.noiseSensitivityDb) { v -> set { it.copy(noiseSensitivityDb = v) } }
-            ValueSlider(smoothingT(), cs.noiseSmoothing.toFloat(), 0f..12f, bandsT(), default = dflt.noiseSmoothing.toFloat()) { v -> set { it.copy(noiseSmoothing = v.toInt()) } }
-            FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Btn(previewT(), enabled = cl.noiseProfile != null && !cl.busy) { cl.previewNoise(scope ?: (ed.viewStart to ed.viewStart + ed.visibleDuration)) }
-                Btn(applyT(), primary = true, enabled = cl.noiseProfile != null && !cl.busy) { cl.reduceNoise(scope) }
-            }
-
-            Divider()
-            FlowRow(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Btn(undoT(), enabled = cl.canUndo && !cl.busy) { cl.undo() }
-                Btn(originalT(), enabled = cl.hasOriginal() && !cl.busy) { cl.restoreOriginal() }
-            }
+            CleanupTools(app, ed, compact = false)
         }
+    }
+}
+
+/** A short explanation as a "?" next to a heading (narrow panels), or as text under it (the dialog). */
+@Composable
+private fun Hint(text: String, compact: Boolean) {
+    if (!compact) Text(text, color = T.c.muted, fontSize = 12.sp)
+}
+
+@Composable
+private fun Heading(title: String, hint: String, compact: Boolean) {
+    SectionTitle(title) {
+        if (compact) Tip(hint) { Text("?", color = T.c.muted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp)) }
+    }
+}
+
+/**
+ * Every tool that changes the recording: in the clean-up dialog, and (compact, explanations behind "?") in the
+ * sound panel. The quick ones come first.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CleanupTools(app: AppState, ed: mlabeler.app.state.EditorState, compact: Boolean) {
+    val c = T.c
+    val cl = ed.cleanup
+    val cs = app.settings.clean
+    fun set(f: (CleanSettings) -> CleanSettings) = app.update { it.copy(clean = f(it.clean)) }
+    val dflt = CleanSettings()
+    val selected: Pair<Double, Double>? = ed.range ?: ed.selectedInterval()?.let { r ->
+        (ed.doc?.tiers?.getOrNull(r.tier) as? IntervalTier)?.let { it.startOf(r.index) to it.endOf(r.index) }
+    }
+    var whole by remember { mutableStateOf(selected == null) }
+    val scope = if (whole || selected == null) null else selected
+    val gap = Arrangement.spacedBy(8.dp)
+
+    Heading(whereT(), "", false)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (selected != null) Chip(selectionT(), !whole) { whole = false }
+        Chip(wholeT(), whole || selected == null) { whole = true }
+    }
+    scope?.let { Text("${formatTime(it.first)} – ${formatTime(it.second)}", color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp)) }
+
+    Heading(muteT(), muteHint(), compact)
+    Hint(muteHint(), compact)
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = gap, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Btn(muteBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.silence(it) } }
+        Btn(cutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.cut(it) } }
+    }
+
+    Heading(levelT(), levelHint(), compact)
+    Hint(levelHint(), compact)
+    ValueSlider(normDbT(), cs.normalizeDb, -12f..0f, "dB", decimals = 1, default = dflt.normalizeDb) { v -> set { it.copy(normalizeDb = (v * 10).toInt() / 10f) } }
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = gap, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Btn(normalizeBtn(), enabled = !cl.busy) { cl.normalize(scope) }
+        Btn(fadeInBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, true) } }
+        Btn(fadeOutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, false) } }
+    }
+    ValueSlider(trimDbT(), cs.trimThresholdDb, -70f..-20f, "dB", default = dflt.trimThresholdDb) { v -> set { it.copy(trimThresholdDb = v.toInt().toFloat()) } }
+    ValueSlider(trimPadT(), cs.trimPadMs, 0f..1000f, mlabeler.app.i18n.S.msUnit(), default = dflt.trimPadMs) { v -> set { it.copy(trimPadMs = ((v / 10).toInt() * 10).toFloat()) } }
+    Row(Modifier.padding(top = 6.dp)) { Btn(trimBtn(), enabled = !cl.busy) { cl.trimSilence() } }
+
+    Heading(clicksT(), clicksHint(), compact)
+    Hint(clicksHint(), compact)
+    ValueSlider(sensitivityT(), cs.clickSensitivity, 1f..10f, decimals = 1, default = dflt.clickSensitivity) { v -> set { it.copy(clickSensitivity = v) } }
+    ValueSlider(maxWidthT(), cs.clickMaxMs, 0.5f..20f, S.msUnit(), decimals = 1, default = dflt.clickMaxMs) { v -> set { it.copy(clickMaxMs = v) } }
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = gap, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Btn(findT(), enabled = !cl.busy) { cl.findClicks(scope) }
+        Btn(repairFoundT.format(cl.found.size), primary = true, enabled = cl.found.isNotEmpty() && !cl.busy) { cl.repairFound() }
+        if (cl.found.isNotEmpty()) Btn(clearT()) { cl.clearFound() }
+    }
+
+    Heading(repairT(), repairHint(), compact)
+    Hint(repairHint(), compact)
+    Row(Modifier.padding(top = 6.dp)) { Btn(repairBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.repairRange(it) } } }
+
+    Heading(noiseT(), noiseHint(), compact)
+    Hint(noiseHint(), compact)
+    Row(Modifier.padding(top = 6.dp), horizontalArrangement = gap, verticalAlignment = Alignment.CenterVertically) {
+        Btn(profileT(), enabled = selected != null && !cl.busy) { selected?.let { cl.takeNoiseProfile(it) } }
+    }
+    val pf = cl.profileFrom
+    Text(if (pf != null) profileFromT.format(formatTime(pf.first), formatTime(pf.second)) else noProfile(), color = c.muted, fontSize = 12.sp,
+        modifier = Modifier.padding(top = 4.dp))
+    ValueSlider(reductionT(), cs.noiseReductionDb, 0f..40f, "dB", default = dflt.noiseReductionDb) { v -> set { it.copy(noiseReductionDb = v) } }
+    ValueSlider(noiseSensT(), cs.noiseSensitivityDb, 0f..24f, "dB", decimals = 1, default = dflt.noiseSensitivityDb) { v -> set { it.copy(noiseSensitivityDb = v) } }
+    ValueSlider(smoothingT(), cs.noiseSmoothing.toFloat(), 0f..12f, bandsT(), default = dflt.noiseSmoothing.toFloat()) { v -> set { it.copy(noiseSmoothing = v.toInt()) } }
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = gap, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Btn(previewT(), enabled = cl.noiseProfile != null && !cl.busy) { cl.previewNoise(scope ?: (ed.viewStart to ed.viewStart + ed.visibleDuration)) }
+        Btn(applyT(), primary = true, enabled = cl.noiseProfile != null && !cl.busy) { cl.reduceNoise(scope) }
+    }
+
+    Divider()
+    FlowRow(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = gap, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Btn(undoT(), enabled = cl.canUndo && !cl.busy) { cl.undo() }
+        Btn(originalT(), enabled = cl.hasOriginal() && !cl.busy) { cl.restoreOriginal() }
     }
 }

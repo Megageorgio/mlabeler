@@ -45,16 +45,6 @@ object Environments {
             )
         },
         BuiltIn(
-            "one-picture", L("One picture", "Одна картинка"),
-            L("Sound and labels in one picture.", "Звук и разметка одной картинкой."),
-        ) {
-            Environment(
-                "one-picture", LayoutSettings(overlay = true, showPitch = true, showInspector = false),
-                ToolbarSettings(listOf(ToolbarGroups.FILES, ToolbarGroups.HISTORY, ToolbarGroups.PLAY, ToolbarGroups.EDIT, ToolbarGroups.AUTO,
-                    ToolbarGroups.VIEW), labels = true, big = false),
-            )
-        },
-        BuiltIn(
             "singing", L("Singing data", "Певческий датасет"),
             L("Pitch as its own lane, loudness and notes.", "Высота тона своей полосой, громкость и ноты."),
         ) {
@@ -84,12 +74,27 @@ object Environments {
             )
         },
         BuiltIn(
-            "full", L("Full", "Полная"),
-            L("Every button as an icon, pitch and loudness.", "Все кнопки значками, высота тона и громкость."),
+            "studio", L("Studio", "Студия"),
+            L("Labels on top, every lane of the sound, the notepad at hand; few buttons, more room.",
+                "Разметка сверху, все полосы звука, блокнот под рукой; мало кнопок, больше места."),
         ) {
             Environment(
-                "full", LayoutSettings(showInspector = true, showPitch = true, showPower = true, entriesSeparate = true),
-                ToolbarSettings(ToolbarGroups.all, labels = false, big = false),
+                "studio",
+                LayoutSettings(
+                    tierHeight = 32f, labelFontSize = 17f, showPitch = true, pitchOverSpectrogram = false, showPower = true, tiersOnTop = true,
+                    entriesSide = "right", laneOrder = listOf("labels", "wave", "spec", "power", "pitch"),
+                    laneWeights = mapOf("wave" to 0.53f, "spec" to 0.35f, "power" to 0.12f), waveGain = 2.44f,
+                    showNotepad = true, notepadX = 40f, notepadY = 368f, notepadW = 257f, notepadH = 264f,
+                    inspectorOrder = listOf("file", "selection", "problems", "queue", "notes", "tiers", "compare"),
+                    overlayDim = 0.34f, overlayWaveFill = true, overlayWaveFillAlpha = 1f,
+                ),
+                ToolbarSettings(
+                    listOf(ToolbarGroups.HISTORY, ToolbarGroups.AUTO, ToolbarGroups.MARKS, ToolbarGroups.VIEW, ToolbarGroups.EXTRAS, ToolbarGroups.FILES),
+                    order = listOf(ToolbarGroups.PLAY, ToolbarGroups.EDIT, ToolbarGroups.HISTORY, ToolbarGroups.MODES, ToolbarGroups.AUTO,
+                        ToolbarGroups.MARKS, ToolbarGroups.VIEW, ToolbarGroups.EXTRAS, ToolbarGroups.FILES, ToolbarGroups.ZOOM),
+                    scaleButton = false,
+                ),
+                statusBar = false,
             )
         },
     )

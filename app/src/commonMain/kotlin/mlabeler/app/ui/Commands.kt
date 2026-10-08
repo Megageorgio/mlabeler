@@ -222,7 +222,7 @@ object Commands {
     val exportDs = Command("export-diffsinger", L("Export a DiffSinger dataset…", "Экспорт датасета DiffSinger…"), emptyList()) { _, a -> a.showDsExport = true }.only(Mode.Labels)
     val midiOut = Command("midi-export", L("Save notes as MIDI", "Сохранить ноты в MIDI"), emptyList()) { e, _ -> e.exportMidi() }.only(Mode.Labels)
     val midiIn = Command("midi-import", L("Notes from a MIDI file next to the recording", "Ноты из MIDI рядом с записью"), emptyList()) { e, _ -> e.importMidi() }.only(Mode.Labels)
-    val help = Command("help", L("How it works", "Как с этим работать"), listOf(Chord(Key.F1))) { _, a -> a.showHelp = true }
+    val help = Command("help", L("Help", "Справка"), listOf(Chord(Key.F1))) { _, a -> a.showHelp = true }
     val speed = Command("speed", L("Playback speed", "Скорость воспроизведения"), listOf(ch('Y'))) { e, _ -> e.cycleSpeed() }
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
     val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: клик выбирает, перетаскивание двигает"), listOf(Chord(Key.One)), { it.app.settings.edit.tools }) { _, a ->
@@ -255,6 +255,9 @@ object Commands {
         if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите кусок или фонему")())
         else e.cleanup.cut(r)
     }
+    val soundMode = Command("sound-mode", L("Sound editing (labels locked)", "Правка звука (метки закреплены)"), listOf(ch('E', ctrl = true, shift = true))) { e, _ ->
+        e.soundMode = !e.soundMode
+    }.only(Mode.Labels)
     val lockLayout = Command("lock-layout", L("Lock lane and panel sizes", "Закрепить размеры полос и панелей"), emptyList()) { _, a ->
         a.update { it.copy(layout = it.layout.copy(locked = !it.layout.locked)) }
     }
@@ -270,7 +273,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, segments, resynthWorld, resynthNsf,

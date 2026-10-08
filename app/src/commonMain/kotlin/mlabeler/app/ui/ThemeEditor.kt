@@ -98,7 +98,7 @@ fun ThemesPage(app: AppState) {
     val s = app.settings
     val data = Platform.dataDir()
     SectionTitle(themesT())
-    val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(), "contrast" to S.themeContrast())
+    val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(), "retro-fairy" to S.themeFairy(), "contrast" to S.themeContrast())
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (t in Themes.builtIn) ThemeSwatch(t, names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
         for (ct in Themes.custom) ThemeSwatch(ct.tokens, ct.name, s.theme == ct.tokens.id) { app.update { it.copy(theme = ct.tokens.id) } }
@@ -127,7 +127,7 @@ fun ThemesPage(app: AppState) {
 }
 
 @Composable
-private fun ThemeSwatch(t: Tokens, name: String, selected: Boolean, onClick: () -> Unit) {
+internal fun ThemeSwatch(t: Tokens, name: String, selected: Boolean, onClick: () -> Unit) {
     val c = T.c
     val shape = RoundedCornerShape(c.radius)
     Column(

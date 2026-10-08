@@ -6,12 +6,19 @@ import androidx.compose.runtime.setValue
 
 object Lang {
     var current by mutableStateOf("en")
-    val available = listOf("en" to "English", "ru" to "Русский")
+    val available = listOf(
+        "en" to "English", "ru" to "Русский", "ja" to "日本語", "zh" to "中文（简体）", "ko" to "한국어",
+        "fr" to "Français", "de" to "Deutsch", "es" to "Español", "pt" to "Português (Brasil)",
+    )
 }
 
 /** A UI string in every bundled language. Reading it inside a composable follows language changes. */
 class L(val en: String, val ru: String) {
-    operator fun invoke(): String = if (Lang.current == "ru") ru else en
+    operator fun invoke(): String = when (val code = Lang.current) {
+        "en" -> en
+        "ru" -> ru
+        else -> Translations.get(code, en) ?: en
+    }
     fun format(vararg args: Any?): String {
         var s = invoke()
         args.forEachIndexed { i, a -> s = s.replace("{$i}", a.toString()) }
@@ -148,6 +155,7 @@ object S {
     val themeModernDark = L("Dark", "Тёмная")
     val themeModernLight = L("Light", "Светлая")
     val themeRetro = L("Retro", "Ретро")
+    val themeFairy = L("Retro Fairy", "Ретро-фея")
     val themeContrast = L("High contrast", "Контрастная")
     val interfaceScale = L("Interface size", "Размер интерфейса")
     val editing = L("Editing", "Редактирование")
@@ -178,7 +186,7 @@ object S {
     val toolkitOk = L("Toolkit answers", "Тулкит отвечает")
     val toolkitHint = L("Autolabel and the aligner in auto-oto use mVocalToolkit. On a computer mLabeler installs and starts it by itself; a phone connects to a computer where it runs.",
         "Авторазметка и выравниватель в авто-ото работают через mVocalToolkit. На компьютере mLabeler сам его установит и запустит; телефон подключается к компьютеру, где он работает.")
-    val toolkitAutoStart = L("Start it when needed (and stop on exit)", "Запускать, когда нужен (и закрывать при выходе)")
+    val toolkitAutoStart = L("Start it when needed (and stop when unused)", "Запускать, когда нужен (и закрывать, когда не нужен)")
     val toolkitShare = L("Let phones connect (local network)", "Разрешить подключение с телефона (локальная сеть)")
     val toolkitShareHint = L("On the phone: Settings → Autolabel, enter one of these addresses and the token.",
         "На телефоне: Настройки → Авторазметка, введите один из этих адресов и токен.")

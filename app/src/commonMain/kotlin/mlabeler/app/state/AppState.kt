@@ -52,6 +52,7 @@ class AppState(private val scope: CoroutineScope) {
     var showSummary by mutableStateOf(false)
     var showSoundCheck by mutableStateOf(false)
     val toolkit = mlabeler.app.toolkit.ToolkitManager(this, scope)
+    val updater = Updater(this, scope)
     var plugins by mutableStateOf<List<mlabeler.app.plugins.Plugin>>(emptyList())
         private set
 
@@ -143,6 +144,7 @@ class AppState(private val scope: CoroutineScope) {
         mlabeler.app.ui.Keymap.load(settings.keymap)
         applyAudioFormats(settings)
         Lang.current = settings.language.ifEmpty { Platform.systemLanguage }.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
+        if (settings.setupDone) updater.checkAtStart()
     }
 
     fun update(transform: (AppSettings) -> AppSettings) {
@@ -281,6 +283,6 @@ class AppState(private val scope: CoroutineScope) {
 
     fun close() {
         editor?.saveAllOnClose()
-        toolkit.stop()
+        toolkit.close()
     }
 }

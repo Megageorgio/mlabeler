@@ -194,11 +194,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.files, ed, app, checked = l.showFiles, title = MenuTitles.filesPanel()))
             if (l.entriesSeparate) add(toggle(MenuTitles.entriesPanel(), l.showEntries) { it.copy(layout = it.layout.togglePanel("entries")) })
             add(item(Commands.inspector, ed, app, checked = l.showInspector, title = MenuTitles.detailsPanel()))
-            add(MSep)
-            add(toggle(MenuTitles.entriesSeparate(), l.entriesSeparate) { it.copy(layout = it.layout.copy(entriesSeparate = !it.layout.entriesSeparate, showEntries = true, entriesSide = it.layout.filesSide)) })
-            if (l.entriesSeparate) add(toggle(MenuTitles.entriesRight(), l.entriesSide == "right") { it.copy(layout = it.layout.copy(entriesSide = if (it.layout.entriesSide == "right") "left" else "right")) })
-            add(toggle(MenuTitles.filesRight(), l.filesSide == "right") { it.copy(layout = it.layout.copy(filesSide = if (it.layout.filesSide == "right") "left" else "right")) })
-            add(toggle(MenuTitles.detailsLeft(), l.inspectorSide == "left") { it.copy(layout = it.layout.copy(inspectorSide = if (it.layout.inspectorSide == "left") "right" else "left")) })
+            // which side each panel is on, and entries as a panel of their own, are set on the panels themselves
             add(MItem(MenuTitles.arrange(), checked = app.arrangePanels) { app.arrangePanels = !app.arrangePanels })
             add(MSep)
             if (!Platform.isMobile) add(toggle(MenuTitles.menuBar(), s.menuBar) { it.copy(menuBar = !it.menuBar) })
@@ -271,6 +267,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     }
     val tools = buildList {
         if (oto) add(item(Commands.autoOto, ed, app)) else add(item(Commands.autolabel, ed, app))
+        if (!oto) add(item(Commands.soundMode, ed, app, checked = ed.soundMode))
         add(item(Commands.cleanup, ed, app))
         add(item(Commands.mute, ed, app))
         if (!oto) add(item(Commands.cutAudio, ed, app))

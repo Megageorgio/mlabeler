@@ -36,22 +36,89 @@ import mlabeler.app.state.EnvironmentEntry
 import mlabeler.app.state.Environments
 import mlabeler.app.theme.T
 
-/** Shown once, on the first start: language and the work environment. */
+private object SetupTitles {
+    val welcome = L("Welcome", "Добро пожаловать")
+    val intro = L("A few basic choices first. Everything here can be changed later in Settings.",
+        "Сначала несколько основных настроек. Всё это можно поменять потом в Настройках.")
+    val language = L("Language of the program", "Язык программы")
+    val theme = L("Look", "Внешний вид")
+    val themeHint = L("Colours of the whole program. Dark is easier on the eyes in the evening.", "Цвета всей программы. Тёмная тема спокойнее для глаз вечером.")
+    val size = L("Size of text and buttons", "Размер текста и кнопок")
+    val sizeHint = L("Pick what is comfortable to read. On a small screen take a smaller size.", "Выберите, что удобно читать. На маленьком экране — поменьше.")
+    val updates = L("New versions", "Новые версии")
+    val updatesHint = L("At start the program can look on the internet for a newer version and ask whether to download it. Nothing is installed without asking.",
+        "При запуске программа может проверить в интернете, есть ли новая версия, и спросить, скачать ли её. Без вопроса ничего не устанавливается.")
+    val toolkit = L("Automatic labelling (toolkit)", "Автоматическая разметка (тулкит)")
+    val toolkitHint = L("A separate helper program does the automatic labelling. When it is installed, it can start by itself whenever it is needed and stop once no program uses it.",
+        "Автоматическую разметку делает отдельная программа-помощник. Если она установлена, она может запускаться сама, когда нужна, и закрываться, когда больше не используется.")
+    val next = L("Next", "Дальше")
+    val back = L("Back", "Назад")
+}
+
+/** Shown once, on the first start: the main settings (each explained), then the work environment. */
 @Composable
 fun SetupDialog(app: AppState) {
     val c = T.c
+    var step by remember { mutableStateOf(0) }
+    val s = app.settings
     Overlay({ app.applyEnvironment("basic") }, 760) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(22.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("mLabeler", color = c.text, fontSize = 20.sp, modifier = Modifier.weight(1f))
-                for ((code, name) in Lang.available) {
-                    Chip(name, Lang.current == code) { app.update { it.copy(language = code) } }
-                    androidx.compose.foundation.layout.Spacer(Modifier.width(6.dp))
+            Text("mLabeler", color = c.text, fontSize = 20.sp)
+            if (step == 0) {
+                Text(SetupTitles.welcome(), color = c.text, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp))
+                Text(SetupTitles.intro(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+
+                SectionTitle(SetupTitles.language())
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((code, name) in Lang.available) Chip(name, Lang.current == code) { app.update { it.copy(language = code) } }
                 }
+
+                SectionTitle(SetupTitles.theme())
+                Text(SetupTitles.themeHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+                val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(),
+                    "retro-fairy" to S.themeFairy(), "contrast" to S.themeContrast())
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (t in mlabeler.app.theme.Themes.builtIn) ThemeSwatch(t, names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
+                }
+
+                SectionTitle(SetupTitles.size())
+                Text(SetupTitles.sizeHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (v in listOf(0.8f, 0.9f, 1f, 1.15f, 1.3f, 1.5f)) Chip("${(v * 100).toInt()}%", kotlin.math.abs(s.scale - v) < 0.01f) { app.update { it.copy(scale = v) } }
+                }
+
+                SectionTitle(SetupTitles.updates())
+                Text(SetupTitles.updatesHint(), color = c.muted, fontSize = 12.sp)
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Toggle(s.updates.checkOnStart, { v -> app.update { it.copy(updates = it.updates.copy(checkOnStart = v)) } })
+                    Text(UpdateTitles.checkOnStart(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
+                }
+                if (s.updates.checkOnStart) {
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for (ch in listOf("stable", "beta", "alpha")) Chip(UpdateTitles.channelName(ch), s.updates.channel == ch) {
+                            app.update { it.copy(updates = it.updates.copy(channel = ch)) }
+                        }
+                    }
+                    Text(UpdateTitles.channelHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+
+                if (!Platform.isMobile) {
+                    SectionTitle(SetupTitles.toolkit())
+                    Text(SetupTitles.toolkitHint(), color = c.muted, fontSize = 12.sp)
+                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Toggle(s.toolkit.autoStart, { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoStart = v)) } })
+                        Text(S.toolkitAutoStart(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.End) {
+                    Btn(SetupTitles.next(), primary = true) { step = 1 }
+                }
+            } else {
+                Text(S.chooseEnvironment(), color = c.text, fontSize = 15.sp, modifier = Modifier.padding(top = 10.dp))
+                Text(S.chooseEnvironmentHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp))
+                EnvironmentCards(app, Environments.builtIns(), current = null) { app.applyEnvironment(it.id); app.updater.checkAtStart() }
+                Row(Modifier.fillMaxWidth().padding(top = 14.dp)) { Btn(SetupTitles.back()) { step = 0 } }
             }
-            Text(S.chooseEnvironment(), color = c.text, fontSize = 15.sp, modifier = Modifier.padding(top = 18.dp))
-            Text(S.chooseEnvironmentHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp))
-            EnvironmentCards(app, Environments.builtIns(), current = null) { app.applyEnvironment(it.id) }
         }
     }
 }

@@ -12,9 +12,6 @@ actual object LocalToolkit {
     private var process: Process? = null
     private var last: Process? = null
 
-    init {
-        Runtime.getRuntime().addShutdownHook(Thread { stop() })
-    }
 
     actual val supported: Boolean = true
     actual val running: Boolean get() = process?.isAlive == true
@@ -51,6 +48,8 @@ actual object LocalToolkit {
     private fun builder(command: List<String>) = ProcessBuilder(command).redirectErrorStream(true).apply {
         environment()["PYTHONUNBUFFERED"] = "1"
         environment()["PYTHONIOENCODING"] = "utf-8"
+        // not the folder the app runs from: it must stay free to move or delete
+        directory(File(System.getProperty("user.home")))
     }
 
     actual suspend fun run(command: List<String>, onLine: (String) -> Unit): Int = withContext(Dispatchers.IO) {
@@ -67,11 +66,38 @@ actual object LocalToolkit {
 
     actual fun start(command: List<String>, onLine: (String) -> Unit): Boolean {
         stop()
-        val p = runCatching { builder(command).start() }.getOrElse { onLine(it.message ?: it.toString()); return false }
+        // the output goes to a file, not a pipe: the toolkit may outlive this app (other programs use it) and
+        // must not fail writing to a closed pipe; the file is followed for the log shown here
+        val logFile = File(mlabeler.app.Platform.dataDir(), "toolkit.log")
+        runCatching { logFile.parentFile?.mkdirs(); logFile.writeText("") }
+        val p = runCatching {
+            builder(command).redirectOutput(ProcessBuilder.Redirect.appendTo(logFile)).start()
+        }.getOrElse { onLine(it.message ?: it.toString()); return false }
         process = p
         last = p
         thread(isDaemon = true, name = "toolkit-output") {
-            runCatching { p.inputStream.bufferedReader(Charsets.UTF_8).forEachLine(onLine) }
+            runCatching {
+                java.io.RandomAccessFile(logFile, "r").use { f ->
+                    var pos = 0L
+                    val pending = java.io.ByteArrayOutputStream()
+                    while (true) {
+                        val len = f.length()
+                        if (len > pos) {
+                            f.seek(pos)
+                            val buf = ByteArray((len - pos).toInt().coerceAtMost(1 shl 20))
+                            val n = f.read(buf)
+                            if (n > 0) {
+                                pos += n
+                                for (i in 0 until n) {
+                                    if (buf[i] == '\n'.code.toByte()) { onLine(pending.toString(Charsets.UTF_8).trimEnd('\r')); pending.reset() }
+                                    else pending.write(buf[i].toInt())
+                                }
+                            }
+                        } else if (!p.isAlive) break else Thread.sleep(200)
+                    }
+                    if (pending.size() > 0) onLine(pending.toString(Charsets.UTF_8))
+                }
+            }
         }
         return true
     }

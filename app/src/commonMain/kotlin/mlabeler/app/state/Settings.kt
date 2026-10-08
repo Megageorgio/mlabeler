@@ -29,6 +29,10 @@ data class LayoutSettings(
     val namesY: Float = 0.5f,
     val showPitch: Boolean = false,
     val showPower: Boolean = false,
+    /** Sound editing mode: boundaries shown over the sound, how ("dash", "dot", "solid"), parts between pauses marked. */
+    val soundShowLabels: Boolean = true,
+    val soundLabelStyle: String = "dash",
+    val soundPhrases: Boolean = false,
     /** First three formants as dots over the spectrogram. */
     val showFormants: Boolean = false,
     /** Pitch drawn over the spectrogram instead of its own lane. */
@@ -309,6 +313,7 @@ data class AppSettings(
     /** The program behind the settings window is darkened (off: colours of a theme are seen as they are). */
     val settingsDim: Boolean = true,
     val status: StatusSettings = StatusSettings(),
+    val updates: UpdateSettings = UpdateSettings(),
     val clean: CleanSettings = CleanSettings(),
 ) {
     companion object {

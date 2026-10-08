@@ -57,6 +57,7 @@ object ToolLabels {
     val rename = L("Rename", "Текст")
     val ripple = L("Ripple", "Следом")
     val linked = L("Linked", "Связь")
+    val sound = L("Sound", "Звук")
     val overlay = L("Overlay", "Наложить")
     val pitch = L("Pitch", "Высота")
     val zoomIn = L("Closer", "Ближе")
@@ -199,6 +200,7 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
                 } else {
                     B(Icons.ripple, ToolLabels.ripple, Commands.ripple, hint = S.ripple() + " — " + S.rippleHint(), active = s.edit.ripple)
                     B(Icons.link, ToolLabels.linked, Commands.linked, hint = S.linked() + " — " + S.linkedHint(), active = s.edit.linked)
+                    B(Icons.soundEdit, ToolLabels.sound, Commands.soundMode, active = ed.soundMode)
                 }
             }
             ToolbarGroups.AUTO -> Group {

@@ -77,6 +77,7 @@ object Icons {
     val magic = icon("magic", "M4 20L15 9", "M14 4v3", "M19 9h-3", "M17.5 5.5l-2 2", "M20 14v.01", "M10 4v.01")
     val plugin = icon("plugin", "M9 3v4", "M15 3v4", "M6 7h12v4a6 6 0 0 1-12 0z", "M12 17v4")
     val pipette = icon("pipette", "M14.5 4.5l5 5", "M17 2.5a2.1 2.1 0 0 1 3 3l-2 2-3-3z", "M15.5 7.5L6 17l-1.5 3.5L8 19l9.5-9.5")
+    val soundEdit = icon("soundEdit", "M3 12h2", "M7 8v8", "M11 5v14", "M15 9v6", "M15 21l2-5 5-5-2-2-5 5z")
     val lock = icon("lock", "M6 11h12v9H6z", "M8.5 11V8a3.5 3.5 0 0 1 7 0v3")
     val unlock = icon("unlock", "M6 11h12v9H6z", "M8.5 11V8a3.5 3.5 0 0 1 6.8-1.2")
     val home = icon("home", "M4 11l8-7 8 7", "M6 9.5V20h12V9.5")

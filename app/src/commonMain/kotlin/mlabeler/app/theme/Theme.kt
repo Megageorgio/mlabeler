@@ -126,7 +126,21 @@ object Themes {
         spectrogram = gray, radius = 2.dp, borderWidth = 2.dp, square = false,
     )
 
-    val builtIn = listOf(modernDark, modernLight, retro, contrast)
+    /** The classic look in soft pink, with crisp square check boxes. */
+    val fairy = Tokens(
+        id = "retro-fairy", dark = false,
+        bg = hex(0xe7e6dd), panel = hex(0xdfb8bf), panelAlt = hex(0xddcccc), border = hex(0x404040),
+        text = hex(0x000000), muted = hex(0x404040), accent = hex(0xd55b86), onAccent = hex(0xffffff),
+        danger = hex(0xff0000), ok = hex(0x64b41e), warn = hex(0xfffd76),
+        laneBg = hex(0xffffff), wave = hex(0x007479), waveCenter = hex(0xc0c0c0),
+        bound = hex(0x000000), boundSelected = hex(0xc00000), intervalSelected = Color(0x40000080), intervalHover = Color(0x18000000),
+        playhead = hex(0xff0000), cursor = Color(0xaa000000), selectionRange = Color(0x30000080),
+        tierText = hex(0x000000), tierColors = listOf(hex(0x000080), hex(0x006000), hex(0x806000), hex(0x800080), hex(0x008080)),
+        spectrogram = listOf(hex(0xf0f0f0), hex(0xff0063)), radius = 10.dp, borderWidth = 1.dp, square = true, mono = true, checkboxes = true,
+        boundLine = hex(0xff008b), boundWidth = 1f, boundStyle = "dash",
+    )
+
+    val builtIn = listOf(modernDark, modernLight, retro, fairy, contrast)
 
     /** Themes from files (see ThemeFiles). */
     var custom by androidx.compose.runtime.mutableStateOf<List<CustomTheme>>(emptyList())

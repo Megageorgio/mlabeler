@@ -1123,7 +1123,16 @@ class EditorState(
         }
     }
 
+    /** Sound editing mode: the recording is changed, the labels can't be (they move only with cut sound). */
+    var soundMode by mutableStateOf(false)
+    private var audioEditCommit = false
+
     fun commit(newDoc: LabelDoc) {
+        if (soundMode && !audioEditCommit) {
+            dragDoc = null
+            app.message(mlabeler.app.ui.SoundTitles.locked())
+            return
+        }
         lastEdit = now()
         val h = history ?: return
         audioRedo.clear()
@@ -1145,7 +1154,7 @@ class EditorState(
     fun applyAudioEdit(path: String, before: ByteArray, after: ByteArray, labels: LabelDoc?) {
         workspace.fs.write(path, after)
         val v0 = history?.version
-        if (labels != null) commit(labels)
+        if (labels != null) { audioEditCommit = true; try { commit(labels) } finally { audioEditCommit = false } }
         audioRedo.clear()
         audioUndo.addLast(AudioStep(path, before, after, history?.version != v0, history?.version ?: 0))
         // kept in memory: a few steps, at most ~400 MB

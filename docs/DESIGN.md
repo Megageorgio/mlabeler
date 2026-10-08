@@ -137,7 +137,7 @@ shift times, set marks, convert formats, regenerate f0. Rules can be saved and b
 
 ## Plugins
 
-JavaScript, compatible with vLabeler-style macro and template scripts where it makes sense:
+JavaScript plugins:
 QuickJS on Android and iOS, the same engine on desktop for identical behaviour. A plugin is a folder with
 `plugin.json` and scripts; parameters are typed (number, text, choice, file, entry filter) and the dialog is
 generated from them. Plugins can read and change the current document and the workspace.

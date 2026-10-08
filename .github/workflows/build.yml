@@ -19,12 +19,23 @@ jobs:
 
   android:
     runs-on: ubuntu-latest
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v4
+      - name: Signing key (repository secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS)
+        if: ${{ env.KEYSTORE_B64 != '' }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks" && echo "MLABELER_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
       - run: ./gradlew :app:assembleRelease
+        env:
+          MLABELER_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MLABELER_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      - run: |
+          V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
+          mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/mLabeler-$V-android.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: mLabeler-android
@@ -50,6 +61,23 @@ jobs:
           name: mLabeler-${{ matrix.name }}
           path: ${{ matrix.out }}
 
+  windows-portable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: actions/setup-go@v5
+        with: { go-version: stable }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: |
+          V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
+          tools/windows-portable.sh "build/mLabeler-$V-windows-x64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mLabeler-windows-portable
+          path: build/mLabeler-*-windows-x64.zip
+
   ios:
     runs-on: macos-latest
     steps:
@@ -61,7 +89,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, android, desktop]
+    needs: [test, android, desktop, windows-portable]
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:

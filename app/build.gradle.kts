@@ -11,6 +11,14 @@ plugins {
 
 val appVersion = project.property("app.version") as String
 
+/** Android version code: 0.2.1-beta3 → 200143; a stable release ends in 99, after its alphas (01–39) and betas (40–98). */
+fun versionCodeOf(v: String): Int {
+    val m = Regex("(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:-(alpha|beta)(\\d+)?)?").find(v) ?: return 1
+    val (ma, mi, pa, kind, n) = m.destructured
+    val tail = when (kind) { "alpha" -> (n.ifEmpty { "1" }.toInt()).coerceIn(1, 39); "beta" -> 40 + (n.ifEmpty { "1" }.toInt()).coerceIn(0, 58); else -> 99 }
+    return ma.toInt() * 10_000_000 + mi.toInt() * 100_000 + pa.ifEmpty { "0" }.toInt() * 100 + tail
+}
+
 // the version shown in the program (Settings → About)
 val appInfoDir = layout.buildDirectory.dir("generated/appinfo")
 val generateAppInfo by tasks.registering {
@@ -103,19 +111,28 @@ android {
         applicationId = "io.github.megageorgio.mlabeler"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        versionCode = versionCodeOf(appVersion)
         versionName = appVersion
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    // a fixed key makes each new APK install over the previous one: given by the build machine (CI secrets),
+    // otherwise the debug key of that machine is used
+    val keystore = System.getenv("MLABELER_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    if (keystore != null) signingConfigs.create("release") {
+        storeFile = keystore
+        storePassword = System.getenv("MLABELER_KEYSTORE_PASSWORD")
+        keyAlias = System.getenv("MLABELER_KEY_ALIAS") ?: "mlabeler"
+        keyPassword = System.getenv("MLABELER_KEY_PASSWORD") ?: System.getenv("MLABELER_KEYSTORE_PASSWORD")
+    }
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }

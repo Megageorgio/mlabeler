@@ -48,6 +48,19 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
     }.getOrNull() ?: "HTTP ${r.status}"
 
     /** Asks the toolkit to stop (one this program started). */
+    /** Tells the toolkit this program uses it; returns the id for [ping] and [detach], null for older toolkits. */
+    suspend fun attach(name: String): String? = runCatching {
+        call("POST", "/clients", buildJsonObject { put("name", name) }, timeoutMs = 5_000).jsonObject["id"]?.jsonPrimitive?.content
+    }.getOrNull()
+
+    /** False when the toolkit doesn't know [id] (it was restarted): attach again. */
+    suspend fun ping(id: String): Boolean = runCatching { call("POST", "/clients/$id/ping", timeoutMs = 5_000); true }.getOrDefault(false)
+
+    /** Detaches; returns how many programs still use the toolkit, null when unknown. */
+    suspend fun detach(id: String): Int? = runCatching {
+        call("DELETE", "/clients/$id", timeoutMs = 2_000).jsonObject["clients"]?.jsonPrimitive?.content?.toIntOrNull()
+    }.getOrNull()
+
     suspend fun shutdown() {
         runCatching { call("POST", "/shutdown", timeoutMs = 2_000) }
     }

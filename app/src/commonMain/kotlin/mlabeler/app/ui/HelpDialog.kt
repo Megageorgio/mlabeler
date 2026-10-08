@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -18,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import mlabeler.app.Platform
@@ -27,9 +29,11 @@ import mlabeler.app.state.AppState
 import mlabeler.app.state.Mode
 import mlabeler.app.theme.T
 
-private val helpTitle = L("How it works", "Как с этим работать")
-private val helpIntro = L("Pick a topic, then open the question you need. Keys in brackets can be changed in Settings → Shortcuts.",
-    "Выберите тему и раскройте нужный вопрос. Клавиши в скобках можно поменять в Настройки → Сочетания клавиш.")
+private val helpTitle = L("Help", "Справка")
+private val helpIntro = L("Pick a topic or search, then open a question. Keys can be changed in Settings → Shortcuts.",
+    "Выберите тему или найдите вопрос поиском. Клавиши можно поменять в Настройки → Сочетания клавиш.")
+private val helpSearch = L("Search help", "Поиск по справке")
+private val helpNothing = L("Nothing found. Try another word.", "Ничего не найдено. Попробуйте другое слово.")
 
 /** One question with its answer lines. Lines may hold {command-id}, replaced with the command's current key. */
 private class Item(val q: L, val lines: List<L>, val touch: Boolean? = null)
@@ -223,6 +227,13 @@ private val topics = listOf(
                 "«Запись» открывает рекордер: он показывает строку, которую нужно спеть, пишет в папку и может сам перейти к следующей. Список строк хранится в reclist.txt."),
             L("R records and stops, Space plays the take, ↑ ↓ change the line. A metronome, count-in and a guide WAV are available.",
                 "R — запись и стоп, пробел — прослушать дубль, ↑ ↓ — другая строка. Есть метроном, отсчёт и направляющий WAV.")),
+        it(L("How do I edit the sound without touching the labels?", "Как править звук, не задевая разметку?"),
+            L("{sound-mode} turns on sound editing: the boundaries are locked, a drag selects any part of the sound, and a panel on the right holds every tool that changes the recording.",
+                "{sound-mode} включает правку звука: границы закреплены, перетаскивание выделяет любой кусок звука, а панель справа собирает все инструменты, которые меняют запись."),
+            L("In that panel the boundaries can be hidden or drawn dashed, dotted or as lines, and the parts between pauses can be marked.",
+                "В этой панели границы можно скрыть или рисовать пунктиром, точками или линией, а куски между паузами — отметить."),
+            L("Every change of the recording is undone with {undo}; the first version of the file is kept in .mlabeler/backup.",
+                "Любое изменение записи отменяется через {undo}; первая версия файла хранится в .mlabeler/backup.")),
         it(L("How do I clean a recording?", "Как почистить запись?"),
             L("{cleanup} finds and repairs clicks and lowers noise (the noise is taken from a selected pause). The original can be put back.",
                 "{cleanup} находит и чинит щелчки и снижает шум (шум берётся из выделенной паузы). Исходник можно вернуть."),
@@ -257,9 +268,15 @@ private fun keyOf(id: String): String = Commands.all.firstOrNull { it.id == id }
 
 private val placeholder = Regex("\\{([a-z0-9-]+)\\}")
 
+/** {command-id} becomes the command's key, or its name in quotes when it has no key. */
 private fun fill(text: String): String = placeholder.replace(text) { m ->
-    val k = keyOf(m.groupValues[1])
-    if (k.isEmpty()) "" else k
+    val cmd = Commands.all.firstOrNull { it.id == m.groupValues[1] }
+    val k = cmd?.keyLabel.orEmpty()
+    when {
+        k.isNotEmpty() -> k
+        cmd != null -> "«" + cmd.title().trimEnd('…') + "»"
+        else -> ""
+    }
 }.replace("()", "").replace("( )", "").replace(Regex(" {2,}"), " ").replace(" .", ".").replace(" ,", ",")
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -270,33 +287,49 @@ fun HelpDialog(app: AppState) {
     val startTopic = if (app.editor?.mode == Mode.Oto) OTO_TOPIC else 0
     var topic by remember { mutableStateOf(startTopic) }
     var open by remember { mutableStateOf(setOf<String>()) }
+    var query by remember { mutableStateOf("") }
+    val searchFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { if (!mlabeler.app.Platform.isMobile) runCatching { searchFocus.requestFocus() } }
     Overlay({ app.showHelp = false; app.editor?.requestFocus?.invoke() }, 720) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
-            Row {
-                Text(helpTitle(), color = c.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp)) {
+            androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                Text(helpTitle(), color = c.text, fontSize = 18.sp, modifier = Modifier.weight(1f))
+                Field(query, { query = it }, Modifier.width(220.dp).focusRequester(searchFocus), placeholder = helpSearch())
                 IconBtn(Icons.close, S.close()) { app.showHelp = false }
             }
             Text(helpIntro(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            val words = query.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
+            if (words.isEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for ((i, t) in topics.withIndex()) Chip(t.title(), i == topic) { topic = i }
             }
-            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                for ((n, item) in topics[topic].items.withIndex()) {
+            // a topic's questions, or every question that has all the searched words (open, with its topic)
+            val shown: List<Triple<Int, Int, Item>> = if (words.isEmpty()) topics[topic].items.mapIndexed { n, item -> Triple(topic, n, item) }
+            else topics.flatMapIndexed { ti, t -> t.items.mapIndexedNotNull { n, item ->
+                val text = (item.q.en + " " + item.q.ru + " " + item.lines.joinToString(" ") { it.en + " " + it.ru } + " " + item.lines.joinToString(" ") { fill(it()) }).lowercase()
+                if (words.all { it in text }) Triple(ti, n, item) else null
+            } }
+            if (words.isNotEmpty() && shown.isEmpty()) Text(helpNothing(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                for ((ti, n, item) in shown) {
                     if (item.touch != null && item.touch != mobile) continue
-                    val key = "$topic/$n"
-                    val expanded = key in open
+                    val key = "$ti/$n"
+                    val expanded = key in open || words.isNotEmpty()
                     Row(
-                        Modifier.fillMaxWidth().clickable { open = if (expanded) open - key else open + key }.padding(vertical = 8.dp),
+                        Modifier.fillMaxWidth().clickable { open = if (key in open) open - key else open + key }.padding(vertical = 8.dp),
                     ) {
-                        Text(if (expanded) "▾" else "▸", color = c.accent, fontSize = 14.sp, modifier = Modifier.width(18.dp))
-                        Text(item.q(), color = c.text, fontSize = 14.sp)
-                    }
-                    if (expanded) Column(Modifier.padding(start = 18.dp, bottom = 6.dp)) {
-                        for (l in item.lines) Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
-                            Text("·", color = c.accent, fontSize = 14.sp, modifier = Modifier.width(14.dp))
-                            Text(fill(l()), color = c.text, fontSize = 13.sp)
+                        Text(if (expanded) "▾" else "▸", color = c.accent, fontSize = 14.sp, modifier = Modifier.width(20.dp))
+                        Column(Modifier.weight(1f)) {
+                            if (words.isNotEmpty()) Text(topics[ti].title(), color = c.muted, fontSize = 11.sp)
+                            Text(item.q(), color = c.text, fontSize = 14.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
                         }
                     }
+                    if (expanded) Column(Modifier.padding(start = 20.dp, bottom = 10.dp, end = 8.dp).widthIn(max = 620.dp)) {
+                        for (l in item.lines) Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Text("•", color = c.accent, fontSize = 13.sp, modifier = Modifier.width(14.dp))
+                            Text(fill(l()), color = c.text, fontSize = 13.sp, lineHeight = 20.sp)
+                        }
+                    }
+                    Divider()
                 }
             }
         }

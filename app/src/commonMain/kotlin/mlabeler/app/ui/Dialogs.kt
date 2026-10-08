@@ -383,7 +383,6 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 SectionTitle(S.files())
                 SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
                 SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
-                DangerZone(app)
                 ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
             }
             Section.View -> {
@@ -524,7 +523,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             Section.Interface -> InterfacePage(app)
             Section.Themes -> ThemesPage(app)
             Section.Keys -> KeymapPage(app)
-            Section.About -> AboutPage()
+            Section.About -> AboutPage(app)
         }
         // every page can go back to the defaults (with a second click to confirm)
         val reset: ((mlabeler.app.state.AppSettings) -> mlabeler.app.state.AppSettings)? = when (section) {
@@ -554,6 +553,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
             }
         }
+        if (section == Section.General) { Spacer(Modifier.height(28.dp)); DangerZone(app) }
     }
 }
 
@@ -876,7 +876,7 @@ private object AboutTitles {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AboutPage() {
+private fun AboutPage(app: AppState) {
     val c = T.c
     val uri = androidx.compose.ui.platform.LocalUriHandler.current
     @Composable
@@ -894,6 +894,7 @@ private fun AboutPage() {
     SectionTitle(S.about())
     Text("mLabeler ${mlabeler.app.AppInfo.VERSION}", color = c.text, fontSize = 15.sp)
     Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+    UpdateSection(app) { t, v, f -> SwitchRow(t, v, f) }
     SectionTitle(AboutTitles.author())
     person("m", listOf(
         "GitHub" to "https://github.com/Megageorgio",
@@ -1046,7 +1047,7 @@ internal object SettingsHelp {
                 "То, на чём DiffSinger падает: фонемы короче кадра, пробелы в имени, две одинаковые паузы подряд, нулевая длина, ноты не той длины, что фонемы предложения."),
             h("Checks", CheckTitles.runScripts, "Runs your own checks written as small JavaScript files after every change.", "Запускать свои проверки (маленькие файлы на JavaScript) после каждого изменения."),
 
-            h("Toolkit", S.toolkitAutoStart, "The toolkit starts by itself when a tool needs it and stops when the program closes.", "Тулкит запускается сам, когда он нужен инструменту, и закрывается вместе с программой."),
+            h("Toolkit", S.toolkitAutoStart, "The toolkit starts by itself when a tool needs it and stops once no program uses it any more.", "Тулкит запускается сам, когда он нужен инструменту, и закрывается, когда им больше не пользуется ни одна программа."),
             h("Toolkit", S.toolkitShare, "Phones and tablets in the same network can use the toolkit of this computer. A token protects it.",
                 "Телефоны и планшеты в той же сети могут пользоваться тулкитом этого компьютера. Доступ защищён токеном."),
         )

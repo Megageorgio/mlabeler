@@ -79,6 +79,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
                 version = (h.jsonObject["version"] as? JsonPrimitive)?.content ?: ""
                 status = Status.Ready
             }
+            keepAttached()
             true
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -139,14 +140,20 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
 
     private fun startCommand(mvt: String = LocalToolkit.findMvt(settings.mvtPath) ?: "mvt"): List<String> = buildList {
         add(mvt); add("serve"); add("--port"); add(port.toString())
+        // shared with other programs: it stops by itself when none of them uses it any more
+        add("--exit-when-unused"); add("30")
         if (settings.shareOnNetwork) { add("--host"); add("0.0.0.0") }
     }
+
+    /** An older toolkit rejected --exit-when-unused (argparse exits with 2): it is started without it. */
+    private var oldToolkit = false
 
     private suspend fun startLocked(): Boolean {
         val mvt = LocalToolkit.findMvt(settings.mvtPath) ?: run { status = Status.Missing; return false }
         busy(Status.Starting)
         networkToken = ""
-        val cmd = startCommand(mvt)
+        val full = startCommand(mvt)
+        val cmd = if (oldToolkit) full.filterIndexed { i, x -> x != "--exit-when-unused" && full.getOrNull(i - 1) != "--exit-when-unused" } else full
         addLog("> " + cmd.joinToString(" "))
         if (!LocalToolkit.start(cmd, ::addLog)) { status = Status.Failed; lastError = log.lastOrNull() ?: ""; return false }
         ownProcess = true
@@ -156,6 +163,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
             if (!LocalToolkit.running) {
                 // the toolkit found a newer version of itself: it updates and starts again on its own
                 if (LocalToolkit.lastExitCode() == EXIT_UPDATING) return waitForUpdate(cmd)
+                if (LocalToolkit.lastExitCode() == 2 && !oldToolkit) { oldToolkit = true; return startLocked() }
                 status = Status.Failed
                 lastError = startFailed()
                 ownProcess = false
@@ -233,6 +241,52 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         } finally {
             updatingNow = false
         }
+    }
+
+    // ---------- sharing the toolkit with other programs ----------
+
+    /** This program's id at the toolkit (it counts the programs using it and stops when none is left). */
+    private var clientId: String? = null
+    private var pingJob: Job? = null
+
+    private fun keepAttached() {
+        if (pingJob?.isActive == true) return
+        pingJob = scope.launch {
+            while (true) {
+                val c = client()
+                val id = clientId
+                if (id == null || !c.ping(id)) clientId = c.attach("mLabeler")
+                delay(30_000)
+            }
+        }
+    }
+
+    /**
+     * The app closes: it stops using the toolkit. When no other program uses it and it was started for programs
+     * (by this app or another), it is stopped now, so nothing stays running and no folder stays busy.
+     */
+    fun close() {
+        pingJob?.cancel()
+        val c = client()
+        val id = clientId
+        clientId = null
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.withTimeoutOrNull(3000) {
+                    val left = id?.let { c.detach(it) }
+                    val h = runCatching { c.health().jsonObject }.getOrNull()
+                    val shared = (h?.get("exit_when_unused") as? JsonPrimitive)?.content?.toDoubleOrNull()?.let { it > 0 } == true
+                    val others = left ?: (h?.get("clients") as? JsonPrimitive)?.content?.toIntOrNull()
+                    when {
+                        // older toolkits don't count programs: one started here goes with the app, as before
+                        others == null -> if (ownProcess) { c.shutdown(); LocalToolkit.stop() }
+                        others == 0 && (shared || ownProcess) -> c.shutdown()
+                        // others still use it: it stays and stops by itself after the last one
+                    }
+                }
+            }
+        }
+        status = Status.Off
     }
 
     /** Started here, but running as its own process after updating itself: it is stopped through /shutdown. */

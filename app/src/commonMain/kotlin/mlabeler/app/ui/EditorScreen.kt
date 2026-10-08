@@ -166,6 +166,11 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
                     VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(180f, 520f))) } }
                     PanelStack(app, ed, right, Modifier.width(l.inspectorWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
                 }
+                // sound editing: its tools at the right edge while the mode is on
+                if (ed.soundMode && ed.mode == Mode.Labels) {
+                    Divider(vertical = true)
+                    SoundPanel(app, ed, Modifier.width(290.dp).fillMaxHeight())
+                }
             }
             // medium width: details slide over the timeline
             if (wc == WidthClass.Medium) {

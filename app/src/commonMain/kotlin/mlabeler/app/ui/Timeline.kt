@@ -890,6 +890,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
 }
 
 private fun hitBound(ed: EditorState, g: Geom, region: Region?, x: Float, grab: Float): BoundRef? {
+    // labels are locked while the sound is edited: a press near a boundary selects sound like anywhere else
+    if (ed.soundMode) return null
     val doc = ed.doc ?: return null
     val k = when (region) {
         is Region.Tier -> region.index
@@ -1172,7 +1174,28 @@ private fun DrawScope.drawTimeline(
 
     // guide lines of the active tier across the audio area
     val guide = doc.tiers.getOrNull(ed.guideTier) as? IntervalTier
-    if (guide != null && g.audioBottom > g.audioTop) {
+    val lay = ed.app.settings.layout
+    val soundMode = ed.soundMode
+    // sound editing: the parts between pauses as bars along the top of the sound
+    if (soundMode && lay.soundPhrases && guide != null && g.audioBottom > g.audioTop) {
+        val pauses = ed.app.settings.checks.pauses
+        var i = 0
+        var n = 0
+        while (i < guide.size) {
+            if (guide.texts[i].isEmpty() || guide.texts[i] in pauses) { i++; continue }
+            var j = i
+            while (j + 1 < guide.size && guide.texts[j + 1].isNotEmpty() && guide.texts[j + 1] !in pauses) j++
+            n++
+            val a = x(guide.startOf(i)); val b = x(guide.endOf(j))
+            if (b > 0 && a < size.width) {
+                drawRect(c.accent.copy(alpha = 0.10f), Offset(a, g.audioTop), Size(b - a, g.audioBottom - g.audioTop))
+                drawRect(c.accent.copy(alpha = 0.75f), Offset(a, g.audioTop), Size(b - a, 3 * px))
+                safeText(measurer, n.toString(), Offset(a + 3 * px, g.audioTop + 4 * px), smallStyle.copy(color = c.accent))
+            }
+            i = j + 1
+        }
+    }
+    if (guide != null && g.audioBottom > g.audioTop && !(soundMode && !lay.soundShowLabels)) {
         val i0 = max(0, guide.indexAt(v0).let { if (it < 0) 0 else it })
         // zoomed far out boundaries would fill the picture: draw only those with some room around them
         var lastX = Float.NEGATIVE_INFINITY
@@ -1193,11 +1216,11 @@ private fun DrawScope.drawTimeline(
                     if (selected) c.boundSelected else if (c.boundLine != Color.Unspecified) c.boundLine else c.bound.copy(alpha = 0.55f),
                     Offset(xx, g.audioTop), Offset(xx, g.audioBottom),
                     if (selected) lw + px else lw,
-                    pathEffect = when {
-                        selected || c.boundStyle == "solid" -> null
-                        c.boundStyle == "dot" -> PathEffect.dashPathEffect(floatArrayOf(lw, 2 * lw + px))
+                    pathEffect = (if (soundMode) lay.soundLabelStyle else c.boundStyle).let { style -> when {
+                        selected || style == "solid" -> null
+                        style == "dot" -> PathEffect.dashPathEffect(floatArrayOf(lw, 2 * lw + px))
                         else -> PathEffect.dashPathEffect(floatArrayOf(4 * px + lw, 3 * px))
-                    },
+                    } },
                 )
             }
         }
