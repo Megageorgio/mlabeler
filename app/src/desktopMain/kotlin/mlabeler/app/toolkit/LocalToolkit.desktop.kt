@@ -48,6 +48,8 @@ actual object LocalToolkit {
     private fun builder(command: List<String>) = ProcessBuilder(command).redirectErrorStream(true).apply {
         environment()["PYTHONUNBUFFERED"] = "1"
         environment()["PYTHONIOENCODING"] = "utf-8"
+        // Python reads text files as UTF-8 even where a library does not say so (Windows would use its ANSI code page)
+        environment()["PYTHONUTF8"] = "1"
         // not the folder the app runs from: it must stay free to move or delete
         directory(File(System.getProperty("user.home")))
     }
