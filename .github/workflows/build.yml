@@ -116,6 +116,8 @@ jobs:
           path: build/mLabeler-*-windows-x64.zip
 
   ios:
+    # iOS builds take long: only for releases (tags) and runs started by hand
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -127,6 +129,8 @@ jobs:
   # An unsigned .ipa: people install it with AltStore, SideStore, Sideloadly or TrollStore,
   # which sign it with their own Apple ID.
   ios-ipa:
+    # iOS builds take long: only for releases (tags) and runs started by hand
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
