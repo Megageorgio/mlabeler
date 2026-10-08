@@ -159,15 +159,15 @@ data class EditSettings(
 @Serializable
 data class MouseSettings(
     /** A plain click on a label lane / on the audio: select, split, play… */
-    val tierClick: String = MouseActions.SELECT,
-    val audioClick: String = MouseActions.SELECT,
+    val tierClick: String = MouseActions.RENAME,
+    val audioClick: String = MouseActions.PLAY_FROM,
     val tierDouble: String = MouseActions.RENAME,
     val tierRight: String = MouseActions.PLAY_FROM,
     val tierMiddle: String = MouseActions.DESELECT,
     val tierCtrl: String = MouseActions.PLAY_FROM,
     val tierAlt: String = MouseActions.DESELECT,
     val audioDouble: String = MouseActions.SPLIT_NAME,
-    val audioRight: String = MouseActions.PLAY_FROM,
+    val audioRight: String = MouseActions.PLAY,
     val audioMiddle: String = MouseActions.DESELECT,
     val audioCtrl: String = MouseActions.PLAY_FROM,
     val audioAlt: String = MouseActions.DESELECT,

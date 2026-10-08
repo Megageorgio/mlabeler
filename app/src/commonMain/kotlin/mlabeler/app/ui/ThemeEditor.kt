@@ -151,14 +151,14 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
     val c = T.c
     val data = Platform.dataDir()
     // edits are written to the theme's file (and so shown) right away
-    var tokens by remember(theme.path) { mutableStateOf(theme.tokens) }
-    var name by remember(theme.path) { mutableStateOf(theme.name) }
-    var dirty by remember(theme.path) { mutableStateOf(0) }
+    var tokens by remember(theme.tokens.id) { mutableStateOf(theme.tokens) }
+    var name by remember(theme.tokens.id) { mutableStateOf(theme.name) }
+    var dirty by remember(theme.tokens.id) { mutableStateOf(0) }
     fun change(t: Tokens) { tokens = t; dirty++ }
     LaunchedEffect(dirty) {
         if (dirty == 0) return@LaunchedEffect
         kotlinx.coroutines.delay(150)
-        Themes.custom.firstOrNull { it.path == theme.path }?.let { ThemeFiles.save(data, it, tokens, name.ifBlank { theme.name }) }
+        Themes.custom.firstOrNull { it.tokens.id == theme.tokens.id }?.let { ThemeFiles.save(data, it, tokens, name.ifBlank { theme.name }) }
     }
     SectionTitle(nameT())
     Field(name, { name = it; dirty++ }, Modifier.fillMaxWidth())
@@ -189,7 +189,7 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
     Row(Modifier.padding(top = 16.dp)) {
         Btn(deleteT()) {
             app.update { it.copy(theme = "modern-dark") }
-            ThemeFiles.delete(data, theme)
+            ThemeFiles.delete(data, Themes.custom.firstOrNull { it.tokens.id == theme.tokens.id } ?: theme)
         }
     }
 }

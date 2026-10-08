@@ -765,8 +765,8 @@ object MouseTitles {
     val cut = L("Scissors: click adds a boundary (2)", "Ножницы: клик ставит границу (2)")
     val pan = L("Hand: dragging scrolls (3)", "Рука: перетаскивание прокручивает (3)")
     val playTool = L("Play: a click plays the phoneme (4)", "Проигрывание: клик воспроизводит фонему (4)")
-    val cutOnLanes = L("Scissors cut on label lanes too (otherwise a click on a label selects it, a double click renames)",
-        "Ножницы режут и на полосах разметки (иначе клик по метке её выбирает, двойной — переименовывает)")
+    val cutOnLanes = L("Scissors cut on label lanes too (otherwise clicks there do what is set below)",
+        "Ножницы режут и на полосах разметки (иначе щелчки там выполняют действия, заданные ниже)")
     val wheel = L("Mouse wheel", "Колесо мыши")
     val wheelScroll = L("Scrolls through time (Ctrl+wheel zooms)", "Прокручивает по времени (Ctrl+колесо — масштаб)")
     val wheelPhonemes = L("Steps through phonemes, Space plays the chosen one (Shift+wheel scrolls)",

@@ -96,27 +96,53 @@ object ThemeFiles {
 
     fun dir(dataDir: String) = Paths.join(dataDir, "themes")
 
+    /** A file name from the theme's name, so the files can be told apart in the folder. */
+    private fun fileName(name: String) =
+        name.map { if (it.isLetterOrDigit() || it in " -_()") it else '_' }.joinToString("").trim().ifEmpty { "theme" }
+
+    /** A free path for a theme called [name] ([own] is the theme's current file, which may be kept). */
+    private fun pathFor(dataDir: String, name: String, own: String? = null): String {
+        val base = fileName(name)
+        var k = 1
+        while (true) {
+            val p = Paths.join(dir(dataDir), (if (k == 1) base else "$base $k") + ".json")
+            if (p == own || !PlatformFs.exists(p)) return p
+            k++
+        }
+    }
+
     /** Loads *.json from the themes folder into [Themes.custom]. */
     fun load(dataDir: String) {
         val d = dir(dataDir)
         Themes.custom = if (!PlatformFs.isDirectory(d)) emptyList() else PlatformFs.list(d).filter { Paths.ext(it) == "json" }.sorted()
             .mapNotNull { p -> runCatching { decode(PlatformFs.read(p).decodeToString()) }.getOrNull()?.let { CustomTheme(it.first, it.second, p) } }
+            .map { t ->
+                // files of earlier versions were numbered (my-theme-1.json): they take the theme's name
+                if (!Paths.name(t.path).startsWith("my-theme-")) t
+                else runCatching {
+                    val p = pathFor(dataDir, t.name, t.path)
+                    if (p != t.path) { PlatformFs.write(p, PlatformFs.read(t.path)); PlatformFs.delete(t.path) }
+                    t.copy(path = p)
+                }.getOrDefault(t)
+            }
     }
 
     /** Writes [t] as a new editable theme file named [name]; returns its id. */
     fun copy(dataDir: String, t: Tokens, name: String): String {
         PlatformFs.mkdirs(dir(dataDir))
         var k = 1
-        while (PlatformFs.exists(Paths.join(dir(dataDir), "my-theme-$k.json"))) k++
+        while (Themes.custom.any { it.tokens.id == "my-theme-$k" }) k++
         val id = "my-theme-$k"
-        PlatformFs.write(Paths.join(dir(dataDir), "$id.json"), encode(t, id, name).encodeToByteArray())
+        PlatformFs.write(pathFor(dataDir, name), encode(t, id, name).encodeToByteArray())
         load(dataDir)
         return id
     }
 
-    /** Saves an edited theme back to its file and reloads. */
+    /** Saves an edited theme back to its file (renamed after the theme when its name changed) and reloads. */
     fun save(dataDir: String, theme: CustomTheme, t: Tokens, name: String) {
-        PlatformFs.write(theme.path, encode(t, theme.tokens.id, name).encodeToByteArray())
+        val p = pathFor(dataDir, name, theme.path)
+        PlatformFs.write(p, encode(t, theme.tokens.id, name).encodeToByteArray())
+        if (p != theme.path) PlatformFs.delete(theme.path)
         load(dataDir)
     }
 
