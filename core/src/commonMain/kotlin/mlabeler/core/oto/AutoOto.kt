@@ -14,20 +14,28 @@ data class Syllable(val text: String, val consonant: String, val vowel: String)
 /** Where a syllable is in the recording, seconds: consonant start, vowel start, vowel end. */
 data class SyllableTiming(val syllable: Syllable, val cStart: Double, val vStart: Double, val vEnd: Double)
 
-enum class RecStyle { Auto, CV, VCV, CVVC }
+enum class RecStyle { Auto, CV, VCV, CVVC,
+    /** Russian-style CVC: "-b", "-ba", "ab", "ba", "ab-", "b" from samples like "babab" (no spaces in aliases). */
+    CVC }
 
 data class AutoOtoSettings(
     val style: RecStyle = RecStyle.Auto,
     /** Beats per minute of the recording; 0 = find syllables from the audio only. */
     val bpm: Double = 0.0,
-    /** Offset this far before the consonant, ms. */
-    val leftMarginMs: Double = 60.0,
+    /** Offset this far before the overlap, ms (syllables with a consonant). */
+    val leftMarginMs: Double = 140.0,
+    /** Offset this far before the overlap, ms (syllables without a consonant). */
+    val vowelLeftMs: Double = 80.0,
+    /** Overlap this far before the consonant, inside the vowel before it, ms (VCV). */
+    val overlapBeforeMs: Double = 55.0,
     /** Consonant (fixed) part reaches this far into the vowel, ms. */
-    val fixedMs: Double = 50.0,
+    val fixedMs: Double = 100.0,
     /** Overlap for syllables without a consonant, ms before the vowel. */
     val vowelOverlapMs: Double = 25.0,
     /** End of an entry this far before the next consonant, ms. */
-    val endMarginMs: Double = 40.0,
+    val endMarginMs: Double = 150.0,
+    /** Alias of the vowel going into silence at the end of a VCV sample ("a -"); empty = none. */
+    val endAlias: String = "-",
     /** Prefix of the first syllable after silence ("- "), empty to leave it out. */
     val headPrefix: String = "- ",
     /** CV entries in CVVC banks: with the "- " head prefix or plain. */
@@ -99,6 +107,38 @@ object Syllables {
     private val latinVowels = "aeiou"
     private val cyrVowels = "аеёиоуыэюя"
 
+    /**
+     * Syllables of a word written without separators: consonants (a letter with its modifiers: ' ь ъ, or a digit
+     * standing for a consonant, as in "4'") up to a vowel; consonants after the last vowel make a syllable without
+     * a vowel ("babab" → ba ba b). A latin "y" before a vowel is a consonant (kya), otherwise a vowel. A number at
+     * the end (a take) is left out.
+     */
+    fun run(word: String): List<Syllable> {
+        val w = word.lowercase().trimEnd { it.isDigit() }
+        val cyr = w.any { it in cyrVowels }
+        fun vowelAt(i: Int): Boolean {
+            val ch = w[i]
+            if (cyr) return ch in cyrVowels
+            if (ch == 'y') return i + 1 >= w.length || w[i + 1] !in latinVowels
+            return ch in latinVowels
+        }
+        val out = mutableListOf<Syllable>()
+        var cons = StringBuilder()
+        var i = 0
+        while (i < w.length) {
+            val ch = w[i]
+            when {
+                vowelAt(i) -> { out += Syllable(cons.toString() + ch, cons.toString(), ch.toString()); cons = StringBuilder() }
+                ch.isLetter() || ch == '~' || ch == '\'' || ch == 'ь' || ch == 'ъ' -> cons.append(ch)
+                ch.isDigit() && i + 1 < w.length && w[i + 1] == '\'' -> cons.append(ch)
+                else -> return emptyList()
+            }
+            i++
+        }
+        if (cons.isNotEmpty()) out += Syllable(cons.toString(), cons.toString(), "")
+        return out
+    }
+
     /** Consonant and vowel of a romaji or Cyrillic syllable ("kya" → ky + a, "n" → n as a vowel-like coda). */
     fun parts(romaji: String): Pair<String, String> {
         val r = romaji.lowercase()
@@ -123,7 +163,10 @@ object Syllables {
                 Syllable(k, c, v.take(1).ifEmpty { v })
             }
         }
-        return name.split('_', '-', ' ').filter { it.isNotEmpty() }.map { t ->
+        val tokens = name.split('_', '-', ' ').filter { it.isNotEmpty() }
+        // one word with several syllables in it ("kakiku", "babab", "b'ab'ab'", "мамам")
+        if (tokens.size == 1) run(tokens[0]).takeIf { it.size > 1 }?.let { return it }
+        return tokens.map { t ->
             val (c, v) = parts(t)
             Syllable(t, c, v.take(1).ifEmpty { v })
         }
@@ -148,9 +191,19 @@ object AutoOto {
         val peak = sm.max()
         val floor = sorted10(sm)
         val gate = floor + (peak - floor) * 0.35f
-        val first = sm.indexOfFirst { it > gate }.coerceAtLeast(0)
-        val last = sm.indexOfLast { it > gate }.coerceAtLeast(first + 1)
         val voiced = BooleanArray(n) { i -> i < f0.size && f0[i] > 0f }
+        // singing starts with the first loud voiced sound and the consonant right before it (up to 300 ms of
+        // sound without a gap); a breath before it, often loud in soft takes, is left out
+        val low = floor + (peak - floor) * 0.15f
+        val v0 = (0 until n).firstOrNull { sm[it] > gate && voiced[it] } ?: sm.indexOfFirst { it > gate }.coerceAtLeast(0)
+        var first = v0
+        while (first > 0 && v0 - first < 60 && sm[first - 1] > low) first--
+        val v1 = (n - 1 downTo 0).firstOrNull { sm[it] > gate && voiced[it] } ?: sm.indexOfLast { it > gate }
+        var last = v1.coerceAtLeast(first + 1)
+        // a sample ending with a consonant ("babab"): its sound after the last vowel belongs in too
+        val endsWithConsonant = syllables.size > 1 && syllables.last().vowel.isEmpty()
+        // (a stop has a silent closure before its release, so a short gap doesn't end it)
+        if (endsWithConsonant) { val l0 = last; for (i in l0 + 1 until min(n, l0 + 100)) if (sm[i] > low) last = i }
         // "dipness": how much quieter than the surroundings, plus a bonus where voicing stops
         val count = syllables.size
         val cuts = mutableListOf<Int>()
@@ -164,26 +217,39 @@ object AutoOto {
                 for (k in i..min(last, i + 30)) r = max(r, sm[k])
                 score[i] = (min(l, r) - sm[i]) + (if (!voiced[i]) 6f else 0f)
             }
-            if (bpm > 0) {
-                // one syllable per beat from the first sound; look for the dip near each beat
-                val beat = 60.0 / bpm / hop
-                for (k in 1 until count) {
-                    val centre = (first + k * beat).toInt()
-                    val w = (beat * 0.35).toInt()
-                    var best = centre
-                    var bestScore = -1e9f
-                    for (i in max(first + 1, centre - w)..min(last - 1, centre + w)) if (score[i] > bestScore) { bestScore = score[i]; best = i }
-                    cuts += best
+            // reclists are sung to a steady beat: the cuts are placed together, as the deepest dips that keep
+            // the syllables about equally long (a nasal or a glide after a vowel leaves no dip of its own, the beat
+            // still puts its cut in the right place); the beat is the given one or the best fitting one
+            val periods = if (bpm > 0) listOf(60.0 / bpm / hop) else {
+                // (a final consonant takes only a little of its beat)
+                val even = span.toDouble() / (if (endsWithConsonant) count - 0.85 else count.toDouble())
+                (0..24).map { even * (0.75 + it * 0.025) }
+            }
+            var best: List<Int>? = null
+            var bestCost = Double.MAX_VALUE
+            for (period in periods) {
+                val r = gridCuts(score, first, last, count, period, endsWithConsonant) ?: continue
+                if (r.second < bestCost) { bestCost = r.second; best = r.first }
+            }
+            cuts += best ?: (1 until count).map { first + span * it / count }
+        }
+        // a vowel (or ん) right after a vowel leaves no dip: its start is where the timbre changes most
+        if (cuts.isNotEmpty() && syllables.drop(1).any { it.consonant.isEmpty() }) {
+            val spec = mlabeler.core.dsp.Spectrogram.compute(samples, sampleRate, hopSeconds = hop, bands = 40, maxFreq = 8000.0)
+            fun change(i: Int): Double {
+                if (i - 6 < 0 || i + 6 >= spec.frames) return 0.0
+                var d = 0.0
+                for (b in 0 until spec.bands) {
+                    var l = 0; var r = 0
+                    for (k in 1..6) { l += spec.value(i - k, b); r += spec.value(i + k - 1, b) }
+                    d += abs(l - r)
                 }
-            } else {
-                val order = (first + minGap until last - minGap).sortedByDescending { score[it] }
-                for (i in order) {
-                    if (cuts.size == count - 1) break
-                    if (cuts.all { abs(it - i) >= minGap }) cuts += i
-                }
-                // not enough dips: split the rest evenly
-                while (cuts.size < count - 1) cuts += first + (last - first) * (cuts.size + 1) / count
-                cuts.sort()
+                return d
+            }
+            for (j in cuts.indices) {
+                if (syllables[j + 1].consonant.isNotEmpty()) continue
+                val lo = max(first + 1, cuts[j] - 20); val hi = min(last - 1, cuts[j] + 20)
+                if (lo < hi) cuts[j] = (lo..hi).maxBy { change(it) }
             }
         }
         // a cut inside an unvoiced stretch (a consonant) moves to where that stretch begins
@@ -209,6 +275,88 @@ object AutoOto {
             }
             SyllableTiming(syl, a * hop, v * hop, b * hop)
         }
+    }
+
+    /**
+     * CVC entries (aliases without spaces), placed as in hand-made Russian CVC banks: from silence "-b" (the
+     * consonant) and "-ba"; between syllables "ab" (vowel into the consonant) and "ba"; at the end "ab-" and the
+     * final consonant alone "b".
+     */
+    fun cvcEntries(sample: String, timings: List<SyllableTiming>, lengthMs: Double, s: AutoOtoSettings): List<OtoEntry> {
+        val out = mutableListOf<OtoEntry>()
+        fun add(alias: String, left: Double, overlap: Double, preu: Double, fixed: Double, right: Double) {
+            val l = left.coerceIn(0.0, lengthMs)
+            val r = max(right, fixed + 5).coerceIn(l, lengthMs)
+            out += OtoEntry.fromAbsolute(sample, alias, OtoAbsolute(l, overlap.coerceIn(l, r), preu.coerceIn(l, r), fixed.coerceIn(l, r), r), lengthMs, negativeCutoff = true)
+        }
+        for ((k, t) in timings.withIndex()) {
+            val c = t.cStart * 1000
+            val v = t.vStart * 1000
+            val syl = t.syllable
+            val nextC = timings.getOrNull(k + 1)?.cStart?.times(1000)
+            if (syl.vowel.isEmpty()) {
+                // the final consonant: after the vowel before it ("ab-") and on its own ("b")
+                val prev = timings.getOrNull(k - 1) ?: continue
+                add(prev.syllable.vowel + syl.consonant + "-", c - 85, c - 25, c + 35, c + 285, lengthMs - 10)
+                add(syl.consonant, c - 2, c + 30, c + 42, c + 292, lengthMs - 10)
+                continue
+            }
+            val end = (nextC ?: (t.vEnd * 1000)) - if (nextC == null) 40.0 else if (k == 0) 101.0 else 87.0
+            if (k == 0) {
+                // (the detected start of a consonant from silence is a little early: a voiced one hums before it)
+                if (syl.consonant.isNotEmpty()) add("-" + syl.consonant, c - 4, c + 34, c + 34, v + 114, v + 144)
+                if (syl.consonant.isNotEmpty()) add("-" + syl.text, c + 26, c + 65, v + 41, v + 211, end)
+                else add("-" + syl.text, v - 60, v - 20, v, v + 170, end)
+            } else {
+                add(syl.text, c + 4, c + 33, v - 19, v + 159, end)
+            }
+            // the vowel into the next consonant
+            val nt = timings.getOrNull(k + 1)
+            if (nt != null && nt.syllable.vowel.isNotEmpty() && nextC != null) {
+                add(syl.vowel + nt.syllable.consonant, nextC - 96, nextC - 37, nextC - 27, nextC + 4, nextC + 33)
+            }
+        }
+        return out
+    }
+
+    /**
+     * Cuts between [count] syllables from [first] to [last] frames, about [period] frames apart: the best sum of
+     * dip [score]s minus a penalty for uneven spacing (dynamic programming). Null when the beat doesn't fit.
+     */
+    private fun gridCuts(score: FloatArray, first: Int, last: Int, count: Int, period: Double, shortLast: Boolean = false): Pair<List<Int>, Double>? {
+        val w = (period * 0.4).toInt().coerceAtLeast(2)
+        fun cost(len: Int): Double { val d = (len - period) / period; return 40.0 * d * d }
+        // cand[j]: frames allowed for cut j (1-based), around first + j·period
+        val cand = (1 until count).map { j -> val c = (first + j * period).toInt(); (max(first + 1, c - w)..min(last - 1, c + w)).toList() }
+        if (cand.any { it.isEmpty() }) return null
+        var prevPos = listOf(first)
+        var prevCost = doubleArrayOf(0.0)
+        val back = mutableListOf<IntArray>()
+        for (j in cand.indices) {
+            val pos = cand[j]
+            val cur = DoubleArray(pos.size) { Double.MAX_VALUE }
+            val from = IntArray(pos.size)
+            for ((a, x) in pos.withIndex()) for ((b, y) in prevPos.withIndex()) {
+                if (x - y < 4) continue
+                val c = prevCost[b] + cost(x - y) - score[x]
+                if (c < cur[a]) { cur[a] = c; from[a] = b }
+            }
+            back += from
+            prevPos = pos; prevCost = cur
+        }
+        // the last syllable may be held longer: only a shorter one than the beat costs
+        var bestEnd = -1; var bestCost = Double.MAX_VALUE
+        for ((a, x) in prevPos.withIndex()) {
+            if (prevCost[a] == Double.MAX_VALUE) continue
+            val tail = last - x
+            val c = prevCost[a] + if (tail < period && !shortLast) cost(tail) else 0.0
+            if (c < bestCost) { bestCost = c; bestEnd = a }
+        }
+        if (bestEnd < 0) return null
+        val out = IntArray(cand.size)
+        var k = bestEnd
+        for (j in cand.indices.reversed()) { out[j] = cand[j][k]; k = back[j][k] }
+        return out.toList() to bestCost
     }
 
     private fun FloatArray.sliceMax(a: Int, b: Int): Float { var m = -1e9f; for (i in a until max(a + 1, b)) m = max(m, this[i]); return m }
@@ -239,27 +387,36 @@ object AutoOto {
     fun styleOf(syllables: List<Syllable>, settings: AutoOtoSettings): RecStyle = when {
         settings.style != RecStyle.Auto -> settings.style
         syllables.size <= 1 -> RecStyle.CV
+        // a run of syllables ending with a consonant: "babab"
+        syllables.last().vowel.isEmpty() && syllables.none { s -> s.text.any { Kana.isKana(it) } } -> RecStyle.CVC
         else -> RecStyle.VCV
     }
 
-    /** oto entries for one sample from syllable timings. */
+    /**
+     * oto entries for one sample from syllable timings. The rules follow hand-made oto of VCV banks: the
+     * preutterance at the vowel, the overlap a little before the consonant (in the vowel before it), the offset a
+     * fixed distance before the overlap, the end of the entry well before the next consonant.
+     */
     fun entries(sample: String, timings: List<SyllableTiming>, lengthMs: Double, s: AutoOtoSettings): List<OtoEntry> {
         val style = styleOf(timings.map { it.syllable }, s)
+        if (style == RecStyle.CVC) return cvcEntries(sample, timings, lengthMs, s)
         val out = mutableListOf<OtoEntry>()
         for ((k, t) in timings.withIndex()) {
             val c = t.cStart * 1000
             val v = t.vStart * 1000
             val next = timings.getOrNull(k + 1)?.cStart?.times(1000)
-            val vowelEnd = (next ?: (t.vEnd * 1000)) - s.endMarginMs
             val prev = timings.getOrNull(k - 1)
             val hasC = t.syllable.consonant.isNotEmpty()
-            val preu = if (hasC) v else v
-            val overlap = if (hasC) c + min(20.0, (v - c) / 3) else v - s.vowelOverlapMs
-            val leftLimit = prev?.let { it.vStart * 1000 + 20 } ?: 0.0
-            val left = (min(c, overlap) - s.leftMarginMs).coerceAtLeast(leftLimit).coerceAtLeast(0.0)
-            val fixed = (v + s.fixedMs).coerceAtMost(vowelEnd)
+            // after a pause (the first syllable, or every one in CV banks) the sound starts from silence
+            val head = k == 0 || style == RecStyle.CV || style == RecStyle.CVVC
+            val onset = if (hasC) c + min(20.0, (v - c) / 3) else v - s.vowelOverlapMs
+            val overlap = onset - when { head && hasC -> 5.0; head -> 40.0; else -> s.overlapBeforeMs }
+            val leftLimit = if (head) 0.0 else prev?.let { it.vStart * 1000 + 20 } ?: 0.0
+            val left = (overlap - if (hasC) s.leftMarginMs else s.vowelLeftMs).coerceAtLeast(leftLimit).coerceAtLeast(0.0)
+            val vowelEnd = (next ?: (t.vEnd * 1000)) - if (next == null) 40.0 else if (head) s.endMarginMs / 2 else s.endMarginMs
+            val fixed = min(v + s.fixedMs, max(v + 10, vowelEnd - 10))
             val right = max(vowelEnd, fixed + 10).coerceAtMost(lengthMs)
-            val a = OtoAbsolute(left, overlap, preu, fixed, right)
+            val a = OtoAbsolute(left, overlap.coerceAtLeast(left), v, fixed, right)
             val alias = when {
                 style == RecStyle.CV -> (if (k == 0 && s.cvWithHead) s.headPrefix else "") + t.syllable.text
                 style == RecStyle.CVVC -> (if (k == 0 && s.cvWithHead) s.headPrefix else "") + t.syllable.text
@@ -278,6 +435,15 @@ object AutoOto {
                     out += OtoEntry.fromAbsolute(sample, t.syllable.vowel + " " + nt.syllable.consonant, vc, lengthMs, negativeCutoff = true)
                 }
             }
+        }
+        // VCV: the end of the last vowel into silence ("a -")
+        if (style == RecStyle.VCV && timings.isNotEmpty() && s.endAlias.isNotEmpty()) {
+            val t = timings.last()
+            // where the voice fades out (the loudness gate is a little late for that), then the silence after it
+            val end = t.vEnd * 1000 - 50
+            val left = max(t.vStart * 1000 + 20, end - 160)
+            val e = OtoAbsolute(left, left + 80, end, end + 100, max(end + 150, lengthMs - 100).coerceAtMost(lengthMs))
+            out += OtoEntry.fromAbsolute(sample, t.syllable.vowel + " " + s.endAlias, e, lengthMs, negativeCutoff = true)
         }
         return out
     }

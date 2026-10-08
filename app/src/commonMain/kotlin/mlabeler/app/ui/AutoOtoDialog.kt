@@ -43,7 +43,7 @@ private val everyFile = L("Every file in the folder", "Все файлы пап�
 private val styleT = L("Recording style", "Тип записи")
 private val auto = L("Detect", "Определить")
 private val bpmT = L("Tempo of the recording, BPM (0 = find from the audio)", "Темп записи, BPM (0 — искать по звуку)")
-private val leftT = L("Offset before the consonant, ms", "Offset до согласной, мс")
+private val leftT = L("Offset before the overlap, ms", "Offset до overlap, мс")
 private val fixedT = L("Consonant part into the vowel, ms", "Consonant заходит в гласную, мс")
 private val existing = L("Existing entries of these files", "Существующие записи этих файлов")
 private val keep = L("Keep, add missing aliases", "Оставить, добавить недостающие")
@@ -65,8 +65,8 @@ fun AutoOtoDialog(app: AppState) {
     var scope by remember { mutableStateOf(0) }
     var style by remember { mutableStateOf(RecStyle.Auto) }
     var bpm by remember { mutableStateOf("0") }
-    var left by remember { mutableStateOf(60f) }
-    var fixed by remember { mutableStateOf(50f) }
+    var left by remember { mutableStateOf(140f) }
+    var fixed by remember { mutableStateOf(100f) }
     var replace by remember { mutableStateOf(true) }
     var useAligner by remember { mutableStateOf(false) }
     var langs by remember { mutableStateOf<List<ToolkitLanguage>?>(null) }
@@ -121,7 +121,7 @@ fun AutoOtoDialog(app: AppState) {
                 Text(bpmT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
                 Field(bpm, { bpm = it }, Modifier.width(120.dp))
             }
-            ValueSlider(leftT(), left, 10f..200f, S.msUnit()) { left = it }
+            ValueSlider(leftT(), left, 10f..300f, S.msUnit()) { left = it }
             ValueSlider(fixedT(), fixed, 10f..200f, S.msUnit()) { fixed = it }
             SectionTitle(existing())
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {

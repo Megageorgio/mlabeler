@@ -289,8 +289,35 @@ class AutoOtoTest {
             assertTrue(kotlin.math.abs(t[k].vStart - expectV[k]) < 0.04, "v$k ${t[k].vStart}")
         }
         val e = mlabeler.core.oto.AutoOto.entries("_かさな.wav", t, x.size * 1000.0 / sr, mlabeler.core.oto.AutoOtoSettings())
-        assertEquals(listOf("- か", "a さ", "a な"), e.map { it.alias })
+        assertEquals(listOf("- か", "a さ", "a な", "a -"), e.map { it.alias })
         assertTrue(e.all { it.preutterance > it.overlap && it.cutoff < 0 })
+    }
+
+    @Test
+    fun wordsWithoutSeparators() {
+        val s = mlabeler.core.oto.Syllables
+        assertEquals(listOf("ba", "ba", "b"), s.fromName("babab").map { it.text })
+        assertEquals(listOf("b'a", "b'a", "b'"), s.fromName("b'ab'ab'").map { it.text })
+        assertEquals(listOf("4'a", "4'a", "4'"), s.fromName("4'a4'a4'").map { it.text })
+        assertEquals(listOf("by", "b'i", "b"), s.fromName("byb'ib").map { it.text })
+        assertEquals(listOf("kya", "ki"), s.fromName("kyaki").map { it.text })
+        assertEquals(listOf("ма", "ма", "м"), s.fromName("мамам").map { it.text })
+        // one syllable keeps the old reading, a take number is left out
+        assertEquals(listOf("ka"), s.fromName("ka").map { it.text })
+        assertEquals("CVC", mlabeler.core.oto.AutoOto.styleOf(s.fromName("babab"), mlabeler.core.oto.AutoOtoSettings()).name)
+    }
+
+    @Test
+    fun cvcEntries() {
+        val syl = mlabeler.core.oto.Syllables.fromName("babab")
+        val t = listOf(
+            mlabeler.core.oto.SyllableTiming(syl[0], 0.70, 0.80, 1.45),
+            mlabeler.core.oto.SyllableTiming(syl[1], 1.45, 1.55, 2.20),
+            mlabeler.core.oto.SyllableTiming(syl[2], 2.24, 2.30, 2.40),
+        )
+        val e = mlabeler.core.oto.AutoOto.entries("babab.wav", t, 2700.0, mlabeler.core.oto.AutoOtoSettings())
+        assertEquals(listOf("-b", "-ba", "ab", "ba", "ab-", "b"), e.map { it.alias })
+        assertTrue(e.all { it.offset >= 0 && it.preutterance >= it.overlap })
     }
 }
 
