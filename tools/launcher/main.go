@@ -32,7 +32,6 @@ func fail(text string) {
 func portableEnv(dir string) []string {
 	data := filepath.Join(dir, "data")
 	tk := filepath.Join(dir, "toolkit")
-	home := filepath.Join(data, "home")
 	tmp := filepath.Join(data, "tmp")
 	vars := map[string]string{
 		"MLABELER_HOME": data,
@@ -46,20 +45,12 @@ func portableEnv(dir string) []string {
 		"UV_PYTHON_INSTALL_DIR": filepath.Join(tk, "python"),
 		"UV_PYTHON_BIN_DIR":     filepath.Join(tk, "bin"),
 		"UV_CACHE_DIR":          filepath.Join(tk, "cache", "uv"),
-		// whatever a library keeps in the user's folders lands in the program folder instead
-		"TEMP":           tmp,
-		"TMP":            tmp,
-		"USERPROFILE":    home,
-		"HOME":           home,
-		"APPDATA":        filepath.Join(home, "AppData", "Roaming"),
-		"LOCALAPPDATA":   filepath.Join(home, "AppData", "Local"),
-		"XDG_CACHE_HOME": filepath.Join(tk, "cache"),
-		"PIP_CACHE_DIR":  filepath.Join(tk, "cache", "pip"),
-		"MPLCONFIGDIR":   filepath.Join(tk, "cache", "matplotlib"),
-		"HF_HOME":        filepath.Join(tk, "cache", "huggingface"),
-		"TORCH_HOME":     filepath.Join(tk, "cache", "torch"),
+		"TEMP":                  tmp,
+		"TMP":                   tmp,
+		// the user's profile folders (USERPROFILE, APPDATA…) are NOT changed here: the Windows dialogs of this
+		// program need the real ones; the program moves them into the program folder for the toolkit only
 	}
-	for _, d := range []string{data, tk, tmp, filepath.Join(home, "AppData", "Roaming"), filepath.Join(home, "AppData", "Local")} {
+	for _, d := range []string{data, tk, tmp} {
 		os.MkdirAll(d, 0o755)
 	}
 	env := os.Environ()

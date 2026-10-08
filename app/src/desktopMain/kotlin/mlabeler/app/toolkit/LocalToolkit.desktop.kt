@@ -54,6 +54,20 @@ actual object LocalToolkit {
         environment()["PYTHONIOENCODING"] = "utf-8"
         // Python reads text files as UTF-8 even where a library does not say so (Windows would use its ANSI code page)
         environment()["PYTHONUTF8"] = "1"
+        // fully portable build: whatever the toolkit, uv and Python libraries keep in the user's profile goes into the
+        // program folder (only for these processes: the program's own Windows dialogs need the real profile)
+        mlabeler.app.Platform.portableDir?.let { dir ->
+            val home = File(dir, "data/home")
+            val tk = File(dir, "toolkit")
+            val vars = mapOf(
+                "USERPROFILE" to home, "HOME" to home,
+                "APPDATA" to File(home, "AppData/Roaming"), "LOCALAPPDATA" to File(home, "AppData/Local"),
+                "XDG_CACHE_HOME" to File(tk, "cache"), "PIP_CACHE_DIR" to File(tk, "cache/pip"),
+                "MPLCONFIGDIR" to File(tk, "cache/matplotlib"),
+                "HF_HOME" to File(tk, "cache/huggingface"), "TORCH_HOME" to File(tk, "cache/torch"),
+            )
+            for ((k, f) in vars) { runCatching { f.mkdirs() }; environment()[k] = f.path }
+        }
         // not the folder the app runs from: it must stay free to move or delete (the portable build keeps to its data folder)
         directory(File(if (mlabeler.app.Platform.portableDir != null) mlabeler.app.Platform.dataDir() else System.getProperty("user.home")))
     }
