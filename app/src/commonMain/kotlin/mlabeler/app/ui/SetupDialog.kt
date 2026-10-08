@@ -88,6 +88,7 @@ fun SetupDialog(app: AppState) {
                     Chip(UpdateTitles.channelName(ch), s.updates.channel == ch) { app.update { it.copy(updates = it.updates.copy(channel = ch)) } }
                 }
             }
+            Platform.portableDir?.let { PortableNote(it) }
             if (!Platform.isMobile) SetupItem(SetupTitles.toolkit(), SetupTitles.toolkitHint()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Toggle(s.toolkit.autoStart, { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoStart = v)) } })

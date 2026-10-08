@@ -16,6 +16,8 @@ expect object Platform {
     val systemLanguage: String
     /** Folder for settings and caches. */
     fun dataDir(): String
+    /** The program folder of the fully portable Windows build, where everything is kept; null otherwise. */
+    val portableDir: String?
     /** Where the folder browser starts. */
     fun homeDir(): String
     /** Shortcuts to show in the folder browser (name to path). */

@@ -11,7 +11,9 @@ English · [中文](README.zh.md) · [Русский](README.ru.md)
 
 Ready builds for every platform are on the [Releases](https://github.com/Megageorgio/mlabeler/releases) page:
 
-- **Windows** — the portable `.zip` (unpack and run `mLabeler.exe`) or the `.msi` installer;
+- **Windows** — a `.zip` that needs no installation (unpack and run `mLabeler.exe`), the `.msi` installer, or the fully
+  portable `-portable.zip`: the settings, the toolkit, its Python and models all stay in the program folder and nothing
+  is written anywhere else (a USB stick or a separate disk will do; the toolkit and models take several gigabytes);
 - **macOS** — `.dmg`;
 - **Linux** — `.deb` for Debian and Ubuntu, or a `.tar.gz` for any distribution (unpack and run `bin/mLabeler`);
 - **Android** — `.apk`;

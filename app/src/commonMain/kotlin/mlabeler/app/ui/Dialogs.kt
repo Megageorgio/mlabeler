@@ -664,6 +664,7 @@ private fun ToolkitPage(app: AppState) {
     val tk = app.toolkit
     SectionTitle(S.toolkit())
     Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+    mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
     ToolkitStatus(app)
     if (tk.canRunHere) Row(Modifier.padding(top = 6.dp)) {
         Btn(ErrorTitles.updateToolkit(), enabled = !tk.updatingNow) { tk.updateNow() }
@@ -918,6 +919,7 @@ private fun AboutPage(app: AppState) {
     SectionTitle(S.about())
     Text("mLabeler ${mlabeler.app.AppInfo.VERSION}", color = c.text, fontSize = 15.sp)
     Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+    mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
     UpdateSection(app) { t, v, f -> SwitchRow(t, v, f) }
     SectionTitle(AboutTitles.author())
     person("m", listOf(
@@ -1122,4 +1124,15 @@ internal fun Modifier.settingFocus(title: String): Modifier {
     val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
     androidx.compose.runtime.LaunchedEffect(focus) { kotlinx.coroutines.delay(150); requester.bringIntoView() }
     return this.bringIntoViewRequester(requester).background(T.c.accent.copy(alpha = 0.18f))
+}
+
+/** The notice of the fully portable build: where everything is kept and that it needs room. */
+@Composable
+internal fun PortableNote(dir: String) {
+    val c = T.c
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(c.radius)).background(c.warn.copy(alpha = 0.12f))
+        .border(c.borderWidth, c.warn.copy(alpha = 0.5f), RoundedCornerShape(c.radius)).padding(10.dp)) {
+        Text(S.portableTitle(), color = c.text, fontSize = 13.sp)
+        Text(S.portableNote.format(dir), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+    }
 }

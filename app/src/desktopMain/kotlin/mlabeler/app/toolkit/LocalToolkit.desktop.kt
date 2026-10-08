@@ -19,6 +19,10 @@ actual object LocalToolkit {
     private fun exe(name: String) = if (windows) "$name.exe" else name
 
     private fun candidates(name: String): List<File> {
+        // the fully portable build uses only its own uv and toolkit, inside the program folder
+        if (mlabeler.app.Platform.portableDir != null) {
+            return listOfNotNull(System.getenv("UV_INSTALL_DIR"), System.getenv("UV_TOOL_BIN_DIR")).map { File(it, exe(name)) }
+        }
         val home = System.getProperty("user.home")
         val path = System.getenv("PATH").orEmpty().split(File.pathSeparator).filter { it.isNotBlank() }.map { File(it, exe(name)) }
         val extra = buildList {
@@ -50,8 +54,8 @@ actual object LocalToolkit {
         environment()["PYTHONIOENCODING"] = "utf-8"
         // Python reads text files as UTF-8 even where a library does not say so (Windows would use its ANSI code page)
         environment()["PYTHONUTF8"] = "1"
-        // not the folder the app runs from: it must stay free to move or delete
-        directory(File(System.getProperty("user.home")))
+        // not the folder the app runs from: it must stay free to move or delete (the portable build keeps to its data folder)
+        directory(File(if (mlabeler.app.Platform.portableDir != null) mlabeler.app.Platform.dataDir() else System.getProperty("user.home")))
     }
 
     actual suspend fun run(command: List<String>, onLine: (String) -> Unit): Int = withContext(Dispatchers.IO) {

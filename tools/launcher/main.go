@@ -27,6 +27,48 @@ func fail(text string) {
 	os.Exit(1)
 }
 
+// The fully portable build has a file named "portable" next to mLabeler.exe: then everything the program, the
+// toolkit and its Python write stays inside the program folder.
+func portableEnv(dir string) []string {
+	data := filepath.Join(dir, "data")
+	tk := filepath.Join(dir, "toolkit")
+	home := filepath.Join(data, "home")
+	tmp := filepath.Join(data, "tmp")
+	vars := map[string]string{
+		"MLABELER_HOME": data,
+		"MVT_HOME":      tk,
+		// uv itself, the tools it installs, the Pythons it downloads and its cache
+		"UV_UNMANAGED_INSTALL":  filepath.Join(tk, "uv"),
+		"UV_INSTALL_DIR":        filepath.Join(tk, "uv"),
+		"UV_NO_MODIFY_PATH":     "1",
+		"UV_TOOL_DIR":           filepath.Join(tk, "uv-tools"),
+		"UV_TOOL_BIN_DIR":       filepath.Join(tk, "bin"),
+		"UV_PYTHON_INSTALL_DIR": filepath.Join(tk, "python"),
+		"UV_PYTHON_BIN_DIR":     filepath.Join(tk, "bin"),
+		"UV_CACHE_DIR":          filepath.Join(tk, "cache", "uv"),
+		// whatever a library keeps in the user's folders lands in the program folder instead
+		"TEMP":           tmp,
+		"TMP":            tmp,
+		"USERPROFILE":    home,
+		"HOME":           home,
+		"APPDATA":        filepath.Join(home, "AppData", "Roaming"),
+		"LOCALAPPDATA":   filepath.Join(home, "AppData", "Local"),
+		"XDG_CACHE_HOME": filepath.Join(tk, "cache"),
+		"PIP_CACHE_DIR":  filepath.Join(tk, "cache", "pip"),
+		"MPLCONFIGDIR":   filepath.Join(tk, "cache", "matplotlib"),
+		"HF_HOME":        filepath.Join(tk, "cache", "huggingface"),
+		"TORCH_HOME":     filepath.Join(tk, "cache", "torch"),
+	}
+	for _, d := range []string{data, tk, tmp, filepath.Join(home, "AppData", "Roaming"), filepath.Join(home, "AppData", "Local")} {
+		os.MkdirAll(d, 0o755)
+	}
+	env := os.Environ()
+	for k, v := range vars {
+		env = append(env, k+"="+v)
+	}
+	return env
+}
+
 // The same folder the program keeps its settings in (MLABELER_HOME, or %APPDATA%\mLabeler).
 func dataDir() string {
 	if d := os.Getenv("MLABELER_HOME"); d != "" {
@@ -75,8 +117,18 @@ func main() {
 		"-cp", filepath.Join(dir, "app", "*"),
 		"mlabeler.app.MainKt",
 	}
+	portable := false
+	if _, err := os.Stat(filepath.Join(dir, "portable")); err == nil {
+		portable = true
+		// -XX:-UsePerfData: no hsperfdata folder in the system's temporary folder
+		args = append([]string{"-XX:-UsePerfData", "-Dmlabeler.portable=" + dir, "-Djava.io.tmpdir=" + filepath.Join(dir, "data", "tmp")}, args...)
+	}
 	args = append(args, os.Args[1:]...)
 	cmd := exec.Command(java, args...)
+	if portable {
+		cmd.Env = portableEnv(dir)
+		os.Setenv("MLABELER_HOME", filepath.Join(dir, "data"))
+	}
 	cmd.Dir = dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000} // CREATE_NO_WINDOW
 

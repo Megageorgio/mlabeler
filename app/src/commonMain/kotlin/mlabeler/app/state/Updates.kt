@@ -123,7 +123,10 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
         fun find(vararg parts: String) = assets.firstOrNull { (n, _) -> parts.all { p -> n.lowercase().contains(p) } }?.second
         val file = when {
             os == "android" -> find(".apk")
-            os.contains("win") -> find("windows", ".zip") ?: find(".msi")
+            // the fully portable build updates to the portable archive, the others never to it
+            os.contains("win") && Platform.portableDir != null -> find("windows", "portable", ".zip")
+            os.contains("win") -> assets.firstOrNull { (n, _) -> n.lowercase().let { it.contains("windows") && it.endsWith(".zip") && !it.contains("portable") } }?.second
+                ?: find(".msi")
             os.contains("mac") -> find(".dmg")
             os == "ios" -> null
             else -> null // Linux: .deb or the portable archive, the person picks on the release page

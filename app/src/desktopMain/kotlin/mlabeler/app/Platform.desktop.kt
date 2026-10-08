@@ -22,6 +22,8 @@ actual object Platform {
     actual val cores: Int get() = Runtime.getRuntime().availableProcessors()
     actual val systemLanguage: String = Locale.getDefault().language
 
+    actual val portableDir: String? = System.getProperty("mlabeler.portable")?.takeIf { it.isNotBlank() }
+
     actual fun dataDir(): String {
         val home = System.getProperty("user.home")
         System.getenv("MLABELER_HOME")?.let { return it }

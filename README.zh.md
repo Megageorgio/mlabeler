@@ -11,7 +11,8 @@
 
 所有平台的安装包均位于 [Releases](https://github.com/Megageorgio/mlabeler/releases) 页面：
 
-- **Windows**：免安装 `.zip`（解压后运行 `mLabeler.exe`）或 `.msi` 安装程序；
+- **Windows**：免安装 `.zip`（解压后运行 `mLabeler.exe`）、`.msi` 安装程序，或完全便携的 `-portable.zip`：设置、工具包及其
+  Python 和模型都保存在程序文件夹中，不会向其他任何位置写入文件（可放在 U 盘或单独的磁盘上；工具包和模型占用数 GB）；
 - **macOS**：`.dmg`；
 - **Linux**：适用于 Debian 和 Ubuntu 的 `.deb`，或适用于任何发行版的 `.tar.gz`（解压后运行 `bin/mLabeler`）；
 - **Android**：`.apk`；

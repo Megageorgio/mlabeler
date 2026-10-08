@@ -110,10 +110,11 @@ jobs:
       - run: |
           V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
           tools/windows-portable.sh "build/mLabeler-$V-windows-x64.zip"
+          PORTABLE=1 tools/windows-portable.sh "build/mLabeler-$V-windows-x64-portable.zip"
       - uses: actions/upload-artifact@v4
         with:
           name: mLabeler-windows-portable
-          path: build/mLabeler-*-windows-x64.zip
+          path: build/mLabeler-*-windows-x64*.zip
 
   ios:
     # iOS builds take long: only for releases (tags) and runs started by hand

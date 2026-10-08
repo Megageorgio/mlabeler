@@ -28,6 +28,11 @@ class L(val en: String, val ru: String) {
 
 /** Glossary: workspace = folder, item = file, tier, interval, boundary. Plain words, no exclamations. */
 object S {
+    // the fully portable Windows build
+    val portableTitle = L("Portable version", "Портативная версия")
+    val portableNote = L("Everything is kept in the program folder ({0}): the settings, and the toolkit with its Python, environments and models. They take several gigabytes, so the disk needs room for them. Nothing is written anywhere else.",
+        "Всё хранится в папке программы ({0}): настройки, а также тулкит с его Python, окружениями и моделями. Они занимают несколько гигабайт, поэтому на диске нужно место. Больше ничего никуда не записывается.")
+
     val appName = L("mLabeler", "mLabeler")
 
     // start
