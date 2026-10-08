@@ -36,6 +36,16 @@ jobs:
       - run: |
           V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
           mv app/build/outputs/apk/release/*.apk "app/build/outputs/apk/release/mLabeler-$V-android.apk"
+      # the certificate the APK is signed with, for comparing with the key; a release without the key is refused,
+      # since an APK signed by a temporary key cannot be updated later
+      - name: Signature
+        run: |
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
+          "$SIGNER" verify --print-certs app/build/outputs/apk/release/*.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
+          if [ -z "$KEYSTORE_B64" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "::error::No signing key (secret ANDROID_KEYSTORE_BASE64): the release APK would be signed with a temporary key"
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: mLabeler-android
