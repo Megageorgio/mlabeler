@@ -39,7 +39,7 @@ internal object SoundTitles {
 fun SoundPanel(app: AppState, ed: EditorState, modifier: Modifier, titled: Boolean = true) {
     val c = T.c
     val l = app.settings.layout
-    Column(modifier.background(c.panel).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp)) {
+    Column(modifier.background(c.panel).scrollWithHint().padding(horizontal = 12.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // in a tab the tab already names it
             Text(if (titled) SoundTitles.title() else "", color = c.text, fontSize = 15.sp, modifier = Modifier.weight(1f))

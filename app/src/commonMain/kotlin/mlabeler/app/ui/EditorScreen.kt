@@ -559,7 +559,7 @@ fun ErrorDetailsDialog(app: AppState) {
                 androidx.compose.foundation.text.selection.SelectionContainer {
                     Text(
                         text.trim(), color = c.text, fontSize = 12.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp),
+                        modifier = Modifier.fillMaxWidth().scrollWithHint().padding(12.dp),
                     )
                 }
             }

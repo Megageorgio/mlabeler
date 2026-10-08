@@ -173,7 +173,7 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
 fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
     val c = T.c
     val e = ed.oto.current()
-    Column(modifier.background(c.panel).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 4.dp)) {
+    Column(modifier.background(c.panel).scrollWithHint().padding(horizontal = 14.dp, vertical = 4.dp)) {
         SectionTitle(otoFile())
         ed.item?.let { Text(ed.workspace.relative(ed.oto.bookPath(it)), color = c.muted, fontSize = 12.sp) }
         ed.oto.book()?.let { Text(it.charset, color = c.muted, fontSize = 12.sp) }

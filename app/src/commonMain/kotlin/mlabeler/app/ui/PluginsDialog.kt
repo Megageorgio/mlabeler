@@ -84,7 +84,7 @@ fun PluginsDialog(app: AppState) {
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 240.dp)) {
             val narrow = maxWidth < 560.dp
             val listView: @Composable (Modifier) -> Unit = { m ->
-                Column(m.background(c.panelAlt).verticalScroll(rememberScrollState())) {
+                Column(m.background(c.panelAlt).scrollWithHint()) {
                     if (list.isEmpty()) Text(none(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
                     for (p in list) {
                         val sel = p.info.name == selected
@@ -120,7 +120,7 @@ fun PluginsDialog(app: AppState) {
 private fun PluginForm(app: AppState, p: Plugin, modifier: Modifier, onRun: () -> Unit) {
     val c = T.c
     var values by remember(p.info.name) { mutableStateOf(app.pluginParams(p)) }
-    Column(modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+    Column(modifier.scrollWithHint().padding(18.dp)) {
         Text(pluginTitle(p), color = c.text, fontSize = 16.sp)
         pluginDesc(p).takeIf { it.isNotEmpty() }?.let { Text(it, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) }
         if (p.info.author.isNotEmpty()) Text(p.info.author + " · " + p.info.version, color = c.muted, fontSize = 11.sp)

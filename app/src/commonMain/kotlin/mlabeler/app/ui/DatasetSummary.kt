@@ -88,7 +88,7 @@ fun DatasetSummaryDialog(app: AppState, ed: EditorState) {
     val pauses = app.settings.checks.pauses
     val stats = remember(docs, dictName) { docs?.let { DatasetStats.of(it, pauses, Dictionaries.byName(dictName)) } }
     Overlay({ close() }, 760) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        Column(Modifier.scrollWithHint().padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title(), color = c.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
                 IconBtn(Icons.close, S.close()) { close() }

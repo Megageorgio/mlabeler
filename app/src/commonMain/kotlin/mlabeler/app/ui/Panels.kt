@@ -232,7 +232,7 @@ fun Inspector(ed: EditorState, modifier: Modifier = Modifier) {
     val item = ed.item
     val doc = ed.doc
     val sel = ed.selection
-    Column(modifier.background(c.panel).verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 4.dp)) {
+    Column(modifier.background(c.panel).scrollWithHint().padding(horizontal = 14.dp, vertical = 4.dp)) {
         for (id in inspectorOrder(ed.app.settings.layout.inspectorOrder)) when (id) {
             "file" -> if (item != null) InspectorSection(ed, id, S.file()) {
             Text(Paths.name(item.audioPath), color = c.text, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)

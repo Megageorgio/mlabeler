@@ -55,7 +55,7 @@ fun WorkspaceDialog(app: AppState) {
     val c = T.c
     fun close() { app.showWorkspace = false; ed.requestFocus() }
     Overlay({ close() }, 600) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        Column(Modifier.scrollWithHint().padding(18.dp)) {
             Text(folderSettings(), color = c.text, fontSize = 17.sp)
             Text(ed.workspace.root, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             SectionTitle(whatLabelled())

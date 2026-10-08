@@ -174,7 +174,7 @@ fun androidx.compose.foundation.layout.ColumnScope.DialogContent(
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     Column(
-        Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
+        Modifier.weight(1f, fill = false).scrollWithHint()
             .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = if (footer == null) 18.dp else 6.dp),
         content = content,
     )
@@ -342,7 +342,7 @@ fun SettingsDialog(app: AppState) {
             if (query.isNotBlank()) {
                 // what was found: a click opens the page with the setting highlighted
                 val found = SettingsHelp.search(query)
-                Column(Modifier.fillMaxWidth().heightIn(max = minOf(800.dp, maxHeight)).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp)) {
+                Column(Modifier.fillMaxWidth().heightIn(max = minOf(800.dp, maxHeight)).scrollWithHint().padding(horizontal = 20.dp, vertical = 10.dp)) {
                     if (found.isEmpty()) Text(S.nothingFound(), color = c.muted, fontSize = 13.sp)
                     for (e in found) {
                         val sec = Section.entries.firstOrNull { it.name == e.section } ?: continue
@@ -364,7 +364,7 @@ fun SettingsDialog(app: AppState) {
                 }
             } else {
                 Row(Modifier.fillMaxWidth().height(minOf(800.dp, maxHeight))) {
-                    Column(Modifier.width(190.dp).fillMaxHeight().background(c.panelAlt).padding(vertical = 8.dp)) {
+                    Column(Modifier.width(190.dp).fillMaxHeight().background(c.panelAlt).scrollWithHint().padding(vertical = 8.dp)) {
                         for (s in Section.entries) {
                             val sel = s == section
                             Text(
@@ -395,7 +395,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
     val dL = mlabeler.app.state.LayoutSettings()
     val dC = mlabeler.core.check.CheckSettings()
     val dScale = if (mlabeler.app.Platform.isMobile) 0.8f else 1f
-    Column(modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
+    Column(modifier.scrollWithHint().padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
         when (section) {
             Section.General -> {
                 SectionTitle(S.language())

@@ -125,7 +125,7 @@ fun MenuPopup(expanded: Boolean, side: Boolean = false, onDismiss: () -> Unit = 
     Popup(popupPositionProvider = provider, onDismissRequest = onDismiss, properties = PopupProperties(focusable = focusable, dismissOnClickOutside = focusable)) {
         Column(
             Modifier.padding(4.dp).shadow(6.dp, shape).clip(shape).background(c.panel).border(c.borderWidth, c.border, shape)
-                .heightIn(max = maxH).width(IntrinsicSize.Max).verticalScroll(rememberScrollState()).padding(vertical = 4.dp),
+                .heightIn(max = maxH).width(IntrinsicSize.Max).scrollWithHint().padding(vertical = 4.dp),
         ) { content() }
     }
 }

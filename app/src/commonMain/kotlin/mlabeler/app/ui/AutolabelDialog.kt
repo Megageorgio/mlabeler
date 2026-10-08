@@ -219,7 +219,7 @@ fun AutolabelDialog(app: AppState) {
                         for (l in langs.sortedWith(compareBy({ it.code == "*" }, { mlabeler.app.i18n.LanguageNames.of(it.code, it.name) }))) Chip(mlabeler.app.i18n.LanguageNames.of(l.code, l.name), l.code == lang) { lang = l.code }
                     }
                     val models = langs.firstOrNull { it.code == lang }?.models.orEmpty()
-                    Column(Modifier.padding(top = 6.dp).heightIn(max = 200.dp).verticalScroll(rememberScrollState())) {
+                    Column(Modifier.padding(top = 6.dp).heightIn(max = 200.dp).scrollWithHint()) {
                         for (m in models) {
                             val sel = m.id == model
                             Row(

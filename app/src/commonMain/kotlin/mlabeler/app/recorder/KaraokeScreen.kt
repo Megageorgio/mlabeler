@@ -66,6 +66,7 @@ import mlabeler.app.ui.Field
 import mlabeler.app.ui.IconBtn
 import mlabeler.app.ui.Icons
 import mlabeler.app.ui.Overlay
+import mlabeler.app.ui.scrollWithHint
 import mlabeler.app.ui.DialogContent
 import mlabeler.app.ui.TextFocus
 import mlabeler.core.io.Paths
@@ -501,7 +502,7 @@ private fun PasteLyrics(k: KaraokeState, onClose: () -> Unit) {
                 text, { text = it }, textStyle = TextStyle(color = c.text, fontSize = 14.sp),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp, max = 420.dp).clip(RoundedCornerShape(c.radius))
                     .background(c.bg).border(c.borderWidth, c.border, RoundedCornerShape(c.radius)).padding(10.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .scrollWithHint(),
             )
         }
     }

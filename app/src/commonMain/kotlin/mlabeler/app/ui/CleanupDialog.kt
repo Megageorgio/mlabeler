@@ -85,7 +85,7 @@ fun CleanupDialog(app: AppState) {
     val c = T.c
     fun close() { app.showCleanup = false; ed.requestFocus() }
     Overlay({ close() }, 640) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        Column(Modifier.scrollWithHint().padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title(), color = c.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
                 IconBtn(Icons.close, S.close()) { close() }

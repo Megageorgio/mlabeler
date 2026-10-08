@@ -42,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
@@ -523,4 +525,30 @@ fun ClassicSlider(value: Float, range: ClosedFloatingPointRange<Float>, onChange
         rect(dark.copy(alpha = 0.5f), tx + px, ty + th - 2 * px, thumbW - 2 * px, px)
         rect(dark.copy(alpha = 0.5f), tx + thumbW - 2 * px, ty + px, px, th - 2 * px)
     }
+}
+
+/**
+ * Vertical scrolling with a quiet hint that there is more: a thin bar at the right edge, shown only when the
+ * content does not fit (brighter while it moves).
+ */
+@Composable
+fun Modifier.scrollWithHint(state: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState()): Modifier {
+    val c = T.c
+    val color = c.muted
+    return this.drawWithContent {
+        drawContent()
+        val max = state.maxValue
+        if (max <= 0 || max == Int.MAX_VALUE) return@drawWithContent
+        val h = size.height
+        val total = h + max
+        val thumb = (h * h / total).coerceAtLeast(24.dp.toPx()).coerceAtMost(h)
+        val top = (h - thumb) * state.value / max
+        val w = 3.dp.toPx()
+        drawRoundRect(
+            color.copy(alpha = if (state.isScrollInProgress) 0.7f else 0.35f),
+            topLeft = androidx.compose.ui.geometry.Offset(size.width - w - 2.dp.toPx(), top),
+            size = androidx.compose.ui.geometry.Size(w, thumb),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2, w / 2),
+        )
+    }.verticalScroll(state)
 }

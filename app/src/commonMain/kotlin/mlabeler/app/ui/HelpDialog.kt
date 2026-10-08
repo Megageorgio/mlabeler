@@ -291,7 +291,7 @@ fun HelpDialog(app: AppState) {
     val searchFocus = remember { androidx.compose.ui.focus.FocusRequester() }
     androidx.compose.runtime.LaunchedEffect(Unit) { if (!mlabeler.app.Platform.isMobile) runCatching { searchFocus.requestFocus() } }
     Overlay({ app.showHelp = false; app.editor?.requestFocus?.invoke() }, 720) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp)) {
+        Column(Modifier.scrollWithHint().padding(horizontal = 22.dp, vertical = 18.dp)) {
             androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text(helpTitle(), color = c.text, fontSize = 18.sp, modifier = Modifier.weight(1f))
                 Field(query, { query = it }, Modifier.width(220.dp).focusRequester(searchFocus), placeholder = helpSearch())
