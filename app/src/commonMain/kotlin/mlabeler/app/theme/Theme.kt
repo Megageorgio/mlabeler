@@ -80,24 +80,24 @@ object Themes {
     val modernDark = Tokens(
         id = "modern-dark", dark = true,
         bg = hex(0x16181c), panel = hex(0x1d2026), panelAlt = hex(0x252932), border = hex(0x323743),
-        text = hex(0xe6e8ec), muted = hex(0x8c93a1), accent = hex(0x7aa2ff), onAccent = hex(0x0d1630),
+        text = hex(0xe6e8ec), muted = hex(0x8c93a1), accent = hex(0xa6cf82), onAccent = hex(0x15240c),
         danger = hex(0xff6b6b), ok = hex(0x6fd49a), warn = hex(0xf2c46d),
-        laneBg = hex(0x121419), wave = hex(0x8fb3ff), waveCenter = hex(0x2a2f3a),
-        bound = hex(0xc9cfdb), boundSelected = hex(0xffd166), intervalSelected = Color(0x337aa2ff), intervalHover = Color(0x14ffffff),
-        playhead = hex(0xff5c7a), cursor = Color(0x99e6e8ec), selectionRange = Color(0x297aa2ff),
-        tierText = hex(0xe6e8ec), tierColors = listOf(hex(0x7aa2ff), hex(0x6fd49a), hex(0xf2c46d), hex(0xd99cff), hex(0x5fd0d6)),
+        laneBg = hex(0x121419), wave = hex(0xb1d394), waveCenter = hex(0x2a2f3a),
+        bound = hex(0xc9cfdb), boundSelected = hex(0xffd166), intervalSelected = Color(0x33a6cf82), intervalHover = Color(0x14ffffff),
+        playhead = hex(0xff5c7a), cursor = Color(0x99e6e8ec), selectionRange = Color(0x29a6cf82),
+        tierText = hex(0xe6e8ec), tierColors = listOf(hex(0xa6cf82), hex(0x7aa2ff), hex(0xf2c46d), hex(0xd99cff), hex(0x5fd0d6)),
         spectrogram = magma, radius = 8.dp, borderWidth = 1.dp, square = false,
     )
 
     val modernLight = Tokens(
         id = "modern-light", dark = false,
         bg = hex(0xf4f5f7), panel = hex(0xffffff), panelAlt = hex(0xeef0f4), border = hex(0xd9dde4),
-        text = hex(0x1b1f27), muted = hex(0x667085), accent = hex(0x3461d1), onAccent = hex(0xffffff),
+        text = hex(0x1b1f27), muted = hex(0x667085), accent = hex(0x4e8a2c), onAccent = hex(0xffffff),
         danger = hex(0xd14343), ok = hex(0x23955a), warn = hex(0xb7791f),
-        laneBg = hex(0xffffff), wave = hex(0x3461d1), waveCenter = hex(0xe3e6ec),
-        bound = hex(0x3b4252), boundSelected = hex(0xe8590c), intervalSelected = Color(0x2e3461d1), intervalHover = Color(0x0f000000),
-        playhead = hex(0xe03159), cursor = Color(0x881b1f27), selectionRange = Color(0x223461d1),
-        tierText = hex(0x1b1f27), tierColors = listOf(hex(0x3461d1), hex(0x23955a), hex(0xb7791f), hex(0x8e44c4), hex(0x0e8a91)),
+        laneBg = hex(0xffffff), wave = hex(0x6a9f48), waveCenter = hex(0xe3e6ec),
+        bound = hex(0x3b4252), boundSelected = hex(0xe8590c), intervalSelected = Color(0x2e4e8a2c), intervalHover = Color(0x0f000000),
+        playhead = hex(0xe03159), cursor = Color(0x881b1f27), selectionRange = Color(0x224e8a2c),
+        tierText = hex(0x1b1f27), tierColors = listOf(hex(0x4e8a2c), hex(0x3461d1), hex(0xb7791f), hex(0x8e44c4), hex(0x0e8a91)),
         spectrogram = paper, radius = 8.dp, borderWidth = 1.dp, square = false,
     )
 

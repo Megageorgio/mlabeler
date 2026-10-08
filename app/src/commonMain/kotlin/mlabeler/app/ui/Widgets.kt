@@ -41,6 +41,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -436,8 +438,13 @@ fun DropHint(text: String) {
 fun Toggle(value: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     val c = T.c
     if (!c.checkboxes && !c.crisp) {
-        androidx.compose.material3.Switch(value, onChange, modifier,
-            colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
+        // a little smaller than Material's 52×32, to sit with 13 sp text rows
+        androidx.compose.foundation.layout.Box(modifier.size(42.dp, 26.dp), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides androidx.compose.ui.unit.Dp.Unspecified) {
+                androidx.compose.material3.Switch(value, onChange, Modifier.requiredSize(52.dp, 32.dp).scale(0.8f),
+                    colors = androidx.compose.material3.SwitchDefaults.colors(checkedTrackColor = c.accent, checkedThumbColor = c.onAccent))
+            }
+        }
         return
     }
     val box = if (c.dark) c.panelAlt else androidx.compose.ui.graphics.Color.White
