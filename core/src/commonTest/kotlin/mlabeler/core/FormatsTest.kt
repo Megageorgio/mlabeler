@@ -308,6 +308,22 @@ class AutoOtoTest {
     }
 
     @Test
+    fun otherLanguages() {
+        val s = mlabeler.core.oto.Syllables
+        val arpa = s.fromName("m_ah_s_t_ah_v")
+        assert(arpa.map { it.text } == listOf("m ah", "s t ah", "v"))
+        assertEquals("ARPA", mlabeler.core.oto.AutoOto.styleOf(arpa, mlabeler.core.oto.AutoOtoSettings()).name)
+        val e = mlabeler.core.oto.AutoOto.entries("m_ah_s_t_ah_v.wav", listOf(
+            mlabeler.core.oto.SyllableTiming(arpa[0], 0.30, 0.40, 0.80), mlabeler.core.oto.SyllableTiming(arpa[1], 0.80, 1.00, 1.40),
+            mlabeler.core.oto.SyllableTiming(arpa[2], 1.40, 1.45, 1.60)), 2000.0, mlabeler.core.oto.AutoOtoSettings())
+        assertEquals(listOf("- m", "m ah", "ah", "ah s", "s t", "t ah", "ah", "ah v", "v -"), e.map { it.alias })
+        // pinyin keeps the whole final; Japanese romaji gets kana aliases
+        assertEquals(listOf("ai", "uang"), s.fromName("mai_zhuang").map { it.vowel })
+        assertTrue(s.romajiJapanese(listOf("ka_ki_ku", "sa-shi-su", "kye_kyo")))
+        assertEquals(listOf("か", "き", "きぇ"), s.fromName("ka_ki_kye", kana = true).map { it.text })
+    }
+
+    @Test
     fun cvcEntries() {
         val syl = mlabeler.core.oto.Syllables.fromName("babab")
         val t = listOf(

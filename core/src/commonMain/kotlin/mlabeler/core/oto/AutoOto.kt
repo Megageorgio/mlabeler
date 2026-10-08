@@ -16,7 +16,9 @@ data class SyllableTiming(val syllable: Syllable, val cStart: Double, val vStart
 
 enum class RecStyle { Auto, CV, VCV, CVVC,
     /** Russian-style CVC: "-b", "-ba", "ab", "ba", "ab-", "b" from samples like "babab" (no spaces in aliases). */
-    CVC }
+    CVC,
+    /** English ARPAsing: "- m", "m ah", "ah", "ah s", "s -" from samples named by ARPAbet phonemes ("m_ah_s"). */
+    ARPA }
 
 data class AutoOtoSettings(
     val style: RecStyle = RecStyle.Auto,
@@ -89,6 +91,21 @@ object Kana {
         return out
     }
 
+    /** Hiragana for a Japanese romaji syllable ("ka" → か, "kye" → きぇ, "n" → ん), or null. */
+    fun fromRomaji(r: String): String? {
+        val t = r.lowercase()
+        reverse[t]?.let { return it }
+        // a consonant with y and a vowel the table doesn't list: the i-kana of the consonant and a small one
+        val m = Regex("^([a-z]+)y([aeiou])$").find(t) ?: return null
+        val base = reverse[m.groupValues[1] + "i"] ?: return null
+        val small = mapOf("a" to "ゃ", "u" to "ゅ", "o" to "ょ", "e" to "ぇ", "i" to "ぃ")[m.groupValues[2]] ?: return null
+        return base + small
+    }
+
+    private val reverse: Map<String, String> by lazy {
+        buildMap { for ((k, v) in table) if (k.all { it in 'ぁ'..'ゖ' } && v !in this) put(v, k) }
+    }
+
     fun romaji(kana: String): String? = table[kana] ?: run {
         // a kana and a small one: the consonant of the first and the sound of the small one
         if (kana.length != 2) return@run null
@@ -139,6 +156,37 @@ object Syllables {
         return out
     }
 
+    private val pinyinInitials = listOf("zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "r", "z", "c", "s", "y", "w")
+    private val pinyinFinals = setOf("a", "o", "e", "i", "u", "v", "ü", "ai", "ei", "ao", "ou", "an", "en", "ang", "eng", "ong", "er", "ia", "ie", "iao",
+        "iu", "iou", "ian", "in", "iang", "ing", "iong", "ua", "uo", "uai", "ui", "uei", "uan", "un", "uen", "uang", "ueng", "ue", "ve", "üe", "van", "vn", "n", "ng", "m")
+
+    /** Initial and final of a pinyin syllable without tone ("zhuang" → zh + uang), or null. */
+    fun pinyin(token: String): Pair<String, String>? {
+        val t = token.lowercase().trimEnd { it.isDigit() }
+        if (t.isEmpty()) return null
+        val ini = pinyinInitials.firstOrNull { t.startsWith(it) && t.length > it.length } ?: ""
+        val fin = t.removePrefix(ini)
+        return if (fin in pinyinFinals) ini to fin else null
+    }
+
+    val arpaVowels = setOf("aa", "ae", "ah", "ao", "aw", "ax", "ay", "eh", "er", "ey", "ih", "ix", "iy", "ow", "oy", "uh", "uw", "ux")
+    private val arpaConsonants = setOf("b", "ch", "d", "dh", "dx", "f", "g", "hh", "jh", "k", "l", "m", "n", "ng", "p", "q", "r", "s", "sh",
+        "t", "th", "v", "w", "y", "z", "zh", "el", "em", "en")
+
+    /** Syllables of a name made of ARPAbet phonemes; the consonants of one syllable are joined by spaces. Null: not such a name. */
+    fun arpa(tokens: List<String>): List<Syllable>? {
+        val t = tokens.map { it.lowercase().trimEnd { c -> c.isDigit() } }
+        if (t.isEmpty() || t.any { it !in arpaVowels && it !in arpaConsonants } || t.none { it in arpaVowels }) return null
+        val out = mutableListOf<Syllable>()
+        val cons = mutableListOf<String>()
+        for (p in t) {
+            if (p in arpaVowels) { out += Syllable((cons + p).joinToString(" "), cons.joinToString(" "), p); cons.clear() }
+            else cons += p
+        }
+        if (cons.isNotEmpty()) out += Syllable(cons.joinToString(" "), cons.joinToString(" "), "")
+        return out
+    }
+
     /** Consonant and vowel of a romaji or Cyrillic syllable ("kya" → ky + a, "n" → n as a vowel-like coda). */
     fun parts(romaji: String): Pair<String, String> {
         val r = romaji.lowercase()
@@ -154,7 +202,21 @@ object Syllables {
      * Syllables named by a sample file: kana ("_あかさ", "かきくけこ") or tokens separated by "_", "-" or spaces
      * ("ka_ki_ku", "ма-мо"). Leading "_" (pause) is ignored.
      */
-    fun fromName(stem: String): List<Syllable> {
+    /**
+     * True when most [stems] are Japanese written in romaji ("ka_ki_ku", "ka-ki-ku"): such banks name their aliases
+     * in kana.
+     */
+    fun romajiJapanese(stems: List<String>): Boolean {
+        if (stems.isEmpty()) return false
+        val ok = stems.count { st ->
+            val name = st.trim().trimStart('_', '-', ' ')
+            val toks = name.split('_', '-', ' ').filter { it.isNotEmpty() }
+            name.none { Kana.isKana(it) } && toks.isNotEmpty() && toks.all { Kana.fromRomaji(it) != null }
+        }
+        return ok >= stems.size * 0.6
+    }
+
+    fun fromName(stem: String, kana: Boolean = false): List<Syllable> {
         val name = stem.trim().trimStart('_', '-', ' ')
         if (name.any { Kana.isKana(it) }) {
             return Kana.split(name).map { k ->
@@ -164,11 +226,17 @@ object Syllables {
             }
         }
         val tokens = name.split('_', '-', ' ').filter { it.isNotEmpty() }
+        // ARPAbet phonemes ("m_ah_s_t_ah"): syllables are the consonants before each vowel and the vowel
+        arpa(tokens)?.let { return it }
+        // Chinese pinyin ("mai_mai", "zhuang"): the whole final is the vowel ("ai m", not "a m")
+        if (!kana && tokens.isNotEmpty() && tokens.all { pinyin(it) != null } && tokens.any { Kana.fromRomaji(it) == null }) {
+            return tokens.map { t -> val (c, v) = pinyin(t)!!; Syllable(t, c, v) }
+        }
         // one word with several syllables in it ("kakiku", "babab", "b'ab'ab'", "мамам")
         if (tokens.size == 1) run(tokens[0]).takeIf { it.size > 1 }?.let { return it }
         return tokens.map { t ->
             val (c, v) = parts(t)
-            Syllable(t, c, v.take(1).ifEmpty { v })
+            Syllable((if (kana) Kana.fromRomaji(t) else null) ?: t, c, v.take(1).ifEmpty { v })
         }
     }
 }
@@ -275,6 +343,63 @@ object AutoOto {
             }
             SyllableTiming(syl, a * hop, v * hop, b * hop)
         }
+    }
+
+    /** One phoneme of a sample and where it is, ms. */
+    private class Phone(val name: String, val start: Double, val end: Double, val vowel: Boolean)
+
+    /** Phonemes from syllable timings: the consonants share the time before the vowel, the vowel lasts to the next syllable. */
+    private fun phones(timings: List<SyllableTiming>): List<Phone> {
+        val out = mutableListOf<Phone>()
+        for ((k, t) in timings.withIndex()) {
+            val c = t.cStart * 1000
+            val v = t.vStart * 1000
+            val end = timings.getOrNull(k + 1)?.cStart?.times(1000) ?: (t.vEnd * 1000)
+            val cons = t.syllable.consonant.split(' ').filter { it.isNotEmpty() }
+            if (t.syllable.vowel.isEmpty()) {
+                val step = (end - c) / cons.size.coerceAtLeast(1)
+                cons.forEachIndexed { i, p -> out += Phone(p, c + i * step, c + (i + 1) * step, false) }
+                continue
+            }
+            val step = (v - c) / cons.size.coerceAtLeast(1)
+            cons.forEachIndexed { i, p -> out += Phone(p, c + i * step, c + (i + 1) * step, false) }
+            out += Phone(t.syllable.vowel, v, end, true)
+        }
+        return out
+    }
+
+    /**
+     * ARPAsing entries: from silence into the first phoneme ("- m"), every pair of neighbouring phonemes ("m ah",
+     * "s t"), every vowel held on its own ("ah"), the last phoneme into silence ("v -").
+     */
+    fun arpaEntries(sample: String, timings: List<SyllableTiming>, lengthMs: Double): List<OtoEntry> {
+        val out = mutableListOf<OtoEntry>()
+        val ph = phones(timings)
+        if (ph.isEmpty()) return out
+        fun add(alias: String, left: Double, overlap: Double, preu: Double, fixed: Double, right: Double) {
+            val l = left.coerceIn(0.0, lengthMs)
+            val r = max(right, fixed + 5).coerceIn(l, lengthMs)
+            out += OtoEntry.fromAbsolute(sample, alias, OtoAbsolute(l, overlap.coerceIn(l, r), preu.coerceIn(l, r), fixed.coerceIn(l, r), r), lengthMs, negativeCutoff = true)
+        }
+        val first = ph.first()
+        add("- " + first.name, first.start - 110, first.start - 10, first.start, first.start + 10, (first.start + first.end) / 2)
+        for ((i, p) in ph.withIndex()) {
+            val next = ph.getOrNull(i + 1)
+            if (p.vowel) {
+                val d = p.end - p.start
+                add(p.name, p.start + d * 0.25, p.start + d * 0.25, p.start + d * 0.25, p.start + d * 0.25 + 10, p.end - d * 0.2)
+            }
+            if (next != null) {
+                // a vowel into a consonant is heard earlier than the loudness dip that separates the syllables
+                val b = if (p.vowel && !next.vowel) next.start - 60 else next.start
+                add(p.name + " " + next.name, b - 110, b - 10, b, b + 10, (next.start + next.end) / 2)
+            }
+        }
+        // into silence: from the end of a vowel, or from the start of a final consonant (its release is the end)
+        val last = ph.last()
+        val e = if (last.vowel) last.end - 50 else last.start
+        add(last.name + " -", e - 110, e - 10, e, e + 10, lengthMs - 10)
+        return out
     }
 
     /**
@@ -386,6 +511,7 @@ object AutoOto {
 
     fun styleOf(syllables: List<Syllable>, settings: AutoOtoSettings): RecStyle = when {
         settings.style != RecStyle.Auto -> settings.style
+        syllables.any { it.vowel in Syllables.arpaVowels } && syllables.none { s -> s.text.any { Kana.isKana(it) } } -> RecStyle.ARPA
         syllables.size <= 1 -> RecStyle.CV
         // a run of syllables ending with a consonant: "babab"
         syllables.last().vowel.isEmpty() && syllables.none { s -> s.text.any { Kana.isKana(it) } } -> RecStyle.CVC
@@ -400,6 +526,7 @@ object AutoOto {
     fun entries(sample: String, timings: List<SyllableTiming>, lengthMs: Double, s: AutoOtoSettings): List<OtoEntry> {
         val style = styleOf(timings.map { it.syllable }, s)
         if (style == RecStyle.CVC) return cvcEntries(sample, timings, lengthMs, s)
+        if (style == RecStyle.ARPA) return arpaEntries(sample, timings, lengthMs)
         val out = mutableListOf<OtoEntry>()
         for ((k, t) in timings.withIndex()) {
             val c = t.cStart * 1000
@@ -416,7 +543,20 @@ object AutoOto {
             val vowelEnd = (next ?: (t.vEnd * 1000)) - if (next == null) 40.0 else if (head) s.endMarginMs / 2 else s.endMarginMs
             val fixed = min(v + s.fixedMs, max(v + 10, vowelEnd - 10))
             val right = max(vowelEnd, fixed + 10).coerceAtMost(lengthMs)
-            val a = OtoAbsolute(left, overlap.coerceAtLeast(left), v, fixed, right)
+            var a = OtoAbsolute(left, overlap.coerceAtLeast(left), v, fixed, right)
+            val headA = a
+            // CV banks: the offset just before the sound, a longer consonant part, the end well before the vowel fades
+            if (style == RecStyle.CV) {
+                val l = max(0.0, overlap - 30)
+                val f = min(v + 170, max(v + 10, right - 20))
+                a = OtoAbsolute(l, overlap.coerceAtLeast(l), v, f, max(f + 10, right - 150))
+            }
+            // CV entries of CVVC banks follow a vowel-to-consonant entry: they start within the consonant
+            // (as in hand-made CVVC banks)
+            if (style == RecStyle.CVVC && hasC) {
+                val l = max(0.0, c + 25)
+                a = OtoAbsolute(l, max(l, c + 70).coerceAtMost(v), max(v - 20, l), max(v + 80, v - 20 + 10), right)
+            }
             val alias = when {
                 style == RecStyle.CV -> (if (k == 0 && s.cvWithHead) s.headPrefix else "") + t.syllable.text
                 style == RecStyle.CVVC -> (if (k == 0 && s.cvWithHead) s.headPrefix else "") + t.syllable.text
@@ -424,14 +564,17 @@ object AutoOto {
                 else -> (prev?.syllable?.vowel ?: "") + " " + t.syllable.text
             }
             out += OtoEntry.fromAbsolute(sample, alias, a, lengthMs, negativeCutoff = true)
+            // CVVC: the first syllable also from silence ("- か")
+            if (style == RecStyle.CVVC && k == 0 && !s.cvWithHead && s.headPrefix.isNotEmpty()) out += OtoEntry.fromAbsolute(sample, s.headPrefix + t.syllable.text, headA, lengthMs, negativeCutoff = true)
             // CVVC: vowel-to-consonant part before the next consonant
             if (style == RecStyle.CVVC && next != null) {
                 val nt = timings[k + 1]
                 if (nt.syllable.consonant.isNotEmpty()) {
                     val nc = nt.cStart * 1000
                     val nv = nt.vStart * 1000
-                    val vcLeft = max(v + s.fixedMs, nc - 150)
-                    val vc = OtoAbsolute(vcLeft, nc - 40, nc, nc + min(30.0, (nv - nc) / 2), min(nv, nc + 90))
+                    // (the detected consonant start is a little late for these)
+                    val vcLeft = max(v + s.fixedMs, nc - 175)
+                    val vc = OtoAbsolute(vcLeft, max(vcLeft, nc - 75), max(vcLeft, nc - 25), nc + min(5.0, (nv - nc) / 2), min(nv, nc + 40).coerceAtLeast(nc + 10))
                     out += OtoEntry.fromAbsolute(sample, t.syllable.vowel + " " + nt.syllable.consonant, vc, lengthMs, negativeCutoff = true)
                 }
             }
