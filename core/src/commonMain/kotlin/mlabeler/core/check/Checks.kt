@@ -18,7 +18,10 @@ data class CheckSettings(
     /** Allowed phonemes; empty = not checked. */
     val phonemeSet: Set<String> = emptySet(),
     val confidenceBelow: Float = 0.5f,
+    /** The phoneme tier must start and end with a pause (an error otherwise). */
     val pauseAtEdges: Boolean = false,
+    /** Which pause it must be (DiffSinger: SP); empty = any of [pauses]. */
+    val edgePause: String = "SP",
     /** A phoneme (not a pause) longer than this is a warning; 0 = not checked. */
     val maxDurationMs: Double = 0.0,
     /** A pause or an unnamed gap longer than this is an error; 0 = not checked. */
@@ -125,8 +128,10 @@ object Checks {
             }
             if (k == ph && s.diffsinger) out += notesLength(doc, t, k)
             if (k == ph && s.pauseAtEdges && t.size > 0) {
-                if (t.texts.first() !in s.pauses) out += Problem(Problem.Kind.NoPauseAtEdge, IntervalRef(k, 0))
-                if (t.texts.last() !in s.pauses) out += Problem(Problem.Kind.NoPauseAtEdge, IntervalRef(k, t.size - 1))
+                val want = s.edgePause.trim()
+                fun ok(text: String) = if (want.isEmpty()) text in s.pauses else text == want
+                if (!ok(t.texts.first())) out += Problem(Problem.Kind.NoPauseAtEdge, IntervalRef(k, 0), Severity.Error, want)
+                if (t.size > 1 && !ok(t.texts.last())) out += Problem(Problem.Kind.NoPauseAtEdge, IntervalRef(k, t.size - 1), Severity.Error, want)
             }
         }
         return out

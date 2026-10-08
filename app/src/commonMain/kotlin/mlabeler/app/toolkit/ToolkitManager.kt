@@ -334,6 +334,21 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         }
     }
 
+    /** Stops the toolkit (also one started by another program on this computer) and installs it again. */
+    fun reinstall() {
+        if (installJob?.isActive == true || !LocalToolkit.supported) return
+        installJob = scope.launch {
+            if (ownProcess) stop()
+            else if (status == Status.Ready && isLocalAddress) {
+                runCatching { kotlinx.coroutines.withTimeoutOrNull(3000) { client().shutdown() } }
+            }
+            // give the old process a moment to let go of its files (Windows keeps running files locked)
+            repeat(20) { if (runCatching { client().health() }.isFailure) return@repeat; delay(500) }
+            delay(1000)
+            if (installNow()) start()
+        }
+    }
+
     /** The installation itself; true when `mvt` is there afterwards. */
     private suspend fun installNow(): Boolean {
             busy(Status.Installing)

@@ -26,6 +26,17 @@ class ChecksMoreTest {
         assertEquals(2, p.count { it.kind == Problem.Kind.Long })
         assertEquals(0, Checks.run(d, CheckSettings()).count { it.kind in setOf(Problem.Kind.LongPause, Problem.Kind.LongPhrase, Problem.Kind.Long) })
     }
+
+    @Test
+    fun pauseAtEdges() {
+        val edge = { d: LabelDoc, s: CheckSettings -> Checks.run(d, s).filter { it.kind == Problem.Kind.NoPauseAtEdge }.map { it.ref.index } }
+        val on = CheckSettings(pauseAtEdges = true)
+        assertEquals(emptyList(), edge(doc("SP" to 0.5, "a" to 1.0, "SP" to 0.5), on))
+        assertEquals(listOf(0, 2), edge(doc("AP" to 0.5, "a" to 1.0, "" to 0.5), on))
+        assertEquals(listOf(2), edge(doc("AP" to 0.5, "a" to 1.0, "" to 0.5), on.copy(edgePause = "")))
+        assertEquals(emptyList(), edge(doc("a" to 1.0), CheckSettings()))
+        assertEquals(listOf(0), edge(doc("a" to 1.0), on))
+    }
 }
 
 class DiffSingerChecksTest {

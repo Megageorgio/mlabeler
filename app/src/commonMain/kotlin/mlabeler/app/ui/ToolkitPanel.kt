@@ -50,10 +50,16 @@ private val phoneHint = L(
     "На телефоне или планшете тулкит работает на компьютере. На компьютере: mLabeler → Настройки → Авторазметка → включите «Разрешить подключение с телефона» и введите сюда показанные там адрес и токен.",
 )
 private val showLog = L("Log…", "Журнал…")
+private val reinstallBtn = L("Reinstall", "Переустановить")
+private val reinstallSure = L("Click again to reinstall", "Нажмите ещё раз")
+private val reinstallHint = L(
+    "The toolkit stops and is installed again (a few hundred MB). Downloaded models and engines stay.",
+    "Тулкит остановится и установится заново (несколько сотен МБ). Скачанные модели и движки останутся.",
+)
 
 /** Status of the toolkit with the buttons that fix it (install, start, retry). */
 @Composable
-fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
+fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true, reinstall: Boolean = false) {
     val c = T.c
     val tk = app.toolkit
     val scope = rememberCoroutineScope()
@@ -67,6 +73,7 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
         }
     }
     var logOpen by remember { mutableStateOf(false) }
+    var confirmReinstall by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val dot = when (tk.status) {
@@ -89,8 +96,16 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true) {
             }
             if (tk.status == Status.Ready && tk.ownProcess) Btn(stopBtn()) { tk.stop() }
             if (tk.status != Status.Starting && tk.status != Status.Installing) Btn(retryBtn()) { scope.launch { tk.check() } }
+            // a second click confirms: it downloads the toolkit again
+            if (reinstall && tk.canRunHere && tk.status != Status.Missing && tk.status != Status.Starting && tk.status != Status.Installing &&
+                LocalToolkit.findMvt(app.settings.toolkit.mvtPath) != null) {
+                Btn(if (confirmReinstall) reinstallSure() else reinstallBtn()) {
+                    if (confirmReinstall) { confirmReinstall = false; logOpen = true; tk.reinstall() } else confirmReinstall = true
+                }
+            }
             if (tk.log.isNotEmpty()) Chip(showLog(), logOpen) { logOpen = !logOpen }
         }
+        if (confirmReinstall) Text(reinstallHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         if (tk.status == Status.Missing && LocalToolkit.supported) Text(installHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         if (!LocalToolkit.supported && tk.status != Status.Ready && tk.status != Status.Checking) {
             Text(phoneHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))

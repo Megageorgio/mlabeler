@@ -97,6 +97,8 @@ private object CheckTitles {
     val zeroOff = mlabeler.app.i18n.L("0 = not checked.", "0 — не проверять.")
     val diffsinger = mlabeler.app.i18n.L("For DiffSinger: phonemes shorter than one frame, spaces inside a phoneme, two same pauses in a row, zero length",
         "Для DiffSinger: фонемы короче одного кадра, пробел внутри фонемы, две одинаковые паузы подряд, нулевая длина")
+    val edges = mlabeler.app.i18n.L("A pause at the start and the end of every recording", "Пауза в начале и в конце каждой записи")
+    val edgeWhich = mlabeler.app.i18n.L("Which one (empty = any pause)", "Какая именно (пусто — любая пауза)")
     val scripts = mlabeler.app.i18n.L("Own checks (scripts)", "Свои проверки (скрипты)")
     val scriptsHint = mlabeler.app.i18n.L("Small JavaScript files that mark problems in the labels. For every folder: {0}; for one folder: {1} inside it. The example shows how.",
         "Небольшие файлы на JavaScript, которые отмечают проблемы в разметке. Для всех папок: {0}; для одной папки: {1} внутри неё. Порядок написания показан в примере.")
@@ -527,6 +529,12 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 }
                 Text(CheckTitles.zeroOff(), color = c.muted, fontSize = 12.sp)
                 SwitchRow(CheckTitles.diffsinger(), s.checks.diffsinger) { v -> app.update { it.copy(checks = it.checks.copy(diffsinger = v)) } }
+                SwitchRow(CheckTitles.edges(), s.checks.pauseAtEdges) { v -> app.update { it.copy(checks = it.checks.copy(pauseAtEdges = v)) } }
+                if (s.checks.pauseAtEdges) {
+                    var edge by remember { mutableStateOf(s.checks.edgePause) }
+                    Text(CheckTitles.edgeWhich(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+                    Field(edge, { v -> edge = v; app.update { it.copy(checks = it.checks.copy(edgePause = v.trim())) } }, Modifier.width(160.dp))
+                }
                 SectionTitle(CheckTitles.scripts())
                 Text(CheckTitles.scriptsHint.format(mlabeler.app.plugins.CheckScripts.appDir(), ".mlabeler/checks"), color = c.muted, fontSize = 12.sp)
                 SwitchRow(CheckTitles.runScripts(), s.checks.scripts) { v -> app.update { it.copy(checks = it.checks.copy(scripts = v)) }; app.editor?.reloadCheckScripts() }
@@ -665,7 +673,7 @@ private fun ToolkitPage(app: AppState) {
     SectionTitle(S.toolkit())
     Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
     mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
-    ToolkitStatus(app)
+    ToolkitStatus(app, reinstall = true)
     if (tk.canRunHere) Row(Modifier.padding(top = 6.dp)) {
         Btn(ErrorTitles.updateToolkit(), enabled = !tk.updatingNow) { tk.updateNow() }
     }

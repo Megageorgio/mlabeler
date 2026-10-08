@@ -440,13 +440,16 @@ private fun formatMsField(seconds: Double): String {
     return if (v == kotlin.math.floor(v)) v.toLong().toString() else v.toString()
 }
 
+private val probEdgeStart = mlabeler.app.i18n.L("No pause at the start", "Нет паузы в начале")
+private val probEdgeEnd = mlabeler.app.i18n.L("No pause at the end", "Нет паузы в конце")
+
 @Composable
 private fun problemTitle(p: Problem) = when (p.kind) {
     Problem.Kind.Short -> S.probShort() + " (${p.detail})"
     Problem.Kind.Empty -> S.probEmpty()
     Problem.Kind.UnknownPhoneme -> S.probUnknown()
     Problem.Kind.LowConfidence -> S.probConfidence() + " (${p.detail})"
-    Problem.Kind.NoPauseAtEdge -> S.probEdge()
+    Problem.Kind.NoPauseAtEdge -> (if (p.ref.index == 0) probEdgeStart() else probEdgeEnd()) + if (p.detail.isNotEmpty()) " (${p.detail})" else ""
     Problem.Kind.Long -> probLong() + " (${p.detail})"
     Problem.Kind.LongPause -> probLongPause() + " (${p.detail})"
     Problem.Kind.LongPhrase -> probLongPhrase() + " (${p.detail})"
