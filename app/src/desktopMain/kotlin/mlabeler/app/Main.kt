@@ -1,6 +1,5 @@
 package mlabeler.app
 
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -19,17 +18,19 @@ fun main(args: Array<String>) = application {
         onCloseRequest = { app.close(); exitApplication() },
         state = state,
         title = app.editor?.let { e -> e.item?.name?.let { "$it — mLabeler" } } ?: "mLabeler",
-        icon = appIcon,
     ) {
         window.minimumSize = java.awt.Dimension(360, 480)
+        // every size drawn on its own: the system takes the one that fits the title bar and the taskbar,
+        // instead of shrinking one big picture pixel by pixel
+        androidx.compose.runtime.LaunchedEffect(Unit) { appIcons?.let { window.iconImages = it } }
         App(app)
     }
 }
 
-private val appIcon: androidx.compose.ui.graphics.painter.Painter? by lazy {
+private val appIcons: List<java.awt.Image>? by lazy {
     runCatching {
-        val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("icon.png") ?: return@runCatching null
-        val img = javax.imageio.ImageIO.read(stream)
-        androidx.compose.ui.graphics.painter.BitmapPainter(img.toComposeImageBitmap())
+        listOf(16, 20, 24, 32, 40, 48, 64, 128, 256).mapNotNull { n ->
+            Thread.currentThread().contextClassLoader.getResourceAsStream("icons/icon-$n.png")?.use { javax.imageio.ImageIO.read(it) }
+        }.takeIf { it.isNotEmpty() }
     }.getOrNull()
 }
