@@ -13,6 +13,12 @@ if [ ! -d build/tmp-jre/jre ]; then
   (cd build/tmp-jre && unzip -q jre.zip && mv jdk-*-jre jre)
 fi
 rm -rf "$DIR/runtime"; cp -r build/tmp-jre/jre "$DIR/runtime"
+# native libraries ready next to the jars: nothing has to be unpacked into the user's home folder at start
+# (that fails when the home path is odd, redirected or not writable)
+rm -rf "$DIR/natives"; mkdir -p "$DIR/natives"
+unzip -q -j -o "$DIR"/app/skiko-awt-runtime-windows-x64-*.jar skiko-windows-x64.dll icudtl.dat -d "$DIR/natives"
+unzip -q -j -o "$DIR"/app/lwjgl-[0-9]*-natives-windows.jar 'windows/x64/org/lwjgl/lwjgl.dll' -d "$DIR/natives"
+unzip -q -j -o "$DIR"/app/lwjgl-nfd-*-natives-windows.jar 'windows/x64/org/lwjgl/nfd/lwjgl_nfd.dll' -d "$DIR/natives"
 (cd tools/launcher && GOOS=windows GOARCH=amd64 go build -ldflags "-H windowsgui -s -w" -o "../../$DIR/mLabeler.exe" .)
 rm -rf build/mLabeler; mkdir -p build; cp -r "$DIR" build/mLabeler
 rm -f "$OUT"; (cd build && zip -qr "$(basename "$OUT")" mLabeler)

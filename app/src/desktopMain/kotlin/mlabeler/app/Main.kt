@@ -7,6 +7,15 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 
 fun main(args: Array<String>) {
+    // where the graphics and folder-dialog libraries unpack themselves if they are not next to the program:
+    // the program's own data folder (its path comes from the environment, so any user name works)
+    for ((key, sub) in listOf("skiko.data.path" to "skiko", "org.lwjgl.system.SharedLibraryExtractPath" to "lwjgl")) {
+        if (System.getProperty(key) == null) runCatching {
+            val d = java.io.File(Platform.dataDir(), sub)
+            d.mkdirs()
+            if (d.isDirectory && d.canWrite()) System.setProperty(key, d.path)
+        }
+    }
     // a crash leaves its report for the next start
     val previous = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { t, e -> CrashLog.write(e.stackTraceToString()); previous?.uncaughtException(t, e) }
