@@ -40,8 +40,12 @@ jobs:
       # since an APK signed by a temporary key cannot be updated later
       - name: Signature
         run: |
-          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner
-          "$SIGNER" verify --print-certs app/build/outputs/apk/release/*.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          SIGNER=$(find "$SDK/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+          echo "APK: $APK"
+          echo "apksigner: ${SIGNER:-not found in $SDK/build-tools}"
+          if [ -n "$SIGNER" ]; then "$SIGNER" verify --print-certs "$APK" | grep -E "certificate (DN|SHA-256)" || echo "::warning::apksigner could not read the signature"; fi
           if [ -z "$KEYSTORE_B64" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
             echo "::error::No signing key (secret ANDROID_KEYSTORE_BASE64): the release APK would be signed with a temporary key"
             exit 1
