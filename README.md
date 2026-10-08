@@ -1,113 +1,92 @@
 # mLabeler
 
-Editor for singing voice labels: phoneme and word tiers, notes and pitch, UTAU oto. Windows, macOS, Linux,
-Android and iOS from one codebase (Kotlin, Compose Multiplatform).
+A labeling editor for singing voice data: phoneme and word tiers, notes and pitch, UTAU oto.
+One codebase for Windows, macOS, Linux, Android and iOS (Kotlin, Compose Multiplatform).
 
-[Русский](README.ru.md)
+English · [中文](README.zh.md) · [Русский](README.ru.md)
 
-**Status:** early. The phoneme editor works; oto, notes and pitch, plugins and autolabeling are next.
-The plan is in [docs/DESIGN.md](docs/DESIGN.md).
+## Download
 
-## What works now
+Ready builds for every platform are on the [Releases](https://github.com/Megageorgio/mlabeler/releases) page:
 
-- Open a folder: audio files are listed with their labels (`.lab`, `.TextGrid`, Audacity `.txt`), found next to
-  the audio or in a `lab/` folder beside `wav/`.
-- Waveform and spectrogram, zoom and scroll (wheel, Ctrl+wheel, pinch on touch screens).
-- Interval tiers: move boundaries by mouse, finger or keys, split, merge, rename, add/rename/reorder tiers.
-- Ripple and linked moves as visible toggles; Shift/Alt switch them while dragging.
-- Undo/redo per file, saving straight to the label file with a backup of the original in `.mlabeler/backup`.
-- Done/star/tag marks, file filters, checks for short and empty intervals and unknown phonemes.
-- Playback of an interval, a selection, the screen; loop.
-- Command list (Ctrl+K), keyboard shortcuts for everything.
-- Layout adapts to the window: side panels on wide screens, sheets on phones. Panels can be resized and hidden.
-- Themes: dark, light, retro (square), high contrast. Interface size. English and Russian.
-- oto mode (Ctrl+M or the switch in the toolbar; folders with oto.ini open in it): entry list with search
-  (`alias:`, `sample:`), offset/overlap/preutterance/consonant/cutoff on the waveform, preutterance drags
-  the whole set (Shift switches), Q W E R T put a marker at the cursor, numeric fields, new/duplicate/delete
-  entries, done/star per entry, Shift_JIS and other encodings kept on save.
-- Entries tab: every label of the file or of the whole folder, search (`name:`, `file:`, `tier:`), counts per label.
-- Pitch (over the spectrogram or in its own lane) and loudness lanes.
-- Compare: labels of the same files from other folders shown under yours, boundaries coloured by distance,
-  statistics, take them over in one step.
-- Autolabel with mVocalToolkit (Ctrl+Shift+A): a selected part or the whole recording, by lyrics/phonemes
-  (SOFA, HubertFA) or without lyrics (WFL); put the result into the labels or show it next to them to compare models.
-  On a computer mLabeler installs the toolkit (with uv) and starts it when needed, then stops it on exit;
-  a toolkit that's already running is used as is. Phones and tablets connect to a computer: turn on
-  "Let phones connect" there (Settings → Autolabel) and enter the address and token it shows.
-- Slow playback with pitch kept (Y: 1×, 0.75×, 0.5×, 0.25×), autosave, reload of labels changed elsewhere.
-- Keys can be rebound in Settings → Shortcuts. F1 shows how to work.
-- Folder settings (click the folder name): what is labelled in the folder, format for new labels, extra label folders.
-- Overlaid view (V): waveform outline over a darkened spectrogram, solid boundaries with a dark edge and a solid
-  label band, so labels stay readable; or separate lanes; labels above or below.
-- Menu bar (File, Edit, View, Go, Tools, Help) with the shortcut next to every item; View has check boxes for
-  panels, lanes and toolbar groups. Toolbar groups can be shown, hidden and reordered, with names under the
-  buttons or as compact icons. Work environments (Basic, Labeling, One picture, Full, plus your own saved ones —
-  JSON files that can be shared) are chosen on the first start and in View → Work environment. Phones keep the button menus.
-- Themes: built-in ones or editable copies where every colour (with opacity), the spectrogram gradient, tier colours,
-  corner rounding, border width and font can be changed; changes show at once.
-- Mouse: cursor tool (1) or scissors (2, a click adds a boundary, names it and plays the part before it);
-  double / right / middle / Ctrl / Alt clicks can each be set to select, play, play from here, rename, add a
-  boundary, or remove the phoneme — separately on label lanes and on the audio. Dragging near a boundary always
-  moves it. A label being typed is kept as soon as you click or play elsewhere, no Enter needed.
-- Deleting a selected boundary removes the phoneme that ends at it (or the one that starts at it — a setting);
-  Space plays that phoneme. Space while playing can start again instead of stopping.
-- Cleaning a recording (Tools → Clean the recording, Ctrl+Shift+C): clicks found and rebuilt by linear prediction
-  from the sound around them (only those samples change), a selected short part repaired the same way, and an
-  optional noise gate from a noise profile with preview. Sample rate, bit depth, channels and every untouched sample
-  stay exactly the same; the first version is kept in `.mlabeler/backup`, with undo and "put back the original".
-- A recording changed on disk is read again by itself (or F5); labels and undo history stay. After moving a boundary
-  its phoneme is selected (Space plays it); a click on the audio or Esc clears the selection.
-- Tools 1–4: cursor, scissors (cut over the audio; labels stay clickable), hand, play. A new boundary creates the
-  phoneme it belongs to (named right away, small field). Label text size (Ctrl+Shift+= / −). The wheel can walk
-  through phonemes instead of scrolling. Panels can sit on either side (two on one side become tabs; View → Panels,
-  "Arrange panels"); spectrogram above or below the waveform. Dialogs on computers can be moved and resized.
-- Any system font (the wheel over the font name steps through them) for the interface. Every settings page and every slider can go back to its default.
-- System folder dialog (Explorer with the address bar on Windows). Only WAV files are listed unless other formats are
-  turned on in Settings → General.
-- Every slider in the settings has a number field next to it for an exact value.
-- Automatic oto (Ctrl+Shift+A in oto folders): entries from file names (kana, romaji, Cyrillic) and the recordings,
-  CV / VCV / CVVC, optional tempo, or syllables placed by an aligner model from mVocalToolkit.
-- Recording samples from a list (reclist.txt): big current line with romaji, level meter, take preview, click track
-  with count-in, guide WAV, previous takes kept in `.mlabeler/takes`.
-- Plugins (Ctrl+Shift+P): JavaScript run by QuickJS on every platform, a parameter form made from `plugin.json`,
-  four quick slots (Ctrl+1…4). Built in: replace labels by a table, shift, merge short intervals, name pauses,
-  prefix/suffix; for oto: set a value by expression, sort, duplicates, alias prefix/suffix, remove by pattern.
-  "New plugin…" makes a template in the app's plugin folder.
-- Rename by pattern (Ctrl+H) for oto aliases or the active tier; sound while dragging a boundary.
+- **Windows** — the portable `.zip` (unpack and run `mLabeler.exe`) or the `.msi` installer;
+- **macOS** — `.dmg`; **Linux** — `.deb`;
+- **Android** — `.apk`;
+- **iOS** — unsigned `.ipa` (see below).
 
-## Keys
+There are three release channels: **stable**, **beta** (new features a little earlier) and **alpha** (the latest
+development builds). The program can check for a newer version at start and always asks before downloading;
+the channel is chosen on the first start or in Settings → About. On Android the new `.apk` is downloaded and
+installed by the system installer over the old version, keeping the settings.
 
-| | |
-|---|---|
-| Space / Shift+Space | play selection or interval / play from cursor |
-| ← → | previous / next boundary |
-| Tab, Ctrl+← → | previous / next interval |
-| ↑ ↓ | tier above / below |
-| , . (Shift ×10) | nudge the selected boundary |
-| Q / W | left / right boundary of the interval to the cursor |
-| S, M, Del | split at cursor, merge with next, remove boundary |
-| Enter, F2 | rename |
-| R, G, L | ripple, linked, loop |
-| PgUp / PgDn | previous / next file |
-| D, B | done, star |
-| Ctrl+K | all commands |
+For **iOS** there is an unsigned `.ipa`. Install it with [AltStore](https://altstore.io), [SideStore](https://sidestore.io), Sideloadly or TrollStore: they sign it with your own Apple ID. With a free Apple ID the signature lasts 7 days and has to be renewed (AltStore and SideStore do it by themselves). The program does not install iOS updates by itself; it shows that a new version is out and opens the release page. On iOS the program works in its own Documents folder, which is visible in the Files app.
 
-## Build
+Android asks for access to all files, because label files are written next to the recordings in the opened folders.
 
-JDK 17+.
+## Features
+
+**Labels**
+- Opens a folder with recordings and finds the labels next to them: `.lab`, `.TextGrid`, Audacity labels,
+  DiffSinger `.ds` and `transcriptions.csv`, UTAU `oto.ini`. vLabeler projects (`.lbp`) can be imported.
+- Phoneme and word tiers: moving boundaries by mouse, finger or keys, cutting, joining, renaming,
+  ripple and linked moves, bulk renaming across the whole folder.
+- Waveform, spectrogram, pitch, loudness and optional formants, separately or overlaid in one picture.
+- Checks for typical mistakes (short or empty parts, unknown phonemes, problems that break DiffSinger training),
+  done / star marks, filters and a folder tree.
+- Comparing with labels from another folder, with statistics of the differences.
+
+**Notes and pitch**
+- A piano roll with notes from phoneme groups, pitch drawing, key snapping, MIDI.
+- Listening with the drawn pitch (WORLD or the DiffSinger vocoder).
+- Export of a DiffSinger dataset (`wavs/` + `transcriptions.csv`), with long recordings cut at pauses.
+
+**Sound**
+- A sound editing mode in which the labels are locked: cutting, silence, normalising, fades, trimming silence,
+  click repair and noise reduction. Every change can be undone, and the original file is kept.
+
+**oto and recording**
+- An oto editor with automatic oto for CV / VCV / CVVC banks.
+- Recording from a reclist with a level meter, click track and guide.
+
+**Automatic labelling**
+- Through [mVocalToolkit](https://github.com/Megageorgio/mVocalToolkit), a separate helper program: aligning
+  by lyrics or phonemes, labelling without lyrics, lyrics from the recording, segmentation.
+- On a computer mLabeler installs and starts the toolkit when needed. One running toolkit is shared by every
+  program that uses it and stops when none of them needs it any more. Phones and tablets can use the toolkit
+  of a computer in the same network.
+
+**Interface**
+- Work environments (ready sets of panels, lanes and buttons), themes with full colour editing,
+  rebindable keys and mouse buttons, a command list (Ctrl+K), searchable settings and help (F1).
+- Plugins in JavaScript that run on every platform.
+- Languages: English, Russian, Japanese, Chinese (Simplified), Korean, French, German, Spanish, Portuguese.
+
+## Building from source
+
+Ready builds for every platform, iOS included, are made automatically and published on the
+[Releases](https://github.com/Megageorgio/mlabeler/releases) page, so building by hand is not needed.
+For development: JDK 17 or newer.
 
 ```
 ./gradlew :app:run                     # desktop
 ./gradlew :app:packageMsi              # or packageDmg, packageDeb
 ./gradlew :app:assembleDebug           # Android APK (needs the Android SDK)
-./gradlew :core:jvmTest                # tests
+./gradlew :core:jvmTest :app:desktopTest
 ```
 
-iOS: `cd iosApp && xcodegen`, open `mLabeler.xcodeproj` in Xcode and run. The app works in its Documents folder,
-which is visible in the Files app.
+## Acknowledgements
 
-Android asks for access to all files: label files are written next to the recordings in the folders you open.
+Special thanks to **HHS_kt** ([YouTube](https://www.youtube.com/@HHS_kt), [Telegram](https://t.me/hhs_kt_666)),
+**Gitreti** and **XHR0ME** ([X](https://x.com/ExChroma), [Telegram](https://t.me/xhr0m1),
+[YouTube](https://www.youtube.com/@chr0ma313)).
+
+## A note on AI tools
+
+AI tools were used for a part of the work: mainly for the interface translations and for drafting texts such as
+the help, and also for writing part of the code. The architecture and planning were done without them.
+If this matters to you, there are other good tools for the same job, for example
+[vLabeler](https://github.com/sdercolin/vlabeler) and [SLabeler](https://m-lo7.itch.io/slabeler).
 
 ## License
 
-MIT
+[MIT](LICENSE)
