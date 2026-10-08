@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,8 +66,8 @@ private val groupsT = L("Grouping into notes (ph_num)", "Группировка 
 private val keepWords = L("From the words tier when it fits", "Из слоя слов, если подходит")
 private val byDict = L("Always by the dictionary", "Всегда по словарю")
 private val dictT = L("Phoneme dictionary", "Словарь фонем")
-private val dictHint = L("Vowels start a note, consonants go with the note before them. Your own dictionaries: JSON files in {0}",
-    "Гласные начинают ноту, согласные идут с нотой перед ними. Свои словари — JSON-файлы в {0}")
+private val dictHint = L("Vowels start a note, consonants go with the note before them.",
+    "Гласные начинают ноту, согласные идут с нотой перед ними.")
 private val notesT = L("Notes", "Ноты")
 private val notesNone = L("None", "Без нот")
 private val notesLabels = L("From the labels (else by pitch)", "Из разметки (иначе по высоте)")
@@ -187,8 +188,8 @@ fun DsExportDialog(app: AppState, ed: EditorState) {
                 Chip(byDict(), !keep) { keep = false }
             }
             SectionTitle(dictT())
+            Text(dictHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 6.dp))
             DictionaryChips(dict) { dict = it }
-            Text(dictHint.format(Dictionaries.dir()), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             SectionTitle(notesT())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(notesPitch(), notes == NoteSource.Pitch) { notes = NoteSource.Pitch }
@@ -211,32 +212,65 @@ fun DsExportDialog(app: AppState, ed: EditorState) {
     }
 }
 
-/** Built-in and user phoneme dictionaries as chips. */
+/**
+ * Phoneme dictionaries, chosen like models: the language first, then where the set comes from (DiffSinger,
+ * OpenUtau, a model's author, your own files). The first chip, "Guess from letters" or [autoTitle], picks an empty name.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DictionaryChips(selected: String, onPick: (String) -> Unit) {
-    val all = remember { Dictionaries.all() }
+fun DictionaryChips(selected: String, autoTitle: String? = null, onPick: (String) -> Unit) {
+    val c = mlabeler.app.theme.T.c
+    var version by remember { mutableStateOf(0) }
+    val all = remember(version) { Dictionaries.all().filter { it.name != "Auto" } }
+    val cur = all.firstOrNull { it.name == selected }
+    // own dictionaries without a language are shown together
+    val langs = all.map { it.language }.distinct()
+    var lang by remember(selected) { mutableStateOf(cur?.language) }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (d in all) {
-            val name = dictTitle(d)
-            Chip(name, d.name == selected || (selected.isBlank() && d.name == "Auto")) { onPick(if (d.name == "Auto") "" else d.name) }
+        Chip(autoTitle ?: dictAuto(), cur == null && lang == null) { lang = null; onPick("") }
+        for (l in langs) Chip(langTitle(l), lang == l) {
+            lang = l
+            if (cur?.language != l) all.firstOrNull { it.language == l }?.let { onPick(it.name) }
         }
+    }
+    val variants = all.filter { lang != null && it.language == lang }
+    if (variants.isNotEmpty()) FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+        Text(sourceT(), color = c.muted, fontSize = 12.sp)
+        for (v in variants) Chip(v.source.ifEmpty { v.name }, v.name == cur?.name) { onPick(v.name) }
+    }
+    Text(missingT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+    FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (cur != null) Btn(ownCopyT()) {
+            val title = dictTitle(cur) + ownSuffixT()
+            Dictionaries.saveCopy(cur.copy(source = ""), title)
+            version++
+            onPick(title)
+            mlabeler.app.Platform.openInFileManager(Dictionaries.dir())
+        }
+        Btn(folderT()) {
+            mlabeler.core.io.PlatformFs.mkdirs(Dictionaries.dir())
+            mlabeler.app.Platform.openInFileManager(Dictionaries.dir())
+        }
+        Btn(rereadT()) { version++ }
     }
 }
 
-private val dictAuto = L("Guess from letters", "Определить по буквам")
-private val dictNames: Map<String, () -> String> = mapOf(
-    "Japanese" to L("Japanese", "Японский")::invoke,
-    "Chinese" to L("Chinese (pinyin)", "Китайский (пиньинь)")::invoke,
-    "English" to L("English (ARPAbet)", "Английский (ARPAbet)")::invoke,
-    "Russian" to L("Russian", "Русский")::invoke,
-    "Russian (OpenUtau)" to { mlabeler.app.i18n.LanguageNames.of("ru") + " (OpenUtau)" },
-    "Cantonese" to { mlabeler.app.i18n.LanguageNames.of("yue") + " (Jyutping)" },
-    "Spanish" to { mlabeler.app.i18n.LanguageNames.of("es") },
-    "Portuguese" to { mlabeler.app.i18n.LanguageNames.of("pt") },
-    "Italian" to { mlabeler.app.i18n.LanguageNames.of("it") },
-    "German" to { mlabeler.app.i18n.LanguageNames.of("de") },
-    "French (Millefeuille)" to { mlabeler.app.i18n.LanguageNames.of("fr") + " (Millefeuille)" },
-)
+private fun langTitle(code: String) = if (code.isEmpty()) ownT() else mlabeler.app.i18n.LanguageNames.of(code)
+private val sourceT = L("Source:", "Источник:")
+private val ownT = L("Your own", "Свои")
+private val ownSuffixT = L(" (own)", " (свой)")
+private val missingT = L("No dictionary for your set? \u201cGuess from letters\u201d works with any phonemes, or make your own from the chosen one: a JSON file with lists of vowels and consonants.",
+    "Нет подходящего словаря? «Определить по буквам» работает с любым набором фонем, или сделайте свой на основе выбранного: это JSON-файл со списками гласных и согласных.")
+private val ownCopyT = L("Make your own from this one…", "Сделать свой на основе этого…")
+private val folderT = L("Dictionaries folder…", "Папка словарей…")
+private val rereadT = L("Read the files again", "Перечитать файлы")
 
-/** The name of a phoneme dictionary in the interface language. */
-internal fun dictTitle(d: mlabeler.core.ds.PhonemeDict): String = if (d.name == "Auto") dictAuto() else dictNames[d.name]?.invoke() ?: d.name
+private val dictAuto = L("Guess from letters", "Определить по буквам")
+
+/** The name of a phoneme dictionary in the interface language: its language and source. */
+internal fun dictTitle(d: mlabeler.core.ds.PhonemeDict): String = when {
+    d.name == "Auto" -> dictAuto()
+    d.language.isEmpty() || d.source.isEmpty() -> d.name
+    else -> mlabeler.app.i18n.LanguageNames.of(d.language) + " (" + d.source + ")"
+}

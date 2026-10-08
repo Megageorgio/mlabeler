@@ -500,18 +500,12 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     app.update { it.copy(checks = it.checks.copy(phonemeSet = v.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }.toSet())) }
                 }, Modifier.fillMaxWidth())
                 Text(CheckTitles.fromDict(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for (d in remember { mlabeler.app.state.Dictionaries.all() }.filter { it.vowels.isNotEmpty() }) {
-                        val set = (d.rests + d.vowels + d.semivowels + d.special + d.consonants).distinct()
-                        Chip(dictTitle(d), s.checks.phonemeSet == set.toSet()) {
-                            phonemes = set.joinToString(" ")
-                            app.update { it.copy(checks = it.checks.copy(phonemeSet = set.toSet())) }
-                        }
-                    }
-                    Chip(CheckTitles.anyPhoneme(), s.checks.phonemeSet.isEmpty()) {
-                        phonemes = ""
-                        app.update { it.copy(checks = it.checks.copy(phonemeSet = emptySet())) }
-                    }
+                fun setOf(d: mlabeler.core.ds.PhonemeDict) = (d.rests + d.vowels + d.semivowels + d.special + d.consonants).toSet()
+                val chosen = remember(s.checks.phonemeSet) { mlabeler.app.state.Dictionaries.all().firstOrNull { it.vowels.isNotEmpty() && setOf(it) == s.checks.phonemeSet }?.name ?: "" }
+                DictionaryChips(chosen, autoTitle = CheckTitles.anyPhoneme()) { name ->
+                    val set = if (name.isEmpty()) emptySet() else setOf(mlabeler.app.state.Dictionaries.byName(name))
+                    phonemes = set.joinToString(" ")
+                    app.update { it.copy(checks = it.checks.copy(phonemeSet = set)) }
                 }
                 ValueSlider(CheckTitles.maxLen(), s.checks.maxDurationMs.toFloat(), 0f..3000f, S.msUnit(), default = 0f) { v ->
                     app.update { it.copy(checks = it.checks.copy(maxDurationMs = ((v / 10).roundToInt() * 10).toDouble())) }
