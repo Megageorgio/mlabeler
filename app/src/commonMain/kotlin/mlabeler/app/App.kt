@@ -60,6 +60,8 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showAutolabel && ed != null) mlabeler.app.ui.AutolabelDialog(app)
                     if (app.showCleanup && ed != null) mlabeler.app.ui.CleanupDialog(app)
                     if (app.showHelp && app.settings.setupDone) mlabeler.app.ui.HelpDialog(app)
+                    // (an update offer or a crash report comes first; the tip waits for the folder dialog to close)
+                    if (app.showTips && app.settings.setupDone && app.updater.offer == null && app.folderPick == null && !app.showHelp) mlabeler.app.ui.TipsDialog(app)
                     if (app.showPlugins && ed != null) mlabeler.app.ui.PluginsDialog(app)
                     if (app.showImport && ed != null) mlabeler.app.ui.ImportDialog(app)
                     if (app.showDsExport && ed != null) mlabeler.app.ui.DsExportDialog(app, ed)

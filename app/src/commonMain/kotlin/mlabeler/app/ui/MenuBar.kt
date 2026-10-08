@@ -289,6 +289,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     }
     val help = listOf(
         item(Commands.help, ed, app),
+        item(Commands.tips, ed, app),
         MItem(MenuTitles.about()) { app.settingsPage = "about"; app.showSettings = true },
     )
     return listOf(

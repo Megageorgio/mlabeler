@@ -286,6 +286,10 @@ data class AppSettings(
     val layoutPresets: Map<String, LayoutSettings> = emptyMap(),
     /** The short guide was shown once. */
     val seenHelp: Boolean = false,
+    /** A tip about a less obvious feature at every start. */
+    val tipsAtStart: Boolean = true,
+    /** The tip the next start shows. */
+    val tipNext: Int = 0,
     /** Phones: "landscape", "portrait" or "auto". */
     val orientation: String = "landscape",
     /** Phones: hide the status and navigation bars. */

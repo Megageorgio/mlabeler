@@ -269,7 +269,7 @@ private fun keyOf(id: String): String = Commands.all.firstOrNull { it.id == id }
 private val placeholder = Regex("\\{([a-z0-9-]+)\\}")
 
 /** {command-id} becomes the command's key, or its name in quotes when it has no key. */
-private fun fill(text: String): String = placeholder.replace(text) { m ->
+fun fillKeys(text: String): String = placeholder.replace(text) { m ->
     val cmd = Commands.all.firstOrNull { it.id == m.groupValues[1] }
     val k = cmd?.keyLabel.orEmpty()
     when {
@@ -305,7 +305,7 @@ fun HelpDialog(app: AppState) {
             // a topic's questions, or every question that has all the searched words (open, with its topic)
             val shown: List<Triple<Int, Int, Item>> = if (words.isEmpty()) topics[topic].items.mapIndexed { n, item -> Triple(topic, n, item) }
             else topics.flatMapIndexed { ti, t -> t.items.mapIndexedNotNull { n, item ->
-                val text = (item.q.en + " " + item.q.ru + " " + item.lines.joinToString(" ") { it.en + " " + it.ru } + " " + item.lines.joinToString(" ") { fill(it()) }).lowercase()
+                val text = (item.q.en + " " + item.q.ru + " " + item.lines.joinToString(" ") { it.en + " " + it.ru } + " " + item.lines.joinToString(" ") { fillKeys(it()) }).lowercase()
                 if (words.all { it in text }) Triple(ti, n, item) else null
             } }
             if (words.isNotEmpty() && shown.isEmpty()) Text(helpNothing(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
@@ -326,7 +326,7 @@ fun HelpDialog(app: AppState) {
                     if (expanded) Column(Modifier.padding(start = 20.dp, bottom = 10.dp, end = 8.dp).widthIn(max = 620.dp)) {
                         for (l in item.lines) Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                             Text("•", color = c.accent, fontSize = 13.sp, modifier = Modifier.width(14.dp))
-                            Text(fill(l()), color = c.text, fontSize = 13.sp, lineHeight = 20.sp)
+                            Text(fillKeys(l()), color = c.text, fontSize = 13.sp, lineHeight = 20.sp)
                         }
                     }
                     Divider()

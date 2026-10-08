@@ -111,6 +111,7 @@ private object CheckTitles {
     val written = mlabeler.app.i18n.L("Example saved: {0}", "Пример сохранён: {0}")
 }
 
+private val tipsAtStartT = mlabeler.app.i18n.L("Tip of the day at start", "Совет дня при запуске")
 private val searchSettingsT = mlabeler.app.i18n.L("Search settings", "Поиск настроек")
 private val scaleButtonT = mlabeler.app.i18n.L("Interface size button (in percent) on the toolbar", "Кнопка размера интерфейса (в процентах) на панели")
 private val detailT = mlabeler.app.i18n.L("Detail", "Чёткость")
@@ -732,6 +733,7 @@ private fun InterfacePage(app: AppState) {
     SectionTitle(MenuTitles.panels())
     if (!mlabeler.app.Platform.isMobile) SwitchRow(MenuTitles.menuBar(), s.menuBar) { v -> app.update { it.copy(menuBar = v) } }
     SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }
+    SwitchRow(tipsAtStartT(), s.tipsAtStart) { v -> app.update { it.copy(tipsAtStart = v) } }
     SwitchRow(MenuTitles.filesPanel(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
     SwitchRow(MenuTitles.detailsPanel(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
     if (s.statusBar) {
@@ -991,6 +993,8 @@ internal object SettingsHelp {
             h("General", S.avoidCutout, "Phones: nothing is drawn under the camera cutout.", "Телефоны: ничего не рисуется под вырезом камеры."),
 
             h("Interface", MenuTitles.menuBar, "File, Edit, View… menus at the top of the window.", "Меню «Файл», «Правка», «Вид»… вверху окна."),
+            h("Interface", tipsAtStartT, "At every start a tip about a less obvious feature or setting; Help → Tip of the day shows them any time.",
+                "При каждом запуске — совет о неочевидной функции или настройке; Справка → Совет дня показывает их в любое время."),
             h("Interface", MenuTitles.statusBar, "The line at the bottom: phoneme number, done files, scale and more; below it you choose what it shows.",
                 "Строка внизу окна: номер фонемы, готовые файлы, масштаб и прочее; ниже настраивается, что в ней показывать."),
             h("Interface", MenuTitles.filesPanel, "The panel with the list of files and the list of all labels.", "Панель со списком файлов и списком всех меток."),
