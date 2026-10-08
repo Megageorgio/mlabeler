@@ -90,6 +90,10 @@ private val takeT = L("Take name", "Имя дубля")
 private val intoT = L("Takes go to {0}, with the sung lines next to them as .txt", "Дубли сохраняются в {0}, рядом — спетые строки в .txt")
 private val recordT = L("Record from here (R)", "Записать отсюда (R)")
 private val stopRecT = L("Stop recording", "Остановить запись")
+private val autotuneT = L("With autotune", "С автотюном")
+private val autotuneBusyT = L("Tuning…", "Тюнится…")
+private val autotuneHint = L("Plays the take with every note pulled to the nearest semitone at once, the well-known robotic effect. Just for fun: the saved take stays as it was sung.",
+    "Проигрывает дубль, в котором каждая нота сразу притянута к ближайшему полутону, — тот самый «роботный» эффект. Просто для забавы: сохранённый дубль остаётся как спет.")
 private val lastTakeT = L("Listen to {0}", "Прослушать {0}")
 private val editT = L("Edit the lines", "Править строки")
 private val doneT = L("Done", "Готово")
@@ -351,6 +355,9 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 Text(takeT(), color = c.muted, fontSize = 12.sp)
                 Field(k.takeName, { k.takeName = it }, Modifier.width(180.dp))
                 if (k.lastTake != null && !k.recording) Btn(lastTakeT.format(k.lastTakeName), icon = Icons.play) { k.playLastTake() }
+                if (k.lastTake != null && !k.recording) mlabeler.app.ui.Tip(autotuneHint()) {
+                    Btn(if (k.tuning) autotuneBusyT() else autotuneT(), enabled = !k.tuning) { k.playTuned() }
+                }
                 Text(intoT.format(Paths.name(k.folder)) + ". " + headphonesT(), color = c.muted, fontSize = 11.sp, maxLines = 2, modifier = Modifier.weight(1f))
             }
             if (!Platform.isMobile) Text(keysT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))

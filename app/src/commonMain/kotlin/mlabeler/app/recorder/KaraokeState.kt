@@ -526,6 +526,25 @@ class KaraokeState(
 
     fun playLastTake() { lastTake?.let { playTake(it) } }
 
+    /** The last take is being pulled to the notes for [playTuned]. */
+    var tuning by mutableStateOf(false)
+    private var tuned: Pair<Audio, Audio>? = null
+
+    /** Plays the last take with the "autotune" effect: every sung note pulled to the nearest semitone at once. */
+    fun playTuned() {
+        val take = lastTake ?: return
+        if (tuning) return
+        scope.launch {
+            val a = tuned?.takeIf { it.first === take }?.second ?: run {
+                tuning = true
+                try {
+                    withContext(Dispatchers.Default) { Audio(take.sampleRate, mlabeler.core.dsp.AutoTune.process(take.samples, take.sampleRate)) }
+                } finally { tuning = false }
+            }.also { tuned = take to it }
+            playTake(a)
+        }
+    }
+
     fun playTake(t: Audio) {
         stop()
         runCatching { output.play(t, 0, t.samples.size, false) }
