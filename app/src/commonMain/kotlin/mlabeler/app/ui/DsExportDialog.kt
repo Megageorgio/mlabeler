@@ -217,16 +217,26 @@ fun DictionaryChips(selected: String, onPick: (String) -> Unit) {
     val all = remember { Dictionaries.all() }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for (d in all) {
-            val name = if (d.name == "Auto") dictAuto() else dictNames[d.name]?.invoke() ?: d.name
+            val name = dictTitle(d)
             Chip(name, d.name == selected || (selected.isBlank() && d.name == "Auto")) { onPick(if (d.name == "Auto") "" else d.name) }
         }
     }
 }
 
 private val dictAuto = L("Guess from letters", "Определить по буквам")
-private val dictNames = mapOf(
-    "Japanese" to L("Japanese", "Японский"),
-    "Chinese" to L("Chinese (pinyin)", "Китайский (пиньинь)"),
-    "English" to L("English (ARPAbet)", "Английский (ARPAbet)"),
-    "Russian" to L("Russian", "Русский"),
+private val dictNames: Map<String, () -> String> = mapOf(
+    "Japanese" to L("Japanese", "Японский")::invoke,
+    "Chinese" to L("Chinese (pinyin)", "Китайский (пиньинь)")::invoke,
+    "English" to L("English (ARPAbet)", "Английский (ARPAbet)")::invoke,
+    "Russian" to L("Russian", "Русский")::invoke,
+    "Russian (OpenUtau)" to { mlabeler.app.i18n.LanguageNames.of("ru") + " (OpenUtau)" },
+    "Cantonese" to { mlabeler.app.i18n.LanguageNames.of("yue") + " (Jyutping)" },
+    "Spanish" to { mlabeler.app.i18n.LanguageNames.of("es") },
+    "Portuguese" to { mlabeler.app.i18n.LanguageNames.of("pt") },
+    "Italian" to { mlabeler.app.i18n.LanguageNames.of("it") },
+    "German" to { mlabeler.app.i18n.LanguageNames.of("de") },
+    "French (Millefeuille)" to { mlabeler.app.i18n.LanguageNames.of("fr") + " (Millefeuille)" },
 )
+
+/** The name of a phoneme dictionary in the interface language. */
+internal fun dictTitle(d: mlabeler.core.ds.PhonemeDict): String = if (d.name == "Auto") dictAuto() else dictNames[d.name]?.invoke() ?: d.name

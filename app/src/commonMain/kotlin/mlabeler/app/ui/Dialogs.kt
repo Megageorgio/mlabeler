@@ -503,7 +503,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (d in remember { mlabeler.app.state.Dictionaries.all() }.filter { it.vowels.isNotEmpty() }) {
                         val set = (d.rests + d.vowels + d.semivowels + d.special + d.consonants).distinct()
-                        Chip(d.name, s.checks.phonemeSet == set.toSet()) {
+                        Chip(dictTitle(d), s.checks.phonemeSet == set.toSet()) {
                             phonemes = set.joinToString(" ")
                             app.update { it.copy(checks = it.checks.copy(phonemeSet = set.toSet())) }
                         }

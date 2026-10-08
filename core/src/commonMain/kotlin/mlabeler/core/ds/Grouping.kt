@@ -54,28 +54,23 @@ data class PhonemeDict(
             return if (l.any { it in VOWEL_LETTERS }) PhonemeKind.Vowel else PhonemeKind.Consonant
         }
 
+        /** The Japanese dictionary of DiffSinger alignment (japanese_dict_full.txt of HubertFA): っ (cl) and ん (N) are notes of their own. */
         val japanese = PhonemeDict(
             "Japanese",
-            vowels = listOf("a", "i", "u", "e", "o", "N", "A", "I", "U", "E", "O"),
-            consonants = listOf("k", "ky", "g", "gy", "s", "sh", "z", "j", "t", "ts", "ty", "ch", "d", "dy", "n", "ny",
-                "h", "hy", "f", "b", "by", "p", "py", "m", "my", "r", "ry", "ng", "v", "cl", "q"),
-            semivowels = listOf("y", "w"),
+            vowels = listOf("a", "i", "u", "e", "o", "N", "cl"),
+            consonants = listOf("b", "by", "ch", "d", "dy", "f", "g", "gw", "gy", "h", "hy", "j", "k", "kw", "ky", "m", "my", "n", "ny", "p", "py", "r", "ry", "s", "sh", "t", "ts", "ty", "v", "w", "y", "z"),
         )
+        /** DiffSinger's opencpop-extension.txt with the additions of ds-zh-pinyin-lite.txt (io, ueng, y0). */
         val chinese = PhonemeDict(
             "Chinese",
-            vowels = listOf("a", "ai", "an", "ang", "ao", "e", "ei", "en", "eng", "er", "i", "ia", "ian", "iang", "iao",
-                "ie", "in", "ing", "iong", "iu", "ix", "iy", "i0", "ir", "o", "ong", "ou", "u", "ua", "uai", "uan", "uang",
-                "ui", "un", "uo", "v", "van", "ve", "vn", "E", "En"),
-            consonants = listOf("b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "zh", "ch", "sh",
-                "r", "z", "c", "s"),
-            semivowels = listOf("y", "w"),
+            vowels = listOf("a", "ai", "an", "ang", "ao", "e", "ei", "en", "eng", "er", "i", "i0", "ia", "ian", "iang", "iao", "ie", "in", "ing", "io", "iong", "ir", "iu", "o", "ong", "ou", "u", "ua", "uai", "uan", "uang", "ueng", "ui", "un", "uo", "v", "van", "ve", "vn", "E", "En"),
+            consonants = listOf("b", "p", "m", "f", "d", "t", "n", "l", "g", "k", "h", "j", "q", "x", "zh", "ch", "sh", "r", "z", "c", "s", "y", "w", "y0"),
         )
+        /** ARPAbet without stress marks, as in ds_cmudict-07b.txt of DiffSinger alignment and OpenUtau's DiffSinger English phonemizer. */
         val english = PhonemeDict(
             "English",
             vowels = listOf("aa", "ae", "ah", "ao", "aw", "ax", "ay", "eh", "er", "ey", "ih", "iy", "ow", "oy", "uh", "uw"),
-            consonants = listOf("b", "ch", "d", "dh", "dx", "f", "g", "hh", "jh", "k", "l", "m", "n", "ng", "p", "r",
-                "s", "sh", "t", "th", "v", "z", "zh", "q"),
-            semivowels = listOf("w", "y"),
+            consonants = listOf("b", "ch", "d", "dh", "dx", "f", "g", "hh", "jh", "k", "l", "m", "n", "ng", "p", "r", "s", "sh", "t", "th", "v", "w", "y", "z", "zh", "_r"),
         )
         /** The phoneme set of Russian DiffSinger datasets (soft consonants with "y", й = j, reduced vowels ax, x, ex). */
         val russian = PhonemeDict(
@@ -85,9 +80,51 @@ data class PhonemeDict(
                 "by", "vy", "gy", "dy", "zy", "ky", "ly", "my", "ny", "py", "ry", "sy", "ty", "fy", "hy", "shy", "ch", "cl", "vf"),
             semivowels = listOf("j"),
         )
+        /** The Russian set of OpenUtau's DiffSinger Russian phonemizer (RussianG2p). */
+        val russianOpenUtau = PhonemeDict(
+            "Russian (OpenUtau)",
+            vowels = listOf("a", "aa", "ay", "ee", "i", "ii", "ja", "je", "jo", "ju", "oo", "u", "uj", "uu", "y", "yy"),
+            consonants = listOf("b", "bb", "c", "ch", "d", "dd", "f", "ff", "g", "gg", "h", "hh", "j", "k", "kk", "l", "ll", "m", "mm", "n", "nn", "p", "pp", "r", "rr", "s", "sch", "sh", "ss", "t", "tt", "v", "vv", "z", "zh", "zz"),
+        )
+        /** Jyutping, as in jyutping_dict.txt of DiffSinger alignment (HubertFA). */
+        val cantonese = PhonemeDict(
+            "Cantonese",
+            vowels = listOf("aa", "aai", "aak", "aam", "aan", "aang", "aap", "aat", "aau", "ai", "ak", "am", "an", "ang", "ap", "at", "au", "e", "ei", "ek", "em", "eng", "eoi", "eon", "eot", "ep", "eu", "i", "ik", "im", "in", "ing", "ip", "it", "iu", "o", "oe", "oek", "oeng", "oi", "ok", "on", "ong", "ot", "ou", "u", "ui", "uk", "un", "ung", "ut", "yu", "yun", "yut"),
+            consonants = listOf("b", "c", "d", "f", "g", "gw", "h", "j", "k", "kw", "l", "m", "n", "ng", "p", "s", "t", "w", "z"),
+        )
+        /** The set of OpenUtau's DiffSinger Spanish phonemizer. */
+        val spanish = PhonemeDict(
+            "Spanish",
+            vowels = listOf("a", "e", "i", "o", "u"),
+            consonants = listOf("b", "B", "ch", "d", "D", "f", "g", "G", "gn", "I", "k", "l", "ll", "m", "n", "p", "r", "rr", "s", "t", "U", "w", "x", "y", "Y", "z"),
+        )
+        /** The set of OpenUtau's DiffSinger Portuguese phonemizer. */
+        val portuguese = PhonemeDict(
+            "Portuguese",
+            vowels = listOf("E", "O", "a", "a~", "e", "e~", "i", "i~", "o", "o~", "u", "u~"),
+            consonants = listOf("J", "L", "R", "S", "X", "Z", "b", "d", "dZ", "f", "g", "j", "j~", "k", "l", "m", "n", "p", "r", "s", "t", "tS", "v", "w", "w~", "z"),
+        )
+        /** The set of OpenUtau's DiffSinger Italian phonemizer. */
+        val italian = PhonemeDict(
+            "Italian",
+            vowels = listOf("a", "e", "EE", "i", "o", "OO", "u"),
+            consonants = listOf("b", "d", "dz", "dZZ", "f", "g", "j", "JJ", "k", "l", "LL", "m", "n", "nf", "ng", "p", "r", "s", "SS", "t", "ts", "tSS", "v", "w", "z"),
+        )
+        /** The set of OpenUtau's DiffSinger German phonemizer. */
+        val german = PhonemeDict(
+            "German",
+            vowels = listOf("aa", "ae", "ah", "ao", "aw", "ax", "ay", "ee", "eh", "er", "ex", "ih", "iy", "oe", "ohh", "ooh", "oy", "ue", "uh", "uw", "yy"),
+            consonants = listOf("b", "cc", "ch", "d", "dh", "f", "g", "hh", "jh", "k", "l", "m", "n", "ng", "p", "pf", "q", "r", "rr", "s", "sh", "t", "th", "ts", "v", "w", "x", "y", "z", "zh"),
+        )
+        /** The set of OpenUtau's DiffSinger French Millefeuille phonemizer. */
+        val french = PhonemeDict(
+            "French (Millefeuille)",
+            vowels = listOf("ah", "eh", "ae", "ee", "oe", "ih", "oh", "oo", "ou", "uh", "en", "in", "on"),
+            consonants = listOf("y", "w", "f", "k", "p", "s", "sh", "t", "h", "b", "d", "g", "l", "m", "n", "r", "v", "z", "j", "ng", "q", "uy", "vf", "cl"),
+        )
         /** Guesses only. */
         val auto = PhonemeDict("Auto")
-        val builtIn = listOf(auto, japanese, chinese, english, russian)
+        val builtIn = listOf(auto, japanese, chinese, english, russian, russianOpenUtau, cantonese, spanish, portuguese, italian, german, french)
     }
 }
 

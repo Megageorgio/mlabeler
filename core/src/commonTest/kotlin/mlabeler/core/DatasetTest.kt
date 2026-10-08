@@ -24,6 +24,10 @@ class DatasetTest {
         val ja = PhonemeDict.japanese
         // SP+k | a+sh | i | N | AP
         assertEquals(listOf(2, 2, 1, 1, 1), Grouping.phNum(listOf("SP", "k", "a", "sh", "i", "N", "AP"), ja))
+        // っ (cl) is a note of its own, as in DiffSinger's Japanese dictionary
+        assertEquals(listOf(2, 1, 2, 1), Grouping.phNum(listOf("SP", "k", "a", "cl", "t", "a"), ja))
+        // pinyin: y and w are consonants of the next syllable, which join the group before (as add_ph_num.py does)
+        assertEquals(listOf(2, 2, 1), Grouping.phNum(listOf("SP", "w", "o", "d", "e"), PhonemeDict.chinese))
         // y before a vowel belongs to the group before it
         assertEquals(listOf(2, 1), Grouping.phNum(listOf("SP", "y", "a"), ja))
         // without a dictionary letters decide; multi-language prefixes are ignored
