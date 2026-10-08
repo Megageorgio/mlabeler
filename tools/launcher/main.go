@@ -66,7 +66,9 @@ func main() {
 	}
 	args := []string{
 		"-Xss4m",
-		"-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8",
+		// no -Dsun.jnu.encoding: forced to UTF-8 it garbles a Cyrillic (or any non-Latin) user name in the
+		// paths Java gets from Windows, and the graphics library cannot unpack itself into the home folder
+		"-Dfile.encoding=UTF-8",
 		"-cp", filepath.Join(dir, "app", "*"),
 		"mlabeler.app.MainKt",
 	}

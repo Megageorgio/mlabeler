@@ -141,7 +141,8 @@ android {
 compose.desktop {
     application {
         mainClass = "mlabeler.app.MainKt"
-        jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
+        // sun.jnu.encoding is left to the system: forcing UTF-8 garbles a non-Latin Windows user name in user.home
+        jvmArgs += listOf("-Dfile.encoding=UTF-8")
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "mLabeler"
