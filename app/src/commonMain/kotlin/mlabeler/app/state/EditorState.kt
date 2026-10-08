@@ -1067,6 +1067,7 @@ class EditorState(
             } else if (st.pixelsPerSecond > 0) {
                 pixelsPerSecond = st.pixelsPerSecond
                 viewStart = st.viewStart
+                clampView()
             } else {
                 fitStart()
             }
@@ -1791,6 +1792,9 @@ class EditorState(
     // ---------- view ----------
 
     fun clampView() {
+        // never wider than the whole recording: a short file after a long one (or a stored view) shows all of itself
+        val d = duration
+        if (d > 0 && viewWidthPx > 1f && pixelsPerSecond < viewWidthPx / d) { pixelsPerSecond = viewWidthPx / d; viewStart = 0.0 }
         val vis = visibleDuration
         val maxStart = max(0.0, duration - vis * 0.9)
         viewStart = viewStart.coerceIn(min(0.0, -vis * 0.05), maxStart)
@@ -1822,7 +1826,7 @@ class EditorState(
 
     companion object {
         /** How much of a long recording the first look shows, seconds. */
-        const val FIRST_VIEW_SECONDS = 20.0
+        const val FIRST_VIEW_SECONDS = 15.0
     }
 
     fun zoom(factor: Double, anchorTime: Double = viewStart + visibleDuration / 2) {

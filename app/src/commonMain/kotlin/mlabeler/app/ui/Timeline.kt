@@ -1397,7 +1397,7 @@ private fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heigh
         done = true
         if (commit) onCommit(value.text.trim()) else onCancel()
     }
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     LaunchedEffect(Unit) { onDraft(initial) }
     with(density) {
         BasicTextField(

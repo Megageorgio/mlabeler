@@ -15,6 +15,10 @@ import mlabeler.app.i18n.Lang
 import mlabeler.core.io.PlatformFs
 import mlabeler.core.io.Workspace
 
+private val crashedT = mlabeler.app.i18n.L(
+    "Last time the program closed because of an error. The report is under “Details”; sending it to the author helps to fix it.",
+    "В прошлый раз программа закрылась из-за ошибки. Отчёт — в «Подробнее»; если отправить его автору, это поможет её исправить.")
+
 data class Message(val text: String, val error: Boolean, val id: Long) {
     /** The first meaningful line, for the short message. */
     val headline: String get() = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() && !it.endsWith(":") }
@@ -145,6 +149,11 @@ class AppState(private val scope: CoroutineScope) {
         applyAudioFormats(settings)
         Lang.current = settings.language.ifEmpty { Platform.systemLanguage }.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
         if (settings.setupDone) updater.checkAtStart()
+    }
+
+    /** Shows the report of a crash of the previous run (once). */
+    fun showCrashReport() {
+        mlabeler.app.CrashLog.take()?.let { message(crashedT() + "\n\n" + it, error = true) }
     }
 
     fun update(transform: (AppSettings) -> AppSettings) {

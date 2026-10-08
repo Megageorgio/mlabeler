@@ -3,6 +3,7 @@ package mlabeler.app
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ fun rememberAppState(): AppState {
 @Composable
 fun App(app: AppState = rememberAppState()) {
     DisposableEffect(app) { onDispose { app.close() } }
+    androidx.compose.runtime.LaunchedEffect(app) { app.showCrashReport() }
     val base = LocalDensity.current
     val scale = app.settings.scale.coerceIn(0.5f, 2f)
     mlabeler.app.ui.UiScale.current = scale
@@ -46,6 +48,8 @@ fun App(app: AppState = rememberAppState()) {
                     if (kar != null) mlabeler.app.recorder.KaraokeScreen(app, kar)
                     else if (rec != null) mlabeler.app.recorder.RecorderScreen(app, rec)
                     else if (ed == null) StartScreen(app) else EditorScreen(app, ed)
+                    // the start screen shows messages too (an error opening a folder, the report of a crash)
+                    if (ed == null && rec == null && kar == null) mlabeler.app.ui.MessageToast(app, 24.dp)
                     if (app.showCommands && ed != null) CommandPalette(app)
                     if (app.showSettings) SettingsDialog(app)
                     if (!app.settings.setupDone && rec == null && kar == null) mlabeler.app.ui.SetupDialog(app)

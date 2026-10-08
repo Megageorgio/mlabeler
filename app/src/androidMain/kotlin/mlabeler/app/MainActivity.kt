@@ -16,6 +16,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AndroidContext.init(applicationContext)
         AndroidContext.activity = this
+        // a crash leaves its report for the next start
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        if (previous !is CrashHandler) Thread.setDefaultUncaughtExceptionHandler(CrashHandler(previous))
         // draw under the camera cutout too: the whole screen is used
         if (android.os.Build.VERSION.SDK_INT >= 28) {
             window.attributes.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -28,5 +31,12 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         if (AndroidContext.activity === this) AndroidContext.activity = null
         super.onDestroy()
+    }
+}
+
+private class CrashHandler(private val next: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
+    override fun uncaughtException(t: Thread, e: Throwable) {
+        CrashLog.write(e.stackTraceToString())
+        next?.uncaughtException(t, e)
     }
 }

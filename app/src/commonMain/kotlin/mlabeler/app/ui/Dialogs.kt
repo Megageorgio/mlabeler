@@ -190,6 +190,12 @@ fun androidx.compose.foundation.layout.ColumnScope.DialogContent(
 
 @Composable
 fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, dim: Boolean = true, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    // a new interface size lays the window out afresh: otherwise it keeps its old height in pixels and gets cramped
+    androidx.compose.runtime.key(androidx.compose.ui.platform.LocalDensity.current.density) { OverlayBox(onDismiss, maxWidth, dim, content) }
+}
+
+@Composable
+private fun OverlayBox(onDismiss: () -> Unit, maxWidth: Int, dim: Boolean, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     val c = T.c
     BoxWithConstraints(
         Modifier.fillMaxSize().background(c.bg.copy(alpha = if (dim) 0.6f else 0f))

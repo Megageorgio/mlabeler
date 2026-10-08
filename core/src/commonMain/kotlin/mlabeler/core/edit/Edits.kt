@@ -128,8 +128,9 @@ object Edits {
     fun mergeWithNext(doc: LabelDoc, ref: IntervalRef): LabelDoc = removeBound(doc, BoundRef(ref.tier, ref.index + 1))
 
     fun setText(doc: LabelDoc, ref: IntervalRef, text: String): LabelDoc {
-        val tier = doc.tiers[ref.tier] as IntervalTier
-        if (tier.texts[ref.index] == text) return doc
+        // a name typed for an interval that no longer exists (undone, merged, another file) is dropped
+        val tier = doc.tiers.getOrNull(ref.tier) as? IntervalTier ?: return doc
+        if (ref.index !in tier.texts.indices || tier.texts[ref.index] == text) return doc
         val nt = tier.texts.toMutableList().apply { this[ref.index] = text }
         return doc.replace(ref.tier, tier.copy(texts = nt))
     }
