@@ -154,9 +154,13 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
             if (l.showNotepad && l.notepadDocked) (if (l.notepadSide == "left") left else right) += SidePanelId.Notepad
             if (l.leftCollapsed) left.clear()
             if (l.rightCollapsed) right.clear()
+            // sound editing: its tools become the first tab on the side of the details panel while the mode is on
+            val sound = ed.soundMode && ed.mode == Mode.Labels
+            if (sound) (if (l.showInspector && wc == WidthClass.Expanded && l.inspectorSide == "left") left else right).add(0, SidePanelId.Sound)
+            fun width(w: Float, panels: List<SidePanelId>) = (if (SidePanelId.Sound in panels) w.coerceAtLeast(290f) else w).coerceIn(180f, 520f).dp
             Row(Modifier.fillMaxSize()) {
                 if (left.isNotEmpty()) {
-                    PanelStack(app, ed, left, Modifier.width(l.filesWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
+                    PanelStack(app, ed, left, Modifier.width(width(l.filesWidth, left)).fillMaxHeight())
                     VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(filesWidth = (it.layout.filesWidth + d).coerceIn(180f, 520f))) } }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
@@ -164,12 +168,7 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
                 }
                 if (right.isNotEmpty()) {
                     VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(180f, 520f))) } }
-                    PanelStack(app, ed, right, Modifier.width(l.inspectorWidth.coerceIn(180f, 520f).dp).fillMaxHeight())
-                }
-                // sound editing: its tools at the right edge while the mode is on
-                if (ed.soundMode && ed.mode == Mode.Labels) {
-                    Divider(vertical = true)
-                    SoundPanel(app, ed, Modifier.width(290.dp).fillMaxHeight())
+                    PanelStack(app, ed, right, Modifier.width(width(l.inspectorWidth, right)).fillMaxHeight())
                 }
             }
             // medium width: details slide over the timeline
@@ -432,13 +431,14 @@ fun MessageToast(app: AppState, bottom: Dp) {
     }
 }
 
-enum class SidePanelId { Files, Entries, Details, Notepad }
+enum class SidePanelId { Files, Entries, Details, Notepad, Sound }
 
 private val panelNames = mapOf(
     SidePanelId.Files to mlabeler.app.i18n.L("Files and entries", "Файлы и записи"),
     SidePanelId.Entries to mlabeler.app.i18n.L("Entries", "Записи"),
     SidePanelId.Details to mlabeler.app.i18n.L("Details", "Подробности"),
     SidePanelId.Notepad to notepadTitle,
+    SidePanelId.Sound to ToolLabels.sound,
 )
 private val toOtherSide = mlabeler.app.i18n.L("Move to the other side", "Перенести на другую сторону")
 private val hidePanel = mlabeler.app.i18n.L("Hide", "Скрыть")
@@ -449,8 +449,14 @@ private val joinEntries = mlabeler.app.i18n.L("Back into the files panel", "Ве
 @Composable
 private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>, modifier: Modifier) {
     val c = T.c
-    var tab by remember { mutableStateOf(0) }
-    val current = panels[tab.coerceIn(0, panels.size - 1)]
+    var chosen by remember { mutableStateOf<SidePanelId?>(null) }
+    var beforeSound by remember { mutableStateOf<SidePanelId?>(null) }
+    // the sound tools open in front when sound editing starts; the previous tab comes back when it ends
+    val hasSound = SidePanelId.Sound in panels
+    androidx.compose.runtime.LaunchedEffect(hasSound) {
+        if (hasSound) { beforeSound = chosen; chosen = SidePanelId.Sound } else if (chosen == SidePanelId.Sound || chosen == null) chosen = beforeSound
+    }
+    val current = chosen?.takeIf { it in panels } ?: panels.first { it != SidePanelId.Sound || panels.size == 1 }
     val arranging = app.arrangePanels
     Column(modifier.background(c.panel)) {
         if (panels.size > 1 || arranging || current == SidePanelId.Notepad) {
@@ -462,7 +468,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                     Text(
                         (if (p == SidePanelId.Files && app.settings.layout.entriesSeparate) S.files() else panelNames.getValue(p)()), fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(c.radius)).background(if (sel && panels.size > 1) c.panelAlt else c.panel.copy(alpha = 0f))
-                            .clickable { tab = k }.padding(horizontal = 10.dp, vertical = 5.dp),
+                            .clickable { chosen = p }.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
                 }
@@ -488,6 +494,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                                 SidePanelId.Entries -> st.layout.copy(entriesSide = flip(st.layout.entriesSide))
                                 SidePanelId.Details -> st.layout.copy(inspectorSide = flip(st.layout.inspectorSide))
                                 SidePanelId.Notepad -> st.layout.copy(notepadSide = flip(st.layout.notepadSide))
+                                SidePanelId.Sound -> st.layout.copy(inspectorSide = flip(st.layout.inspectorSide))
                             })
                         }
                     }
@@ -498,6 +505,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                                 SidePanelId.Entries -> st.layout.copy(showEntries = false)
                                 SidePanelId.Details -> st.layout.copy(showInspector = false)
                                 SidePanelId.Notepad -> st.layout.copy(showNotepad = false)
+                                SidePanelId.Sound -> { ed.soundMode = false; st.layout }
                             })
                         }
                     }
@@ -510,6 +518,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
             SidePanelId.Entries -> EntriesPanel(ed, Modifier.weight(1f).fillMaxWidth().background(c.panel)) {}
             SidePanelId.Details -> Inspector(ed, Modifier.weight(1f).fillMaxWidth())
             SidePanelId.Notepad -> NotepadText(app, ed, Modifier.weight(1f).fillMaxWidth())
+            SidePanelId.Sound -> SoundPanel(app, ed, Modifier.weight(1f).fillMaxWidth(), titled = panels.size == 1)
         }
     }
 }

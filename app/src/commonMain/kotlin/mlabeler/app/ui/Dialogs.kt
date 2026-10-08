@@ -83,23 +83,23 @@ internal object PlayTitles {
     val playback = mlabeler.app.i18n.L("Playback", "Воспроизведение")
     val volume = mlabeler.app.i18n.L("Volume", "Громкость")
     val follow = mlabeler.app.i18n.L("While playing, the view", "Во время воспроизведения вид")
-    val followOff = mlabeler.app.i18n.L("Stays put", "Не двигается")
+    val followOff = mlabeler.app.i18n.L("Stays in place", "Остаётся на месте")
     val followPage = mlabeler.app.i18n.L("Turns the page at the edge", "Перелистывается у края")
-    val followKeep = mlabeler.app.i18n.L("Scrolls smoothly, the playhead stays in place", "Плавно едет, курсор стоит на месте")
+    val followKeep = mlabeler.app.i18n.L("Scrolls smoothly, the playhead stays in place", "Плавно прокручивается, курсор остаётся на месте")
     val followAt = mlabeler.app.i18n.L("Where the playhead stays (from the left)", "Где держится курсор (от левого края)")
 }
 
 private object CheckTitles {
     val maxLen = mlabeler.app.i18n.L("Longest phoneme (not a pause)", "Самая длинная фонема (не пауза)")
-    val maxPause = mlabeler.app.i18n.L("Longest pause or gap", "Самая длинная пауза или пустота")
-    val maxPhrase = mlabeler.app.i18n.L("Longest singing without a pause (DiffSinger: about 15 s)", "Самый долгий кусок без паузы (для DiffSinger — около 15 с)")
+    val maxPause = mlabeler.app.i18n.L("Longest pause or gap", "Самая длинная пауза или промежуток")
+    val maxPhrase = mlabeler.app.i18n.L("Longest singing without a pause (DiffSinger: about 15 s)", "Самое долгое пение без паузы (для DiffSinger — около 15 с)")
     val phrasePause = mlabeler.app.i18n.L("A pause counts from", "Пауза считается от")
     val zeroOff = mlabeler.app.i18n.L("0 = not checked.", "0 — не проверять.")
     val diffsinger = mlabeler.app.i18n.L("For DiffSinger: phonemes shorter than one frame, spaces inside a phoneme, two same pauses in a row, zero length",
         "Для DiffSinger: фонемы короче одного кадра, пробел внутри фонемы, две одинаковые паузы подряд, нулевая длина")
     val scripts = mlabeler.app.i18n.L("Own checks (scripts)", "Свои проверки (скрипты)")
     val scriptsHint = mlabeler.app.i18n.L("Small JavaScript files that mark problems in the labels. For every folder: {0}; for one folder: {1} inside it. The example shows how.",
-        "Небольшие файлы на JavaScript, которые отмечают проблемы в разметке. Для всех папок: {0}; для одной папки: {1} внутри неё. Как писать — в примере.")
+        "Небольшие файлы на JavaScript, которые отмечают проблемы в разметке. Для всех папок: {0}; для одной папки: {1} внутри неё. Порядок написания показан в примере.")
     val runScripts = mlabeler.app.i18n.L("Run them", "Запускать их")
     val none = mlabeler.app.i18n.L("No scripts yet", "Скриптов пока нет")
     val example = mlabeler.app.i18n.L("Create an example", "Создать пример")
@@ -121,9 +121,9 @@ private val detailPresets = listOf(
     mlabeler.app.i18n.L("High", "Высокая") to Triple(20f, 1.5f, 288),
     mlabeler.app.i18n.L("Highest", "Максимальная") to Triple(20f, 1f, 384),
 )
-private val snapZeroT = mlabeler.app.i18n.L("Boundaries jump to where the waveform crosses zero", "Границы прилипают к переходу волны через ноль")
+private val snapZeroT = mlabeler.app.i18n.L("Snap boundaries to zero crossings of the waveform", "Привязывать границы к переходам волны через ноль")
 private val keepZoomT = mlabeler.app.i18n.L("Keep the scale when going to another file", "Сохранять масштаб при переходе к другому файлу")
-private val namesOnAudioT = mlabeler.app.i18n.L("Phoneme names on the waveform and spectrogram too", "Имена фонем ещё и на волне и спектрограмме")
+private val namesOnAudioT = mlabeler.app.i18n.L("Phoneme names on the waveform and spectrogram too", "Имена фонем также на волне и спектрограмме")
 private val namesWhereT = mlabeler.app.i18n.L("Where inside each phoneme: drag the dot or click the grid", "Где внутри каждой фонемы: перетащите точку или щёлкните по сетке")
 
 /** A box standing for one phoneme: the dot is where its name goes (0..1 across and down). */
@@ -163,6 +163,30 @@ private fun PlacementPad(x: Float, y: Float, onChange: (Float, Float) -> Unit) {
 }
 
 private val whatToShow = mlabeler.app.i18n.L("What to show", "Что показывать")
+
+/**
+ * The inside of a dialog: [content] scrolls, [footer] (the final buttons, right-aligned) always stays visible
+ * at the bottom, however small the window is.
+ */
+@Composable
+fun androidx.compose.foundation.layout.ColumnScope.DialogContent(
+    footer: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    Column(
+        Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())
+            .padding(start = 18.dp, end = 18.dp, top = 18.dp, bottom = if (footer == null) 18.dp else 6.dp),
+        content = content,
+    )
+    if (footer != null) {
+        Box(Modifier.fillMaxWidth().height(T.c.borderWidth).background(T.c.border.copy(alpha = 0.5f)))
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically,
+            content = footer,
+        )
+    }
+}
 
 @Composable
 fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, dim: Boolean = true, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
@@ -578,7 +602,7 @@ private val pressKeys = mlabeler.app.i18n.L("Press the keys…", "Нажмите
 private val resetAll = mlabeler.app.i18n.L("Reset all", "Сбросить все")
 private val keysHint = mlabeler.app.i18n.L("Click a command and press new keys. Esc cancels, Backspace removes the binding.",
     "Нажмите на команду, затем новые клавиши. Esc — отмена, Backspace — убрать сочетание.")
-private val usedBy = mlabeler.app.i18n.L("also used by: {0}", "также у: {0}")
+private val usedBy = mlabeler.app.i18n.L("also used by: {0}", "также используется: {0}")
 
 @Composable
 private fun KeymapPage(app: AppState) {
@@ -740,19 +764,19 @@ object MouseTitles {
     val cursor = L("Cursor: click selects, drag moves (1)", "Курсор: клик выбирает, перетаскивание двигает (1)")
     val cut = L("Scissors: click adds a boundary (2)", "Ножницы: клик ставит границу (2)")
     val pan = L("Hand: dragging scrolls (3)", "Рука: перетаскивание прокручивает (3)")
-    val playTool = L("Play: a click plays the phoneme (4)", "Проигрывание: клик играет фонему (4)")
+    val playTool = L("Play: a click plays the phoneme (4)", "Проигрывание: клик воспроизводит фонему (4)")
     val cutOnLanes = L("Scissors cut on label lanes too (otherwise a click on a label selects it, a double click renames)",
         "Ножницы режут и на полосах разметки (иначе клик по метке её выбирает, двойной — переименовывает)")
     val wheel = L("Mouse wheel", "Колесо мыши")
     val wheelScroll = L("Scrolls through time (Ctrl+wheel zooms)", "Прокручивает по времени (Ctrl+колесо — масштаб)")
     val wheelPhonemes = L("Steps through phonemes, Space plays the chosen one (Shift+wheel scrolls)",
-        "Переходит по фонемам, пробел играет выбранную (Shift+колесо — прокрутка)")
+        "Переходит по фонемам, пробел воспроизводит выбранную (Shift+колесо — прокрутка)")
     val toolHint = L("Near a boundary both tools drag it. Shift+click and dragging over the audio select a part in both.",
-        "Рядом с границей оба инструмента её двигают. Shift+клик и протягивание по звуку выделяют кусок в обоих.")
+        "Рядом с границей оба инструмента её перемещают. Shift+клик и перетаскивание по звуку выделяют фрагмент в обоих.")
     val askName = L("Type the name of the new part right away", "Сразу вводить название новой части")
     val playIt = L("Play the part before a new boundary", "Проигрывать часть перед новой границей")
     val leftHint = L("Near a boundary a press always drags it; Shift+click and dragging over the audio select a part. Each click below can be set to select, split, play and more.",
-        "Рядом с границей нажатие всегда её тянет; Shift+щелчок и протягивание по звуку выделяют кусок. Каждому щелчку ниже можно задать: выбрать, разрезать, проиграть и другое.")
+        "Рядом с границей нажатие всегда перемещает её; Shift+щелчок и перетаскивание по звуку выделяют фрагмент. Каждому щелчку ниже можно назначить действие: выбрать, разрезать, воспроизвести и другие.")
     val onLabels = L("On label lanes", "На полосах разметки")
     val onAudio = L("On the waveform and spectrogram", "На волне и спектрограмме")
     val double = L("Double click", "Двойной клик")
@@ -760,11 +784,11 @@ object MouseTitles {
     val middle = L("Middle click (dragging with it scrolls)", "Средний клик (с перетаскиванием — прокрутка)")
     val ctrl = L("Ctrl+click", "Ctrl+клик")
     val alt = L("Alt+click", "Alt+клик")
-    val selectAfterDrag = L("Touching a boundary (moving or just pressing it) selects its phoneme: Space plays it, Delete removes it",
-        "Касание границы (перетаскивание или просто нажатие) выделяет её фонему: пробел её играет, Delete удаляет")
+    val selectAfterDrag = L("Touching a boundary (moving or pressing it) selects its phoneme: Space plays it, Delete removes it",
+        "Касание границы (перетаскивание или нажатие) выделяет её фонему: пробел воспроизводит её, Delete удаляет")
     val audioDeselects = L("A click on the waveform or spectrogram clears the selection (Space plays from there)",
-        "Клик по волне или спектрограмме снимает выделение (пробел играет оттуда)")
-    val spaceRestarts = L("Space while playing starts again (instead of stopping)", "Пробел во время проигрывания начинает заново (а не останавливает)")
+        "Клик по волне или спектрограмме снимает выделение (пробел воспроизводит с этого места)")
+    val spaceRestarts = L("Space while playing starts again (instead of stopping)", "Пробел во время воспроизведения начинает заново (а не останавливает)")
     val owner = L("A boundary belongs to the phoneme…", "Граница относится к фонеме…")
     val ownerHint = L("Delete on a selected boundary removes that phoneme, Space plays it, and a new boundary creates it (that part gets the new name).",
         "Delete на выбранной границе убирает эту фонему, пробел её проигрывает, а новая граница создаёт её (эта часть получает новое название).")
@@ -776,7 +800,7 @@ object MouseTitles {
         mlabeler.app.state.MouseActions.SELECT -> L("Select", "Выбрать")()
         mlabeler.app.state.MouseActions.DESELECT -> L("Clear the selection", "Снять выделение")()
         mlabeler.app.state.MouseActions.PLAY -> L("Play the phoneme", "Проиграть фонему")()
-        mlabeler.app.state.MouseActions.PLAY_FROM -> L("Play from here", "Играть отсюда")()
+        mlabeler.app.state.MouseActions.PLAY_FROM -> L("Play from here", "Воспроизвести отсюда")()
         mlabeler.app.state.MouseActions.RENAME -> L("Rename", "Переименовать")()
         mlabeler.app.state.MouseActions.SPLIT -> L("Add a boundary", "Поставить границу")()
         mlabeler.app.state.MouseActions.SPLIT_NAME -> L("Add a boundary and name it", "Поставить границу и назвать")()
@@ -948,11 +972,11 @@ internal object SettingsHelp {
         listOf(
             h("General", S.language, "Language of the whole program. Changes at once.", "Язык всей программы. Меняется сразу."),
             h("General", S.saveOnSwitch, "Going to another file saves the labels of this one first. Off: changes stay in memory until you save; leaving the folder asks about them.",
-                "При переходе к другому файлу разметка текущего сначала сохраняется. Выключено: изменения живут в памяти до сохранения, при выходе из папки программа спросит."),
+                "При переходе к другому файлу разметка текущего сначала сохраняется. Выключено: изменения хранятся в памяти до сохранения, при выходе из папки будет предложено их сохранить."),
             h("General", S.otherAudio, "Lists compressed formats too. On computers they are read with ffmpeg, which must be installed. Labels and cleaning work only on WAV.",
                 "Показывать и сжатые форматы. На компьютере они читаются через ffmpeg, его нужно установить. Чистка записи работает только с WAV."),
-            h("General", S.autosave, "Saves the labels on its own every N seconds when something changed. 0 turns it off.",
-                "Сохранять разметку самостоятельно каждые N секунд, если что-то изменилось. 0 — выключено."),
+            h("General", S.autosave, "Saves the labels automatically every N seconds when something changed. 0 turns it off.",
+                "Сохранять разметку автоматически каждые N секунд, если что-то изменилось. 0 — выключено."),
             h("General", S.fullscreen, "Phones and tablets: the status and navigation bars are hidden.", "Телефоны и планшеты: скрыть строку состояния и навигации."),
             h("General", S.avoidCutout, "Phones: nothing is drawn under the camera cutout.", "Телефоны: ничего не рисуется под вырезом камеры."),
 
@@ -962,30 +986,30 @@ internal object SettingsHelp {
             h("Interface", MenuTitles.filesPanel, "The panel with the list of files and the list of all labels.", "Панель со списком файлов и списком всех меток."),
             h("Interface", MenuTitles.detailsPanel, "The panel with details of the selection, checks and comparison.", "Панель со свойствами выбранного, проверками и сравнением."),
             h("Interface", MenuTitles.buttonLabels, "Names of the toolbar buttons under their icons.", "Названия кнопок панели инструментов под значками."),
-            h("Interface", MenuTitles.bigButtons, "Larger toolbar buttons, easier to hit with a finger or a pen.", "Кнопки панели крупнее — проще попадать пальцем или пером."),
+            h("Interface", MenuTitles.bigButtons, "Larger toolbar buttons, easier to tap with a finger or a pen.", "Кнопки панели крупнее — удобнее нажимать пальцем или пером."),
 
             h("Themes", dimT, "Off: the program behind the settings stays as bright as usual, so colours of a theme can be judged while editing it.",
-                "Выключено: программа за окном настроек не темнеет, и цвета темы видно как есть, пока вы их правите."),
+                "Выключено: программа за окном настроек не затемняется, и цвета темы видны без искажений во время правки."),
             h("Themes", crispT, "Text, corners, sliders and switches are drawn with hard pixel edges, like in old programs. Corners keep their rounding as pixel steps.",
-                "Текст, углы, ползунки и переключатели рисуются чёткими пикселями, как в старых программах. Скругления остаются, но ступеньками."),
-            h("Themes", checkboxesT, "Square boxes with a tick instead of sliding switches, and classic sliders.", "Квадратики с галочкой вместо ползунков-переключателей и классические ползунки."),
+                "Текст, углы, ползунки и переключатели рисуются чёткими пикселями, как в старых программах. Скругления передаются пиксельными ступенями."),
+            h("Themes", checkboxesT, "Square boxes with a tick instead of sliding switches, and classic sliders.", "Квадратные флажки вместо переключателей и классические ползунки."),
             h("Themes", radiusT, "How round the corners of buttons, fields and windows are; 0 = square.", "Насколько скруглены углы кнопок, полей и окон; 0 — прямые."),
             h("Themes", borderT, "Thickness of frames around buttons and fields.", "Толщина рамок вокруг кнопок и полей."),
             h("Themes", squareT, "A pressed button is filled with one colour instead of a soft highlight.", "Нажатая кнопка заливается одним цветом, а не мягкой подсветкой."),
             h("Themes", monoT, "Every letter takes the same width, as in a terminal.", "Все буквы одной ширины, как в терминале."),
             h("Themes", darkT, "Tells the system parts (scroll bars, text cursor) that the theme is dark.", "Сообщает системным элементам (полосы прокрутки, текстовый курсор), что тема тёмная."),
 
-            h("View", S.interfaceScale, "Size of everything: text, buttons, panels. Applied when the slider is let go.", "Размер всего: текста, кнопок, панелей. Применяется, когда отпускаете ползунок."),
+            h("View", S.interfaceScale, "Size of all elements: text, buttons, panels. Applied when the slider is released.", "Размер всех элементов: текста, кнопок, панелей. Применяется после отпускания ползунка."),
             h("View", scaleButtonT, "A button with the interface size in percent on the toolbar, for quick changes.", "Кнопка с размером интерфейса в процентах на панели — для быстрой смены."),
             h("View", keepZoomT, "Opening another file keeps the scale you set. Off: each file opens with the scale it had last time (or whole).",
                 "Другой файл открывается в том же масштабе. Выключено: каждый файл открывается в своём последнем масштабе (или целиком)."),
             h("View", S.overlay, "The waveform is drawn over the spectrogram and the labels over both, in one picture instead of separate lanes.",
                 "Волна рисуется поверх спектрограммы, а разметка поверх обоих — одна картинка вместо отдельных полос."),
             h("View", namesOnAudioT, "Names of the phonemes are also written over the waveform and the spectrogram, where you choose inside each phoneme.",
-                "Имена фонем пишутся ещё и поверх волны и спектрограммы — в выбранном месте каждой фонемы."),
+                "Имена фонем выводятся также поверх волны и спектрограммы — в выбранном месте каждой фонемы."),
             h("View", S.labelFontSize, "Size of the label text on the lanes; the lanes grow to fit it.", "Размер текста меток на полосах; полосы подстраиваются по высоте."),
             h("View", S.overlayWaveFillAlpha, "How solid the waveform is over the spectrogram in the overlaid view.", "Насколько плотная волна поверх спектрограммы в наложенном виде."),
-            h("View", S.overlayDim, "Darkens the spectrogram in the overlaid view so labels and the waveform stay readable.", "Затемняет спектрограмму в наложенном виде, чтобы разметку и волну было видно."),
+            h("View", S.overlayDim, "Darkens the spectrogram in the overlaid view so labels and the waveform stay readable.", "Затемняет спектрограмму в наложенном виде, чтобы разметка и волна оставались различимыми."),
             h("View", S.tiersOnTop, "Label lanes above the waveform and spectrogram instead of below.", "Полосы разметки над волной и спектрограммой, а не под ними."),
             h("View", S.waveform, "Shows the waveform lane.", "Показывать полосу волны."),
             h("View", S.spectrogram, "Shows the spectrogram lane.", "Показывать полосу спектрограммы."),
@@ -998,10 +1022,10 @@ internal object SettingsHelp {
 
             h("Spectrogram", S.brightness, "Lifts or lowers all colours of the spectrogram.", "Делает все цвета спектрограммы светлее или темнее."),
             h("Spectrogram", S.contrast, "Spreads the colours: higher makes quiet and loud parts differ more.", "Растягивает цвета: больше — сильнее различаются тихое и громкое."),
-            h("Spectrogram", S.windowMs, "Length of the piece analysed for each column. Longer: sharper harmonics, blurrier in time. Shorter: sharper in time.",
-                "Длина куска, по которому считается каждый столбец. Длиннее — чётче гармоники, но размыто по времени. Короче — чётче по времени."),
+            h("Spectrogram", S.windowMs, "Length of the audio analysed for each column. Longer: sharper harmonics, blurrier in time. Shorter: sharper in time.",
+                "Длина фрагмента, по которому рассчитывается каждый столбец. Длиннее — чётче гармоники, но ниже точность по времени. Короче — выше точность по времени."),
             h("Spectrogram", S.hopMs, "Time between columns. Smaller is sharper when zoomed in but takes longer and more memory. 0 picks it by the length of the file.",
-                "Время между столбцами. Меньше — чётче при приближении, но дольше и больше памяти. 0 — по длине файла."),
+                "Время между столбцами. Меньше — чётче при приближении, но дольше расчёт и больше памяти. 0 — по длине файла."),
             h("Spectrogram", S.bands, "How many rows of frequency the picture has. More is finer, slower.", "Сколько строк по частоте в картинке. Больше — детальнее, но медленнее."),
             h("Spectrogram", S.dbRange, "Anything quieter is drawn as the darkest colour. Lower shows more of the quiet sound and noise.",
                 "Всё тише этого рисуется самым тёмным цветом. Ниже — видно больше тихих звуков и шума."),
@@ -1015,23 +1039,23 @@ internal object SettingsHelp {
                 "При сдвиге границы все границы после неё сдвигаются на столько же. Shift переключает во время перетаскивания."),
             h("Editing", S.linked, "Boundaries at the same time on other lanes (phonemes and words) move together. Alt switches it while dragging.",
                 "Границы в то же время на других полосах (фонемы и слова) двигаются вместе. Alt переключает во время перетаскивания."),
-            h("Editing", S.loop, "Playing a part repeats it until stopped.", "Проигрывание куска повторяется, пока не остановите."),
-            h("Editing", snapZeroT, "A boundary placed or dragged by hand moves to the nearest point within 3 ms where the waveform crosses zero, so cut pieces don't click.",
-                "Граница, поставленная или сдвинутая вручную, переезжает в ближайшую точку (до 3 мс), где волна проходит через ноль, — нарезанные куски не щёлкают."),
+            h("Editing", S.loop, "Playing a part repeats it until stopped.", "Воспроизведение фрагмента повторяется до остановки."),
+            h("Editing", snapZeroT, "A boundary placed or dragged by hand moves to the nearest point within 3 ms where the waveform crosses zero, so cut segments don't click.",
+                "Граница, поставленная или сдвинутая вручную, смещается в ближайшую точку (до 3 мс), где волна проходит через ноль, — чтобы нарезанные сегменты не щёлкали."),
             h("Editing", PlayTitles.volume, "Playback volume of the program (the files don't change).", "Громкость воспроизведения в программе (файлы не меняются)."),
-            h("Editing", PlayTitles.followAt, "Where the playhead stays when the view scrolls smoothly during playback.", "Где стоит курсор воспроизведения, когда вид плавно едет за ним."),
+            h("Editing", PlayTitles.followAt, "Where the playhead stays when the view scrolls smoothly during playback.", "Где находится курсор воспроизведения, когда вид плавно прокручивается за ним."),
             h("Editing", S.speedSetting, "Slower playback with the same pitch, to hear fast phonemes.", "Замедленное воспроизведение без изменения высоты — чтобы расслышать быстрые фонемы."),
-            h("Editing", S.playOnDrag, "A short piece around the boundary plays while it is dragged.", "Во время перетаскивания границы звучит короткий кусок вокруг неё."),
+            h("Editing", S.playOnDrag, "A short part around the boundary plays while it is dragged.", "Во время перетаскивания границы воспроизводится короткий фрагмент вокруг неё."),
             h("Editing", S.otoLocked, "oto: dragging the preutterance moves all markers of the entry together. Shift switches it.",
                 "oto: перетаскивание preutterance двигает все маркеры записи вместе. Shift — наоборот."),
-            h("Editing", MouseTitles.spaceRestarts, "Space during playback starts the part again instead of stopping.", "Пробел во время воспроизведения начинает кусок заново, а не останавливает."),
+            h("Editing", MouseTitles.spaceRestarts, "Space during playback starts the part again instead of stopping.", "Пробел во время воспроизведения запускает фрагмент заново, а не останавливает его."),
             h("Editing", MouseTitles.owner, "Which phoneme Delete removes and Space plays when a boundary is selected, and which part gets the name of a new boundary.",
-                "Какую фонему удаляет Delete и играет пробел при выбранной границе, и какой части достаётся имя новой границы."),
+                "Какую фонему удаляет Delete и воспроизводит пробел при выбранной границе и какая часть получает имя новой границы."),
 
             h("Mouse", MouseTitles.wheel, "What the wheel does over the picture: scroll in time, or step through phonemes.", "Что делает колесо над картинкой: прокрутка по времени или переход по фонемам."),
             h("Mouse", MouseTitles.playIt, "After a boundary is added with the mouse, the part before it plays.", "После добавления границы мышью проигрывается часть перед ней."),
-            h("Mouse", MouseTitles.selectAfterDrag, "Pressing or moving a boundary selects its phoneme, so Space plays it right away.", "Нажатие или сдвиг границы выбирает её фонему — пробел сразу её играет."),
-            h("Mouse", MouseTitles.audioDeselects, "A click on the audio clears the selected phoneme; Space then plays from the click.", "Щелчок по звуку снимает выбор фонемы; пробел тогда играет с места щелчка."),
+            h("Mouse", MouseTitles.selectAfterDrag, "Pressing or moving a boundary selects its phoneme, so Space plays it right away.", "Нажатие или сдвиг границы выбирает её фонему — пробел сразу её воспроизводит."),
+            h("Mouse", MouseTitles.audioDeselects, "A click on the audio clears the selected phoneme; Space then plays from the click.", "Щелчок по звуку снимает выбор фонемы; пробел затем воспроизводит с места щелчка."),
             h("Mouse", MouseTitles.onLabels, "What each click does on the label lanes: select, play, rename, split…", "Что делает каждый щелчок на полосах разметки: выбрать, проиграть, переименовать, разрезать…"),
             h("Mouse", MouseTitles.onAudio, "What each click does on the waveform and spectrogram.", "Что делает каждый щелчок на волне и спектрограмме."),
 
@@ -1039,15 +1063,15 @@ internal object SettingsHelp {
             h("Checks", S.phonemeSet, "Phonemes outside this set are marked as unknown. Empty: any name is allowed. The buttons below fill it from a dictionary.",
                 "Фонемы не из этого набора отмечаются как незнакомые. Пусто — подходит любое имя. Кнопки ниже заполняют набор из словаря."),
             h("Checks", CheckTitles.maxLen, "A phoneme (not a pause) longer than this is marked. 0 = not checked.", "Фонема (не пауза) длиннее этого отмечается. 0 — не проверять."),
-            h("Checks", CheckTitles.maxPause, "A pause or an unnamed part longer than this is marked. 0 = not checked.", "Пауза или неподписанный кусок длиннее этого отмечается. 0 — не проверять."),
-            h("Checks", CheckTitles.maxPhrase, "Singing without a long enough pause for longer than this is marked: DiffSinger is trained on pieces up to about 15 s.",
-                "Пение без достаточной паузы дольше этого отмечается: DiffSinger учится на кусках примерно до 15 с."),
-            h("Checks", CheckTitles.phrasePause, "How long a pause must be to count as a place where a piece can end.", "Какой длины пауза считается местом, где может закончиться кусок."),
-            h("Checks", CheckTitles.diffsinger, "Things DiffSinger fails on: phonemes shorter than one frame, spaces inside a name, two same pauses in a row, zero length, notes not as long as the phonemes of their sentence.",
-                "То, на чём DiffSinger падает: фонемы короче кадра, пробелы в имени, две одинаковые паузы подряд, нулевая длина, ноты не той длины, что фонемы предложения."),
-            h("Checks", CheckTitles.runScripts, "Runs your own checks written as small JavaScript files after every change.", "Запускать свои проверки (маленькие файлы на JavaScript) после каждого изменения."),
+            h("Checks", CheckTitles.maxPause, "A pause or an unnamed part longer than this is marked. 0 = not checked.", "Пауза или неподписанный интервал длиннее этого отмечается. 0 — не проверять."),
+            h("Checks", CheckTitles.maxPhrase, "Singing without a long enough pause for longer than this is marked: DiffSinger is trained on segments up to about 15 s.",
+                "Пение без достаточной паузы дольше этого отмечается: DiffSinger обучается на сегментах примерно до 15 с."),
+            h("Checks", CheckTitles.phrasePause, "How long a pause must be to count as a place where a segment can end.", "Какой длины пауза считается местом, где может закончиться сегмент."),
+            h("Checks", CheckTitles.diffsinger, "Issues that make DiffSinger fail: phonemes shorter than one frame, spaces inside a name, two same pauses in a row, zero length, notes not as long as the phonemes of their sentence.",
+                "Ошибки, приводящие к сбою DiffSinger: фонемы короче кадра, пробелы в имени, две одинаковые паузы подряд, нулевая длина, ноты не той длины, что фонемы предложения."),
+            h("Checks", CheckTitles.runScripts, "Runs your own checks written as small JavaScript files after every change.", "Запускать свои проверки (небольшие файлы на JavaScript) после каждого изменения."),
 
-            h("Toolkit", S.toolkitAutoStart, "The toolkit starts by itself when a tool needs it and stops once no program uses it any more.", "Тулкит запускается сам, когда он нужен инструменту, и закрывается, когда им больше не пользуется ни одна программа."),
+            h("Toolkit", S.toolkitAutoStart, "The toolkit starts automatically when a tool needs it and stops once no program uses it any more.", "Тулкит запускается автоматически, когда он нужен инструменту, и закрывается, когда им больше не пользуется ни одна программа."),
             h("Toolkit", S.toolkitShare, "Phones and tablets in the same network can use the toolkit of this computer. A token protects it.",
                 "Телефоны и планшеты в той же сети могут пользоваться тулкитом этого компьютера. Доступ защищён токеном."),
         )

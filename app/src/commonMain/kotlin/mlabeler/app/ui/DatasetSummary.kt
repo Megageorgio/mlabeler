@@ -58,7 +58,7 @@ private val unusedT = L("Never used", "Ни разу не встретились
 private val allGood = L("All phonemes are in the dictionary and all of it is used", "Все фонемы есть в словаре, и весь словарь использован")
 private val notesT = L("Notes", "Ноты")
 private val notesHint = L("How much is sung on each note. Gaps in the range are notes the model hasn't heard.",
-    "Сколько спето на каждой ноте. Дыры в диапазоне — ноты, которых модель не слышала.")
+    "Сколько спето на каждой ноте. Пропуски в диапазоне — ноты, которых модель не слышала.")
 private val tableT = L("All phonemes", "Все фонемы")
 private val colName = L("Phoneme", "Фонема")
 private val colCount = L("Times", "Раз")

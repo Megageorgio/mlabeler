@@ -108,7 +108,7 @@ class Command(
 
 object Commands {
     val togglePlay = Command("play", S.play, listOf(Chord(Key.Spacebar))) { e, _ -> e.togglePlay() }
-    val playFrom = Command("play-from", L("Play from cursor", "Играть от курсора"), listOf(Chord(Key.Spacebar, shift = true))) { e, _ -> e.playFromCursor() }
+    val playFrom = Command("play-from", L("Play from cursor", "Воспроизвести от курсора"), listOf(Chord(Key.Spacebar, shift = true))) { e, _ -> e.playFromCursor() }
     val loop = Command("loop", S.loop, listOf(ch('L'))) { _, a -> a.update { it.copy(edit = it.edit.copy(loop = !it.edit.loop)) } }
     val ripple = Command("ripple", S.ripple, listOf(ch('R'))) { _, a -> a.update { it.copy(edit = it.edit.copy(ripple = !it.edit.ripple)) } }
     val linked = Command("linked", S.linked, listOf(ch('G'))) { _, a -> a.update { it.copy(edit = it.edit.copy(linked = !it.edit.linked)) } }
@@ -181,13 +181,13 @@ object Commands {
     val otoLock = Command("oto-lock", L("Preutterance moves all markers", "Preutterance двигает все маркеры"), listOf(ch('G'))) { _, a ->
         a.update { it.copy(edit = it.edit.copy(otoLockedDrag = !it.edit.otoLockedDrag)) }
     }.only(Mode.Oto)
-    val resynthWorld = Command("resynth-world", L("Listen with the drawn pitch (quick)", "Послушать с нарисованной высотой (быстро)"), emptyList()) { e, _ -> e.playResynth("world") }.only(Mode.Labels)
-    val resynthNsf = Command("resynth-nsf", L("Listen with the drawn pitch (DiffSinger vocoder)", "Послушать с нарисованной высотой (вокодер DiffSinger)"), emptyList()) { e, a ->
+    val resynthWorld = Command("resynth-world", L("Listen with the drawn pitch (quick)", "Прослушать с нарисованной высотой (быстро)"), emptyList()) { e, _ -> e.playResynth("world") }.only(Mode.Labels)
+    val resynthNsf = Command("resynth-nsf", L("Listen with the drawn pitch (DiffSinger vocoder)", "Прослушать с нарисованной высотой (вокодер DiffSinger)"), emptyList()) { e, a ->
         a.message(L("The vocoder is NSF-HiFiGAN by OpenVPI (CC BY-NC-SA 4.0: non-commercial use only); it is downloaded on first use.",
-            "Вокодер — NSF-HiFiGAN от OpenVPI (CC BY-NC-SA 4.0: только некоммерческое использование); скачивается при первом запуске.")())
+            "Вокодер — NSF-HiFiGAN от OpenVPI (CC BY-NC-SA 4.0: только некоммерческое использование); загружается при первом использовании.")())
         e.playResynth("nsf")
     }.only(Mode.Labels)
-    val segments = Command("segments", L("Cut into pieces…", "Нарезка на куски…"), emptyList()) { _, a -> a.showSegments = true }.only(Mode.Labels)
+    val segments = Command("segments", L("Cut into segments…", "Нарезка на сегменты…"), emptyList()) { _, a -> a.showSegments = true }.only(Mode.Labels)
     val batchRename = Command("batch-rename", L("Rename in bulk…", "Пакетное переименование…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
     val overlay = Command("overlay", S.overlayShort, listOf(ch('V'))) { _, a -> a.update { it.copy(layout = it.layout.copy(overlay = !it.layout.overlay)) } }
     val namesOnAudio = Command("names-on-audio", L("Phoneme names on the picture", "Имена фонем на картинке"), emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(namesOnAudio = !it.layout.namesOnAudio)) } }
@@ -234,7 +234,7 @@ object Commands {
     val toolPan = Command("tool-pan", L("Hand tool: dragging scrolls", "Рука: перетаскивание прокручивает"), listOf(Chord(Key.Three)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "pan")) }
     }.only(Mode.Labels)
-    val toolPlay = Command("tool-play", L("Play tool: a click plays the phoneme", "Проигрывание: клик играет фонему"), listOf(Chord(Key.Four)), { it.app.settings.edit.tools }) { _, a ->
+    val toolPlay = Command("tool-play", L("Play tool: a click plays the phoneme", "Проигрывание: клик воспроизводит фонему"), listOf(Chord(Key.Four)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "play")) }
     }.only(Mode.Labels)
     val labelsBigger = Command("labels-bigger", L("Bigger label text", "Крупнее текст меток"), listOf(Chord(Key.Equals, ctrl = true, shift = true))) { _, a ->
@@ -247,12 +247,12 @@ object Commands {
     val cleanup = Command("cleanup", L("Clean the recording…", "Чистка записи…"), listOf(ch('C', ctrl = true, shift = true))) { _, a -> a.showCleanup = true }
     val mute = Command("mute", L("Silence the selection in the recording", "Заглушить выделенное в записи"), listOf(ch('M', ctrl = true, shift = true))) { e, a ->
         val r = e.range ?: e.selectedSpan()
-        if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите кусок или фонему")())
+        if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите фрагмент или фонему")())
         else e.cleanup.silence(r)
     }
     val cutAudio = Command("cut-audio", L("Cut the selection out of the recording", "Вырезать выделенное из записи"), listOf(ch('X', ctrl = true))) { e, a ->
         val r = e.range ?: e.selectedSpan()
-        if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите кусок или фонему")())
+        if (r == null || r.second <= r.first) a.message(L("Select a part or a phoneme first", "Сначала выделите фрагмент или фонему")())
         else e.cleanup.cut(r)
     }
     val soundMode = Command("sound-mode", L("Sound editing (labels locked)", "Правка звука (метки закреплены)"), listOf(ch('E', ctrl = true, shift = true))) { e, _ ->

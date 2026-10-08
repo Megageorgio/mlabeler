@@ -35,7 +35,7 @@ object StatusItems {
         "done" to L("Files marked done (7 / 12)", "Файлы, отмеченные готовыми (7 / 12)"),
         "phoneme" to L("Selected phoneme and its length", "Выбранная фонема и её длина"),
         "cursor" to L("Time under the mouse", "Время под мышью"),
-        "range" to L("Selected part", "Выделенный кусок"),
+        "range" to L("Selected part", "Выделенный фрагмент"),
         "work" to L("Work in progress (analysis, toolkit)", "Текущая работа (анализ, тулкит)"),
         "problems" to L("Number of warnings", "Число предупреждений"),
         "help" to L("Help (F1)", "Справка (F1)"),

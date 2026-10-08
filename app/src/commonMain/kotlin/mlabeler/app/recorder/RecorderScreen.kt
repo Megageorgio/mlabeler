@@ -68,6 +68,7 @@ import mlabeler.app.ui.Field
 import mlabeler.app.ui.IconBtn
 import mlabeler.app.ui.Icons
 import mlabeler.app.ui.Overlay
+import mlabeler.app.ui.DialogContent
 import mlabeler.app.ui.SectionTitle
 import mlabeler.app.ui.formatTime
 import mlabeler.core.io.Paths
@@ -264,7 +265,7 @@ private val noVoice = L("—", "—")
 private val takeNote = L("take: {0}", "дубль: {0}")
 private val clipped = L("too loud: the take clips", "слишком громко: дубль перегружен")
 private val quiet = L("very quiet take", "очень тихий дубль")
-private val takeHint = L("Click to play from there, drag to select and play a part", "Щелчок — играть отсюда, протяжка — выделить и прослушать кусок")
+private val takeHint = L("Click to play from there, drag to select and play a part", "Щелчок — воспроизведение с этого места, перетаскивание — выделение и прослушивание фрагмента")
 
 /** Note name without cents for a MIDI value. */
 private fun noteName(midi: Double) = NoteNames.format(kotlin.math.round(midi))
@@ -587,7 +588,10 @@ private fun ListEditor(rec: RecorderState, onClose: () -> Unit) {
     val c = T.c
     var text by remember { mutableStateOf(rec.listText()) }
     Overlay(onClose, 560) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(S.cancel()) { onClose() }
+            Btn(S.save(), primary = true) { rec.saveList(text); onClose() }
+        }) {
             Text(editList(), color = c.text, fontSize = 17.sp)
             Text(emptyList(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
             BasicTextField(
@@ -596,10 +600,6 @@ private fun ListEditor(rec: RecorderState, onClose: () -> Unit) {
                     .background(c.bg).border(c.borderWidth, c.border, RoundedCornerShape(c.radius)).padding(10.dp)
                     .verticalScroll(rememberScrollState()),
             )
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn(S.cancel()) { onClose() }
-                Btn(S.save(), primary = true) { rec.saveList(text); onClose() }
-            }
         }
     }
 }
@@ -609,7 +609,9 @@ private fun RecSettings(rec: RecorderState, onClose: () -> Unit) {
     val c = T.c
     val s = rec.settings
     Overlay(onClose, 480) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+                Btn(S.close()) { onClose() }
+        }) {
             Text(S.settings(), color = c.text, fontSize = 17.sp)
             SectionTitle(clickBpm())
             var bpm by remember { mutableStateOf(s.bpm.toString()) }
@@ -641,7 +643,6 @@ private fun RecSettings(rec: RecorderState, onClose: () -> Unit) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (r in listOf(44100, 48000)) Chip(r.toString(), s.sampleRate == r) { rec.updateSettings { st -> st.copy(sampleRate = r) } }
             }
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) { Btn(S.close()) { onClose() } }
         }
     }
 }

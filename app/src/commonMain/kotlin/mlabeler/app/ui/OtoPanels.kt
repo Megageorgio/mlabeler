@@ -251,7 +251,7 @@ private fun OtoCompareSection(ed: EditorState) {
 
 private val otoLockT = mlabeler.app.i18n.L("Preutterance moves all markers", "Preutterance двигает все маркеры")
 private val otoLockHint = mlabeler.app.i18n.L("Off: dragging the red line moves only it. Shift while dragging does the opposite of this switch.",
-    "Выключено — красная линия двигается одна. Shift во время перетаскивания делает наоборот.")
+    "Выключено: перетаскивание красной линии сдвигает только её. Shift во время перетаскивания меняет это поведение на противоположное.")
 
 private val pitchFolders = mlabeler.app.i18n.L("Folders (pitches, appends)", "Папки (высоты, аппенды)")
 

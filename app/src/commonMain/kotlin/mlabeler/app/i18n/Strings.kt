@@ -33,7 +33,7 @@ object S {
     // start
     val openFolder = L("Open folder", "Открыть папку")
     val openFolderHint = L("Pick any recording in the folder: the whole folder opens, labels next to the recordings are found automatically.",
-        "Выберите любую запись в папке: откроется вся папка, разметка рядом с записями найдётся сама.")
+        "Выберите любую запись в папке: откроется вся папка, разметка рядом с записями будет найдена автоматически.")
     val recent = L("Recent", "Недавние")
     val noRecent = L("Folders you open appear here.", "Здесь появятся открытые папки.")
     val removeFromList = L("Remove from list", "Убрать из списка")
@@ -185,14 +185,14 @@ object S {
     val toolkitCheck = L("Check", "Проверить")
     val toolkitOk = L("Toolkit answers", "Тулкит отвечает")
     val toolkitHint = L("Autolabel and the aligner in auto-oto use mVocalToolkit. On a computer mLabeler installs and starts it by itself; a phone connects to a computer where it runs.",
-        "Авторазметка и выравниватель в авто-ото работают через mVocalToolkit. На компьютере mLabeler сам его установит и запустит; телефон подключается к компьютеру, где он работает.")
+        "Авторазметка и выравниватель в авто-ото работают через mVocalToolkit. На компьютере mLabeler устанавливает и запускает его автоматически; телефон подключается к компьютеру, на котором он работает.")
     val toolkitAutoStart = L("Start it when needed (and stop when unused)", "Запускать, когда нужен (и закрывать, когда не нужен)")
     val toolkitShare = L("Let phones connect (local network)", "Разрешить подключение с телефона (локальная сеть)")
     val toolkitShareHint = L("On the phone: Settings → Autolabel, enter one of these addresses and the token.",
         "На телефоне: Настройки → Авторазметка, введите один из этих адресов и токен.")
     val toolkitShareOwn = L("The running toolkit wasn't started here; restart it from here to open it to the network.",
         "Работающий тулкит запущен не отсюда; перезапустите его отсюда, чтобы открыть доступ по сети.")
-    val toolkitMvtPath = L("The mvt command (empty = find it)", "Команда mvt (пусто — найти самому)")
+    val toolkitMvtPath = L("The mvt command (empty = find it)", "Команда mvt (пусто — найти автоматически)")
     val toolkitSource = L("Install from (URL or folder)", "Устанавливать из (ссылка или папка)")
     val toolkitReinstall = L("Install / update", "Установить / обновить")
     val reloaded = L("Labels changed in another program and were reloaded", "Разметка изменилась в другой программе и перечитана")
@@ -203,7 +203,7 @@ object S {
     val overlay = L("Overlaid view: waveform, spectrogram and labels in one picture", "Наложенный вид: волна, спектрограмма и разметка в одной картинке")
     val overlayShort = L("Overlaid / separate lanes", "Наложить / разнести полосы")
     val tiersOnTop = L("Labels above the audio", "Разметка над звуком")
-    val nothingToDo = L("Nothing to do", "Делать нечего")
+    val nothingToDo = L("Nothing to do", "Нечего обрабатывать")
     val autoOtoDone = L("{0} entries for {1} files; {2} skipped", "записей: {0} для файлов: {1}; пропущено: {2}")
     val pluginDone = L("Done", "Готово")
     val pluginsTitle = L("Plugins", "Плагины")
@@ -213,7 +213,7 @@ object S {
     val dbRange = L("Quietest shown, dB", "Самое тихое, дБ")
     val dbTop = L("Loudest, dB", "Самое громкое, дБ")
     val themeCopy = L("Copy to a file to edit", "Скопировать в файл для правки")
-    val themeCopied = L("Theme saved to {0}. Change the colours there and press Reload.", "Тема сохранена в {0}. Поменяйте там цвета и нажмите «Перечитать».")
+    val themeCopied = L("Theme saved to {0}. Change the colours there and press Reload.", "Тема сохранена в {0}. Измените в ней цвета и нажмите «Перечитать».")
     val themeReload = L("Reload theme files", "Перечитать файлы тем")
     val pitchNotReady = L("Pitch is still being analysed", "Высота тона ещё считается")
     val note = L("Note", "Нота")
@@ -249,7 +249,7 @@ object S {
     val toolbarHint = L("Button groups on the toolbar and their order:", "Группы кнопок на панели и их порядок:")
     val autolabelCompareDone = L("Done: the result is under your labels. Keep it or remove it with the buttons above the picture.",
         "Готово: результат — под вашей разметкой. Принять или убрать — кнопками над картинкой.")
-    val otherAudio = L("Also list mp3, flac, ogg and other audio (WAV only otherwise)", "Показывать и mp3, flac, ogg и другой звук (иначе только WAV)")
+    val otherAudio = L("Also list mp3, flac, ogg and other audio (WAV only otherwise)", "Показывать также mp3, flac, ogg и другие аудиоформаты (иначе только WAV)")
     val environment = L("Work environment", "Рабочая среда")
     val environments = L("Work environments", "Рабочие среды")
     val environmentChanged = L("changed", "изменена")
@@ -260,7 +260,7 @@ object S {
         "Рабочая среда — это набор панелей, полос, кнопок, строк меню и статуса и переключатель инструментов мыши. Настройте всё под себя и сохраните как свою; файлы сред можно передавать другим.")
     val environmentsFolder = L("Open the environments folder", "Открыть папку сред")
     val environmentUpdate = L("Save changes to \"{0}\"", "Сохранить изменения в «{0}»")
-    val reset = L("Reset", "Вернуть как было")
+    val reset = L("Reset", "Сбросить")
     val chooseEnvironment = L("Choose a work environment", "Выберите рабочую среду")
     val chooseEnvironmentHint = L("It can be changed later in View → Work environment.", "Её можно сменить потом: Вид → Рабочая среда.")
     val overlayWaveFill = L("Filled waveform in the overlaid view", "Закрашенная волна в наложенном виде")
@@ -269,7 +269,7 @@ object S {
     val resetPage = L("Reset this page to defaults", "Сбросить эту страницу по умолчанию")
     val audioReloaded = L("The recording changed on disk and was read again; labels kept", "Запись изменилась на диске и перечитана, разметка сохранена")
     val labelFontSize = L("Label text size (Ctrl+Shift+= / −)", "Размер текста меток (Ctrl+Shift+= / −)")
-    val toolkitAutoUpdate = L("Update it by itself when a new version is out (checked before it starts)",
-        "Обновлять самому, когда выходит новая версия (проверяется перед запуском)")
+    val toolkitAutoUpdate = L("Update automatically when a new version is available (checked at startup)",
+        "Обновлять автоматически при выходе новой версии (проверка при запуске)")
     val toolkitCheckUpdate = L("Update now", "Обновить сейчас")
 }

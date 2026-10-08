@@ -23,8 +23,8 @@ internal object UpdateTitles {
     val stable = L("Stable", "Стабильные")
     val beta = L("Beta", "Бета")
     val alpha = L("Alpha", "Альфа")
-    val channelHint = L("Stable: tested releases. Beta: new features a little earlier, mostly ready. Alpha: the newest work, may have rough edges. Beta and alpha also get stable releases when those are newer.",
-        "Стабильные — проверенные выпуски. Бета — новое чуть раньше, почти готово. Альфа — самое свежее, возможны шероховатости. Бета и альфа тоже получают стабильный выпуск, если он новее.")
+    val channelHint = L("Stable: tested releases. Beta: new features earlier, mostly finished. Alpha: the newest development builds, may be less stable. Beta and alpha also receive a stable release if it is newer.",
+        "Стабильные — проверенные выпуски. Бета — новые функции раньше, в основном доработанные. Альфа — новейшие сборки в разработке, возможна меньшая стабильность. Бета и альфа также получают стабильный выпуск, если он новее.")
     val checkOnStart = L("Check for a new version at start", "Проверять новую версию при запуске")
     val checkNow = L("Check now", "Проверить сейчас")
     val checking = L("Checking…", "Проверка…")

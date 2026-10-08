@@ -87,7 +87,24 @@ fun BatchRenameDialog(app: AppState) {
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
     androidx.compose.runtime.LaunchedEffect(Unit) { focus.requestFocus() }
     Overlay({ close() }, 560) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(mlabeler.app.i18n.S.cancel()) { close() }
+            Btn(apply(), primary = true, enabled = fn != null && changes.isNotEmpty()) {
+                val f = fn ?: return@Btn
+                when {
+                    oto && everywhere -> app.message(renamed.format(ed.oto.renameEverywhere(f)))
+                    oto -> app.message(renamed.format(ed.oto.renameAll(ed.oto.entries.indices.toList(), f)))
+                    everywhere -> ed.renameEverywhere(tierName, f).let { (files, n) -> app.message(renamedFiles.format(n, files)) }
+                    else -> {
+                        val k = ed.activeTier
+                        val t = ed.doc?.tiers?.getOrNull(k) as? IntervalTier
+                        if (t != null) ed.updateDoc { d -> Edits.setTexts(d, (0 until t.size).map { IntervalRef(k, it) }, f) }
+                        app.message(renamed.format(changes.size))
+                    }
+                }
+                close()
+            }
+        }) {
             Text(title(), color = c.text, fontSize = 17.sp)
             androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for ((k, t) in listOf(modePattern, modeExact, modeSuffix, modePrefix).withIndex()) Chip(t(), mode == k) { mode = k }
@@ -124,24 +141,6 @@ fun BatchRenameDialog(app: AppState) {
             for ((a, b) in changes.take(8)) Text("$a → $b", color = c.text, fontSize = 12.sp, maxLines = 1, modifier = Modifier.padding(start = 8.dp, top = 2.dp))
             if (changes.size > 8) Text("…", color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
             if (everywhere && !oto) Text(allNote(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn(mlabeler.app.i18n.S.cancel()) { close() }
-                Btn(apply(), primary = true, enabled = fn != null && changes.isNotEmpty()) {
-                    val f = fn ?: return@Btn
-                    when {
-                        oto && everywhere -> app.message(renamed.format(ed.oto.renameEverywhere(f)))
-                        oto -> app.message(renamed.format(ed.oto.renameAll(ed.oto.entries.indices.toList(), f)))
-                        everywhere -> ed.renameEverywhere(tierName, f).let { (files, n) -> app.message(renamedFiles.format(n, files)) }
-                        else -> {
-                            val k = ed.activeTier
-                            val t = ed.doc?.tiers?.getOrNull(k) as? IntervalTier
-                            if (t != null) ed.updateDoc { d -> Edits.setTexts(d, (0 until t.size).map { IntervalRef(k, it) }, f) }
-                            app.message(renamed.format(changes.size))
-                        }
-                    }
-                    close()
-                }
-            }
         }
     }
 }

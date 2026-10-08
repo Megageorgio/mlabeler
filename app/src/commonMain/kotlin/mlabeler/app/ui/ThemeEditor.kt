@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.sp
@@ -45,7 +46,7 @@ import kotlin.math.min
 private val themesT = L("Themes", "Темы")
 private val makeCopy = L("Make an editable copy", "Сделать копию для правки")
 private val builtInNote = L("Built-in themes can't be changed; make a copy and change anything in it.",
-    "Встроенные темы не меняются: сделайте копию и меняйте в ней что угодно.")
+    "Встроенные темы изменить нельзя: создайте копию и измените её.")
 private val nameT = L("Name", "Название")
 internal val darkT = L("Dark theme (for system parts like scroll bars)", "Тёмная тема (для системных элементов)")
 internal val radiusT = L("Corner rounding", "Скругление углов")
@@ -53,7 +54,7 @@ internal val borderT = L("Border width", "Толщина рамок")
 internal val squareT = L("Flat pressed buttons", "Плоские нажатые кнопки")
 private val pipetteT = L("Take a colour from the screen (Esc cancels)", "Взять цвет с экрана (Esc — отмена)")
 internal val monoT = L("Monospace font", "Моноширинный шрифт")
-internal val checkboxesT = L("Check boxes instead of switches", "Галочки вместо переключателей")
+internal val checkboxesT = L("Check boxes instead of switches", "Флажки вместо переключателей")
 internal val dimT = L("Darken the program behind the settings", "Затемнять программу за окном настроек")
 private val deleteT = L("Delete theme", "Удалить тему")
 private val boundsT = L("Boundaries over the audio", "Границы поверх звука")
@@ -238,12 +239,27 @@ fun ColorRow(title: String, color: Color, onRemove: (() -> Unit)? = null, onChan
             if (onRemove != null) IconBtn(Icons.close, S.removeFromList(), size = 26.dp) { onRemove() }
         }
         if (open) {
-            val hsv = remember(color) { toHsv(color) }
+            // the sliders keep their own values: moving one never moves another, even where a colour has no hue
+            // (grey) or no saturation (black); only a change from outside (typed, picked) resets them
+            var hsv by remember { mutableStateOf(toHsv(color)) }
+            var sent by remember { mutableStateOf<Int?>(null) }
+            LaunchedEffect(color) {
+                if (sent != color.toArgb()) {
+                    val n = toHsv(color)
+                    hsv = floatArrayOf(if (n[1] == 0f || n[2] == 0f) hsv[0] else n[0], if (n[2] == 0f) hsv[1] else n[1], n[2])
+                }
+            }
+            fun set(h: Float, sat: Float, v: Float, a: Float = color.alpha) {
+                hsv = floatArrayOf(h, sat, v)
+                val col = Color.hsv(h.coerceIn(0f, 359.9f), sat.coerceIn(0f, 1f), v.coerceIn(0f, 1f), a)
+                sent = col.toArgb()
+                onChange(col)
+            }
             Column(Modifier.padding(start = 38.dp)) {
-                ValueSlider(L("Hue", "Оттенок")(), hsv[0], 0f..360f, "°") { onChange(Color.hsv(it.coerceIn(0f, 359.9f), hsv[1], hsv[2], color.alpha)) }
-                ValueSlider(L("Saturation", "Насыщенность")(), hsv[1], 0f..1f, "%", factor = 100f) { onChange(Color.hsv(hsv[0], it, hsv[2], color.alpha)) }
-                ValueSlider(L("Brightness", "Яркость")(), hsv[2], 0f..1f, "%", factor = 100f) { onChange(Color.hsv(hsv[0], hsv[1], it, color.alpha)) }
-                ValueSlider(L("Opacity", "Непрозрачность")(), color.alpha, 0f..1f, "%", factor = 100f) { onChange(color.copy(alpha = it)) }
+                ValueSlider(L("Hue", "Оттенок")(), hsv[0], 0f..360f, "°") { set(it, hsv[1], hsv[2]) }
+                ValueSlider(L("Saturation", "Насыщенность")(), hsv[1], 0f..1f, "%", factor = 100f) { set(hsv[0], it, hsv[2]) }
+                ValueSlider(L("Brightness", "Яркость")(), hsv[2], 0f..1f, "%", factor = 100f) { set(hsv[0], hsv[1], it) }
+                ValueSlider(L("Opacity", "Непрозрачность")(), color.alpha, 0f..1f, "%", factor = 100f) { set(hsv[0], hsv[1], hsv[2], it) }
             }
         }
     }
@@ -266,7 +282,7 @@ private fun toHsv(c: Color): FloatArray {
 
 internal val crispT = L("No smoothing (hard pixel edges)", "Без сглаживания (чёткие пиксели)")
 private val crispNote = L("Corners keep their rounding but are drawn as pixel steps; text, sliders and switches without smoothing, as in old programs. On Android text stays smoothed.",
-    "Скругления остаются, но рисуются ступеньками пикселей; текст, ползунки и переключатели без сглаживания, как в старых программах. На Android текст останется сглаженным.")
+    "Скругления сохраняются, но рисуются пиксельными ступенями; текст, ползунки и переключатели без сглаживания, как в старых программах. На Android текст остаётся сглаженным.")
 private val fontT = L("Interface font", "Шрифт интерфейса")
 private val fontTheme = L("As in the theme", "Как в теме")
 private val fontSearch = L("Find a font", "Найти шрифт")

@@ -23,25 +23,26 @@ import mlabeler.app.theme.T
 internal object SoundTitles {
     val title = L("Sound editing", "Правка звука")
     val about = L("Labels are locked: dragging selects parts of the sound, nothing moves the boundaries. Changes of the recording are undone with Ctrl+Z.",
-        "Метки закреплены: перетаскивание выделяет куски звука, границы не сдвигаются. Изменения записи отменяются через Ctrl+Z.")
+        "Метки закреплены: перетаскивание выделяет фрагменты звука, границы не сдвигаются. Изменения записи отменяются через Ctrl+Z.")
     val showLabels = L("Show the boundaries over the sound", "Показывать границы поверх звука")
     val style = L("Boundaries in this mode", "Границы в этом режиме")
     val dash = L("Dashed", "Пунктир")
     val dot = L("Dotted", "Точки")
     val solid = L("Line", "Линия")
-    val phrases = L("Mark the parts between pauses", "Отмечать куски между паузами")
+    val phrases = L("Mark the parts between pauses", "Отмечать сегменты между паузами")
     val leave = L("Back to labelling", "Вернуться к разметке")
-    val locked = L("Labels are locked while editing the sound", "Пока правится звук, метки закреплены")
+    val locked = L("Labels are locked while editing the sound", "Во время правки звука метки закреплены")
 }
 
 /** The panel of sound editing mode: how labels look in it, and every tool that changes the recording. */
 @Composable
-fun SoundPanel(app: AppState, ed: EditorState, modifier: Modifier) {
+fun SoundPanel(app: AppState, ed: EditorState, modifier: Modifier, titled: Boolean = true) {
     val c = T.c
     val l = app.settings.layout
     Column(modifier.background(c.panel).verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(SoundTitles.title(), color = c.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+            // in a tab the tab already names it
+            Text(if (titled) SoundTitles.title() else "", color = c.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
             Tip(SoundTitles.about()) { Text("?", color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 6.dp)) }
             IconBtn(Icons.close, SoundTitles.leave(), size = 28.dp) { ed.soundMode = false }
         }

@@ -48,8 +48,8 @@ data class RecorderSettings(
 
 private val savedTake = L("Saved {0}", "Сохранено: {0}")
 private val noMic = L("No access to the microphone", "Нет доступа к микрофону")
-private val trimmed = L("Only the selected part is kept; the previous take is in .mlabeler/takes", "Оставлен только выделенный кусок; прошлый дубль — в .mlabeler/takes")
-private val cutDone = L("The selected part is cut out; the previous take is in .mlabeler/takes", "Выделенный кусок вырезан; прошлый дубль — в .mlabeler/takes")
+private val trimmed = L("Only the selected part is kept; the previous take is in .mlabeler/takes", "Оставлен только выделенный фрагмент; прежний дубль — в .mlabeler/takes")
+private val cutDone = L("The selected part is cut out; the previous take is in .mlabeler/takes", "Выделенный фрагмент вырезан; прежний дубль — в .mlabeler/takes")
 private val micError = L("Recording failed: {0}", "Не удалось записать: {0}")
 
 /** Recording samples from a list (reclist) into a folder, one WAV per line. */

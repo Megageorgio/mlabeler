@@ -57,9 +57,9 @@ enum class Mode { Labels, Oto }
 private val dropAdded = L("Added to the folder {1}: {0}", "Добавлено в папку {1}: {0}")
 private val dropNoAudio = L("Only recordings can be added here", "Сюда можно добавить только записи")
 private val dropOtherAudio = L("Turn on other audio formats in Settings → General to add these", "Чтобы добавить такие файлы, включите другие форматы в Настройках → Общие")
-private val removedInRange = L("Boundaries removed in the selected part: {0}", "Убрано границ в выделенном куске: {0}")
+private val removedInRange = L("Boundaries removed in the selected part: {0}", "Удалено границ в выделенном фрагменте: {0}")
 private val queueEmpty = L("Type the phonemes first", "Сначала впишите фонемы")
-private val queueNoPlace = L("Select a part or a phoneme to fill", "Выделите кусок или фонему, которую заполнить")
+private val queueNoPlace = L("Select a part or a phoneme to fill", "Выделите фрагмент или фонему для заполнения")
 private val grouped = L("Phonemes are grouped into notes (the words tier)", "Фонемы сгруппированы по нотам (слой words)")
 
 class EditorState(
@@ -260,7 +260,7 @@ class EditorState(
         viewWidthPx = px
         if (needsFit && audio != null) {
             needsFit = false
-            fitAll()
+            if (fitLimit < Double.MAX_VALUE) fitStart() else fitAll()
         } else {
             clampView()
         }
@@ -991,9 +991,14 @@ class EditorState(
         rememberView()
         stop()
         val sel = selection
+        // the view stays exactly where it was (a cut or a fade must not jump to the whole file)
+        val view = viewStart to pixelsPerSecond
         load(it)
         pendingSelection = sel
+        pendingView = view
     }
+
+    private var pendingView: Pair<Double, Double>? = null
 
     private var pendingSelection: Selection? = null
     private var lastLoadedPath = ""
@@ -1063,8 +1068,9 @@ class EditorState(
                 pixelsPerSecond = st.pixelsPerSecond
                 viewStart = st.viewStart
             } else {
-                fitAll()
+                fitStart()
             }
+            pendingView?.let { (start, pps) -> pendingView = null; pixelsPerSecond = pps; viewStart = start; clampView() }
             activeTier = doc?.phonemeTierIndex() ?: 0
             pendingRange?.let { (a0, b0) -> pendingRange = null; range = a0 to b0; reveal(a0, b0) }
             pendingInterval?.let { (tierName, i) ->
@@ -1794,10 +1800,29 @@ class EditorState(
         val d = duration
         if (d <= 0 || viewWidthPx <= 1f) {
             needsFit = true
+            fitLimit = Double.MAX_VALUE
             return
         }
         pixelsPerSecond = viewWidthPx / d
         viewStart = 0.0
+    }
+
+    /** First look at a file: all of it when short, otherwise its beginning ([FIRST_VIEW_SECONDS]); zooming out shows the rest. */
+    private fun fitStart() {
+        val d = duration
+        if (d <= 0 || viewWidthPx <= 1f) {
+            needsFit = true
+            fitLimit = FIRST_VIEW_SECONDS
+            return
+        }
+        pixelsPerSecond = viewWidthPx / min(d, FIRST_VIEW_SECONDS)
+        viewStart = 0.0
+    }
+    private var fitLimit = Double.MAX_VALUE
+
+    companion object {
+        /** How much of a long recording the first look shows, seconds. */
+        const val FIRST_VIEW_SECONDS = 20.0
     }
 
     fun zoom(factor: Double, anchorTime: Double = viewStart + visibleDuration / 2) {

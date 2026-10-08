@@ -30,7 +30,7 @@ object Environments {
     private val builtIn = listOf(
         BuiltIn(
             "basic", L("Basic", "Базовая"),
-            L("Big named buttons for the main things.", "Крупные подписанные кнопки для основного."),
+            L("Large labelled buttons for the main actions.", "Крупные подписанные кнопки для основных действий."),
         ) {
             Environment("basic", LayoutSettings(showInspector = false), ToolbarSettings(ToolbarGroups.simple, labels = true, big = true), tools = false)
         },

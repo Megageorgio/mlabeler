@@ -218,10 +218,10 @@ private fun ago(ms: Long): String {
 }
 
 private val searchHint = L("Search by name or phonemes", "Поиск по имени или фонемам")
-private val queueTitle = L("Phonemes in advance", "Фонемы наперёд")
+private val queueTitle = L("Phonemes in advance", "Фонемы заранее")
 private val queueHint = L("e.g. SP k a sh i SP", "например: SP k a sh i SP")
 private val queueHelp = L("Type the phonemes, then each new boundary names its part with the next one.",
-    "Впишите фонемы — каждая новая граница подпишет свой кусок следующей из них.")
+    "Впишите фонемы — каждая новая граница подпишет свою часть следующей из них.")
 private val queueNext = L("Next: {0} ({1} left)", "Следующая: {0} (осталось {1})")
 private val queueFill = L("Spread over the selection", "Расставить по выделенному")
 
@@ -509,7 +509,7 @@ private val compareHint = mlabeler.app.i18n.L(
     "Show labels of the same files from another folder (another model, another person) under these, with the differences marked.",
     "Показать разметку тех же файлов из другой папки (другая модель, другой человек) под этой и отметить различия.")
 private val addFolder = mlabeler.app.i18n.L("Add folder…", "Добавить папку…")
-private val useThese = mlabeler.app.i18n.L("Use these labels", "Взять эту разметку")
+private val useThese = mlabeler.app.i18n.L("Use these labels", "Использовать эту разметку")
 private val showRef = mlabeler.app.i18n.L("Show under the labels", "Показать под разметкой")
 private val hideRef = mlabeler.app.i18n.L("Hide (stays in this list)", "Скрыть (останется в этом списке)")
 private val noMatch = mlabeler.app.i18n.L("no labels for this file", "для этого файла разметки нет")

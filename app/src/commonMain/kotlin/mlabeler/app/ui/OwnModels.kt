@@ -33,7 +33,7 @@ import mlabeler.app.toolkit.ToolkitClient
 private val title = L("Your own models", "Свои модели")
 private val hint = L(
     "A model you trained or downloaded, without publishing it anywhere. Pick its checkpoint (.pt, .ckpt): the config, phoneme list and language list next to it are taken too. A folder or an archive works as well. The file has to be on the computer where the toolkit runs.",
-    "Модель, которую вы обучили или скачали, — без публикации. Выберите её чекпоинт (.pt, .ckpt): конфиг, список фонем и языков рядом с ним возьмутся тоже. Подойдёт и папка или архив. Файл должен лежать на компьютере, где работает тулкит.",
+    "Модель, которую вы обучили или скачали, — без публикации. Выберите её чекпоинт (.pt, .ckpt): конфиг, список фонем и список языков рядом с ним также будут добавлены. Поддерживаются также папка или архив. Файл должен находиться на компьютере, где работает тулкит.",
 )
 private val pathT = L("Checkpoint, folder or archive", "Чекпоинт, папка или архив")
 private val fileBtn = L("File…", "Файл…")
@@ -46,8 +46,8 @@ private val langT = L("Language", "Язык")
 private val langHint = L("code, e.g. ru", "код, например ru")
 private val nameT = L("Name in the list", "Название в списке")
 private val addBtn = L("Add the model", "Добавить модель")
-private val adding = L("Adding… (the checkpoint is copied)", "Добавляю… (чекпоинт копируется)")
-private val added = L("Added: {0}. It is in the Autolabel window under its language.", "Добавлено: {0}. Модель есть в окне авторазметки у своего языка.")
+private val adding = L("Adding… (the checkpoint is copied)", "Добавление… (чекпоинт копируется)")
+private val added = L("Added: {0}. It is in the Autolabel window under its language.", "Добавлено: {0}. Модель доступна в окне авторазметки в разделе своего языка.")
 private val yours = L("Added before", "Добавленные раньше")
 private val removeBtn = L("Remove", "Удалить")
 private val notReady = L("The toolkit has to be running to add models.", "Чтобы добавлять модели, тулкит должен быть запущен.")

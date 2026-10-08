@@ -53,7 +53,7 @@ private val builtIn = L("Built in (loudness and voicing) — recommended", "Вс
 private val aligner = L("Aligner model from the toolkit (slower)", "Модель выравнивания из тулкита (медленнее)")
 private val methodAbout = L(
     "The built-in way is usually better and takes seconds. Aligner models learned on sung phrases, not on single syllables with silence around them: they place consonant starts less exactly, need the syllables turned into their own phonemes (which fails for some banks) and load a large model first.",
-    "Встроенный способ обычно точнее и работает за секунды. Модели выравнивания обучены на пропетых фразах, а не на отдельных слогах с тишиной вокруг: начало согласной они ставят менее точно, слоги надо переводить в их фонемы (для части банков это не выходит), и сначала грузится большая модель.")
+    "Встроенный способ обычно точнее и работает за секунды. Модели выравнивания обучены на пропетых фразах, а не на отдельных слогах с тишиной вокруг: они менее точно ставят начало согласной, требуют перевода слогов в фонемы (для некоторых банков это невозможно) и сначала загружают большую модель.")
 private val preview = L("This file: {0}", "Этот файл: {0}")
 private val start = L("Make entries", "Сделать записи")
 
@@ -76,7 +76,14 @@ fun AutoOtoDialog(app: AppState) {
     val loaded = rememberToolkitModels(app, "align", enabled = useAligner)
     LaunchedEffect(loaded) { langs = loaded.first; error = loaded.second }
     Overlay({ close() }, 620) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(S.cancel()) { close() }
+            Btn(start(), primary = true, enabled = !useAligner || model.isNotEmpty()) {
+                val settings = AutoOtoSettings(style = style, bpm = bpm.replace(',', '.').toDoubleOrNull() ?: 0.0, leftMarginMs = left.toDouble(), fixedMs = fixed.toDouble())
+                ed.oto.autoOto(scope, settings, replace, if (useAligner) model else null, lang.takeIf { it.isNotEmpty() && it != "*" })
+                close()
+            }
+        }) {
             Text(title(), color = c.text, fontSize = 17.sp)
             Text(hint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
             ed.item?.let { Text(preview.format(Syllables.fromName(Paths.stem(it.audioPath)).joinToString(" ") { s -> s.text }), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) }
@@ -120,14 +127,6 @@ fun AutoOtoDialog(app: AppState) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(replaceT(), replace) { replace = true }
                 Chip(keep(), !replace) { replace = false }
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn(S.cancel()) { close() }
-                Btn(start(), primary = true, enabled = !useAligner || model.isNotEmpty()) {
-                    val settings = AutoOtoSettings(style = style, bpm = bpm.replace(',', '.').toDoubleOrNull() ?: 0.0, leftMarginMs = left.toDouble(), fixedMs = fixed.toDouble())
-                    ed.oto.autoOto(scope, settings, replace, if (useAligner) model else null, lang.takeIf { it.isNotEmpty() && it != "*" })
-                    close()
-                }
             }
         }
     }

@@ -34,19 +34,19 @@ import mlabeler.core.audio.Wav
 import kotlin.math.roundToInt
 
 private val title = L("Check the recordings", "Проверка звука")
-private val about = L("Looks for what spoils training: clipping, too quiet takes, noise in the pauses, an offset of the zero line, long silence at the ends, a different sample rate, stereo. Nothing is changed.",
-    "Ищет то, что портит обучение: перегруз, слишком тихие дубли, шум в паузах, смещение нуля, длинную тишину по краям, другую частоту дискретизации, стерео. Ничего не меняет.")
+private val about = L("Looks for issues that degrade training: clipping, too quiet takes, noise in the pauses, an offset of the zero line, long silence at the ends, a different sample rate, stereo. Nothing is changed.",
+    "Ищет то, что ухудшает обучение: перегрузку, слишком тихие дубли, шум в паузах, смещение нуля, длинную тишину по краям, другую частоту дискретизации, стерео. Ничего не меняет.")
 private val checking = L("Checking {0} of {1}…", "Проверка: {0} из {1}…")
 private val allClean = L("Nothing found in {0} recordings", "В {0} записях ничего не найдено")
-private val found = L("Found something in {0} of {1} recordings. Click to open the place.", "Есть замечания в {0} из {1} записей. Нажмите, чтобы открыть место.")
-private val clipping = L("clipping ×{0}", "перегруз ×{0}")
+private val found = L("Issues found in {0} of {1} recordings. Click to go to the location.", "Замечания найдены в {0} из {1} записей. Нажмите, чтобы перейти к месту.")
+private val clipping = L("clipping ×{0}", "перегрузка ×{0}")
 private val quiet = L("quiet: peak {0} dB", "тихо: пик {0} дБ")
 private val noisy = L("noise in pauses {0} dB", "шум в паузах {0} дБ")
 private val dc = L("zero line offset", "смещение нуля")
 private val silenceStart = L("silence at the start {0}", "тишина в начале {0}")
 private val silenceEnd = L("silence at the end {0}", "тишина в конце {0}")
 private val otherRate = L("{0} Hz (most are {1} Hz)", "{0} Гц (у большинства {1} Гц)")
-private val lowRate = L("{0} Hz: low for singing", "{0} Гц: мало для пения")
+private val lowRate = L("{0} Hz: low for singing", "{0} Гц: недостаточно для пения")
 private val stereo = L("stereo", "стерео")
 private val unreadable = L("can't be read: {0}", "не читается: {0}")
 private val again = L("Check again", "Проверить снова")
@@ -77,7 +77,9 @@ fun SoundCheckDialog(app: AppState, ed: EditorState) {
         }
     }
     Overlay({ close() }, 720) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(again()) { run++ }
+        }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title(), color = c.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
                 IconBtn(Icons.close, S.close()) { close() }
@@ -86,7 +88,7 @@ fun SoundCheckDialog(app: AppState, ed: EditorState) {
             val list = rows
             if (list == null) {
                 Text(checking.format(progress, items.size), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp))
-                return@Column
+                return@DialogContent
             }
             val usual = list.filter { it.rate > 0 }.groupingBy { it.rate }.eachCount().maxByOrNull { it.value }?.key ?: 0
             fun notes(r: Row1): List<Pair<String, Double>> = buildList {
@@ -119,7 +121,6 @@ fun SoundCheckDialog(app: AppState, ed: EditorState) {
                     }
                 }
             }
-            Row(Modifier.padding(top = 12.dp)) { Btn(again()) { run++ } }
         }
     }
 }

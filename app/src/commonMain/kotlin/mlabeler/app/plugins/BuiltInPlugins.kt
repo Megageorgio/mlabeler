@@ -37,7 +37,7 @@ report = n + ' replaced';
         PluginInfo(
             "shift-labels", "Shift all labels", "Сдвинуть всю разметку",
             "Moves every boundary of every tier by the same amount.", "Сдвигает все границы всех слоёв на одну величину.",
-            parameters = listOf(p("ms", "float", "Shift, ms (negative = earlier)", "Сдвиг, мс (минус — раньше)", 10.0)),
+            parameters = listOf(p("ms", "float", "Shift, ms (negative = earlier)", "Сдвиг, мс (отрицательное значение — раньше)", 10.0)),
         ) to """
 var d = params.ms / 1000;
 labels.forEach(function (t) { t.intervals.forEach(function (iv) { iv.start = Math.max(0, iv.start + d); iv.end = Math.max(0, iv.end + d); }); });

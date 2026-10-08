@@ -43,7 +43,7 @@ private val stopBtn = L("Stop", "Остановить")
 private val retryBtn = L("Check again", "Проверить снова")
 private val installHint = L(
     "Installs into your user folder with uv: Python and the toolkit itself. Models and engines download later, when you first use them.",
-    "Ставится в папку пользователя через uv: Python и сам тулкит. Модели и движки скачаются потом, при первом использовании.",
+    "Устанавливается в папку пользователя через uv: Python и сам тулкит. Модели и движки загружаются позже, при первом использовании.",
 )
 private val phoneHint = L(
     "On a phone or tablet the toolkit runs on a computer. On the computer: open mLabeler, Settings → Autolabel, turn on \"Let phones connect\" — then type the address and token shown there into the fields below.",

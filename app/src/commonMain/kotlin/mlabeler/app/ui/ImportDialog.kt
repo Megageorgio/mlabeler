@@ -33,7 +33,7 @@ import mlabeler.core.io.encodeText
 
 val importTitle = L("Import a vLabeler project", "Импорт проекта vLabeler")
 private val hint = L("Projects (.lbp) found in this folder and the one above it. Labels and oto.ini are written next to the recordings (old files go to .mlabeler/backup), done/star/tag notes are kept.",
-    "Проекты (.lbp) в этой папке и в папке выше. Разметка и oto.ini записываются рядом с записями (старые файлы — в .mlabeler/backup), отметки «готово», звёздочки и метки сохраняются.")
+    "Проекты (.lbp) в этой папке и в папке выше. Разметка и oto.ini записываются рядом с записями (старые файлы — в .mlabeler/backup), отметки «готово», «звезда» и метки сохраняются.")
 private val noneFound = L("No .lbp files here. Put the project file into this folder.", "Здесь нет файлов .lbp. Положите файл проекта в эту папку.")
 private val imported = L("Imported: {0} files", "Импортировано файлов: {0}")
 private val importBtn = L("Import", "Импортировать")
@@ -50,7 +50,19 @@ fun ImportDialog(app: AppState) {
     }
     var chosen by remember { mutableStateOf(found.firstOrNull()) }
     Overlay({ close() }, 600) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(S.cancel()) { close() }
+            Btn(importBtn(), primary = true, enabled = chosen != null) {
+                val path = chosen ?: return@Btn
+                try {
+                    val n = importProject(app, path)
+                    app.message(imported.format(n))
+                } catch (e: Exception) {
+                    app.message(e.message ?: e.toString(), error = true)
+                }
+                close()
+            }
+        }) {
             Text(importTitle(), color = c.text, fontSize = 17.sp)
             Text(hint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
             if (found.isEmpty()) Text(noneFound(), color = c.muted, fontSize = 13.sp)
@@ -58,19 +70,6 @@ fun ImportDialog(app: AppState) {
                 Row(Modifier.fillMaxWidth().clickable { chosen = f }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Chip(Paths.name(f), chosen == f) { chosen = f }
                     Text("  " + Paths.parent(f), color = c.muted, fontSize = 11.sp)
-                }
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn(S.cancel()) { close() }
-                Btn(importBtn(), primary = true, enabled = chosen != null) {
-                    val path = chosen ?: return@Btn
-                    try {
-                        val n = importProject(app, path)
-                        app.message(imported.format(n))
-                    } catch (e: Exception) {
-                        app.message(e.message ?: e.toString(), error = true)
-                    }
-                    close()
                 }
             }
         }

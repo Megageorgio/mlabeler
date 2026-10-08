@@ -66,24 +66,25 @@ import mlabeler.app.ui.Field
 import mlabeler.app.ui.IconBtn
 import mlabeler.app.ui.Icons
 import mlabeler.app.ui.Overlay
+import mlabeler.app.ui.DialogContent
 import mlabeler.app.ui.TextFocus
 import mlabeler.core.io.Paths
 import kotlin.math.max
 
 val karaokeTitle = L("Karaoke recording", "Караоке-запись")
 private val noSongs = L("Add a song to sing over (WAV, MP3, FLAC…). Songs, their lyrics and backing tracks are kept in the program's folder, not in the dataset; only your takes go to the dataset.",
-    "Добавьте песню, под которую будете петь (WAV, MP3, FLAC…). Песни, их текст и минусы хранятся в папке программы, а не в датасете; в датасет попадают только ваши дубли.")
+    "Добавьте песню для исполнения (WAV, MP3, FLAC…). Песни, их тексты и аккомпанементы хранятся в папке программы, а не в датасете; в датасет попадают только ваши дубли.")
 private val addSongT = L("Add a song…", "Добавить песню…")
 private val songPathT = L("Path to a song file", "Путь к файлу песни")
 private val songsFolderT = L("Or put files into: {0}", "Или положите файлы в: {0}")
-private val separateT = L("Make a backing track", "Сделать минус")
+private val separateT = L("Make a backing track", "Создать аккомпанемент")
 private val separateHint = L("The toolkit removes the voice from the song; the result is kept for the next time.",
     "Тулкит уберёт голос из песни; результат сохранится на следующий раз.")
 private val recogniseT = L("Recognise the words", "Распознать слова")
 private val recogniseHint = L("Whisper in the toolkit writes the lines with approximate times, in the language set next to the button. It listens to the voice without the music, so the backing track is made first if there is none.",
-    "Whisper в тулките запишет строки с примерным временем, на языке, указанном рядом с кнопкой. Он слушает голос без музыки, поэтому сначала делается минус, если его ещё нет.")
+    "Whisper в тулките записывает строки с примерным временем на языке, указанном рядом с кнопкой. Он анализирует голос без музыки, поэтому, если аккомпанемента ещё нет, сначала создаётся он.")
 private val guideT = L("Original voice in the headphones", "Голос исполнителя в наушниках")
-private val headphonesT = L("Sing in headphones: whatever the speakers play gets into the take.", "Пойте в наушниках: всё, что играет из колонок, попадёт в дубль.")
+private val headphonesT = L("Sing in headphones: sound from the speakers is recorded into the take.", "Пойте в наушниках: звук из колонок записывается в дубль.")
 private val takeT = L("Take name", "Имя дубля")
 private val intoT = L("Takes go to {0}, with the sung lines next to them as .txt", "Дубли сохраняются в {0}, рядом — спетые строки в .txt")
 private val recordT = L("Record from here (R)", "Записать отсюда (R)")
@@ -92,36 +93,36 @@ private val lastTakeT = L("Listen to {0}", "Прослушать {0}")
 private val editT = L("Edit the lines", "Править строки")
 private val doneT = L("Done", "Готово")
 private val pasteT = L("Paste the lyrics", "Вставить текст")
-private val pasteAbout = L("One line per line. The times of the existing lines are kept, new lines are spread to the end; then set each one with ⏱ while listening.",
-    "По одной строке на строку. Время уже имеющихся строк сохранится, новые распределятся до конца; потом выставьте каждую кнопкой ⏱ под музыку.")
+private val pasteAbout = L("One lyric line per line. The times of the existing lines are kept, new lines are spread to the end; then set each one with ⏱ while listening.",
+    "Одна строка текста на строку. Время имеющихся строк сохраняется, новые распределяются до конца; затем выставьте каждую кнопкой ⏱ во время прослушивания.")
 private val noLines = L("No lyrics yet. Recognise them in the toolkit, paste the text, or add lines while listening.",
-    "Текста пока нет. Распознайте его в тулките, вставьте или добавляйте строки под музыку.")
+    "Текста пока нет. Распознайте его в тулките, вставьте или добавьте строки во время прослушивания.")
 private val firstWordsT = L("To the first words", "К первым словам")
 private val prevLineT = L("Previous line", "Предыдущая строка")
 private val nextLineT = L("Next line", "Следующая строка")
-private val addHereT = L("Add a line here", "Строка отсюда")
+private val addHereT = L("Add a line here", "Добавить строку здесь")
 private val leadT = L("Start before a line, s", "Начинать до строки, с")
 private val languageT = L("Lyrics language", "Язык текста")
-private val firstTimeT = L("The first time the toolkit installs the separation part and downloads its model (a few GB): this takes a while, then it is quick.",
-    "В первый раз тулкит ставит модуль разделения и качает модель (несколько ГБ): это долго, дальше быстро.")
+private val firstTimeT = L("On first use the toolkit installs the separation module and downloads its model (several GB); this takes some time, later runs are fast.",
+    "При первом использовании тулкит устанавливает модуль разделения и загружает его модель (несколько ГБ); это занимает время, последующие запуски выполняются быстро.")
 private val keysT = L("R records from the current place, Space plays and stops, the Up and Down arrows go by lines, Home goes to the first words.",
-    "R — запись с текущего места, пробел — играть и стоп, стрелки вверх и вниз — по строкам, Home — к первым словам.")
+    "R — запись с текущего места, пробел — воспроизведение и остановка, стрелки вверх и вниз — переход по строкам, Home — к первым словам.")
 private val inT = L("in {0} s", "через {0} с")
 private val cancelWorkT = L("Stop", "Остановить")
-private val tidyT = L("Tidy the lines", "Почистить строки")
+private val tidyT = L("Tidy the lines", "Упорядочить строки")
 private val loopT = L("Repeat the line", "Повторять строку")
 private val keyT = L("Key", "Тональность")
 private val keyDownT = L("A semitone lower", "На полтона ниже")
 private val keyUpT = L("A semitone higher", "На полтона выше")
 private val tempoT = L("Tempo", "Темп")
-private val preparingT = L("Preparing the backing…", "Минус готовится…")
+private val preparingT = L("Preparing the backing…", "Подготовка аккомпанемента…")
 private val splitT = L("Each line to its own file", "Каждая строка — отдельный файл")
 private val latencyT = L("Sound card delay, ms", "Задержка звука, мс")
 private val practiceT = L("Practice", "Репетиция")
 private val practicingT = L("Practice: nothing is saved", "Репетиция: ничего не сохраняется")
-private val leakT = L("The backing track is heard in this take: sing in headphones, or turn the speakers down.", "В дубле слышен минус: пойте в наушниках или сделайте колонки тише.")
+private val leakT = L("The backing track is heard in this take: sing in headphones, or turn the speakers down.", "В дубле слышен аккомпанемент: пойте в наушниках или уменьшите громкость колонок.")
 private val takesT = L("Takes (click to listen):", "Дубли (щёлкните, чтобы послушать):")
-private val scoreT = L("In tune {0}% of the time · {1} ¢ off on average", "В ноты: {0}% времени · в среднем мимо на {1} ¢")
+private val scoreT = L("In tune {0}% of the time · {1} ¢ off on average", "Попадание в ноты: {0}% времени · среднее отклонение {1} ¢")
 private val octDownT = L("an octave lower than the song", "октавой ниже песни")
 private val octUpT = L("an octave higher than the song", "октавой выше песни")
 private val pitchHint = L("Grey: the song's melody; colour: your voice (an octave up or down counts as right)",
@@ -490,7 +491,10 @@ private fun PasteLyrics(k: KaraokeState, onClose: () -> Unit) {
     val c = T.c
     var text by remember { mutableStateOf(k.lines.joinToString("\n") { it.text }) }
     Overlay(onClose, 560) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(S.cancel()) { onClose() }
+            Btn(S.ok(), primary = true) { k.replaceText(text); onClose() }
+        }) {
             Text(pasteT(), color = c.text, fontSize = 17.sp)
             Text(pasteAbout(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
             BasicTextField(
@@ -499,10 +503,6 @@ private fun PasteLyrics(k: KaraokeState, onClose: () -> Unit) {
                     .background(c.bg).border(c.borderWidth, c.border, RoundedCornerShape(c.radius)).padding(10.dp)
                     .verticalScroll(rememberScrollState()),
             )
-            Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn(S.cancel()) { onClose() }
-                Btn(S.ok(), primary = true) { k.replaceText(text); onClose() }
-            }
         }
     }
 }

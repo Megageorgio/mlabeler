@@ -29,10 +29,10 @@ import mlabeler.core.model.IntervalTier
 private val title = L("Clean the recording", "Чистка записи")
 private val promise = L(
     "The file keeps its sample rate, bit depth and channels. Only what is repaired changes; every other sample stays exactly as it was. The first version is kept in the folder's .mlabeler/backup.",
-    "Файл сохраняет частоту, разрядность и каналы. Меняется только то, что чинится, — все остальные сэмплы остаются точно такими же. Первая версия хранится в .mlabeler/backup папки.",
+    "Файл сохраняет частоту, разрядность и каналы. Меняется только то, что исправляется, — все остальные сэмплы остаются точно такими же. Первая версия хранится в .mlabeler/backup папки.",
 )
 private val whereT = L("Where", "Где")
-private val selectionT = L("Selected part", "Выделенный кусок")
+private val selectionT = L("Selected part", "Выделенный фрагмент")
 private val wholeT = L("Whole recording", "Вся запись")
 private val clicksT = L("Clicks", "Щелчки")
 private val clicksHint = L("Finds short pops and clicks and rebuilds just those few samples from the sound around them.",
@@ -42,17 +42,17 @@ private val maxWidthT = L("Longest click", "Самый длинный щелчо
 private val findT = L("Find", "Найти")
 private val repairFoundT = L("Repair found ({0})", "Исправить найденные ({0})")
 private val clearT = L("Clear marks", "Убрать отметки")
-private val repairT = L("Repair the selected part", "Починить выделенный кусок")
+private val repairT = L("Repair the selected part", "Исправить выделенный фрагмент")
 private val repairHint = L("Select a click by hand (up to 100 ms) and rebuild it from both sides.",
     "Выделите щелчок вручную (до 100 мс) и восстановите его по звуку с обеих сторон.")
-private val repairBtn = L("Repair", "Починить")
+private val repairBtn = L("Repair", "Исправить")
 private val muteT = L("Silence or cut out", "Заглушить или вырезать")
 private val muteHint = L("Silencing keeps the length (Ctrl+Shift+M in the editor); cutting out makes the recording shorter and moves the labels after it back (Ctrl+X). Both work on the selection or the selected phoneme and are undone with Ctrl+Z.",
-    "Заглушение сохраняет длину (в редакторе Ctrl+Shift+M); вырезание укорачивает запись и сдвигает разметку после куска назад (Ctrl+X). Оба действуют на выделение или выбранную фонему и отменяются через Ctrl+Z.")
+    "Заглушение сохраняет длину (в редакторе Ctrl+Shift+M); вырезание укорачивает запись и сдвигает разметку после фрагмента назад (Ctrl+X). Оба действуют на выделение или выбранную фонему и отменяются через Ctrl+Z.")
 private val cutBtn = L("Cut out", "Вырезать")
 private val levelT = L("Level and edges", "Громкость и края")
 private val levelHint = L("Normalising works on the chosen part (above) or the whole file; fades on the selection. Trimming cuts silence off both ends of the file and moves the labels with the sound. All are undone with Ctrl+Z.",
-    "Нормализация действует на выбранное выше (кусок или весь файл), плавные края — на выделение. Обрезка убирает тишину с обоих концов файла и сдвигает разметку вместе со звуком. Всё отменяется через Ctrl+Z.")
+    "Нормализация действует на выбранное выше (фрагмент или весь файл), плавные края — на выделение. Обрезка убирает тишину с обоих концов файла и сдвигает разметку вместе со звуком. Всё отменяется через Ctrl+Z.")
 private val normDbT = L("Loudest point after normalising", "Самая громкая точка после нормализации")
 private val normalizeBtn = L("Normalise", "Нормализовать")
 private val fadeInBtn = L("Fade in", "Плавное начало")
@@ -64,18 +64,18 @@ private val muteBtn = L("Silence the selection", "Заглушить выдел�
 private val noiseT = L("Noise", "Шум")
 private val noiseHint = L(
     "Lowers steady noise (hum, hiss) where it's quieter than the voice. Unlike the tools above it changes the whole processed part: listen first.",
-    "Снижает ровный шум (гул, шипение) там, где он тише голоса. В отличие от инструментов выше меняет весь обрабатываемый кусок — сначала послушайте.",
+    "Снижает ровный шум (гул, шипение) там, где он тише голоса. В отличие от инструментов выше, меняет весь обрабатываемый фрагмент — сначала прослушайте результат.",
 )
-private val profileT = L("Take the noise from the selected part", "Взять шум из выделенного куска")
+private val profileT = L("Take the noise from the selected part", "Взять шум из выделенного фрагмента")
 private val profileFromT = L("Noise taken from {0} – {1}", "Шум взят из {0} – {1}")
-private val noProfile = L("Select a part with noise only (a pause) and take it first.", "Сначала выделите кусок, где только шум (паузу), и возьмите его.")
+private val noProfile = L("Select a part with noise only (a pause) and take it first.", "Сначала выделите фрагмент, содержащий только шум (паузу), и возьмите его.")
 private val reductionT = L("Lower by", "Снизить на")
 private val noiseSensT = L("Sensitivity", "Чувствительность")
 private val smoothingT = L("Frequency smoothing", "Сглаживание по частоте")
-private val previewT = L("Listen", "Послушать")
+private val previewT = L("Listen", "Прослушать")
 private val applyT = L("Apply", "Применить")
 private val undoT = L("Undo the last change", "Отменить последнее изменение")
-private val originalT = L("Put back the original", "Вернуть исходник")
+private val originalT = L("Restore the original", "Восстановить исходную запись")
 private val bandsT = L("bands", "полос")
 
 @OptIn(ExperimentalLayoutApi::class)

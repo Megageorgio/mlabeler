@@ -381,12 +381,12 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         val starting = L("The toolkit is starting…", "Тулкит запускается…")
         val installingT = L("Installing the toolkit… this downloads a few hundred MB", "Тулкит устанавливается… будет скачано несколько сотен МБ")
         val missing = L("mVocalToolkit isn't installed on this computer", "mVocalToolkit не установлен на этом компьютере")
-        val offHere = L("The toolkit isn't running; it starts by itself when needed", "Тулкит не запущен; он запустится сам, когда понадобится")
+        val offHere = L("The toolkit isn't running; it starts automatically when needed", "Тулкит не запущен; он запустится автоматически при необходимости")
         val offRemote = L("No answer from the toolkit at this address", "Тулкит по этому адресу не отвечает")
         val failed = L("The toolkit couldn't start", "Тулкит не смог запуститься")
         val notStarted = L("The toolkit stopped right after start", "Тулкит остановился сразу после запуска")
         val gettingUv = L("Installing uv (Python package manager)…", "Устанавливается uv (менеджер пакетов Python)…")
-        val noUv = L("Couldn't install uv. Install it from astral.sh/uv and try again.", "Не получилось установить uv. Установите его с astral.sh/uv и попробуйте снова.")
+        val noUv = L("Couldn't install uv. Install it from astral.sh/uv and try again.", "Не удалось установить uv. Установите его с astral.sh/uv и повторите попытку.")
         val installFailed = L("Installation failed; see the log below", "Установка не удалась, подробности в журнале ниже")
         val installed = L("Installed", "Установлено")
         val updating = L("The toolkit is updating itself to a newer version and will start again…", "Тулкит обновляется до новой версии и запустится снова…")
@@ -415,4 +415,4 @@ private fun ByteArray.decodeUtf16le(): String {
 }
 
 private val upToDate = L("The toolkit is up to date ({0})", "Тулкит последней версии ({0})")
-private val updateUnsupported = L("This toolkit version can't update on request; it looks for a newer version each time it starts", "Эта версия тулкита не умеет обновляться по запросу; она ищет новую версию при каждом запуске")
+private val updateUnsupported = L("This toolkit version can't update on request; it looks for a newer version each time it starts", "Эта версия тулкита не поддерживает обновление по запросу; она проверяет наличие новой версии при каждом запуске")

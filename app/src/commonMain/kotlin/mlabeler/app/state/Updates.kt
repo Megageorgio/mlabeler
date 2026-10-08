@@ -134,7 +134,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
 
     companion object {
         const val REPO = "Megageorgio/mlabeler"
-        val upToDate = mlabeler.app.i18n.L("This is the newest version", "Это самая новая версия")
+        val upToDate = mlabeler.app.i18n.L("This is the newest version", "Установлена последняя версия")
         val failed = mlabeler.app.i18n.L("Couldn't check for updates: {0}", "Не удалось проверить обновления: {0}")
     }
 }

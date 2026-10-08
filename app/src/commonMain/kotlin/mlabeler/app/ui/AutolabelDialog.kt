@@ -42,9 +42,9 @@ private val byText2 = L("SOFA, HubertFA · the text is needed", "SOFA, HubertFA 
 private val recognize = L("Recognise phonemes", "Распознать фонемы")
 private val recognize2 = L("WFL · no text needed", "WFL · текст не нужен")
 private val byTextAbout = L("The aligner places what is sung: words (turned into phonemes with the model's dictionary) or phonemes. It doesn't guess the text; without text it can only work after Whisper has recognised the words.",
-    "Выравниватель расставляет то, что поётся: слова (он сам разложит их на фонемы по словарю модели) или сразу фонемы. Текст он не угадывает; без текста можно только сначала распознать слова через Whisper.")
+    "Выравниватель расставляет то, что поётся: слова (разбивая их на фонемы по словарю модели) или фонемы. Текст он не определяет; при отсутствии текста сначала нужно распознать слова через Whisper.")
 private val recognizeAbout = L("The model hears the phonemes itself, no text needed. If you know the phonemes, enter them: then it only places them.",
-    "Модель сама слышит фонемы, текст не нужен. Если фонемы известны, впишите их — тогда она только расставит их по местам.")
+    "Модель распознаёт фонемы самостоятельно, текст не нужен. Если фонемы известны, введите их — тогда она только расставит их по местам.")
 private val textTitle = L("What is sung there", "Что там поётся")
 private val wordsHint = L("e.g. twinkle twinkle little star", "например: в лесу родилась ёлочка")
 private val phonemesHint = L("e.g. SP t w i ng k ax l SP", "например: SP v l e s u SP")
@@ -52,7 +52,7 @@ private val fromFile = L("From a file…", "Из файла…")
 private val fromFileNote = L("Lyrics, subtitles (.lrc, .srt) or a .lab: timings, tags and punctuation are removed.",
     "Текст песни, субтитры (.lrc, .srt) или .lab: тайминги, теги и знаки препинания убираются.")
 private val whisperT = L("No text: recognise the words with Whisper first (a large model, downloaded on first use)",
-    "Нет текста — сначала распознать слова через Whisper (большая модель, скачается при первом запуске)")
+    "Нет текста — сначала распознать слова через Whisper (большая модель, загружается при первом использовании)")
 private val needText = L("Enter the text, load it from a file or turn on Whisper", "Впишите текст, загрузите его из файла или включите Whisper")
 private val allFiles = L("All files of the folder", "Все файлы папки")
 private val whichFiles = L("Which files", "Какие файлы")
@@ -72,8 +72,8 @@ private val asText = L("These are words", "Это слова")
 private val replaceHere = L("Put into the labels", "Записать в разметку")
 private val forCompare = L("Show next to them for comparison", "Показать рядом для сравнения")
 private val run = L("Start", "Запустить")
-private val loadingModels = L("Asking the toolkit for models…", "Запрашиваю модели у тулкита…")
-private val notInstalled = L("downloads on first use", "скачается при первом запуске")
+private val loadingModels = L("Asking the toolkit for models…", "Запрос моделей у тулкита…")
+private val notInstalled = L("downloads on first use", "загружается при первом использовании")
 private val noModels = L("No models for this", "Для этого нет моделей")
 
 private val forcedTitle = L("Phonemes, if you know them (optional)", "Фонемы, если они известны (необязательно)")
@@ -159,8 +159,27 @@ fun AutolabelDialog(app: AppState) {
     var text by remember(whole) { mutableStateOf(if (wordTier != null) textsIn(wordTier, range) else textsIn(phoneTier, range)) }
     // the whole file goes into the labels by default; a part is compared first
     var replace by remember(whole) { mutableStateOf(whole && (doc == null || doc.tiers.all { t -> (t as? IntervalTier)?.texts?.all { it.isEmpty() } ?: true })) }
+    val textMissing = !recognizeMode && !batch && text.isBlank() && !whisper
     Overlay({ close() }, 640) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(S.cancel()) { close() }
+            val modelOk = langs?.any { g -> g.models.any { it.id == model } } == true
+            val files = if (batch) ed.batchFiles(which) else emptyList()
+            Btn(run(), primary = true, enabled = modelOk && error == null && !textMissing && (!batch || files.isNotEmpty())) {
+                app.update {
+                    val t = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang)
+                    else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper)
+                    it.copy(toolkit = t)
+                }
+                val language = lang.takeIf { it.isNotEmpty() && it != "*" }
+                if (batch) {
+                    val src = if (recognizeMode && batchSource == mlabeler.app.state.EditorState.BatchText.TxtNextToIt) mlabeler.app.state.EditorState.BatchText.None else batchSource
+                    ed.autolabelFiles(files, model, language, recognizeMode, src, phonemes, whisper && !recognizeMode)
+                } else ed.autolabel(range.first, range.second, model, language, if (recognizeMode) forced else text,
+                    phonemes && text.isNotBlank(), replace, recognize = recognizeMode, whisper = whisper && !recognizeMode)
+                close()
+            }
+        }) {
             Text(title(), color = c.text, fontSize = 17.sp)
             Column(Modifier.padding(top = 10.dp)) { ToolkitStatus(app) }
             SectionTitle(whatPart())
@@ -274,27 +293,7 @@ fun AutolabelDialog(app: AppState) {
                 Chip(forCompare(), !replace) { replace = false }
                 Chip(replaceHere(), replace) { replace = true }
             }
-            val textMissing = !recognizeMode && !batch && text.isBlank() && !whisper
             if (textMissing) Text(needText(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn(S.cancel()) { close() }
-                val modelOk = langs?.any { g -> g.models.any { it.id == model } } == true
-                val files = if (batch) ed.batchFiles(which) else emptyList()
-                Btn(run(), primary = true, enabled = modelOk && error == null && !textMissing && (!batch || files.isNotEmpty())) {
-                    app.update {
-                        val t = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang)
-                        else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper)
-                        it.copy(toolkit = t)
-                    }
-                    val language = lang.takeIf { it.isNotEmpty() && it != "*" }
-                    if (batch) {
-                        val src = if (recognizeMode && batchSource == mlabeler.app.state.EditorState.BatchText.TxtNextToIt) mlabeler.app.state.EditorState.BatchText.None else batchSource
-                        ed.autolabelFiles(files, model, language, recognizeMode, src, phonemes, whisper && !recognizeMode)
-                    } else ed.autolabel(range.first, range.second, model, language, if (recognizeMode) forced else text,
-                        phonemes && text.isNotBlank(), replace, recognize = recognizeMode, whisper = whisper && !recognizeMode)
-                    close()
-                }
-            }
         }
     }
 }

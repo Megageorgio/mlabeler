@@ -35,8 +35,8 @@ import mlabeler.app.state.EditorState
 import mlabeler.app.theme.T
 
 private val working = L("Autolabel is running", "Идёт авторазметка")
-private val waitHint = L("While autolabel runs, the labels can't be changed, so the result lands exactly where it belongs.",
-    "Пока идёт авторазметка, разметку менять нельзя: так результат встанет точно на своё место.")
+private val waitHint = L("While autolabel runs, the labels can't be changed, so the result is placed exactly where it belongs.",
+    "Пока идёт авторазметка, разметку изменить нельзя: так результат будет помещён точно на своё место.")
 private val elapsed = L("{0} so far", "прошло {0}")
 private val stopT = L("Stop", "Остановить")
 private val modelResult = L("Model result", "Результат модели")
@@ -111,4 +111,4 @@ fun ModelResultsBar(ed: EditorState) {
 
 private val hideT = mlabeler.app.i18n.L("Hide", "Скрыть")
 private val hideHint = mlabeler.app.i18n.L("Keep it for later: it stays in Details → Compare, where it can be shown again or removed",
-    "Оставить на потом: результат останется в Подробности → Сравнение, там его можно снова показать или убрать")
+    "Отложить: результат останется в Подробности → Сравнение, где его можно снова показать или удалить")

@@ -51,7 +51,7 @@ private val run = L("Run", "Запустить")
 private val slot = L("Quick slot (Ctrl+number)", "Быстрый слот (Ctrl+цифра)")
 private val newPlugin = L("New plugin…", "Новый плагин…")
 private val openFolder = L("Plugin folder", "Папка плагинов")
-private val created = L("Created {0}: edit main.js and plugin.json, then reopen this list", "Создан {0}: правьте main.js и plugin.json, затем откройте список заново")
+private val created = L("Created {0}: edit main.js and plugin.json, then reopen this list", "Создан {0}: отредактируйте main.js и plugin.json, затем откройте список заново")
 private val builtIn = L("built in", "встроенный")
 private val none = L("No plugins for this kind of folder.", "Для такой папки плагинов нет.")
 

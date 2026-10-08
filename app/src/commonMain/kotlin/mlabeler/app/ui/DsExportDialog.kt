@@ -49,17 +49,17 @@ import mlabeler.core.model.NoteTier
 
 private val title = L("Export a DiffSinger dataset", "Экспорт датасета DiffSinger")
 private val hint = L(
-    "Recordings are cut into pieces at pauses and saved as wavs/ + transcriptions.csv with phonemes, their grouping into notes (ph_num) and notes. To choose the pieces yourself, add a tier named \"segments\" and name the parts to keep.",
-    "Записи режутся на куски по паузам и сохраняются как wavs/ + transcriptions.csv: фонемы, их группировка по нотам (ph_num) и ноты. Чтобы задать куски самому, добавьте слой «segments» и подпишите нужные части.",
+    "Recordings are cut into segments at pauses and saved as wavs/ + transcriptions.csv with phonemes, their grouping into notes (ph_num) and notes. To choose the segments yourself, add a tier named \"segments\" and name the parts to keep.",
+    "Записи разрезаются на сегменты по паузам и сохраняются как wavs/ + transcriptions.csv: фонемы, их группировка по нотам (ph_num) и ноты. Чтобы задать сегменты вручную, добавьте слой «segments» и подпишите нужные части.",
 )
 private val whereT = L("Folder", "Папка")
 private val pickT = L("Choose…", "Выбрать…")
 private val whichT = L("Recordings", "Записи")
 private val allLabeled = L("All with labels", "Все с разметкой")
 private val onlyDone = L("Only done", "Только готовые")
-private val piecesT = L("Pieces", "Куски")
-private val maxLen = L("Longest piece", "Самый длинный кусок")
-private val minLen = L("Shortest piece", "Самый короткий кусок")
+private val piecesT = L("Segments", "Сегменты")
+private val maxLen = L("Longest segment", "Самый длинный сегмент")
+private val minLen = L("Shortest segment", "Самый короткий сегмент")
 private val pad = L("Silence at the edges", "Тишина по краям")
 private val groupsT = L("Grouping into notes (ph_num)", "Группировка по нотам (ph_num)")
 private val keepWords = L("From the words tier when it fits", "Из слоя слов, если подходит")
@@ -75,7 +75,7 @@ private val rateT = L("Sample rate", "Частота")
 private val asIs = L("As recorded", "Как в записи")
 private val exportBtn = L("Export", "Экспортировать")
 private val working = L("Exporting {0} of {1}…", "Экспорт {0} из {1}…")
-private val doneMsg = L("Exported {0} pieces ({1}) from {2} recordings into {3}", "Экспортировано кусков: {0} ({1}) из записей: {2} в {3}")
+private val doneMsg = L("Exported {0} segments ({1}) from {2} recordings into {3}", "Экспортировано сегментов: {0} ({1}) из записей: {2} в {3}")
 private val skippedMsg = L("Skipped without labels: {0}", "Пропущено без разметки: {0}")
 private val failedMsg = L("Export failed: {0}", "Экспорт не удался: {0}")
 private val stopBtn = L("Stop", "Остановить")
@@ -158,7 +158,13 @@ fun DsExportDialog(app: AppState, ed: EditorState) {
     }
 
     Overlay({ if (job == null) close() }, 640) {
-        Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
+        DialogContent(footer = {
+            if (job != null) Btn(stopBtn()) { job?.cancel() }
+            else {
+                Btn(S.close()) { close() }
+                Btn(exportBtn(), primary = true, enabled = folder.isNotBlank()) { run() }
+            }
+        }) {
             Text(title(), color = c.text, fontSize = 17.sp)
             Text(hint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
             SectionTitle(whereT())
@@ -201,13 +207,6 @@ fun DsExportDialog(app: AppState, ed: EditorState) {
                 }
             }
             result?.let { Text(it, color = if (failed) c.danger else c.ok, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp)) }
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                if (job != null) Btn(stopBtn()) { job?.cancel() }
-                else {
-                    Btn(S.close()) { close() }
-                    Btn(exportBtn(), primary = true, enabled = folder.isNotBlank()) { run() }
-                }
-            }
         }
     }
 }
@@ -224,7 +223,7 @@ fun DictionaryChips(selected: String, onPick: (String) -> Unit) {
     }
 }
 
-private val dictAuto = L("Guess from letters", "Угадать по буквам")
+private val dictAuto = L("Guess from letters", "Определить по буквам")
 private val dictNames = mapOf(
     "Japanese" to L("Japanese", "Японский"),
     "Chinese" to L("Chinese (pinyin)", "Китайский (пиньинь)"),

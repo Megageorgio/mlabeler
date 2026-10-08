@@ -37,20 +37,20 @@ import mlabeler.core.io.Paths
 import mlabeler.core.model.IntervalTier
 import mlabeler.core.model.LabelDoc
 
-private val titleT = L("Cut into pieces", "Нарезка на куски")
-private val aboutT = L("Pieces are the named parts of the \"segments\" lane. Fill it automatically, then move its boundaries, rename or remove pieces as with any labels. Each named piece is saved as its own WAV (and labels) — the recording itself stays as it is.",
-    "Куски — это подписанные части слоя «segments». Заполните его автоматически, потом двигайте границы, переименовывайте и убирайте куски как обычную разметку. Каждый подписанный кусок сохраняется отдельным WAV (и разметкой); сама запись не меняется.")
-private val bySilenceT = L("Pieces by silence", "Куски по тишине")
-private val byPausesT = L("Pieces by pauses of the labels", "Куски по паузам разметки")
-private val fromRangeT = L("The selection becomes a piece", "Выделенное — в кусок")
-private val countT = L("Named pieces: {0}", "Подписанных кусков: {0}")
+private val titleT = L("Cut into segments", "Нарезка на сегменты")
+private val aboutT = L("Segments are the named parts of the \"segments\" lane. Fill it automatically, then move its boundaries, rename or remove segments as with any labels. Each named segment is saved as its own WAV (and labels) — the recording itself stays as it is.",
+    "Сегменты — это подписанные части слоя «segments». Заполните его автоматически, затем сдвигайте границы, переименовывайте и удаляйте сегменты как обычную разметку. Каждый подписанный сегмент сохраняется отдельным WAV (с разметкой); сама запись не меняется.")
+private val bySilenceT = L("Segments by silence", "Сегменты по тишине")
+private val byPausesT = L("Segments by pauses of the labels", "Сегменты по паузам разметки")
+private val fromRangeT = L("The selection becomes a segment", "Сегмент из выделения")
+private val countT = L("Named segments: {0}", "Подписанных сегментов: {0}")
 private val noneT = L("No \"segments\" lane yet", "Слоя «segments» пока нет")
-private val folderT = L("Save to (folder next to the recording; a \"/\" in a piece's name makes a subfolder, e.g. power/001)",
-    "Куда сохранить (папка рядом с записью; «/» в имени куска делает подпапку, например power/001)")
+private val folderT = L("Save to (folder next to the recording; a \"/\" in a segment's name makes a subfolder, e.g. power/001)",
+    "Куда сохранить (папка рядом с записью; «/» в имени сегмента создаёт подпапку, например power/001)")
 private val withLabelsT = L("With labels", "С разметкой")
-private val saveT = L("Save the pieces", "Сохранить куски")
-private val savedT = L("Saved pieces: {0} in {1}", "Сохранено кусков: {0} в {1}")
-private val existsT = L("{0} already exists; nothing was written", "{0} уже есть; ничего не записано")
+private val saveT = L("Save the segments", "Сохранить сегменты")
+private val savedT = L("Saved segments: {0} in {1}", "Сохранено сегментов: {0} в {1}")
+private val existsT = L("{0} already exists; nothing was written", "{0} уже существует; ничего не записано")
 
 /** Marking pieces of a long recording on a "segments" lane and saving each as its own file. */
 @Composable
@@ -80,7 +80,43 @@ fun SegmentDialog(app: AppState) {
     }
 
     Overlay({ close() }, 560) {
-        Column(Modifier.verticalScroll(rememberScrollState()).padding(18.dp)) {
+        DialogContent(footer = {
+            Btn(S.cancel()) { close() }
+            Btn(saveT(), primary = true, enabled = seg != null && named.isNotEmpty() && folder.isNotBlank()) {
+                val t = seg ?: return@Btn
+                val d = doc ?: return@Btn
+                val fs = ed.workspace.fs
+                val base = Paths.join(Paths.parent(item.audioPath), folder.trim().trim('/', '\\'))
+                val fmt = ed.workspace.state.defaultFormat.takeIf { it == LabelFormat.TextGrid } ?: LabelFormat.Lab
+                scope.launch {
+                    val result = runCatching {
+                        withContext(Dispatchers.Default) {
+                            val bytes = fs.read(item.audioPath)
+                            if (!mlabeler.core.audio.Wav.isWav(bytes)) error(S.unsupportedAudio())
+                            val w = WavEdit(bytes)
+                            val labels = d.copy(tiers = d.tiers.filterIndexed { k, _ -> k != segIndex })
+                            val targets = named.map { i -> Paths.join(base, t.texts[i].trim().replace('\\', '/') + ".wav") }
+                            targets.firstOrNull { fs.exists(it) }?.let { error(existsT.format(it)) }
+                            for ((n, i) in named.withIndex()) {
+                                val a = t.startOf(i)
+                                val b = t.endOf(i)
+                                val path = targets[n]
+                                fs.mkdirs(Paths.parent(path))
+                                fs.write(path, w.slice((a * w.sampleRate).toInt(), (b * w.sampleRate).toInt()))
+                                if (withLabels) {
+                                    val part = Edits.crop(labels, a, b, duration)
+                                    val text = if (fmt == LabelFormat.TextGrid) TextGridFormat.write(part, b - a) else HtkLab.write(part)
+                                    fs.write(Paths.withExt(path, fmt.extension), text.encodeToByteArray())
+                                }
+                            }
+                            named.size
+                        }
+                    }
+                    result.onSuccess { n -> app.message(savedT.format(n, base)); ed.rescan(); close() }
+                        .onFailure { app.message(it.message ?: it.toString(), error = true) }
+                }
+            }
+        }) {
             Text(titleT(), color = c.text, fontSize = 17.sp)
             Text(aboutT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 10.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -108,43 +144,6 @@ fun SegmentDialog(app: AppState) {
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Toggle(withLabels, { withLabels = it })
                 Text(withLabelsT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn(S.cancel()) { close() }
-                Btn(saveT(), primary = true, enabled = seg != null && named.isNotEmpty() && folder.isNotBlank()) {
-                    val t = seg ?: return@Btn
-                    val d = doc ?: return@Btn
-                    val fs = ed.workspace.fs
-                    val base = Paths.join(Paths.parent(item.audioPath), folder.trim().trim('/', '\\'))
-                    val fmt = ed.workspace.state.defaultFormat.takeIf { it == LabelFormat.TextGrid } ?: LabelFormat.Lab
-                    scope.launch {
-                        val result = runCatching {
-                            withContext(Dispatchers.Default) {
-                                val bytes = fs.read(item.audioPath)
-                                if (!mlabeler.core.audio.Wav.isWav(bytes)) error(S.unsupportedAudio())
-                                val w = WavEdit(bytes)
-                                val labels = d.copy(tiers = d.tiers.filterIndexed { k, _ -> k != segIndex })
-                                val targets = named.map { i -> Paths.join(base, t.texts[i].trim().replace('\\', '/') + ".wav") }
-                                targets.firstOrNull { fs.exists(it) }?.let { error(existsT.format(it)) }
-                                for ((n, i) in named.withIndex()) {
-                                    val a = t.startOf(i)
-                                    val b = t.endOf(i)
-                                    val path = targets[n]
-                                    fs.mkdirs(Paths.parent(path))
-                                    fs.write(path, w.slice((a * w.sampleRate).toInt(), (b * w.sampleRate).toInt()))
-                                    if (withLabels) {
-                                        val part = Edits.crop(labels, a, b, duration)
-                                        val text = if (fmt == LabelFormat.TextGrid) TextGridFormat.write(part, b - a) else HtkLab.write(part)
-                                        fs.write(Paths.withExt(path, fmt.extension), text.encodeToByteArray())
-                                    }
-                                }
-                                named.size
-                            }
-                        }
-                        result.onSuccess { n -> app.message(savedT.format(n, base)); ed.rescan(); close() }
-                            .onFailure { app.message(it.message ?: it.toString(), error = true) }
-                    }
-                }
             }
         }
     }
