@@ -88,30 +88,6 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             )
         }
 
-    /**
-     * Words to phonemes with the dictionary (and G2P model) of the aligner [model], or with the language's own
-     * text frontend (Japanese, Chinese, Korean) when there is no model. Returns the phonemes (an unknown word
-     * stays as it is) and the unknown words.
-     */
-    suspend fun g2p(text: String, language: String?, model: String?): Pair<List<String>, List<String>> {
-        val req = buildJsonObject {
-            put("texts", buildJsonArray { add(JsonPrimitive(text)) })
-            if (language != null) put("language", language)
-            if (model != null) put("model", model)
-        }
-        val item = call("POST", "/text/g2p", req, timeoutMs = 180_000).jsonObject["items"]!!.jsonArray[0].jsonObject
-        val tokens = item["tokens"]!!.jsonArray.map { it.jsonPrimitive.content }
-        val phones = (item["phonemes"] as? JsonArray)
-        val out = mutableListOf<String>()
-        val unknown = mutableListOf<String>()
-        for ((k, t) in tokens.withIndex()) {
-            val p = phones?.getOrNull(k)
-            if (phones == null) { out += t; continue }
-            if (p is JsonArray) out += p.map { it.jsonPrimitive.content } else { out += t; unknown += t }
-        }
-        return out to unknown
-    }
-
     /** A model on the toolkit's computer. */
     data class InstalledModel(val id: String, val name: String, val engine: String, val languages: List<String>, val source: String)
 

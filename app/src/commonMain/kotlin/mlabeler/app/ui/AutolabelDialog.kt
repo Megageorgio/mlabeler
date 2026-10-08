@@ -155,8 +155,6 @@ fun AutolabelDialog(app: AppState) {
     }
     var phonemes by remember { mutableStateOf(wordTier == null) }
     var forced by remember { mutableStateOf("") }
-    var forcedWords by remember { mutableStateOf(false) }
-    var g2pNote by remember { mutableStateOf<String?>(null) }
     var showWfl by remember { mutableStateOf(false) }
     var text by remember(whole) { mutableStateOf(if (wordTier != null) textsIn(wordTier, range) else textsIn(phoneTier, range)) }
     // the whole file goes into the labels by default; a part is compared first
@@ -248,16 +246,8 @@ fun AutolabelDialog(app: AppState) {
                     }
                 } else {
                     SectionTitle(forcedTitle())
-                    Field(forced, { forced = it }, Modifier.fillMaxWidth(), placeholder = if (forcedWords) wordsHint() else forcedHint())
-                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Chip(asPhonemes(), !forcedWords) { forcedWords = false }
-                        Chip(asText(), forcedWords) { forcedWords = true }
-                    }
-                    if (forcedWords) WordsToPhonemes(app, lang, forced) { ph, note -> forced = ph; g2pNote = note; forcedWords = false }
-                    else {
-                        g2pNote?.let { Text(it, color = c.warn, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
-                        Text(forcedNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-                    }
+                    Field(forced, { forced = it }, Modifier.fillMaxWidth(), placeholder = forcedHint())
+                    Text(forcedNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 }
                 Row(Modifier.padding(top = 10.dp)) { Chip(wflMore(), showWfl) { showWfl = !showWfl } }
                 if (showWfl) WflOptions(app)
@@ -356,52 +346,4 @@ private fun TextFromFile(folder: String, onText: (String) -> Unit) {
             for (f in files) androidx.compose.material3.DropdownMenuItem({ Text(mlabeler.core.io.Paths.name(f), fontSize = 13.sp) }, onClick = { menu = false; load(f) })
         }
     }
-}
-
-private val g2pFrom = L("Dictionary of", "Словарь из")
-private val g2pFrontend = L("The language's own rules", "Правила языка")
-private val g2pAbout = L(
-    "The phoneme model has no dictionary of its own: words are split with the dictionary of an aligner model of the same language (its G2P guesses the words it lacks), or with the built-in rules of Japanese, Chinese and Korean. The phonemes must be the ones the phoneme model knows.",
-    "У модели распознавания фонем нет своего словаря: слова разбиваются словарём модели выравнивания того же языка (её G2P угадывает недостающие слова) или встроенными правилами японского, китайского и корейского. Фонемы должны быть из набора, который знает модель распознавания.",
-)
-private val g2pRun = L("Split into phonemes", "Разбить на фонемы")
-private val g2pUnknown = L("Not in the dictionary, left as written: {0}", "Нет в словаре, оставлены как есть: {0}")
-private val g2pNoModels = L("No aligner models for this language: only the language's own rules (Japanese, Chinese, Korean).",
-    "Для этого языка нет моделей выравнивания: остаются только правила языка (японский, китайский, корейский).")
-
-/** Words typed for a phoneme model are turned into its phonemes with an aligner model's dictionary or the language's rules. */
-@Composable
-private fun WordsToPhonemes(app: AppState, lang: String, words: String, onDone: (String, String?) -> Unit) {
-    val c = T.c
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val (alignLangs, _) = rememberToolkitModels(app, "align")
-    val models = alignLangs?.firstOrNull { it.code == lang }?.models.orEmpty().sortedByDescending { it.installed }
-    var source by remember(lang, models.size) { mutableStateOf(models.firstOrNull()?.id ?: "") }
-    var busy by remember { mutableStateOf(false) }
-    var note by remember { mutableStateOf<String?>(null) }
-    var failed by remember { mutableStateOf(false) }
-    Text(g2pAbout(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-    Text(g2pFrom(), color = c.text, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-    androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (m in models) Chip(m.name, source == m.id) { source = m.id }
-        Chip(g2pFrontend(), source.isEmpty()) { source = "" }
-    }
-    if (alignLangs != null && models.isEmpty()) Text(g2pNoModels(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Btn(g2pRun(), enabled = words.isNotBlank() && !busy) {
-            busy = true; note = null
-            scope.launch {
-                try {
-                    val (ph, unknown) = app.toolkit.client().g2p(words, lang.takeIf { it.isNotEmpty() && it != "*" }, source.takeIf { it.isNotEmpty() })
-                    onDone(ph.joinToString(" "), if (unknown.isEmpty()) null else g2pUnknown.format(unknown.joinToString(" ")))
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    failed = true
-                    note = e.message ?: e.toString()
-                } finally { busy = false }
-            }
-        }
-    }
-    note?.let { Text(it, color = if (failed) c.danger else c.warn, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp)) }
 }
