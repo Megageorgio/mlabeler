@@ -135,7 +135,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             for (n in listOf("lab", "labs", "label", "labels", "TextGrid", "textgrid", "textgrids")) dirs += Paths.join(parent, n)
         }
         for (f in state.labelFolders) dirs += Paths.join(root, f)
-        return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "ds", "txt").map { Paths.join(d, "$stem.$it") } }
+        return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "ds", "seg", "txt").map { Paths.join(d, "$stem.$it") } }
     }
 
     /** transcriptions.csv files of the folder (root and three levels down), parsed. */
@@ -186,6 +186,10 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                     val text = try { decodeGuess(fs.read(c), "UTF-8").first } catch (_: Exception) { "" }
                     if (AudacityLabels.looksLike(text)) return c to LabelFormat.Audacity
                 }
+                "seg" -> {
+                    val text = try { decodeGuess(fs.read(c), "UTF-8").first } catch (_: Exception) { "" }
+                    if (mlabeler.core.format.SegFile.looksLike(text)) return c to LabelFormat.Seg
+                }
             }
         }
         csvFor(audioPath, Paths.stem(audioPath))?.let { return it to LabelFormat.DsCsv }
@@ -202,6 +206,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.Audacity -> AudacityLabels.read(text, "phones", duration)
             LabelFormat.Ds -> mlabeler.core.format.DsFile.read(text, duration)
             LabelFormat.DsCsv -> csvRows[path]?.firstOrNull { it.name == item.name }?.doc ?: LabelDoc.empty(duration)
+            LabelFormat.Seg -> mlabeler.core.format.SegFile.read(text, duration)
             null -> throw FormatException("Unknown label format")
         }
         return Edits.fitToDuration(doc, duration)
@@ -243,7 +248,22 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             } catch (_: Exception) {
             }
         }
+        val old = if (fs.exists(path)) runCatching { fs.read(path).decodeToString() }.getOrNull() else null
         val text = when (fmt) {
+            LabelFormat.Seg -> {
+                // the transcription next to it follows the phonemes (left as it was while they are the same)
+                val transPath = Paths.withExt(path, "trans")
+                val oldTrans = if (fs.exists(transPath)) runCatching { fs.read(transPath).decodeToString() }.getOrNull() else null
+                val trans = mlabeler.core.format.TransFile.write(mlabeler.core.format.SegFile.phonemes(doc), oldTrans)
+                if (trans != oldTrans) {
+                    if (oldTrans != null && transPath !in backedUp) runCatching {
+                        fs.copy(transPath, Paths.join(Paths.join(metaDir, "backup"), Paths.stem(transPath) + ".${timestamp()}.trans"))
+                        backedUp += transPath
+                    }
+                    fs.write(transPath, trans.encodeToByteArray())
+                }
+                mlabeler.core.format.SegFile.write(doc, old)
+            }
             LabelFormat.Lab -> HtkLab.write(doc)
             LabelFormat.TextGrid -> TextGridFormat.write(doc, duration)
             LabelFormat.Audacity -> AudacityLabels.write(doc)

@@ -17,6 +17,8 @@ enum class LabelFormat(val extension: String, val title: String) {
     Ds("ds", "DiffSinger .ds"),
     /** A DiffSinger transcriptions.csv holding the labels of many recordings. */
     DsCsv("csv", "DiffSinger transcriptions.csv"),
+    /** Phoneme segmentation (.seg) with its transcription (.trans) next to it. */
+    Seg("seg", "Phoneme segments (.seg + .trans)"),
     ;
 
     /** Formats one file can be saved in on its own. */

@@ -14,7 +14,7 @@ data class Problem(val kind: Kind, val ref: IntervalRef, val severity: Severity 
 @Serializable
 data class CheckSettings(
     val minDurationMs: Double = 5.0,
-    val pauses: Set<String> = setOf("SP", "AP", "pau", "sil", "br", "cl", "R", "-"),
+    val pauses: Set<String> = setOf("SP", "AP", "pau", "sil", "Sil", "br", "cl", "R", "-"),
     /** Allowed phonemes; empty = not checked. */
     val phonemeSet: Set<String> = emptySet(),
     val confidenceBelow: Float = 0.5f,
