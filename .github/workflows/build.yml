@@ -104,8 +104,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
+      # Go 1.20: the last one whose programs start on Windows 7 and 8.1 (the zips run there too, without the toolkit)
       - uses: actions/setup-go@v5
-        with: { go-version: stable }
+        with: { go-version: '1.20' }
       - uses: gradle/actions/setup-gradle@v4
       - run: |
           V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
@@ -120,24 +121,6 @@ jobs:
         with:
           name: mLabeler-windows-x64-portable
           path: build/mLabeler-*-windows-x64-portable.zip
-
-  windows-legacy:
-    # Windows 7 and 8.1: the same program, a launcher built with Go 1.20 (the last one that runs there), no toolkit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 21 }
-      - uses: actions/setup-go@v5
-        with: { go-version: '1.20' }
-      - uses: gradle/actions/setup-gradle@v4
-      - run: |
-          V=$(grep '^app.version=' gradle.properties | cut -d= -f2)
-          LEGACY=1 tools/windows-portable.sh "build/mLabeler-$V-windows7-legacy-x64-no-toolkit.zip"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mLabeler-windows7-legacy-x64-no-toolkit
-          path: build/mLabeler-*-windows7-legacy-x64-no-toolkit.zip
 
   ios:
     # iOS builds take long: only for releases (tags) and runs started by hand
@@ -183,7 +166,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, android, desktop, windows-portable, windows-legacy, linux-portable, ios-ipa]
+    needs: [test, android, desktop, windows-portable, linux-portable, ios-ipa]
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:

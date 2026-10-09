@@ -18,7 +18,7 @@ expect object Platform {
     fun dataDir(): String
     /** The program folder of the fully portable Windows build, where everything is kept; null otherwise. */
     val portableDir: String?
-    /** The build for old Windows (7, 8.1): no toolkit of its own, drawing through OpenGL. */
+    /** Running on old Windows (7, 8.1): no toolkit of its own, drawing through OpenGL. */
     val legacyWindows: Boolean
     /** Where the folder browser starts. */
     fun homeDir(): String

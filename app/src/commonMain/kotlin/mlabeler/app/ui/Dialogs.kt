@@ -1140,7 +1140,7 @@ internal fun Modifier.settingFocus(title: String): Modifier {
     return this.bringIntoViewRequester(requester).background(T.c.accent.copy(alpha = 0.18f))
 }
 
-/** The notice of the build for old Windows: no toolkit of its own. */
+/** The notice on old Windows: no toolkit of its own. */
 @Composable
 internal fun LegacyNote() {
     val c = T.c
@@ -1151,10 +1151,10 @@ internal fun LegacyNote() {
     }
 }
 
-private val legacyTitleT = mlabeler.app.i18n.L("Build for old Windows, without mVocalToolkit", "Сборка для старых Windows, без mVocalToolkit")
+private val legacyTitleT = mlabeler.app.i18n.L("Old Windows: without mVocalToolkit", "Старая Windows: без mVocalToolkit")
 private val legacyNoteT = mlabeler.app.i18n.L(
-    "Made for Windows 7 and 8.1 (64-bit). The toolkit can't be installed here; autolabel works through the toolkit of another computer in the network. On Windows 10 and 11 the usual build is better.",
-    "Для Windows 7 и 8.1 (64-бит). Тулкит здесь не устанавливается; авторазметка работает через тулкит другого компьютера в сети. На Windows 10 и 11 лучше обычная сборка.",
+    "On Windows 7 and 8.1 the toolkit can't be installed (it doesn't run there); autolabel works through the toolkit of another computer in the network. Everything else works as usual.",
+    "На Windows 7 и 8.1 тулкит не устанавливается (он там не работает); авторазметка работает через тулкит другого компьютера в сети. Всё остальное работает как обычно.",
 )
 
 /** The notice of the fully portable build: where everything is kept and that it needs room. */

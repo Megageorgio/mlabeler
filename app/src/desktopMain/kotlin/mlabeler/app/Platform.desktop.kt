@@ -23,8 +23,8 @@ actual object Platform {
     actual val systemLanguage: String = Locale.getDefault().language
 
     actual val portableDir: String? = System.getProperty("mlabeler.portable")?.takeIf { it.isNotBlank() }
+    // Windows older than 10 (version 6.x); -Dmlabeler.legacy=1 pretends it, for trying it out
     actual val legacyWindows: Boolean = System.getProperty("mlabeler.legacy") == "1" || run {
-        // also any build started on Windows older than 10 (version 6.x)
         val os = System.getProperty("os.name").orEmpty()
         os.startsWith("Windows") && (System.getProperty("os.version")?.substringBefore('.')?.toIntOrNull() ?: 10) < 10
     }
