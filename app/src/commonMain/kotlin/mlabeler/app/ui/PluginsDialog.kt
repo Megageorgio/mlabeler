@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
@@ -164,6 +165,18 @@ private fun PluginForm(app: AppState, p: Plugin, modifier: Modifier, onRun: () -
                     var text by remember(p.info.name, param.name) { mutableStateOf((v as? JsonPrimitive)?.content ?: "") }
                     Field(text, { text = it; it.replace(',', '.').toDoubleOrNull()?.let { d -> set(if (param.type == "integer") JsonPrimitive(d.toLong()) else JsonPrimitive(d)) } }, Modifier.width(160.dp))
                 }
+                "file", "folder" -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val scope = androidx.compose.runtime.rememberCoroutineScope()
+                    Field((v as? JsonPrimitive)?.content ?: "", { set(JsonPrimitive(it)) }, Modifier.weight(1f))
+                    val start = app.editor?.workspace?.root
+                    if (param.type == "folder") Btn(browseT()) { app.pickFolder(label) { set(JsonPrimitive(it)) } }
+                    else if (mlabeler.app.Platform.hasNativeFolderPicker) Btn(browseT()) {
+                        scope.launch {
+                            val f = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { mlabeler.app.Platform.pickFileNative(label, param.options, start) }
+                            if (f != null) set(JsonPrimitive(f))
+                        }
+                    }
+                }
                 else -> Field((v as? JsonPrimitive)?.content ?: "", { set(JsonPrimitive(it)) }, Modifier.fillMaxWidth())
             }
         }
@@ -207,6 +220,8 @@ private fun PluginForm(app: AppState, p: Plugin, modifier: Modifier, onRun: () -
     }
 }
 
+private val browseT = L("Choose…", "Выбрать…")
+
 private const val TEMPLATE_JSON = """{
   "name": "NAME",
   "title": "My plugin",
@@ -221,7 +236,12 @@ private const val TEMPLATE_JSON = """{
 """
 
 private const val TEMPLATE_LABELS = """// labels: [{ name, intervals: [{ start, end, text }] }] — change in place.
-// params: values from the dialog. file: { name, duration }. Set report = '...' to show a message, log(...) prints.
+// notes: [{ start, end, pitch, slur, text }] or null; marks: { done, star, tag } of the file — change in place.
+// params: values from the dialog (types: integer, float, boolean, string, text, enum, file, folder).
+// file: { name, duration }. folder: { path, files: [{ name, path, labelled, done, star, tag }] }. env: { platform, language }.
+// pitch: { hop, values } when plugin.json has "uses": ["pitch"].
+// readText(path), writeText(path, text), listFiles(dir), exists(path): files inside the folder (paths relative to it).
+// Set report = '...' to show a message, play = [start, end] to play a part afterwards; log(...) prints.
 labels.forEach(function (tier) {
   tier.intervals.forEach(function (iv) {
     // example: iv.text = iv.text.toUpperCase();
@@ -230,8 +250,10 @@ labels.forEach(function (tier) {
 report = 'checked ' + labels.length + ' tiers';
 """
 
-private const val TEMPLATE_OTO = """// entries: [{ sample, alias, offset, consonant, cutoff, preutterance, overlap }] — change, add or remove in place.
-// params: values from the dialog. Set report = '...' to show a message, log(...) prints.
+private const val TEMPLATE_OTO = """// entries: [{ sample, alias, offset, consonant, cutoff, preutterance, overlap, done, star, tag }] — change, add or remove in place.
+// params: values from the dialog (types: integer, float, boolean, string, text, enum, file, folder).
+// folder: { path, files }. env: { platform, language }. readText(path), writeText(path, text), listFiles(dir), exists(path).
+// Set report = '...' to show a message, log(...) prints.
 entries.forEach(function (e) {
   // example: if (/^- /.test(e.alias)) e.overlap = 5;
 });

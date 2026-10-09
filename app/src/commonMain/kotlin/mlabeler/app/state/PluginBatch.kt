@@ -42,7 +42,10 @@ class PluginBatch(val plugin: Plugin, private val params: Map<String, JsonElemen
                     if (before == null) { results += FileResult(f, null, 0.0, 0, T.noLabels()); continue }
                     val duration = if (f.id == ed.item?.id) ed.duration else before.end
                     results += try {
-                        val r = Plugins.run(plugin, params, before, null, f.name, duration)
+                        val base = ed.app.pluginContext(ed, false)
+                        val ctx = mlabeler.app.plugins.PluginContext(base.folder, base.files, ed.marks(f), null,
+                            if (f.id == ed.item?.id) ed.pitchCurve else null, base.language, base.platform, base.backup)
+                        val r = Plugins.run(plugin, params, before, null, f.name, duration, ctx)
                         val after = r.doc?.let { mlabeler.core.edit.Edits.fitToDuration(it, duration) } ?: before
                         val note = listOfNotNull(r.report, r.logs.takeIf { it.isNotEmpty() }?.joinToString("; ")).joinToString(" · ").ifEmpty { null }
                         FileResult(f, after, duration, changes(before, after), note)

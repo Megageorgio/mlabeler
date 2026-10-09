@@ -545,6 +545,11 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
         return to
     }
 
+    /** Copies [path] into .mlabeler/backup/<time>/ (as it lay in the folder) before something overwrites it. */
+    fun backupCopy(path: String) {
+        runCatching { copyTo(path, Paths.join(Paths.join(Paths.join(metaDir, "backup"), timestamp()), relative(path))) }
+    }
+
     /** A name for a backup folder made now. */
     fun stamp(): String = timestamp()
 
