@@ -87,6 +87,58 @@ fun EditorState.playResynth(method: String) {
 }
 
 /**
+ * Sings the whole recording again with the pitch as it is now (the analysed f0 with what was drawn) through the
+ * toolkit ("world" or "nsf") and saves it: in place of the recording ([asCopy] false; Ctrl+Z undoes it, the drawing
+ * goes since the sound has that pitch now) or as <name>_f0.wav next to it.
+ */
+fun EditorState.saveResynth(method: String, asCopy: Boolean) {
+    val a = audio ?: return
+    val it = item ?: return
+    val curve = pitchCurve ?: return app.message(S.pitchNotReady())
+    if (!asCopy && it.audioPath.substringAfterLast('.').lowercase() != "wav") return app.message(Cleanup.onlyWav(), error = true)
+    toolkitJob?.cancel()
+    toolkitJob = scope.launch {
+        val client = app.toolkit.client()
+        var serverJob: String? = null
+        try {
+            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+            if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+            toolkitBusy = S.uploading()
+            val wav = withContext(Dispatchers.Default) { Wav.encode16(a) }
+            val f0 = FloatArray(curve.values.size.coerceAtLeast(1)) { i -> curve.values.getOrNull(i)?.takeIf { v -> !v.isNaN() } ?: 0f }
+            val fileId = client.upload(it.name + "_resynth.wav", wav)
+            val job = client.resynth(fileId, f0, curve.hop, method)
+            serverJob = job
+            val result = client.await(job, { toolkitDetail = it }) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
+            serverJob = null
+            val path = (result["file"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: throw mlabeler.app.toolkit.ToolkitException("no file in the result")
+            val bytes = client.download(path)
+            if (asCopy) {
+                val out = Paths.join(Paths.parent(it.audioPath), Paths.stem(it.audioPath) + "_f0.wav")
+                withContext(Dispatchers.Default) { workspace.fs.write(out, bytes) }
+                rescan()
+                app.message(resynthSavedCopy.format(Paths.name(out)))
+            } else {
+                cleanup.replaceSound(bytes)
+                resetF0()
+                app.message(resynthSaved())
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
+            throw e
+        } catch (e: Exception) {
+            app.message(e.message ?: e.toString(), error = true)
+        } finally {
+            toolkitBusy = null
+            toolkitProgress = null
+        }
+    }
+}
+
+private val resynthSaved = L("The recording is sung with the drawn pitch now. Ctrl+Z undoes this.", "Запись теперь спета с нарисованной высотой. Отмена — Ctrl+Z.")
+private val resynthSavedCopy = L("Saved {0} next to the recording", "Сохранено рядом с записью: {0}")
+
+/**
  * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown
  * as a comparison tier named after the model.
  */
@@ -111,7 +163,7 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             val fileId = client.upload(it.name + "_part.wav", wav)
             val job = if (recognize) {
                 client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter())
-            } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages)
+            } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords)
             serverJob = job
             val result = client.await(job, { toolkitDetail = it }) { p, stage ->
                 toolkitProgress = p
@@ -204,7 +256,7 @@ fun EditorState.autolabelFiles(
                             else -> ""
                         }
                         if (text.isBlank() && !whisper) error(noText())
-                        client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter(), extraLanguages)
+                        client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords)
                     }
                     serverJob = job
                     val result = client.await(job, { toolkitDetail = it }) { p, stage ->
@@ -255,6 +307,70 @@ fun EditorState.autolabelFiles(
         }
     }
 }
+
+/**
+ * Fills the phoneme tier under the words of the words tier (those in the selection, or all) with their phonemes by
+ * the dictionary of [model], its own words and G2P; each word's span is shared equally among its phonemes (undoable).
+ */
+fun EditorState.phonemesFromWords(model: String, language: String?) {
+    val d = doc ?: return
+    val wk = d.wordTierIndex()
+    if (wk < 0) return app.message(noWordsTier())
+    val wt = d.tiers[wk] as IntervalTier
+    val (from, to) = range ?: (0.0 to duration)
+    val idx = (0 until wt.size).filter { i -> (wt.startOf(i) + wt.endOf(i)) / 2 in from..to }
+    val rests = setOf("", "SP", "AP", "pau", "sil", "br")
+    val words = idx.filter { wt.texts[it].trim() !in rests }
+    if (words.isEmpty()) return app.message(noWordsTier())
+    toolkitJob?.cancel()
+    toolkitJob = scope.launch {
+        try {
+            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+            if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+            toolkitBusy = g2pBusy()
+            // one text per word, so each answer belongs to its interval
+            val res = app.toolkit.client().phonemize(words.map { wt.texts[it].trim() }, model, language)
+            val missing = mutableListOf<String>()
+            val parts = mutableListOf<Triple<Double, Double, String>>()
+            for (i in idx) {
+                val s = wt.startOf(i)
+                val e = wt.endOf(i)
+                val k = words.indexOf(i)
+                if (k < 0) { parts += Triple(s, e, wt.texts[i].trim()); continue }
+                val r = res.getOrNull(k)
+                val phs = r?.phonemes?.let { ps -> if (ps.isEmpty() || ps.any { it == null }) null else ps.flatMap { it!! } }
+                if (phs.isNullOrEmpty()) { missing += wt.texts[i].trim(); parts += Triple(s, e, ""); continue }
+                val step = (e - s) / phs.size
+                for ((j, ph) in phs.withIndex()) parts += Triple(s + j * step, if (j == phs.lastIndex) e else s + (j + 1) * step, ph)
+            }
+            val a = wt.startOf(idx.first())
+            val b = wt.endOf(idx.last())
+            val part = IntervalTier.fromIntervals("phones", parts, b)
+            updateDocShowingChanges { cur ->
+                val pk = cur.phonemeTierIndex().takeIf { it >= 0 && it != cur.wordTierIndex() }
+                if (pk != null) cur.replace(pk, mlabeler.core.edit.RangeEdits.replace(cur.tiers[pk] as IntervalTier, a, b, part))
+                else cur.copy(tiers = cur.tiers + mlabeler.core.edit.RangeEdits.replace(IntervalTier.empty("phones", duration), a, b, part))
+            }
+            if (missing.isEmpty()) app.message(g2pDone.format(words.size))
+            else {
+                app.message(g2pMissing.format(missing.distinct().joinToString(", ")), error = true)
+                app.wordsCheck = mlabeler.app.ui.WordsCheck(model, language, text = missing.distinct().joinToString(" "))
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            app.message(e.message ?: e.toString(), error = true)
+        } finally {
+            toolkitBusy = null
+            toolkitProgress = null
+        }
+    }
+}
+
+private val noWordsTier = L("Needs a words tier with words (in the selection, or anywhere)", "Нужен ярус слов со словами (в выделенном или во всём файле)")
+private val g2pBusy = L("Words to phonemes", "Слова в фонемы")
+private val g2pDone = L("Phonemes of {0} words written under them", "Фонемы {0} слов записаны под ними")
+private val g2pMissing = L("No phonemes for: {0}. Write them in the model's own words.", "Нет фонем для: {0}. Впишите их в собственные слова модели.")
 
 /** The refinement done after autolabelling, when it's on in the settings. */
 internal fun EditorState.refineAfter(): RefineSettings? = settings.toolkit.refine.takeIf { it.enabled && it.model.isNotBlank() }

@@ -124,6 +124,10 @@ data class EditSettings(
     val saveOnSwitch: Boolean = true,
     val newFormat: LabelFormat = LabelFormat.Lab,
     val otoLockedDrag: Boolean = true,
+    /** oto: after a marker is moved by hand: "none", "next" (the next entry), "done" (marked done) or "done-next". */
+    val otoAfterEdit: String = "none",
+    /** Only after this marker ([mlabeler.core.format.OtoMarker] name); empty = any. */
+    val otoAfterMarker: String = "",
     /** Play a short piece around a boundary while it is dragged. */
     val playOnDrag: Boolean = false,
     /** Which phoneme a boundary "belongs" to: "end" = the one that ends at it, "start" = the one that starts at it.
@@ -205,6 +209,10 @@ data class ToolkitSettings(
     val lastSegmentModel: String = "",
     /** Aligning without text: recognise the words with Whisper first (a large download on first use). */
     val whisper: Boolean = false,
+    /** The Whisper model that recognises the words for autolabelling. */
+    val whisperModel: String = "whisper-large-v3-turbo",
+    /** Words no dictionary or G2P can spell are left out instead of failing the file. */
+    val skipUnknownWords: Boolean = false,
     /** Phoneme recognition (WFL-ASR): see [mlabeler.app.toolkit.SegmentOptions]. */
     val wfl: WflSettings = WflSettings(),
     /** Refinement of the phoneme boundaries after autolabelling (off by default). */
@@ -339,6 +347,7 @@ data class AppSettings(
     val updates: UpdateSettings = UpdateSettings(),
     val clean: CleanSettings = CleanSettings(),
     val karaoke: KaraokeSettings = KaraokeSettings(),
+    val doneSound: DoneSoundSettings = DoneSoundSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
@@ -469,6 +478,16 @@ data class KaraokeSettings(
     val musicLevel: Float = 1f,
     val separation: String = "auto",
     val whisper: String = "whisper-large-v3-turbo",
+)
+
+/** A sound played when long work (autolabelling and the like) ends: off and without a sound by default. */
+@Serializable
+data class DoneSoundSettings(
+    val enabled: Boolean = false,
+    /** The sound file (WAV, or what the platform can decode). */
+    val path: String = "",
+    /** Only after work that took at least this long, seconds. */
+    val minSeconds: Int = 20,
 )
 
 /** Options of phoneme recognition without text (WFL-ASR); negative confidence = the model's own value. */

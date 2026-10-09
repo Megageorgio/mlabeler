@@ -132,9 +132,19 @@ data class PhonemeDict(
             vowels = listOf("ah", "eh", "ae", "ee", "oe", "ih", "oh", "oo", "ou", "uh", "en", "in", "on"),
             consonants = listOf("y", "w", "f", "k", "p", "s", "sh", "t", "h", "b", "d", "g", "l", "m", "n", "r", "v", "z", "j", "ng", "q", "uy", "vf", "cl"),
         )
+        /**
+         * Korean as in the dictionary of colstone's SOFA model (and OpenUtau's DiffSinger Korean): K, L, M, N, NG, P, T
+         * are the final consonants of a syllable, so they stay with the vowel before them.
+         */
+        val korean = PhonemeDict(
+            "Korean", language = "ko", source = "DiffSinger",
+            vowels = listOf("a", "e", "eo", "eu", "i", "o", "u", "ae", "oe", "ui"),
+            consonants = listOf("b", "ch", "d", "g", "h", "j", "jj", "k", "kk", "m", "n", "p", "pp", "r", "s", "ss", "t", "tt", "K", "L", "M", "N", "NG", "P", "T"),
+            semivowels = listOf("w", "y"),
+        )
         /** Guesses only. */
         val auto = PhonemeDict("Auto")
-        val builtIn = listOf(auto, japanese, chinese, english, englishTigermeat, englishOpenUtau, russian, cantonese, spanish, portuguese, italian, german, french)
+        val builtIn = listOf(auto, japanese, chinese, english, englishTigermeat, englishOpenUtau, russian, cantonese, korean, spanish, portuguese, italian, german, french)
     }
 }
 

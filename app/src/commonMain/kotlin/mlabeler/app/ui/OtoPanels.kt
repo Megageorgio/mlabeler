@@ -225,6 +225,7 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
             Toggle(ed.app.settings.edit.otoLockedDrag, { Commands.otoLock.run(ed, ed.app) })
         }
         Text(otoLockHint(), color = c.muted, fontSize = 11.sp)
+        OtoAfterEdit(ed.app)
         OtoCompareSection(ed)
         androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Btn(Commands.otoDuplicate.title()) { ed.oto.duplicate() }
@@ -252,6 +253,69 @@ private fun OtoCompareSection(ed: EditorState) {
     Text(S.otoDiffLine.format(d.matched, d.onlyHere, d.onlyThere), color = c.muted, fontSize = 12.sp)
     Text(S.otoDiffMean() + ": " + d.meanMs.entries.joinToString("  ") { (m, v) -> m.name.take(4).lowercase() + " " + (kotlin.math.round(v * 10) / 10) },
         color = c.muted, fontSize = 12.sp)
+    // every entry that differs: a click selects it here, or shows its values there
+    var minMs by remember { mutableStateOf(10f) }
+    val list = remember(ref, ed.oto.version, minMs) { mlabeler.core.format.OtoCompare.differences(ed.oto.entries, ref.second, minMs.toDouble()) }
+    ValueSlider(diffMinT(), minMs, 1f..100f, " ms", default = 10f) { minMs = it.toInt().toFloat() }
+    if (list.isEmpty()) Text(noDiffT(), color = c.muted, fontSize = 12.sp)
+    Column(Modifier.heightIn(max = 220.dp).scrollWithHint()) {
+        for (df in list.take(500)) {
+            val sel = df.mine != null && df.mine == ed.oto.selected
+            val what = when {
+                df.mine == null -> onlyThereT()
+                df.theirs == null -> onlyHereT()
+                else -> df.deltas.entries.joinToString("  ") { (m, v) -> m.name.take(4).lowercase() + " " + (if (v > 0) "+" else "") + kotlin.math.round(v).toInt() }
+            }
+            Row(Modifier.fillMaxWidth().background(if (sel) c.accent.copy(alpha = 0.14f) else c.panel).clickable { df.mine?.let { ed.oto.select(it) } }
+                .padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(df.alias, color = c.text, fontSize = 12.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                Text(what, color = c.muted, fontSize = 11.sp, maxLines = 1)
+            }
+        }
+    }
+    androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val i = ed.oto.selected
+        val canTake = i != null && list.any { it.mine == i && it.theirs != null }
+        Btn(takeThereT(), enabled = canTake) { i?.let { ed.oto.takeReference(it) } }
+        Btn(addMissingT.format(d.onlyThere), enabled = d.onlyThere > 0) { ed.app.message(addedT.format(ed.oto.addMissingFromReference())) }
+    }
+}
+
+private val diffMinT = mlabeler.app.i18n.L("A marker counts as different from", "Маркер считается другим от")
+private val noDiffT = mlabeler.app.i18n.L("No entries differ that much", "Настолько различающихся записей нет")
+private val onlyHereT = mlabeler.app.i18n.L("only here", "только здесь")
+private val onlyThereT = mlabeler.app.i18n.L("only there", "только там")
+private val takeThereT = mlabeler.app.i18n.L("Take its values for the selected entry", "Взять его значения для выбранной записи")
+private val addMissingT = mlabeler.app.i18n.L("Add the entries only it has ({0})", "Добавить записи, которые есть только там ({0})")
+private val addedT = mlabeler.app.i18n.L("Entries added: {0}", "Добавлено записей: {0}")
+
+private val afterT = mlabeler.app.i18n.L("After moving a marker by hand", "После того как маркер сдвинут вручную")
+private val afterNoneT = mlabeler.app.i18n.L("Stay", "Остаться")
+private val afterNextT = mlabeler.app.i18n.L("Next entry", "Следующая запись")
+private val afterDoneT = mlabeler.app.i18n.L("Mark done", "Отметить готовой")
+private val afterBothT = mlabeler.app.i18n.L("Mark done, next entry", "Отметить готовой и дальше")
+private val afterMarkerT = mlabeler.app.i18n.L("Only after this marker", "Только после этого маркера")
+private val anyMarkerT = mlabeler.app.i18n.L("Any", "Любого")
+
+/** What happens after a marker is moved by hand: nothing, the next entry, marked done, or both. */
+@Composable
+fun OtoAfterEdit(app: mlabeler.app.state.AppState) {
+    val c = T.c
+    val s = app.settings.edit
+    fun set(f: (mlabeler.app.state.EditSettings) -> mlabeler.app.state.EditSettings) = app.update { it.copy(edit = f(it.edit)) }
+    Text(afterT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((v, t) in listOf("none" to afterNoneT, "next" to afterNextT, "done" to afterDoneT, "done-next" to afterBothT))
+            Chip(t(), s.otoAfterEdit == v) { set { it.copy(otoAfterEdit = v) } }
+    }
+    if (s.otoAfterEdit != "none") {
+        Text(afterMarkerT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip(anyMarkerT(), s.otoAfterMarker.isEmpty()) { set { it.copy(otoAfterMarker = "") } }
+            for ((m, name) in listOf(OtoMarker.Left to "Offset", OtoMarker.Overlap to "Overlap", OtoMarker.Preutterance to "Preutterance", OtoMarker.Consonant to "Consonant", OtoMarker.Right to "Cutoff"))
+                Chip(name, s.otoAfterMarker == m.name) { set { it.copy(otoAfterMarker = m.name) } }
+        }
+    }
 }
 
 private val otoLockT = mlabeler.app.i18n.L("Preutterance moves all markers", "Preutterance двигает все маркеры")

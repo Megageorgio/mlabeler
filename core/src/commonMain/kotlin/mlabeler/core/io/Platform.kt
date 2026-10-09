@@ -5,6 +5,9 @@ expect fun decodeText(bytes: ByteArray, charset: String): String
 
 expect fun encodeText(text: String, charset: String): ByteArray
 
+/** [text] in Unicode normalization form C (composed: "が" as one character, as Windows and UTAU expect). */
+expect fun nfc(text: String): String
+
 /** Charsets offered in the UI. */
 val KNOWN_CHARSETS = listOf("UTF-8", "Shift_JIS", "GBK", "Big5", "EUC-KR", "windows-1251", "windows-1252", "ISO-8859-1")
 
@@ -57,6 +60,8 @@ interface FileSystem {
     fun copy(from: String, to: String) = write(to, read(from))
     /** Deletes a file; false when it couldn't. */
     fun delete(path: String): Boolean = false
+    /** Renames a file or folder; false when it couldn't. */
+    fun rename(from: String, to: String): Boolean = false
 }
 
 expect val PlatformFs: FileSystem

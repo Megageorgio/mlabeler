@@ -73,6 +73,7 @@ object MenuTitles {
     val view = L("View", "Вид")
     val go = L("Go", "Переход")
     val tools = L("Tools", "Инструменты")
+    val words = L("Words and phonemes", "Слова и фонемы")
     val units = L("Transitions (.trans)", "Переходы (.trans)")
     val help = L("Help", "Справка")
     val closeFolder = L("Close folder", "Закрыть папку")
@@ -141,6 +142,8 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MSub(MenuTitles.importExport(), buildList {
             add(item(Commands.importLbp, ed, app))
             if (!oto) add(item(Commands.exportDs, ed, app))
+            if (!oto) add(item(Commands.convert, ed, app))
+            add(item(Commands.ust, ed, app))
         }))
         add(MSub(MenuTitles.recording(), listOf(item(Commands.record, ed, app), item(Commands.karaoke, ed, app))))
         add(MSep)
@@ -177,7 +180,9 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
                 item(Commands.groupPhonemes, ed, app), item(Commands.notesFromGroups, ed, app), MSep,
                 item(Commands.pitchUp, ed, app), item(Commands.pitchDown, ed, app), item(Commands.notesFromAudio, ed, app),
                 MSep, item(Commands.midiIn, ed, app), item(Commands.midiOut, ed, app),
-                MSep, item(Commands.resynthWorld, ed, app), item(Commands.resynthNsf, ed, app),
+                MSep, item(Commands.f0Pencil, ed, app, checked = ed.f0Pencil), item(Commands.vuv, ed, app, checked = ed.vuvTool),
+                item(Commands.dynPencil, ed, app, checked = ed.dynPencil), item(Commands.dynApply, ed, app),
+                MSep, item(Commands.resynthWorld, ed, app), item(Commands.resynthNsf, ed, app), item(Commands.resynthSave, ed, app),
             )))
             add(item(Commands.fillQueue, ed, app))
             add(item(Commands.batchRename, ed, app))
@@ -273,18 +278,23 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         if (oto) { add(MSep); add(item(Commands.home, ed, app)); add(item(Commands.end, ed, app)) }
     }
     val tools = buildList {
-        if (oto) add(item(Commands.autoOto, ed, app)) else { add(item(Commands.autolabel, ed, app)); add(item(Commands.refine, ed, app)) }
+        if (oto) add(item(Commands.autoOto, ed, app)) else {
+            add(item(Commands.autolabel, ed, app)); add(item(Commands.refine, ed, app))
+            add(MSub(MenuTitles.words(), listOf(item(Commands.g2p, ed, app), item(Commands.modelWords, ed, app))))
+        }
         add(MSub(MenuTitles.soundTools(), buildList {
             if (!oto) add(item(Commands.soundMode, ed, app, checked = ed.soundMode))
             add(item(Commands.cleanup, ed, app))
             add(item(Commands.mute, ed, app))
             if (!oto) add(item(Commands.cutAudio, ed, app))
             add(item(Commands.normalize, ed, app))
+            add(item(Commands.gain, ed, app))
             if (!oto) add(item(Commands.trimSilence, ed, app))
             if (!oto) add(item(Commands.segments, ed, app))
         }))
         add(MSub(MenuTitles.datasetTools(), buildList {
             add(item(Commands.soundCheck, ed, app))
+            add(item(Commands.nfc, ed, app))
             if (!oto) add(item(Commands.summary, ed, app))
             if (!oto) add(item(Commands.phonemeCuts, ed, app))
             if (!oto && ed.items.any { it.labelFormat == mlabeler.core.format.LabelFormat.Seg }) add(item(Commands.unitsOverview, ed, app))

@@ -1,6 +1,7 @@
 package mlabeler.app.plugins
 
 import com.dokar.quickjs.QuickJs
+import com.dokar.quickjs.binding.function
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -51,12 +52,40 @@ data class PluginInfo(
     val target: String = "labels",
     val parameters: List<PluginParam> = emptyList(),
     val script: String = "main.js",
+    /** Extra data the script reads: "pitch" (the f0 of the recording). */
+    val uses: List<String> = emptyList(),
 )
 
 class Plugin(val info: PluginInfo, val dir: String, val code: String, val builtIn: Boolean)
 
-/** Result of a run: changed data, a report to show, lines printed with log(). */
-data class PluginResult(val doc: LabelDoc?, val entries: List<OtoEntry>?, val report: String?, val logs: List<String>)
+/**
+ * What a plugin sees besides its data: the folder and its files, the marks of the open file, its pitch; and the
+ * file system of the folder, which it may read and write (only inside the folder).
+ */
+class PluginContext(
+    val folder: String,
+    /** The recordings of the folder: name, labelled, done, star, tag. */
+    val files: List<JsonObject> = emptyList(),
+    /** Marks of the open file (labels plugins). */
+    val marks: mlabeler.core.io.ItemMarks? = null,
+    /** Marks of each oto entry, in the order of the entries (oto plugins). */
+    val entryMarks: List<mlabeler.core.io.ItemMarks>? = null,
+    val pitch: mlabeler.core.dsp.Curve? = null,
+    val language: String = "en",
+    val platform: String = "",
+    /** Called before a file is overwritten by writeText (to keep a copy). */
+    val backup: (String) -> Unit = {},
+)
+
+/**
+ * Result of a run: changed data, a report to show, lines printed with log(), changed marks, a part to play
+ * (start, end in seconds) and the files written.
+ */
+data class PluginResult(
+    val doc: LabelDoc?, val entries: List<OtoEntry>?, val report: String?, val logs: List<String>,
+    val marks: mlabeler.core.io.ItemMarks? = null, val entryMarks: List<mlabeler.core.io.ItemMarks>? = null,
+    val play: Pair<Double, Double>? = null, val written: List<String> = emptyList(),
+)
 
 object Plugins {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -121,32 +150,125 @@ object Plugins {
 
     private fun lit(e: JsonElement) = e.toString()
 
+    fun notesToJson(t: mlabeler.core.model.NoteTier): JsonElement = buildJsonArray {
+        for (n in t.notes) add(buildJsonObject {
+            put("start", n.start); put("end", n.end); put("pitch", n.pitch?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("slur", n.slur); put("text", n.text)
+        })
+    }
+
+    fun notesFromJson(e: JsonElement, name: String): mlabeler.core.model.NoteTier = mlabeler.core.model.NoteTier(name, e.jsonArray.map {
+        val o = it.jsonObject
+        mlabeler.core.model.Note(
+            o["start"]!!.jsonPrimitive.content.toDouble(), o["end"]!!.jsonPrimitive.content.toDouble(),
+            (o["pitch"] as? JsonPrimitive)?.doubleOrNull, (o["slur"] as? JsonPrimitive)?.content == "true", (o["text"] as? JsonPrimitive)?.content ?: "",
+        )
+    }.sortedBy { it.start })
+
+    private fun marksToJson(m: mlabeler.core.io.ItemMarks) = buildJsonObject { put("done", m.done); put("star", m.star); put("tag", m.tag) }
+
+    private fun marksFromJson(e: JsonElement?): mlabeler.core.io.ItemMarks? {
+        val o = e as? JsonObject ?: return null
+        return mlabeler.core.io.ItemMarks((o["done"] as? JsonPrimitive)?.content == "true", (o["star"] as? JsonPrimitive)?.content == "true",
+            (o["tag"] as? JsonPrimitive)?.content ?: "")
+    }
+
+    /** [path] (relative to [folder], or absolute) when it is inside [folder], else null. */
+    private fun inside(folder: String, path: String): String? {
+        val p = path.replace('\\', '/')
+        val abs = if (p.startsWith("/") || Regex("^[A-Za-z]:/").containsMatchIn(p)) p else Paths.join(folder, p).replace('\\', '/')
+        val parts = mutableListOf<String>()
+        for (s in abs.split('/')) when (s) { "", "." -> if (parts.isEmpty()) parts += s; ".." -> if (parts.size > 1) parts.removeAt(parts.lastIndex) else return null; else -> parts += s }
+        val norm = parts.joinToString("/")
+        val root = folder.replace('\\', '/').trimEnd('/')
+        return norm.takeIf { it == root || it.startsWith("$root/") }
+    }
+
     /**
-     * Runs [plugin]. The script sees `params`, `labels` (tiers of the open file) or `entries` (oto),
-     * `file` ({name, duration}); it changes them in place, may set `report`, and may call `log(...)`.
+     * Runs [plugin]. The script sees `params`, `labels` (tiers of the open file) or `entries` (oto, each with its
+     * done, star and tag), `notes`, `marks` ({done, star, tag} of the file), `file` ({name, duration}), `folder`
+     * ({path, files}), `env`, `pitch` ({hop, values} when the plugin uses it); it changes them in place, may set
+     * `report` and `play` ([start, end]), call `log(...)`, and read and write text files of the folder with
+     * readText, writeText, listFiles and exists.
      */
-    suspend fun run(plugin: Plugin, params: Map<String, JsonElement>, doc: LabelDoc?, entries: List<OtoEntry>?, fileName: String, duration: Double): PluginResult {
+    suspend fun run(plugin: Plugin, params: Map<String, JsonElement>, doc: LabelDoc?, entries: List<OtoEntry>?, fileName: String, duration: Double,
+                    ctx: PluginContext? = null): PluginResult {
         val js = QuickJs.create(Dispatchers.Default)
+        val written = mutableListOf<String>()
         try {
+            val folder = ctx?.folder
+            if (folder != null) {
+                js.function("readText") { args ->
+                    val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: return@function null
+                    runCatching { mlabeler.core.io.decodeGuess(PlatformFs.read(p), args.getOrNull(1)?.toString() ?: "UTF-8").first }.getOrNull()
+                }
+                js.function("exists") { args -> inside(folder, args.getOrNull(0)?.toString() ?: "")?.let { PlatformFs.exists(it) } ?: false }
+                js.function("listFiles") { args ->
+                    val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: return@function "[]"
+                    val list = runCatching { PlatformFs.list(p) }.getOrDefault(emptyList()).map { Paths.name(it) }.filter { !it.startsWith(".") }.sorted()
+                    JsonArray(list.map { JsonPrimitive(it) }).toString()
+                }
+                js.function("writeText") { args ->
+                    val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: throw IllegalArgumentException("writeText: only files inside the folder")
+                    if (Paths.name(p).startsWith(".")) throw IllegalArgumentException("writeText: not a hidden file")
+                    if (PlatformFs.exists(p)) ctx.backup(p)
+                    PlatformFs.write(p, (args.getOrNull(1)?.toString() ?: "").encodeToByteArray())
+                    written += p
+                    true
+                }
+            }
             val code = buildString {
                 append("var __logs = [];\n")
                 append("function log() { __logs.push(Array.prototype.map.call(arguments, function (a) { return typeof a === 'string' ? a : JSON.stringify(a); }).join(' ')); }\n")
                 append("var console = { log: log, warn: log, error: log };\n")
+                if (folder != null) append("var __list = listFiles; listFiles = function (d) { return JSON.parse(__list(d || '')); };\n")
                 append("var params = ").append(lit(JsonObject(params))).append(";\n")
                 append("var labels = ").append(if (doc != null) lit(docToJson(doc)) else "null").append(";\n")
-                append("var entries = ").append(if (entries != null) lit(otoToJson(entries)) else "null").append(";\n")
+                val noteTier = doc?.tiers?.firstOrNull { it is mlabeler.core.model.NoteTier } as? mlabeler.core.model.NoteTier
+                append("var notes = ").append(if (noteTier != null) lit(notesToJson(noteTier)) else "null").append(";\n")
+                val withMarks = entries?.let { es ->
+                    val m = ctx?.entryMarks
+                    buildJsonArray {
+                        for ((i, o) in otoToJson(es).jsonArray.withIndex()) add(JsonObject(o.jsonObject + (m?.getOrNull(i)?.let { marksToJson(it) } ?: marksToJson(mlabeler.core.io.ItemMarks()))))
+                    }
+                }
+                append("var entries = ").append(if (withMarks != null) lit(withMarks) else "null").append(";\n")
+                append("var marks = ").append(ctx?.marks?.let { lit(marksToJson(it)) } ?: "null").append(";\n")
                 append("var file = ").append(lit(buildJsonObject { put("name", fileName); put("duration", duration) })).append(";\n")
-                append("var report = null;\n")
+                append("var folder = ").append(if (ctx != null) lit(buildJsonObject { put("path", ctx.folder); put("files", JsonArray(ctx.files)) }) else "null").append(";\n")
+                append("var env = ").append(lit(buildJsonObject { put("platform", ctx?.platform ?: ""); put("language", ctx?.language ?: "en"); put("app", "mLabeler") })).append(";\n")
+                val pitch = ctx?.pitch?.takeIf { "pitch" in plugin.info.uses }
+                append("var pitch = ").append(if (pitch != null) lit(buildJsonObject {
+                    put("hop", pitch.hop)
+                    put("values", buildJsonArray { for (v in pitch.values) add(JsonPrimitive(if (v.isNaN() || v < 0f) 0f else v)) })
+                }) else "null").append(";\n")
+                append("var report = null;\nvar play = null;\n")
                 append("(function () {\n").append(plugin.code).append("\n})();\n")
-                append("JSON.stringify({ labels: labels, entries: entries, report: report, logs: __logs });\n")
+                append("JSON.stringify({ labels: labels, notes: notes, entries: entries, marks: marks, report: report, play: play, logs: __logs });\n")
             }
             val out: String = js.evaluate(code, plugin.info.name + ".js", false)
             val r = json.parseToJsonElement(out).jsonObject
+            var newDoc = r["labels"]?.takeIf { it !is JsonNull && doc != null }?.let { docFromJson(it, doc!!, duration) }
+            val noteIndex = doc?.tiers?.indexOfFirst { it is mlabeler.core.model.NoteTier } ?: -1
+            val notesOut = r["notes"]?.takeIf { it !is JsonNull && doc != null }
+            if (notesOut != null && doc != null) {
+                val base = newDoc ?: doc
+                val name = if (noteIndex >= 0) (doc.tiers[noteIndex] as mlabeler.core.model.NoteTier).name else "notes"
+                val nt = notesFromJson(notesOut, name)
+                val k = base.tiers.indexOfFirst { it is mlabeler.core.model.NoteTier }
+                newDoc = if (k >= 0) base.replace(k, nt) else base.copy(tiers = base.tiers + nt)
+            }
+            val outEntries = r["entries"]?.takeIf { it !is JsonNull && entries != null }
+            val play = (r["play"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.doubleOrNull }?.takeIf { it.size >= 2 }?.let { it[0] to it[1] }
             return PluginResult(
-                doc = r["labels"]?.takeIf { it !is JsonNull && doc != null }?.let { docFromJson(it, doc!!, duration) },
-                entries = r["entries"]?.takeIf { it !is JsonNull && entries != null }?.let { otoFromJson(it) },
+                doc = newDoc,
+                entries = outEntries?.let { otoFromJson(it) },
                 report = (r["report"] as? JsonPrimitive)?.content?.takeIf { r["report"] !is JsonNull },
                 logs = (r["logs"] as? JsonArray)?.map { it.jsonPrimitive.content } ?: emptyList(),
+                marks = marksFromJson(r["marks"]),
+                entryMarks = (outEntries as? JsonArray)?.map { marksFromJson(it) ?: mlabeler.core.io.ItemMarks() },
+                play = play,
+                written = written,
             )
         } finally {
             js.close()

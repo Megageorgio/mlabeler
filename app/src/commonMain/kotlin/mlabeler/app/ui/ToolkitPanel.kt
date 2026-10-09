@@ -178,3 +178,85 @@ private fun InstallStats(tk: mlabeler.app.toolkit.ToolkitManager) {
     Text(parts.joinToString("  ·  "), color = c.text, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
     log.lastOrNull()?.let { Text(it, color = c.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
 }
+
+private val whSmallT = L("Fast (small)", "Быстро (small)")
+private val whMediumT = L("Medium", "Средне (medium)")
+private val whTurboT = L("Accurate (large-v3-turbo)", "Точно (large-v3-turbo)")
+private val whLargeT = L("Most accurate (large-v3, slow)", "Точнее всего (large-v3, медленно)")
+private val whNote = L("Each model is downloaded on first use. Without a graphics card the small ones are several times faster.",
+    "Каждая модель загружается при первом использовании. Без видеокарты маленькие модели в несколько раз быстрее.")
+
+/** The Whisper models of the toolkit's catalogue, from the fastest to the most accurate. */
+@Composable
+fun WhisperModelChoice(selected: String, onPick: (String) -> Unit) {
+    val c = T.c
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+        for ((id, t) in listOf("whisper-small" to whSmallT(), "whisper-medium" to whMediumT(), "whisper-large-v3-turbo" to whTurboT(), "whisper-large-v3" to whLargeT()))
+            Chip(t, selected == id) { onPick(id) }
+    }
+    Text(whNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+}
+
+private val deviceT = L("Processing device", "Устройство для вычислений")
+private val devAutoT = L("Auto", "Авто")
+private val devGpuT = L("Graphics card (CUDA)", "Видеокарта (CUDA)")
+private val devCpuT = L("Processor (CPU)", "Процессор (CPU)")
+private val deviceHintT = L(
+    "Auto uses an NVIDIA graphics card when there is one. Processor: slower, but leaves the graphics card free and works when its memory runs out. The change applies to the next job.",
+    "Авто использует видеокарту NVIDIA, если она есть. Процессор медленнее, но не занимает видеокарту и работает, когда её памяти не хватает. Изменение применяется к следующей задаче.",
+)
+private val gpuFoundT = L("Graphics card: {0}", "Видеокарта: {0}")
+private val noGpuT = L("No NVIDIA graphics card found: everything runs on the processor", "Видеокарта NVIDIA не найдена: всё работает на процессоре")
+
+/** Where the toolkit computes: auto, the graphics card or the processor (a setting of the toolkit itself). */
+@Composable
+fun ToolkitDeviceSection(app: AppState) {
+    val c = T.c
+    val tk = app.toolkit
+    val scope = rememberCoroutineScope()
+    val ready = tk.status == Status.Ready
+    var device by remember { mutableStateOf<String?>(null) }
+    var gpu by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(ready) {
+        if (!ready) return@LaunchedEffect
+        try {
+            val client = tk.client()
+            device = (client.settings()["device"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: "auto"
+            val g = (client.health() as? kotlinx.serialization.json.JsonObject)?.get("gpu")
+            gpu = ((g as? kotlinx.serialization.json.JsonObject)?.get("gpus") as? kotlinx.serialization.json.JsonArray).orEmpty()
+                .mapNotNull { ((it as? kotlinx.serialization.json.JsonObject)?.get("name") as? kotlinx.serialization.json.JsonPrimitive)?.content }.joinToString(", ")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            error = e.message
+        }
+    }
+    Fold(deviceT()) {
+        when {
+            !ready -> Text("—", color = c.muted, fontSize = 13.sp)
+            error != null -> Text(error!!, color = c.danger, fontSize = 13.sp)
+            device == null -> Text("…", color = c.muted, fontSize = 13.sp)
+            else -> {
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for ((v, t) in listOf("auto" to devAutoT(), "cuda" to devGpuT(), "cpu" to devCpuT())) {
+                        Chip(t, device == v || (v == "cuda" && device!!.startsWith("cuda"))) {
+                            scope.launch {
+                                try {
+                                    device = (tk.client().changeSettings(mapOf("device" to v))["device"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: v
+                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    app.message(e.message ?: e.toString(), error = true)
+                                }
+                            }
+                        }
+                    }
+                }
+                Text(if (gpu.isNullOrBlank()) noGpuT() else gpuFoundT.format(gpu!!), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            }
+        }
+        Text(deviceHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+    }
+}

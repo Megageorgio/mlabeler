@@ -17,6 +17,7 @@ import mlabeler.app.state.togglePanel
 import mlabeler.app.state.toggleSide
 import mlabeler.core.format.OtoMarker
 import mlabeler.app.state.playResynth
+import mlabeler.app.state.phonemesFromWords
 
 /** A key combination. "Ctrl" is Cmd on macOS. */
 data class Chord(val key: Key, val ctrl: Boolean = false, val shift: Boolean = false, val alt: Boolean = false) {
@@ -162,6 +163,7 @@ object Commands {
         a.update { it.copy(layout = it.layout.copy(showFormants = !it.layout.showFormants)) }
     }
     val trimSilence = Command("trim-silence", L("Trim silence at the ends", "Обрезать тишину по краям"), emptyList()) { e, _ -> e.cleanup.trimSilence() }.only(Mode.Labels)
+    val gain = Command("gain", L("Change the level (the amount set in Clean the recording)", "Изменить громкость (на величину из «Чистки записи»)"), emptyList()) { e, a -> e.cleanup.gain(e.range ?: e.selectedSpan(), a.settings.clean.gainDb) }
     val normalize = Command("normalize", L("Normalise the level", "Нормализовать громкость"), emptyList()) { e, _ -> e.cleanup.normalize(e.range ?: e.selectedSpan()) }
     val palette = Command("commands", S.commands, listOf(ch('K', ctrl = true))) { _, a -> a.showCommands = true }
     val settings = Command("settings", S.settings, listOf(Chord(Key.Comma, ctrl = true))) { _, a -> a.showSettings = true }
@@ -188,6 +190,7 @@ object Commands {
             "Вокодер — NSF-HiFiGAN от OpenVPI (CC BY-NC-SA 4.0: только некоммерческое использование); загружается при первом использовании.")())
         e.playResynth("nsf")
     }.only(Mode.Labels)
+    val resynthSave = Command("resynth-save", L("Save the sound with the drawn pitch…", "Сохранить звук с нарисованной высотой…"), emptyList()) { _, a -> a.showResynth = true }.only(Mode.Labels)
     val segments = Command("segments", L("Cut into segments…", "Нарезка на сегменты…"), emptyList()) { _, a -> a.showSegments = true }.only(Mode.Labels)
     val batchRename = Command("batch-rename", L("Rename in bulk…", "Пакетное переименование…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
     val overlay = Command("overlay", S.overlayShort, listOf(ch('V'))) { _, a -> a.update { it.copy(layout = it.layout.copy(overlay = !it.layout.overlay)) } }
@@ -213,7 +216,13 @@ object Commands {
     val groupPhonemes = Command("group-phonemes", L("Group phonemes into notes", "Сгруппировать фонемы по нотам"), emptyList()) { e, _ -> e.groupPhonemes() }.only(Mode.Labels)
     val notesFromGroups = Command("notes-from-groups", L("Notes from groups and pitch", "Ноты по группам и высоте"), emptyList()) { e, _ -> e.notesFromGroups() }.only(Mode.Labels)
     val fillQueue = Command("fill-queue", L("Spread typed phonemes over the selection", "Расставить вписанные фонемы по выделенному"), emptyList()) { e, _ -> e.fillWithQueue() }.only(Mode.Labels)
-    val f0Pencil = Command("f0-pencil", L("Draw the pitch in the pitch lane", "Рисовать высоту тона на полосе высоты"), listOf(ch('E'))) { e, _ -> e.f0Pencil = !e.f0Pencil }.only(Mode.Labels)
+    val f0Pencil = Command("f0-pencil", L("Draw the pitch in the pitch lane", "Рисовать высоту тона на полосе высоты"), listOf(ch('E'))) { e, _ -> e.f0Pencil = !e.f0Pencil; e.vuvTool = false }.only(Mode.Labels)
+    val vuv = Command("f0-vuv", L("Mark voiced and unvoiced parts in the pitch lane", "Отмечать звонкие и глухие участки на полосе высоты"), emptyList()) { e, _ -> e.vuvTool = !e.vuvTool; e.f0Pencil = false }.only(Mode.Labels)
+    val dynPencil = Command("dyn-pencil", L("Draw the loudness in the loudness lane", "Рисовать громкость на полосе громкости"), emptyList()) { e, a ->
+        e.dynPencil = !e.dynPencil
+        if (e.dynPencil && !a.settings.layout.showPower) a.update { it.copy(layout = it.layout.copy(showPower = true)) }
+    }.only(Mode.Labels)
+    val dynApply = Command("dyn-apply", L("Write the drawn loudness into the recording", "Записать нарисованную громкость в звук"), emptyList()) { e, _ -> e.cleanup.applyDrawnLoudness() }.only(Mode.Labels)
     val reviewNext = Command("review-next", L("Next place to check (worst first)", "Следующее место для проверки (худшее первым)"), listOf(Chord(Key.N))) { e, _ -> e.reviewStep(1) }.only(Mode.Labels)
     val reviewPrev = Command("review-prev", L("Previous place to check", "Предыдущее место для проверки"), listOf(Chord(Key.N, shift = true))) { e, _ -> e.reviewStep(-1) }.only(Mode.Labels)
     val arrange = Command("arrange", L("Arrange panels and lanes", "Расставить панели и полосы"), emptyList()) { _, a -> a.arrangePanels = !a.arrangePanels }
@@ -231,6 +240,19 @@ object Commands {
     val unitSingle = Command("unit-single", L("This phoneme held: keep or take away", "Эта фонема протяжно: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
     val unitsOverview = Command("units-overview", L("Transitions of the folder (.trans)…", "Переходы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
     val refine = Command("refine-boundaries", L("Refine boundaries…", "Уточнить границы…"), emptyList()) { _, a -> a.showRefine = true }.only(Mode.Labels)
+    val nfc = Command("normalize-names", L("Normalise file names (files from a Mac)…", "Нормализовать имена файлов (файлы с Mac)…"), emptyList()) { _, a -> a.showNfc = true }
+    val ust = Command("ust", L("UTAU sequence (.ust)…", "Партия UTAU (.ust)…"), emptyList()) { _, a -> a.showUst = true }
+    val convert = Command("convert-labels", L("Convert label files…", "Перевести файлы разметки в другой формат…"), emptyList()) { _, a -> a.showConvert = true }.only(Mode.Labels)
+    val g2p = Command("phonemes-from-words", L("Phonemes from the words (dictionary and G2P of the aligner model)", "Фонемы по словам (словарь и G2P модели выравнивания)"), emptyList()) { e, a ->
+        val t = a.settings.toolkit
+        if (t.lastModel.isBlank()) { a.message(L("Choose an aligner model in Autolabel first", "Сначала выберите модель выравнивания в авторазметке")()); a.showAutolabel = true }
+        else e.phonemesFromWords(t.lastModel, t.lastLanguage.takeIf { it.isNotEmpty() && it != "*" })
+    }.only(Mode.Labels)
+    val modelWords = Command("model-words", L("Own words of the aligner model…", "Собственные слова модели выравнивания…"), emptyList()) { _, a ->
+        val t = a.settings.toolkit
+        if (t.lastModel.isBlank()) { a.message(L("Choose an aligner model in Autolabel first", "Сначала выберите модель выравнивания в авторазметке")()); a.showAutolabel = true }
+        else a.wordsCheck = WordsCheck(t.lastModel, t.lastLanguage.takeIf { it.isNotEmpty() && it != "*" })
+    }.only(Mode.Labels)
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
     val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: клик выбирает, перетаскивание двигает"), listOf(Chord(Key.One)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "cursor")) }
@@ -280,10 +302,10 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, ust, nfc, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
-        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, segments, resynthWorld, resynthNsf,
+        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf, resynthSave,
         palette, settings, openFolder,
     )
 

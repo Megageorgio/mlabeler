@@ -23,6 +23,32 @@ class PluginsTest {
     }
 
     @Test
+    fun scriptsSeeMarksNotesAndTheFolder() = runBlocking {
+        val dir = kotlin.io.path.createTempDirectory("mlplug").toFile()
+        java.io.File(dir, "words.txt").writeText("hello")
+        val code = """
+            marks.star = true;
+            notes[0].pitch = 62;
+            var t = readText('words.txt');
+            writeText('out.txt', t + ' ' + folder.files.length + ' ' + params.f);
+            report = listFiles('').join(',') + '|' + (readText('../secret.txt') === null) + '|' + exists('words.txt');
+            play = [0.1, 0.4];
+        """.trimIndent()
+        val p = Plugin(mlabeler.app.plugins.PluginInfo("t", parameters = listOf(mlabeler.app.plugins.PluginParam("f", "file"))), "", code, false)
+        val doc = LabelDoc(listOf(IntervalTier("phones", listOf(0.0, 1.0), listOf("a")),
+            mlabeler.core.model.NoteTier("notes", listOf(mlabeler.core.model.Note(0.0, 1.0, 60.0)))))
+        val ctx = mlabeler.app.plugins.PluginContext(dir.path, listOf(kotlinx.serialization.json.buildJsonObject { }), mlabeler.core.io.ItemMarks())
+        val r = Plugins.run(p, mapOf("f" to JsonPrimitive("x.wav")), doc, null, "x", 1.0, ctx)
+        assertEquals(true, r.marks?.star)
+        assertEquals(62.0, (r.doc!!.tiers.first { it is mlabeler.core.model.NoteTier } as mlabeler.core.model.NoteTier).notes[0].pitch)
+        assertEquals("hello 1 x.wav", java.io.File(dir, "out.txt").readText())
+        assertEquals("out.txt,words.txt|true|true", r.report)
+        assertEquals(0.1 to 0.4, r.play)
+        dir.deleteRecursively()
+        Unit
+    }
+
+    @Test
     fun changesCountsIntervalsThatDiffer() {
         val a = LabelDoc(listOf(IntervalTier("phones", listOf(0.0, 0.5, 1.0, 1.5), listOf("pau", "a", "k"))))
         assertEquals(0, mlabeler.app.state.PluginBatch.changes(a, a))

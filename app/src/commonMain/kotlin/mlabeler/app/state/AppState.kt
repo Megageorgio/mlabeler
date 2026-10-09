@@ -65,6 +65,12 @@ class AppState(private val scope: CoroutineScope) {
     var showSummary by mutableStateOf(false)
     var showPhonemeCuts by mutableStateOf(false)
     var showRefine by mutableStateOf(false)
+    var showConvert by mutableStateOf(false)
+    var showResynth by mutableStateOf(false)
+    var showUst by mutableStateOf(false)
+    var showNfc by mutableStateOf(false)
+    /** The words of an aligner model being looked at (unknown ones and its own words). */
+    var wordsCheck by mutableStateOf<mlabeler.app.ui.WordsCheck?>(null)
     var showUnitsOverview by mutableStateOf(false)
     var showSoundCheck by mutableStateOf(false)
     val toolkit = mlabeler.app.toolkit.ToolkitManager(this, scope)
@@ -93,9 +99,18 @@ class AppState(private val scope: CoroutineScope) {
         scope.launch {
             try {
                 val oto = p.info.target == "oto"
-                val r = mlabeler.app.plugins.Plugins.run(p, params, if (oto) null else ed.doc, if (oto) ed.oto.entries else null, ed.item?.name ?: "", ed.duration)
+                val ctx = pluginContext(ed, oto)
+                val r = mlabeler.app.plugins.Plugins.run(p, params, if (oto) null else ed.doc, if (oto) ed.oto.entries else null, ed.item?.name ?: "", ed.duration, ctx)
                 r.doc?.let { d -> ed.updateDocShowingChanges { mlabeler.core.edit.Edits.fitToDuration(d, ed.duration) } }
                 r.entries?.let { ed.oto.replaceAll(it) }
+                // marks the script changed
+                val it0 = ed.item
+                if (!oto && it0 != null && r.marks != null && r.marks != ctx.marks) ed.setMarks(it0) { r.marks }
+                if (oto && r.entries != null && r.entryMarks != null) {
+                    for ((e, m) in r.entries.zip(r.entryMarks)) if (ed.oto.marks(e) != m) ed.oto.setMarks(e) { m }
+                }
+                if (r.written.isNotEmpty()) { ed.labelsChangedOnDisk(); ed.rescan() }
+                r.play?.let { (a, b) -> if (b > a) ed.play(a.coerceAtLeast(0.0), b.coerceAtMost(ed.duration)) }
                 val text = listOfNotNull(r.report, r.logs.takeIf { it.isNotEmpty() }?.joinToString("\n")).joinToString("\n")
                 message(text.ifEmpty { mlabeler.app.i18n.S.pluginDone() })
             } catch (e: Exception) {
@@ -103,6 +118,56 @@ class AppState(private val scope: CoroutineScope) {
             }
         }
     }
+    private var donePlayer: mlabeler.app.AudioOut? = null
+
+    /** Long work that began at [since] (ms) ended: the sound of [DoneSoundSettings] when it took long enough. */
+    fun workFinished(since: Long) {
+        val s = settings.doneSound
+        if (!s.enabled || s.path.isBlank()) return
+        if (kotlin.time.Clock.System.now().toEpochMilliseconds() - since < s.minSeconds * 1000L) return
+        playDoneSound()
+    }
+
+    /** Plays the sound of [DoneSoundSettings] (also to try it in the settings). */
+    fun playDoneSound() {
+        val path = settings.doneSound.path
+        if (path.isBlank()) return
+        scope.launch {
+            runCatching {
+                val a = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    val bytes = mlabeler.core.io.PlatformFs.read(path)
+                    if (mlabeler.core.audio.Wav.isWav(bytes)) mlabeler.core.audio.Wav.decode(bytes) else Platform.decodeAudio(path)
+                } ?: return@launch
+                val p = donePlayer ?: mlabeler.app.AudioOut().also { donePlayer = it }
+                p.stop()
+                p.play(a, 0, a.samples.size, false)
+            }.onFailure { message(it.message ?: it.toString(), error = true) }
+        }
+    }
+
+    /** What a plugin sees of the open folder: its files with their marks, the open file's marks and pitch. */
+    fun pluginContext(ed: EditorState, oto: Boolean): mlabeler.app.plugins.PluginContext {
+        val files = ed.items.map { f ->
+            val m = ed.marks(f)
+            kotlinx.serialization.json.buildJsonObject {
+                put("name", kotlinx.serialization.json.JsonPrimitive(f.name)); put("path", kotlinx.serialization.json.JsonPrimitive(ed.workspace.relative(f.audioPath)))
+                put("labelled", kotlinx.serialization.json.JsonPrimitive(f.labelPath != null))
+                put("done", kotlinx.serialization.json.JsonPrimitive(m.done)); put("star", kotlinx.serialization.json.JsonPrimitive(m.star))
+                put("tag", kotlinx.serialization.json.JsonPrimitive(m.tag))
+            }
+        }
+        return mlabeler.app.plugins.PluginContext(
+            folder = ed.workspace.root,
+            files = files,
+            marks = if (oto) null else ed.item?.let { ed.marks(it) },
+            entryMarks = if (oto) ed.oto.entries.map { ed.oto.marks(it) } else null,
+            pitch = ed.pitchCurve,
+            language = mlabeler.app.i18n.Lang.current,
+            platform = Platform.name,
+            backup = { path -> ed.workspace.backupCopy(path) },
+        )
+    }
+
     /** A labels plugin tried on many files, waiting to be applied (shown in the plugins dialog). */
     var pluginBatch by mutableStateOf<PluginBatch?>(null)
 

@@ -1,0 +1,69 @@
+package mlabeler.app.ui
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import mlabeler.app.i18n.L
+import mlabeler.app.i18n.S
+import mlabeler.app.state.AppState
+import mlabeler.app.state.EditorState
+import mlabeler.app.state.convertLabels
+import mlabeler.app.state.convertTargets
+import mlabeler.app.state.filesToConvert
+import mlabeler.app.theme.T
+
+private val titleT = L("Convert label files", "Перевод файлов разметки в другой формат")
+private val toT = L("Into", "В формат")
+private val countT = L("Files to convert: {0}", "Файлов для перевода: {0}")
+private val byFormatT = L("now: {0}", "сейчас: {0}")
+private val aboutT = L(
+    "Each recording keeps one label file: the new one is written next to it and the old one goes to .mlabeler/backup. Rows of a transcriptions.csv stay where they are.",
+    "У каждой записи остаётся один файл разметки: новый пишется рядом с ней, а старый переносится в .mlabeler/backup. Строки transcriptions.csv остаются на месте.",
+)
+private val defaultT = L("Use this format for new labels of the folder too", "Использовать этот формат и для новой разметки папки")
+private val runT = L("Convert", "Перевести")
+
+@Composable
+fun ConvertDialog(app: AppState, ed: EditorState) {
+    val c = T.c
+    fun close() { app.showConvert = false; ed.requestFocus() }
+    var target by remember { mutableStateOf(ed.workspace.state.defaultFormat.takeIf { it in convertTargets } ?: mlabeler.core.format.LabelFormat.TextGrid) }
+    var makeDefault by remember { mutableStateOf(true) }
+    val files = remember(target, ed.items) { ed.filesToConvert(target) }
+    Overlay({ close() }, 560) {
+        DialogContent(footer = {
+            Btn(S.cancel()) { close() }
+            Btn(runT(), primary = true, enabled = files.isNotEmpty()) {
+                ed.convertLabels(files, target, makeDefault)
+                close()
+            }
+        }) {
+            Text(titleT(), color = c.text, fontSize = 17.sp)
+            SectionTitle(toT())
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (f in convertTargets) Chip(f.title, f == target) { target = f }
+            }
+            Text(countT.format(files.size), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+            val byFormat = files.groupingBy { it.labelFormat!!.title }.eachCount().entries.joinToString(", ") { "${it.key} ${it.value}" }
+            if (byFormat.isNotEmpty()) Text(byFormatT.format(byFormat), color = c.muted, fontSize = 12.sp)
+            Text(aboutT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp).clickable { makeDefault = !makeDefault }, verticalAlignment = Alignment.CenterVertically) {
+                Text(defaultT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Toggle(makeDefault, { makeDefault = it })
+            }
+        }
+    }
+}

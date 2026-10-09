@@ -27,6 +27,8 @@ data class CleanSettings(
     val noiseSmoothing: Int = 3,
     /** Peak level after normalising, dB below full scale. */
     val normalizeDb: Float = -1f,
+    /** Level change of the gain tool, dB (negative = quieter). */
+    val gainDb: Float = 3f,
     /** Trimming silence at the ends: what counts as silence (dB below the loudest part) and how much of it stays. */
     val trimThresholdDb: Float = -45f,
     val trimPadMs: Float = 200f,
@@ -123,6 +125,73 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
             changed
         }
         if (n > 0) app.message(normalized.format(((gainShown * 10).roundToInt() / 10.0).toString()))
+    }
+
+    /** Makes [range] (or the whole file) louder or quieter by [db]; what would go past full scale is clipped (said). */
+    fun gain(range: Pair<Double, Double>?, db: Float) = run("gain") {
+        if (db == 0f) return@run
+        val g = 10.0.pow(db / 20.0).toFloat()
+        var clipped = 0
+        val n = modify { w, ch, x ->
+            val (from, to) = frames(range, w)
+            var changed = 0
+            for (i in from until to) {
+                val v = x[i] * g
+                if (kotlin.math.abs(v) > 1f) clipped++
+                if (w.set(i, ch, v.coerceIn(-1f, 1f))) changed++
+            }
+            changed
+        }
+        if (n > 0) app.message(gained.format(((db * 10).roundToInt() / 10.0).toString()) + if (clipped > 0) "\n" + clippedT.format(clipped) else "")
+    }
+
+    /** The drawn loudness change at sample [i]: dB per frame of [hop] s, smooth between frames (NaN = none). */
+    private fun gainAt(edits: FloatArray, hop: Double, i: Int, rate: Int): Float {
+        val pos = i.toDouble() / rate / hop
+        val k = pos.toInt()
+        fun at(j: Int) = edits.getOrNull(j)?.takeIf { !it.isNaN() } ?: 0f
+        val f = (pos - k).toFloat()
+        return at(k) * (1 - f) + at(k + 1) * f
+    }
+
+    /** Writes the loudness drawn in the loudness lane into the recording (undone with Ctrl+Z); the drawing goes. */
+    fun applyDrawnLoudness() = run("dynamics") {
+        val edits = ed.gainEdits ?: return@run
+        val hop = ed.power?.hop ?: return@run
+        var clipped = 0
+        val n = modify { w, ch, x ->
+            var changed = 0
+            for (i in 0 until w.frames) {
+                val db = gainAt(edits, hop, i, w.sampleRate)
+                if (db == 0f) continue
+                val v = x[i] * 10.0.pow(db / 20.0).toFloat()
+                if (kotlin.math.abs(v) > 1f) clipped++
+                if (w.set(i, ch, v.coerceIn(-1f, 1f))) changed++
+            }
+            changed
+        }
+        ed.gainApplied()
+        if (n > 0) app.message(loudnessApplied() + if (clipped > 0) "\n" + clippedT.format(clipped) else "")
+    }
+
+    /** Puts [wav] in place of the recording (undone with Ctrl+Z; the first version is kept in .mlabeler/backup). */
+    suspend fun replaceSound(wav: ByteArray) {
+        val it = ed.item ?: return
+        val before = withContext(Dispatchers.Default) { ed.workspace.fs.read(it.audioPath) }
+        keepOriginal(it.audioPath, before)
+        ed.applyAudioEdit(it.audioPath, before, wav, null)
+    }
+
+    /** Plays [range] (or what is on screen) with the drawn loudness, without changing the file. */
+    fun previewDrawnLoudness(range: Pair<Double, Double>) = run("preview") {
+        val a = ed.audio ?: return@run
+        val edits = ed.gainEdits ?: return@run
+        val hop = ed.power?.hop ?: return@run
+        val (from, to) = samples(range, a)
+        val out = withContext(Dispatchers.Default) {
+            FloatArray(to - from) { k -> (a.samples[from + k] * 10.0.pow(gainAt(edits, hop, from + k, a.sampleRate) / 20.0).toFloat()).coerceIn(-1f, 1f) }
+        }
+        ed.playBuffer(Audio(a.sampleRate, out))
     }
 
     /** Fades [range] in (from silence) or out (to silence) along a smooth curve. */
@@ -311,9 +380,11 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
     private fun run(what: String, block: suspend () -> Unit) {
         if (busy) return
         busy = true
+        val start = ed.now()
         ed.workScope.launch {
             try {
                 block()
+                app.workFinished(start)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -334,6 +405,9 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         val profileShort = L("Select at least 50 ms of noise only", "Выделите хотя бы 50 мс, где только шум")
         val profileTaken = L("Noise profile taken", "Профиль шума получен")
         val noiseDone = L("Noise lowered ({0} samples changed)", "Шум снижен (изменено сэмплов: {0})")
+        val loudnessApplied = L("The drawn loudness is in the recording now. Ctrl+Z undoes this.", "Нарисованная громкость записана в звук. Отмена — Ctrl+Z.")
+        val gained = L("Level changed by {0} dB. Ctrl+Z undoes this.", "Громкость изменена на {0} дБ. Отмена — Ctrl+Z.")
+        val clippedT = L("{0} samples went past full scale and were clipped", "Сэмплов вышло за максимум и обрезано: {0}")
         val normalized = L("Level changed by {0} dB. Ctrl+Z undoes this.", "Громкость изменена на {0} дБ. Отмена — Ctrl+Z.")
         val trimNothing = L("No silence to trim at the ends", "По краям нет тишины для обрезки")
         val trimmed = L("Trimmed: {0} at the start, {1} at the end. Ctrl+Z undoes this.", "Обрезано: {0} в начале, {1} в конце. Отмена — Ctrl+Z.")

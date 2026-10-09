@@ -1,5 +1,6 @@
 package mlabeler.app.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +47,9 @@ private val allNote = L("Files of the folder that aren't open are written at onc
 private val preview = L("{0} will change", "изменится: {0}")
 private val badRegex = L("Pattern error: {0}", "Ошибка в шаблоне: {0}")
 private val apply = L("Rename", "Переименовать")
+private val keepOld = L("Keep the old entries: add copies under the new names", "Оставить старые записи: добавить копии под новыми именами")
+private val duplicateBtn = L("Add copies", "Добавить копии")
+private val duplicated = L("Copies added: {0}", "Добавлено копий: {0}")
 private val renamed = L("Renamed: {0}", "Переименовано: {0}")
 private val renamedFiles = L("Renamed: {0} in {1} files", "Переименовано: {0} в файлах: {1}")
 
@@ -59,6 +63,7 @@ fun BatchRenameDialog(app: AppState) {
     var from by remember { mutableStateOf(preset ?: "") }
     var to by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("") }
+    var copies by remember { mutableStateOf(false) }
     val oto = ed.mode == Mode.Oto
     val tierName = (ed.doc?.tiers?.getOrNull(ed.activeTier) as? IntervalTier)?.name ?: "phones"
     // the renaming as a function of a name; null while the pattern is broken or empty
@@ -75,9 +80,10 @@ fun BatchRenameDialog(app: AppState) {
         }
     }
     val fn = built.getOrNull()
-    val changes: List<Pair<String, String>> = remember(fn, everywhere, oto, tierName, ed.docVersion, ed.oto.version) {
+    val changes: List<Pair<String, String>> = remember(fn, everywhere, oto, tierName, ed.docVersion, ed.oto.version, copies) {
         val f = fn ?: return@remember emptyList()
         when {
+            oto && copies && mode == 0 && !everywhere -> ed.oto.previewDuplicates(Regex(from), to)
             oto && everywhere -> ed.oto.previewEverywhere(f)
             oto -> ed.oto.entries.mapNotNull { e -> f(e.alias).takeIf { it != e.alias }?.let { e.alias to it } }
             everywhere -> ed.previewEverywhere(tierName, f).map { (file, a, b) -> "$file: $a" to b }
@@ -90,9 +96,11 @@ fun BatchRenameDialog(app: AppState) {
     Overlay({ close() }, 560) {
         DialogContent(footer = {
             Btn(mlabeler.app.i18n.S.cancel()) { close() }
-            Btn(apply(), primary = true, enabled = fn != null && changes.isNotEmpty()) {
+            val dup = oto && copies && mode == 0 && !everywhere
+            Btn(if (dup) duplicateBtn() else apply(), primary = true, enabled = fn != null && changes.isNotEmpty()) {
                 val f = fn ?: return@Btn
                 when {
+                    dup -> app.message(duplicated.format(ed.oto.duplicateMatching(Regex(from), to)))
                     oto && everywhere -> app.message(renamed.format(ed.oto.renameEverywhere(f)))
                     oto -> app.message(renamed.format(ed.oto.renameAll(ed.oto.entries.indices.toList(), f)))
                     everywhere -> ed.renameEverywhere(tierName, f).let { (files, n) -> app.message(renamedFiles.format(n, files)) }
@@ -122,6 +130,10 @@ fun BatchRenameDialog(app: AppState) {
                     Field(from, { from = it }, ff.focusRequester(focus))
                     Text(replace(), color = c.muted, fontSize = 12.sp)
                     Field(to, { to = it }, ff)
+                    if (oto && !everywhere) Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { copies = !copies }, verticalAlignment = Alignment.CenterVertically) {
+                        Text(keepOld(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Toggle(copies, { copies = it })
+                    }
                 }
                 1 -> {
                     Text(exactFrom(), color = c.muted, fontSize = 12.sp)
