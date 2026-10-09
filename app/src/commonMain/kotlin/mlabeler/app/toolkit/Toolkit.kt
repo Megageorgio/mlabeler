@@ -67,6 +67,12 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
 
     suspend fun health(): JsonElement = call("GET", "/health", timeoutMs = 8_000)
 
+    /** Jobs that haven't finished yet (queued, running, waiting). */
+    suspend fun activeJobs(): Int = call("GET", "/jobs?active=true").jsonArray.size
+
+    /** Ids of the programs using the toolkit. */
+    suspend fun clients(): List<String> = call("GET", "/clients").jsonArray.mapNotNull { (it.jsonObject["id"] as? JsonPrimitive)?.content }
+
     /** Asks the toolkit to update itself now: {"updating": true, "log": …} when it does (it then restarts). */
     suspend fun update(): JsonElement = call("POST", "/update", timeoutMs = 30_000)
 

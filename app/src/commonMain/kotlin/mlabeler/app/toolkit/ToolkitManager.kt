@@ -100,7 +100,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
 
     /** Makes sure the toolkit answers: starts it here when allowed. Returns false when it can't. */
     suspend fun ensure(): Boolean = lock.withLock {
-        if (check()) return true
+        if (check()) return updateRunningLocked()
         if (!canRunHere || !settings.autoStart) return false
         if (damaged || LocalToolkit.findMvt(settings.mvtPath) == null) { status = Status.Missing; return false }
         startLocked()
@@ -116,7 +116,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
      * Asks the toolkit to update itself now (it otherwise looks for a newer version when it starts). The toolkit
      * does the update; this only waits for it to come back, as after an update found at start.
      */
-    fun updateNow() {
+    fun updateNow(quiet: Boolean = false) {
         if (installJob?.isActive == true) return
         installJob = scope.launch {
             if (!ensure()) return@launch
@@ -124,12 +124,12 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
             val r = answer.getOrNull()
             if (r == null) {
                 // toolkits from before this request: they update when they start
-                app.message(updateUnsupported())
+                if (!quiet) app.message(updateUnsupported())
                 return@launch
             }
             if ((r["updating"] as? JsonPrimitive)?.content != "true") {
                 val err = (r["error"] as? JsonPrimitive)?.content
-                app.message(err ?: upToDate.format(version.ifEmpty { "?" }), error = err != null)
+                if (!quiet) app.message(err ?: upToDate.format(version.ifEmpty { "?" }), error = err != null)
                 return@launch
             }
             (r["log"] as? JsonPrimitive)?.content?.let { addLog("Update log: $it") }
@@ -139,6 +139,29 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
                 waitForUpdate(startCommand())
             }
         }
+    }
+
+    private var runningChecked = false
+
+    /**
+     * A toolkit looks for a newer version of itself only when it starts, so one that was already running (started
+     * earlier, by another program or by hand) would stay old for as long as it runs. Once per session, when
+     * automatic updates are on, it is asked to update before its first use, if nothing else uses it and no job runs.
+     * Returns false when it updated and didn't come back.
+     */
+    private suspend fun updateRunningLocked(): Boolean {
+        if (runningChecked || ownProcess || !settings.autoUpdate || !LocalToolkit.supported || !isLocalAddress) return true
+        runningChecked = true
+        val c = client()
+        val r = runCatching {
+            if (clientId == null) clientId = c.attach("mLabeler")
+            if (c.activeJobs() > 0 || c.clients().any { it != clientId }) return true
+            c.update().jsonObject
+        }.getOrNull() ?: return true
+        if ((r["updating"] as? JsonPrimitive)?.content != "true") return true
+        (r["log"] as? JsonPrimitive)?.content?.let { addLog("Update log: $it") }
+        clientId = null
+        return waitForUpdate(startCommand())
     }
 
     private fun startCommand(mvt: String = LocalToolkit.findMvt(settings.mvtPath) ?: "mvt"): List<String> = buildList {
