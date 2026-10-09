@@ -22,7 +22,7 @@
 
 | 系统 | 最低要求 |
 |---|---|
-| Windows | Windows 10 或 11，64 位；`.zip` 版本也可在 7 SP1 和 8.1 上运行（实验性，不含工具包） |
+| Windows | Windows 10 或 11，64 位；`.zip` 版本也可通过 `mLabeler (Windows 7, 8.1).cmd` 在 7 SP1 和 8.1 上运行（实验性，不含工具包） |
 | macOS | macOS 12 或更高版本，搭载 Apple 芯片（M1 及更新）的 Mac |
 | Linux | 较新的 64 位（x86-64）发行版 |
 | Android | Android 8.0 或更高版本 |

@@ -23,7 +23,7 @@ Ready builds for every platform are on the [Releases](https://github.com/Megageo
 
 | System | Minimum |
 |---|---|
-| Windows | Windows 10 or 11, 64-bit; the `.zip` builds also run on 7 SP1 and 8.1 (experimental, without the toolkit) |
+| Windows | Windows 10 or 11, 64-bit; the `.zip` builds also run on 7 SP1 and 8.1 through `mLabeler (Windows 7, 8.1).cmd` (experimental, without the toolkit) |
 | macOS | macOS 12 or newer, a Mac with Apple Silicon (M1 or newer) |
 | Linux | a current 64-bit (x86-64) distribution |
 | Android | Android 8.0 or newer |
