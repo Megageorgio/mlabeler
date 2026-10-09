@@ -52,6 +52,9 @@ private val keptT = L("kept {0} of {1}", "оставлено {0} из {1}")
 private val keepFirstT = L("Keep one of each (the first)", "Оставить по одному (первый)")
 private val keepFirstHint = L("Where a transition is kept in several recordings, only the first of them (in the order of the list) keeps it. Check the result before saving.",
     "Где переход оставлен в нескольких записях, он остаётся только в первой из них (по порядку списка). Проверьте результат перед сохранением.")
+private val perFolderT = L("Repeats count only inside one folder (one pitch)", "Повторы считаются только внутри одной папки (одного питча)")
+private val perFolderHint = L("With a sub-folder per pitch, the same transition in another folder is not a repeat: each pitch keeps its own.",
+    "Если в каждой подпапке свой питч, такой же переход в другой папке не считается повтором: у каждого питча остаётся свой.")
 private val onlyThisT = L("Only here", "Только здесь")
 private val applyT = L("Save ({0} files)", "Сохранить (файлов: {0})")
 private val savedT = L("Transitions saved in {0} files", "Переходы сохранены в файлах: {0}")
@@ -79,8 +82,12 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
         if (v == p.chosen) changes.remove(k) else changes[k] = v
     }
     val order = remember(ed.items) { ed.items.withIndex().associate { it.value.id to it.index } }
-    val groups = remember(places) {
-        places.orEmpty().groupBy { it.unit }.mapValues { (_, l) -> l.sortedWith(compareBy({ order[it.itemId] ?: 0 }, { it.index })) }
+    // with sub-folders (one per pitch) a transition may be in each of them: repeats then count inside a folder
+    val hasFolders = remember(places) { places.orEmpty().any { '/' in it.itemId } }
+    var perFolder by remember(hasFolders) { mutableStateOf(hasFolders) }
+    fun folderOf(p: EditorState.UnitPlace) = if (perFolder) p.itemId.substringBeforeLast('/', "") else ""
+    val groups = remember(places, perFolder) {
+        places.orEmpty().groupBy { it.unit + "\n" + folderOf(it) }.mapValues { (_, l) -> l.sortedWith(compareBy({ order[it.itemId] ?: 0 }, { it.index })) }
             .toList().sortedBy { it.first }
     }
     Overlay({ if (!busy) close() }, 760) {
@@ -101,6 +108,12 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
                     Chip(repeatsT.format(counted.count { it.third > 1 }), filter == 1) { filter = 1 }
                     Chip(missingT.format(counted.count { it.third == 0 }), filter == 2) { filter = 2 }
                 }
+                if (hasFolders) Tip(perFolderHint()) {
+                    Row(Modifier.fillMaxWidth().padding(top = 6.dp).clickable { perFolder = !perFolder }, verticalAlignment = Alignment.CenterVertically) {
+                        Text(perFolderT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Toggle(perFolder, { perFolder = it })
+                    }
+                }
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Field(query, { query = it }, Modifier.weight(1f), placeholder = searchT())
                     Tip(keepFirstHint()) {
@@ -114,7 +127,7 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
                 }
             }
             val shown = counted.filter { (u, _, n) ->
-                (filter == 0 || (filter == 1 && n > 1) || (filter == 2 && n == 0)) && (query.isBlank() || u.contains(query.trim(), ignoreCase = true))
+                (filter == 0 || (filter == 1 && n > 1) || (filter == 2 && n == 0)) && (query.isBlank() || u.substringBefore('\n').contains(query.trim(), ignoreCase = true))
             }
             LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 160.dp)) {
                 items(shown, key = { it.first }) { (u, l, n) ->
@@ -125,7 +138,8 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
                         ) {
                             Icon(if (open == u) Icons.down else Icons.right, null, Modifier.size(14.dp), tint = c.muted)
                             Spacer(Modifier.width(6.dp))
-                            Text("[$u]", color = c.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            val dir = u.substringAfter('\n')
+                            Text("[" + u.substringBefore('\n') + "]" + if (dir.isNotEmpty()) "  · $dir" else "", color = c.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
                             Text(keptT.format(n, l.size), color = if (n > 1) c.warn else if (n == 0) c.muted else c.ok, fontSize = 12.sp)
                         }
                         if (open == u) for (p in l) {
