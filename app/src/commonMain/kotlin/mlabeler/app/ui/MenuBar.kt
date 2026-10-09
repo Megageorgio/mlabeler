@@ -143,6 +143,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.importLbp, ed, app))
             if (!oto) add(item(Commands.exportDs, ed, app))
             if (!oto) add(item(Commands.convert, ed, app))
+            add(item(Commands.ust, ed, app))
         }))
         add(MSub(MenuTitles.recording(), listOf(item(Commands.record, ed, app), item(Commands.karaoke, ed, app))))
         add(MSep)

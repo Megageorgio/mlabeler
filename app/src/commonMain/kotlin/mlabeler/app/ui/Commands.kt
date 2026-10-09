@@ -240,6 +240,7 @@ object Commands {
     val unitSingle = Command("unit-single", L("This phoneme held: keep or take away", "Эта фонема протяжно: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
     val unitsOverview = Command("units-overview", L("Transitions of the folder (.trans)…", "Переходы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
     val refine = Command("refine-boundaries", L("Refine boundaries…", "Уточнить границы…"), emptyList()) { _, a -> a.showRefine = true }.only(Mode.Labels)
+    val ust = Command("ust", L("UTAU sequence (.ust)…", "Партия UTAU (.ust)…"), emptyList()) { _, a -> a.showUst = true }
     val convert = Command("convert-labels", L("Convert label files…", "Перевести файлы разметки в другой формат…"), emptyList()) { _, a -> a.showConvert = true }.only(Mode.Labels)
     val g2p = Command("phonemes-from-words", L("Phonemes from the words (dictionary and G2P of the aligner model)", "Фонемы по словам (словарь и G2P модели выравнивания)"), emptyList()) { e, a ->
         val t = a.settings.toolkit
@@ -300,7 +301,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, ust, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf, resynthSave,

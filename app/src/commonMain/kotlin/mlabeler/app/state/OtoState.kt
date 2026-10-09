@@ -49,6 +49,22 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
 
     fun referenceFor(e: OtoEntry): OtoEntry? = reference?.second?.firstOrNull { it.sample.equals(e.sample, true) && it.alias == e.alias }
 
+    /**
+     * Marks the entries of this oto.ini whose alias is in [aliases] ([how]: "star", "done" or "tag" = the tag "ust");
+     * returns how many and the aliases no entry has.
+     */
+    fun markUsed(aliases: Set<String>, how: String): Pair<Int, List<String>> {
+        var n = 0
+        val found = mutableSetOf<String>()
+        for (e in entries) {
+            if (e.alias !in aliases) continue
+            found += e.alias
+            setMarks(e) { m -> when (how) { "done" -> m.copy(done = true); "tag" -> m.copy(tag = "ust"); else -> m.copy(star = true) } }
+            n++
+        }
+        return n to aliases.filter { it !in found }.sorted()
+    }
+
     /** Entry [index] takes the values of the compared oto.ini (one undo step). */
     fun takeReference(index: Int) {
         val e = entries.getOrNull(index) ?: return
