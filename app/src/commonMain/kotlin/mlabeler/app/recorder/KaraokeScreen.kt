@@ -90,6 +90,13 @@ private val takeT = L("Take name", "Имя дубля")
 private val intoT = L("Takes go to {0}, with the sung lines next to them as .txt", "Дубли сохраняются в {0}, рядом — спетые строки в .txt")
 private val recordT = L("Record from here (R)", "Записать отсюда (R)")
 private val stopRecT = L("Stop recording", "Остановить запись")
+private val followNotesT = L("Notes", "Ноты")
+private val followHalfT = L("Half", "Наполовину")
+private val followAllT = L("Singer's line", "Интонация автора")
+private val followHint = L(
+    "What the autotune takes from the song's singer: only the notes (the robotic effect), the whole pitch line with vibrato and slides (your voice sung the way they sing), or half of it. The line fits best where you sing in time with the original.",
+    "Что автотюн берёт у исполнителя песни: только ноты («роботный» эффект), всю линию высоты с вибрато и подъездами (твой голос поёт так, как поёт он) или наполовину. Линия ложится лучше там, где поёшь в такт с оригиналом.",
+)
 private val autotuneT = L("With autotune", "С автотюном")
 private val autotuneBusyT = L("Tuning…", "Тюнится…")
 private val autotuneHint = L(
@@ -359,6 +366,14 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 if (k.lastTake != null && !k.recording) Btn(lastTakeT.format(k.lastTakeName), icon = Icons.play) { k.playLastTake() }
                 if (k.lastTake != null && !k.recording) mlabeler.app.ui.Tip(autotuneHint()) {
                     Btn(if (k.tuning) autotuneBusyT() else autotuneT(), enabled = !k.tuning) { k.playTuned() }
+                }
+                // what the autotune takes from the song's singer (only with the song's voice separated)
+                if (k.lastTake != null && !k.recording && k.refPitch != null) mlabeler.app.ui.Tip(followHint()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        mlabeler.app.ui.Chip(followNotesT(), k.tuneFollow == 0.0) { k.tuneFollow = 0.0 }
+                        mlabeler.app.ui.Chip(followHalfT(), k.tuneFollow == 0.5) { k.tuneFollow = 0.5 }
+                        mlabeler.app.ui.Chip(followAllT(), k.tuneFollow == 1.0) { k.tuneFollow = 1.0 }
+                    }
                 }
                 Text(intoT.format(Paths.name(k.folder)) + ". " + headphonesT(), color = c.muted, fontSize = 11.sp, maxLines = 2, modifier = Modifier.weight(1f))
             }

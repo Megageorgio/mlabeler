@@ -55,4 +55,14 @@ class AutoTuneTest {
         val m = median(Pitch.yin(y, sr).values)
         assertTrue(kotlin.math.abs(m - 587f) < 8f, "got $m")
     }
+
+    @Test
+    fun followsTheGuideLine() {
+        val sr = 22050
+        // a guide between notes (D + 30 cents): with follow = 1 the voice takes it as it is, not rounded
+        val y = AutoTune.process(voice(sr, 1.0) { 447.0 }, sr, guide = { 62.3 }, follow = 1.0)
+        val m = median(Pitch.yin(y, sr).values)
+        val want = (440.0 * Math.pow(2.0, (74.3 - 69) / 12)).toFloat()
+        assertTrue(kotlin.math.abs(m - want) < 6f, "got $m, want $want")
+    }
 }

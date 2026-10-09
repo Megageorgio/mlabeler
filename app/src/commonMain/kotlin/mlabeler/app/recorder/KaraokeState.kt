@@ -533,7 +533,10 @@ class KaraokeState(
 
     /** The last take is being pulled to the notes for [playTuned]. */
     var tuning by mutableStateOf(false)
-    private var tuned: Pair<Audio, Audio>? = null
+    private var tuned: Triple<Audio, Double, Audio>? = null
+
+    /** How much of the song's singer the autotune takes: 0 only the notes, 1 the whole pitch line (vibrato, slides). */
+    var tuneFollow by mutableDoubleStateOf(0.0)
 
     /**
      * Plays the last take with the "autotune" effect over the backing it was sung to: every note pulled at once to
@@ -545,24 +548,25 @@ class KaraokeState(
         val at = lastTakeAt
         if (tuning) return
         scope.launch {
-            val a = tuned?.takeIf { it.first === take }?.second ?: run {
+            val follow = tuneFollow
+            val a = tuned?.takeIf { it.first === take && it.second == follow }?.third ?: run {
                 tuning = true
                 try {
                     val ref = refPitch
-                    withContext(Dispatchers.Default) { tune(take, at, ref) }
+                    withContext(Dispatchers.Default) { tune(take, at, ref, follow) }
                 } finally { tuning = false }
-            }.also { tuned = take to it }
+            }.also { tuned = Triple(take, follow, it) }
             playTake(a)
         }
     }
 
-    private fun tune(take: Audio, at: TakePlace?, ref: FloatArray?): Audio {
+    private fun tune(take: Audio, at: TakePlace?, ref: FloatArray?, follow: Double): Audio {
         // song time of a sample of the take: where it started, at the tempo it was sung, less the sound card delay
         val guide: ((Int) -> Double?)? = if (ref == null || at == null) null else { i ->
             val t = at.start + i.toDouble() / take.sampleRate * at.speed - at.latency
             ref.getOrNull((t / PITCH_HOP).toInt())?.takeIf { !it.isNaN() }?.let { it.toDouble() + at.semitones }
         }
-        val voice = mlabeler.core.dsp.AutoTune.process(take.samples, take.sampleRate, guide = guide)
+        val voice = mlabeler.core.dsp.AutoTune.process(take.samples, take.sampleRate, guide = guide, follow = follow)
         val played = at?.played ?: return Audio(take.sampleRate, voice)
         // laid over the backing as it was heard (at its sample rate), the voice a little louder
         val v = if (played.sampleRate == take.sampleRate) voice else mlabeler.core.dsp.Stretch.resample(voice, take.sampleRate.toDouble() / played.sampleRate)

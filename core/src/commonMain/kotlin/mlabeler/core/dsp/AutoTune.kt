@@ -18,9 +18,11 @@ object AutoTune {
     /**
      * [scale]: allowed pitch classes (0 = C … 11 = B); null = every semitone. [guide]: the note to sing at a sample
      * (MIDI, e.g. the pitch of the original singer at that moment) or null where there is none; the voice goes to
-     * that note in the octave nearest to it, elsewhere to the nearest allowed note.
+     * that note in the octave nearest to it, elsewhere to the nearest allowed note. [follow]: 0 takes only the guide's
+     * notes (rounded to semitones), 1 its whole pitch line with vibrato and slides, in between a mix.
      */
-    fun process(x: FloatArray, sampleRate: Int, amount: Double = 1.0, scale: Set<Int>? = null, guide: ((Int) -> Double?)? = null): FloatArray {
+    fun process(x: FloatArray, sampleRate: Int, amount: Double = 1.0, scale: Set<Int>? = null, guide: ((Int) -> Double?)? = null,
+                follow: Double = 0.0): FloatArray {
         if (x.isEmpty()) return x
         val hopS = 0.005
         val f0 = Pitch.yin(x, sampleRate, hopS).values
@@ -46,14 +48,18 @@ object AutoTune {
         // the note each voiced stretch is pulled to: the nearest allowed one, kept until the voice is clearly nearer
         // another (no flicker between two notes)
         var held = Double.NaN
+        var octave = Double.NaN
         fun target(f: Float, at: Int): Double {
             val midi = 69 + 12 * ln(f / 440.0) / ln(2.0)
             val g = guide?.invoke(at)
             if (g != null && !g.isNaN()) {
-                // the guide's note (rounded: its vibrato and slides are not copied) in the singer's octave
-                val inOctave = g + 12 * kotlin.math.round((midi - g) / 12)
+                // the guide in the singer's octave (kept until the singer is clearly in another one); its note rounded
+                // to a semitone, or with [follow] its line as it is
+                if (octave.isNaN() || abs(midi - (g + octave)) > 7) octave = 12 * kotlin.math.round((midi - g) / 12)
+                val inOctave = g + octave
                 if (held.isNaN() || abs(inOctave - held) > 0.6) held = kotlin.math.round(inOctave)
-                val note = midi + (held - midi) * amount
+                val goal = held + (inOctave - held) * follow.coerceIn(0.0, 1.0)
+                val note = midi + (goal - midi) * amount
                 return 440.0 * 2.0.pow((note - 69) / 12)
             }
             fun nearest(v: Double): Double {
@@ -77,7 +83,7 @@ object AutoTune {
             val mark = marks[k]
             val f = pitchAt(mark)
             val pa = if (f > 0f) (sampleRate / f).roundToInt().coerceAtLeast(16) else unvoicedPeriod
-            if (f <= 0f) held = Double.NaN
+            if (f <= 0f) { held = Double.NaN; octave = Double.NaN }
             val ps = if (f > 0f) (sampleRate / target(f, mark)).coerceAtLeast(16.0) else pa.toDouble()
             // a two-period piece around the analysis mark, Hann-windowed, centred on the synthesis time (the windows
             // keep their own shape: their spacing is what makes the new pitch; the level follows the spacing)
