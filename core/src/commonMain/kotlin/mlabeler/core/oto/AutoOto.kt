@@ -339,6 +339,20 @@ object AutoOto {
             a
         }
         val ends = starts.drop(1) + listOf(last)
+        // where the vowel's formants come in: the biggest change of the lower spectrum (up to 4 kHz, where the
+        // formants are; the hiss of a consonant is above) from the frames before to the frames after
+        val lowSpec = mlabeler.core.dsp.Spectrogram.compute(samples, sampleRate, hopSeconds = hop, bands = 32, maxFreq = 4000.0)
+        fun formantChange(i: Int): Double {
+            if (i - 4 < 0 || i + 4 >= lowSpec.frames) return 0.0
+            var d = 0.0
+            for (b in 0 until lowSpec.bands) {
+                var l = 0; var r = 0
+                for (k in 1..4) { l += lowSpec.value(i - k, b); r += lowSpec.value(i + k - 1, b) }
+                // only what rises: the vowel coming in, not the consonant fading
+                d += max(0, r - l)
+            }
+            return d
+        }
         return syllables.mapIndexed { k, syl ->
             val a = starts[k]
             val b = ends[k]
@@ -349,6 +363,16 @@ object AutoOto {
                 v = a
                 while (v < b && !(sm[v] >= target && voiced[v])) v++
                 if (v >= b) v = a + (b - a) / 4
+                // the smoothed loudness comes up a little late: the vowel starts where its formants appear,
+                // at most 100 ms earlier, and the sound is voiced there
+                // (after silence the loudness rises with the consonant already: the vowel is looked for later)
+                val lo = if (k == 0) max(a + 2, v - 4) else max(a + 2, v - 20)
+                val hi = if (k == 0) min(b - 2, v + 20) else min(b - 2, v + 3)
+                if (lo < hi) {
+                    val best = (lo..hi).maxBy { formantChange(it) }
+                    // (a hand places it where the vowel is already heard: one frame after the steepest change)
+                    if ((best..min(b - 1, best + 3)).any { voiced[it] }) v = min(best + 1, b - 1)
+                }
             } else {
                 while (v < b && !voiced[v]) v++
                 if (v >= b) v = a
