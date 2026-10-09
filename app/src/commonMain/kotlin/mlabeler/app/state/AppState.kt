@@ -61,6 +61,7 @@ class AppState(private val scope: CoroutineScope) {
     var showImport by mutableStateOf(false)
     var showDsExport by mutableStateOf(false)
     var showSummary by mutableStateOf(false)
+    var showPhonemeCuts by mutableStateOf(false)
     var showSoundCheck by mutableStateOf(false)
     val toolkit = mlabeler.app.toolkit.ToolkitManager(this, scope)
     val updater = Updater(this, scope)

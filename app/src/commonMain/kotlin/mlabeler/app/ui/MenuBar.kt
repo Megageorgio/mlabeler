@@ -282,6 +282,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         add(MSub(MenuTitles.datasetTools(), buildList {
             add(item(Commands.soundCheck, ed, app))
             if (!oto) add(item(Commands.summary, ed, app))
+            if (!oto) add(item(Commands.phonemeCuts, ed, app))
         }))
         val slots = listOf(Commands.slot1, Commands.slot2, Commands.slot3, Commands.slot4)
         val named = slots.withIndex().mapNotNull { (k, c) -> s.pluginSlots.getOrNull(k)?.takeIf { it.isNotEmpty() }?.let { item(c, ed, app, title = it) } }

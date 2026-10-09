@@ -68,6 +68,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showImport && ed != null) mlabeler.app.ui.ImportDialog(app)
                     if (app.showDsExport && ed != null) mlabeler.app.ui.DsExportDialog(app, ed)
                     if (app.showSummary && ed != null) mlabeler.app.ui.DatasetSummaryDialog(app, ed)
+                    if (app.showPhonemeCuts && ed != null) mlabeler.app.ui.PhonemeCutsDialog(app, ed)
                     if (app.showSoundCheck && ed != null) mlabeler.app.ui.SoundCheckDialog(app, ed)
                     if (app.pendingLeave != null) mlabeler.app.ui.LeaveDialog(app)
                     if (app.showAutoOto && ed != null) mlabeler.app.ui.AutoOtoDialog(app)

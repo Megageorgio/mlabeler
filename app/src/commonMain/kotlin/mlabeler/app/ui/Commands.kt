@@ -217,6 +217,7 @@ object Commands {
     val reviewPrev = Command("review-prev", L("Previous place to check", "Предыдущее место для проверки"), listOf(Chord(Key.N, shift = true))) { e, _ -> e.reviewStep(-1) }.only(Mode.Labels)
     val arrange = Command("arrange", L("Arrange panels and lanes", "Расставить панели и полосы"), emptyList()) { _, a -> a.arrangePanels = !a.arrangePanels }
     val summary = Command("dataset-summary", L("Dataset summary…", "Сводка по датасету…"), emptyList()) { _, a -> a.showSummary = true }.only(Mode.Labels)
+    val phonemeCuts = Command("phoneme-cuts", L("Cut out phonemes…", "Нарезка фонем…"), emptyList()) { _, a -> a.showPhonemeCuts = true }.only(Mode.Labels)
     val notepad = Command("notepad", notepadTitle, emptyList()) { _, a -> a.update { it.copy(layout = it.layout.copy(showNotepad = !it.layout.showNotepad)) } }
     val soundCheck = Command("sound-check", L("Check the recordings…", "Проверка звука…"), emptyList()) { _, a -> a.showSoundCheck = true }
     val exportDs = Command("export-diffsinger", L("Export a DiffSinger dataset…", "Экспорт датасета DiffSinger…"), emptyList()) { _, a -> a.showDsExport = true }.only(Mode.Labels)
@@ -274,7 +275,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, segments, resynthWorld, resynthNsf,
