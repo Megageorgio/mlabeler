@@ -285,6 +285,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.mute, ed, app))
             if (!oto) add(item(Commands.cutAudio, ed, app))
             add(item(Commands.normalize, ed, app))
+            add(item(Commands.gain, ed, app))
             if (!oto) add(item(Commands.trimSilence, ed, app))
             if (!oto) add(item(Commands.segments, ed, app))
         }))

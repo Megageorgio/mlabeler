@@ -55,6 +55,8 @@ private val levelHint = L("Normalising works on the chosen part (above) or the w
     "Нормализация действует на выбранное выше (фрагмент или весь файл), плавные края — на выделение. Обрезка убирает тишину с обоих концов файла и сдвигает разметку вместе со звуком. Всё отменяется через Ctrl+Z.")
 private val normDbT = L("Loudest point after normalising", "Самая громкая точка после нормализации")
 private val normalizeBtn = L("Normalise", "Нормализовать")
+private val gainT = L("Change the level by", "Изменить громкость на")
+private val gainBtn = L("Change the level", "Изменить громкость")
 private val fadeInBtn = L("Fade in", "Плавное начало")
 private val fadeOutBtn = L("Fade out", "Плавный конец")
 private val trimDbT = L("Silence is quieter than (from the loudest part)", "Тишина — тише чем (от самого громкого)")
@@ -147,6 +149,10 @@ fun CleanupTools(app: AppState, ed: mlabeler.app.state.EditorState, compact: Boo
     ValueSlider(normDbT(), cs.normalizeDb, -12f..0f, "dB", decimals = 1, default = dflt.normalizeDb) { v -> set { it.copy(normalizeDb = (v * 10).toInt() / 10f) } }
     FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = gap, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Btn(normalizeBtn(), enabled = !cl.busy) { cl.normalize(scope) }
+    }
+    ValueSlider(gainT(), cs.gainDb, -24f..24f, "dB", decimals = 1, default = dflt.gainDb) { v -> set { it.copy(gainDb = (v * 10).toInt() / 10f) } }
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = gap, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Btn(gainBtn(), enabled = !cl.busy && cs.gainDb != 0f) { cl.gain(scope, cs.gainDb) }
         Btn(fadeInBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, true) } }
         Btn(fadeOutBtn(), enabled = selected != null && !cl.busy) { selected?.let { cl.fade(it, false) } }
     }

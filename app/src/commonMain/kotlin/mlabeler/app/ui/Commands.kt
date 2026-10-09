@@ -163,6 +163,7 @@ object Commands {
         a.update { it.copy(layout = it.layout.copy(showFormants = !it.layout.showFormants)) }
     }
     val trimSilence = Command("trim-silence", L("Trim silence at the ends", "Обрезать тишину по краям"), emptyList()) { e, _ -> e.cleanup.trimSilence() }.only(Mode.Labels)
+    val gain = Command("gain", L("Change the level (the amount set in Clean the recording)", "Изменить громкость (на величину из «Чистки записи»)"), emptyList()) { e, a -> e.cleanup.gain(e.range ?: e.selectedSpan(), a.settings.clean.gainDb) }
     val normalize = Command("normalize", L("Normalise the level", "Нормализовать громкость"), emptyList()) { e, _ -> e.cleanup.normalize(e.range ?: e.selectedSpan()) }
     val palette = Command("commands", S.commands, listOf(ch('K', ctrl = true))) { _, a -> a.showCommands = true }
     val settings = Command("settings", S.settings, listOf(Chord(Key.Comma, ctrl = true))) { _, a -> a.showSettings = true }
@@ -295,7 +296,7 @@ object Commands {
         leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
-        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, segments, resynthWorld, resynthNsf,
+        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf,
         palette, settings, openFolder,
     )
 
