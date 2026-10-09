@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds a portable Windows folder (mLabeler.exe + Java runtime + jars) from any OS and zips it.
-# Needs: Go (for the launcher), network for the Windows JRE. Usage: tools/windows-portable.sh [out.zip]
+# Needs: Go (for the launcher and the resources of the Java copy), network for the Windows JRE. Usage: tools/windows-portable.sh [out.zip]
 # PORTABLE=1 makes the fully portable build: a "portable" file next to mLabeler.exe keeps the settings, the toolkit,
 # its Python and models and every other file inside the program folder.
 # The launcher is built with a current Go: an old one (1.20, the last for Windows 7) set off antivirus heuristics.
@@ -27,6 +27,11 @@ VERSION=$(grep '^app.version=' gradle.properties | cut -d= -f2)
 # icon, version information and manifest (a program without them looks suspicious to antivirus heuristics)
 tools/launcher/make-resources.sh "$VERSION"
 (cd tools/launcher && GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-H windowsgui" -o "../../$DIR/mLabeler.exe" .)
+# the program runs as runtime\bin\mLabeler.exe, a copy of java.exe with the program's name and icon: the Task
+# Manager shows "mLabeler" instead of "OpenJDK Platform binary" (the manifest, with its DPI settings, stays Java's)
+cp "$DIR/runtime/bin/java.exe" "$DIR/runtime/bin/mLabeler.exe"
+go run github.com/tc-hib/go-winres@v0.3.3 patch --in tools/launcher/java-resources.json --no-backup --authenticode remove \
+  --file-version "${VERSION%%-*}" --product-version "$VERSION" "$DIR/runtime/bin/mLabeler.exe"
 sed 's/$/\r/' tools/launcher/old-windows.cmd > "$DIR/mLabeler (Windows 7, 8.1).cmd"
 rm -f "$DIR/portable"
 if [ "$PORTABLE" = "1" ]; then

@@ -7,17 +7,19 @@ import org.lwjgl.system.MemoryUtil
 import org.lwjgl.system.windows.WindowsLibrary
 
 // The taskbar groups windows by the program they belong to. In the portable build mLabeler.exe only starts
-// runtime\bin\java.exe, so the window belongs to java.exe: a pinned mLabeler.exe opened a second, separate button.
+// the Java runtime (runtime\bin\mLabeler.exe, a renamed java.exe), so the window belongs to that program:
+// a pinned mLabeler.exe opened a second, separate button.
 // The window takes the name Windows gives mLabeler.exe itself (its path), so it lands on the pinned button.
 // Must run before the first window is made.
 internal fun joinLauncherOnTaskbar() {
     if (!System.getProperty("os.name").orEmpty().startsWith("Windows") || Platform.legacyWindows) return
     runCatching {
-        // only when Java runs as its own program (the .msi build runs inside mLabeler.exe already)
-        val exe = ProcessHandle.current().info().command().orElse(null) ?: return
-        if (!File(exe).name.lowercase().startsWith("java")) return
         val launcher = File(System.getProperty("java.home")).parentFile?.let { File(it, "mLabeler.exe") }
         if (launcher == null || !launcher.isFile) return
+        // only when Java runs as its own program (runtime\bin\mLabeler.exe or java.exe); the .msi build runs
+        // inside the launcher itself
+        val exe = ProcessHandle.current().info().command().orElse(null) ?: return
+        if (File(exe).canonicalPath.equals(launcher.canonicalPath, ignoreCase = true)) return
         val id = windowsAppId(launcher.canonicalPath)
         val set = WindowsLibrary("shell32.dll").getFunctionAddress("SetCurrentProcessExplicitAppUserModelID")
         if (set == 0L) return

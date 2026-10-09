@@ -93,7 +93,11 @@ func main() {
 	dir := filepath.Dir(exe)
 	// java.exe (a console program) started without a window: the app and everything it starts (the toolkit,
 	// its engines, ffmpeg) share one hidden console, so no console windows pop up.
-	java := filepath.Join(dir, "runtime", "bin", "java.exe")
+	// runtime\bin\mLabeler.exe is java.exe with the program's name and icon (as the Task Manager shows it)
+	java := filepath.Join(dir, "runtime", "bin", "mLabeler.exe")
+	if _, err := os.Stat(java); err != nil {
+		java = filepath.Join(dir, "runtime", "bin", "java.exe")
+	}
 	if _, err := os.Stat(java); err != nil {
 		fail("Java was not found at " + java + ".\n\nUnpack the whole folder, not only mLabeler.exe.")
 	}
