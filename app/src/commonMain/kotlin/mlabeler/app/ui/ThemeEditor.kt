@@ -101,33 +101,31 @@ fun ThemesPage(app: AppState) {
     val c = T.c
     val s = app.settings
     val data = Platform.dataDir()
-    SectionTitle(themesT())
-    val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(), "retro-fairy" to S.themeFairy(), "contrast" to S.themeContrast(), "mintaka" to S.themeMintaka())
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        for (t in Themes.builtIn) ThemeSwatch(t, names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
-        for (ct in Themes.custom) ThemeSwatch(ct.tokens, ct.name, s.theme == ct.tokens.id) { app.update { it.copy(theme = ct.tokens.id) } }
-    }
-    SwitchLine(dimT(), s.settingsDim) { v -> app.update { it.copy(settingsDim = v) } }
-    FontPicker(app)
     val current = Themes.custom.firstOrNull { it.tokens.id == s.theme }
-    Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Btn(makeCopy(), primary = current == null) {
-            val base = Themes.byId(s.theme)
-            val title = current?.name ?: names[base.id] ?: base.id
-            val id = ThemeFiles.copy(data, base, copyName.format(title))
-            app.update { it.copy(theme = id) }
+    val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(), "retro-fairy" to S.themeFairy(), "contrast" to S.themeContrast(), "mintaka" to S.themeMintaka())
+    Fold(themesT()) {
+        FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (t in Themes.builtIn) ThemeSwatch(t, names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
+            for (ct in Themes.custom) ThemeSwatch(ct.tokens, ct.name, s.theme == ct.tokens.id) { app.update { it.copy(theme = ct.tokens.id) } }
         }
-        if (!Platform.isMobile) Btn(folderT()) {
-            mlabeler.core.io.PlatformFs.mkdirs(ThemeFiles.dir(data))
-            Platform.openInFileManager(ThemeFiles.dir(data))
+        SwitchLine(dimT(), s.settingsDim) { v -> app.update { it.copy(settingsDim = v) } }
+        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Btn(makeCopy(), primary = current == null) {
+                val base = Themes.byId(s.theme)
+                val title = current?.name ?: names[base.id] ?: base.id
+                val id = ThemeFiles.copy(data, base, copyName.format(title))
+                app.update { it.copy(theme = id) }
+            }
+            if (!Platform.isMobile) Btn(folderT()) {
+                mlabeler.core.io.PlatformFs.mkdirs(ThemeFiles.dir(data))
+                Platform.openInFileManager(ThemeFiles.dir(data))
+            }
+            Btn(reloadT()) { ThemeFiles.load(data) }
         }
-        Btn(reloadT()) { ThemeFiles.load(data) }
+        if (current == null) Text(builtInNote(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
     }
-    if (current == null) {
-        Text(builtInNote(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-        return
-    }
-    ThemeEditor(app, current)
+    FontPicker(app)
+    if (current != null) ThemeEditor(app, current)
 }
 
 @Composable
@@ -163,62 +161,69 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
         kotlinx.coroutines.delay(150)
         Themes.custom.firstOrNull { it.tokens.id == theme.tokens.id }?.let { ThemeFiles.save(data, it, tokens, name.ifBlank { theme.name }) }
     }
-    SectionTitle(nameT())
-    Field(name, { name = it; dirty++ }, Modifier.fillMaxWidth())
-    SwitchLine(darkT(), tokens.dark) { change(tokens.copy(dark = it)) }
-    ValueSlider(radiusT(), tokens.radius.value, 0f..16f, "dp") { change(tokens.copy(radius = it.toInt().dp)) }
-    ValueSlider(borderT(), tokens.borderWidth.value, 0f..3f, "dp", decimals = 1) { change(tokens.copy(borderWidth = ((it * 2).toInt() / 2f).dp)) }
-    SwitchLine(squareT(), tokens.square) { change(tokens.copy(square = it)) }
-    SwitchLine(monoT(), tokens.mono) { change(tokens.copy(mono = it)) }
-    SwitchLine(checkboxesT(), tokens.checkboxes) { change(tokens.copy(checkboxes = it)) }
+    Fold(nameT()) {
+        Field(name, { name = it; dirty++ }, Modifier.fillMaxWidth().padding(top = 6.dp))
+        SwitchLine(darkT(), tokens.dark) { change(tokens.copy(dark = it)) }
+        ValueSlider(radiusT(), tokens.radius.value, 0f..16f, "dp") { change(tokens.copy(radius = it.toInt().dp)) }
+        ValueSlider(borderT(), tokens.borderWidth.value, 0f..3f, "dp", decimals = 1) { change(tokens.copy(borderWidth = ((it * 2).toInt() / 2f).dp)) }
+        SwitchLine(squareT(), tokens.square) { change(tokens.copy(square = it)) }
+        SwitchLine(monoT(), tokens.mono) { change(tokens.copy(mono = it)) }
+        SwitchLine(checkboxesT(), tokens.checkboxes) { change(tokens.copy(checkboxes = it)) }
+    }
     for ((title, keys) in groups) {
-        SectionTitle(title())
-        for (k in keys) {
-            val get = ThemeFiles.colorKeys.first { it.first == k }.second
-            ColorRow(colorNames[k]?.invoke() ?: k, get(tokens)) { change(ThemeFiles.withColor(tokens, k, it)) }
-        }
-    }
-    SectionTitle(boundsT())
-    ColorRow(boundLineT(), if (tokens.boundLine != Color.Unspecified) tokens.boundLine else tokens.bound.copy(alpha = 0.55f)) { change(tokens.copy(boundLine = it)) }
-    ValueSlider(boundWidthT(), tokens.boundWidth, 0.5f..4f, "px", decimals = 1) { change(tokens.copy(boundWidth = ((it * 2).toInt().coerceAtLeast(1) / 2f))) }
-    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for ((k, t) in listOf("dash" to dashT, "dot" to dotT, "solid" to solidT)) Chip(t(), tokens.boundStyle == k) { change(tokens.copy(boundStyle = k)) }
-    }
-    SectionTitle(windowStyleT())
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for ((k, t) in listOf("" to winPlainT, "xp" to winXpT, "classic" to winClassicT)) Chip(t(), tokens.windowStyle == k) { change(tokens.copy(windowStyle = k)) }
-    }
-    SectionTitle(tierColorsT())
-    ColorList(tokens.tierColors, minCount = 1) { change(tokens.copy(tierColors = it)) }
-    SectionTitle(spectrogramT())
-    Box(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(c.radius)).background(Brush.horizontalGradient(tokens.spectrogram)))
-    ColorList(tokens.spectrogram, minCount = 2) { change(tokens.copy(spectrogram = it)) }
-    SectionTitle(backdropT())
-    SwitchLine(gradientT(), tokens.bgGradient.size >= 2) { on ->
-        change(tokens.copy(bgGradient = if (on) listOf(tokens.bg, tokens.accent.copy(alpha = 1f).let { a -> androidx.compose.ui.graphics.lerp(tokens.bg, a, 0.25f) }) else emptyList()))
-    }
-    if (tokens.bgGradient.size >= 2) {
-        Box(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(c.radius)).background(Brush.horizontalGradient(tokens.bgGradient)))
-        ColorList(tokens.bgGradient, minCount = 2) { change(tokens.copy(bgGradient = it)) }
-    }
-    Text(imageT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Field(tokens.bgImage, { change(tokens.copy(bgImage = it.trim().trim('"'))) }, Modifier.weight(1f), placeholder = imageHint())
-        if (mlabeler.app.Platform.hasNativeFolderPicker) {
-            val scope = androidx.compose.runtime.rememberCoroutineScope()
-            Btn(pickImageT()) {
-                scope.launch {
-                    val p = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { mlabeler.app.Platform.pickFileNative(imageT(), listOf("png", "jpg", "jpeg", "webp", "bmp")) }
-                    if (p != null) change(tokens.copy(bgImage = p))
-                }
+        Fold(title()) {
+            for (k in keys) {
+                val get = ThemeFiles.colorKeys.first { it.first == k }.second
+                ColorRow(colorNames[k]?.invoke() ?: k, get(tokens)) { change(ThemeFiles.withColor(tokens, k, it)) }
             }
         }
-        if (tokens.bgImage.isNotEmpty()) IconBtn(Icons.close, deleteT(), size = 28.dp) { change(tokens.copy(bgImage = "")) }
     }
-    if (tokens.bgImage.isNotEmpty()) ValueSlider(imageAlphaT(), tokens.bgImageAlpha, 0.05f..1f, "%", factor = 100f) { change(tokens.copy(bgImageAlpha = it)) }
-    ValueSlider(panelAlphaT(), tokens.panelAlpha, 0.2f..1f, "%", factor = 100f) { change(tokens.copy(panelAlpha = it)) }
-    ValueSlider(laneAlphaT(), tokens.effectiveLaneAlpha, 0.1f..1f, "%", factor = 100f) { change(tokens.copy(laneAlpha = it)) }
-    Text(backdropHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+    Fold(boundsT()) {
+        ColorRow(boundLineT(), if (tokens.boundLine != Color.Unspecified) tokens.boundLine else tokens.bound.copy(alpha = 0.55f)) { change(tokens.copy(boundLine = it)) }
+        ValueSlider(boundWidthT(), tokens.boundWidth, 0.5f..4f, "px", decimals = 1) { change(tokens.copy(boundWidth = ((it * 2).toInt().coerceAtLeast(1) / 2f))) }
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((k, t) in listOf("dash" to dashT, "dot" to dotT, "solid" to solidT)) Chip(t(), tokens.boundStyle == k) { change(tokens.copy(boundStyle = k)) }
+        }
+    }
+    Fold(windowStyleT()) {
+        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((k, t) in listOf("" to winPlainT, "xp" to winXpT, "classic" to winClassicT)) Chip(t(), tokens.windowStyle == k) { change(tokens.copy(windowStyle = k)) }
+        }
+    }
+    Fold(tierColorsT()) {
+        ColorList(tokens.tierColors, minCount = 1) { change(tokens.copy(tierColors = it)) }
+    }
+    Fold(spectrogramT()) {
+        Box(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(c.radius)).background(Brush.horizontalGradient(tokens.spectrogram)))
+        ColorList(tokens.spectrogram, minCount = 2) { change(tokens.copy(spectrogram = it)) }
+    }
+    Fold(backdropT()) {
+        SwitchLine(gradientT(), tokens.bgGradient.size >= 2) { on ->
+            change(tokens.copy(bgGradient = if (on) listOf(tokens.bg, tokens.accent.copy(alpha = 1f).let { a -> androidx.compose.ui.graphics.lerp(tokens.bg, a, 0.25f) }) else emptyList()))
+        }
+        if (tokens.bgGradient.size >= 2) {
+            Box(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(c.radius)).background(Brush.horizontalGradient(tokens.bgGradient)))
+            ColorList(tokens.bgGradient, minCount = 2) { change(tokens.copy(bgGradient = it)) }
+        }
+        Text(imageT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Field(tokens.bgImage, { change(tokens.copy(bgImage = it.trim().trim('"'))) }, Modifier.weight(1f), placeholder = imageHint())
+            if (mlabeler.app.Platform.hasNativeFolderPicker) {
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
+                Btn(pickImageT()) {
+                    scope.launch {
+                        val p = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { mlabeler.app.Platform.pickFileNative(imageT(), listOf("png", "jpg", "jpeg", "webp", "bmp")) }
+                        if (p != null) change(tokens.copy(bgImage = p))
+                    }
+                }
+            }
+            if (tokens.bgImage.isNotEmpty()) IconBtn(Icons.close, deleteT(), size = 28.dp) { change(tokens.copy(bgImage = "")) }
+        }
+        if (tokens.bgImage.isNotEmpty()) ValueSlider(imageAlphaT(), tokens.bgImageAlpha, 0.05f..1f, "%", factor = 100f) { change(tokens.copy(bgImageAlpha = it)) }
+        ValueSlider(panelAlphaT(), tokens.panelAlpha, 0.2f..1f, "%", factor = 100f) { change(tokens.copy(panelAlpha = it)) }
+        ValueSlider(laneAlphaT(), tokens.effectiveLaneAlpha, 0.1f..1f, "%", factor = 100f) { change(tokens.copy(laneAlpha = it)) }
+        Text(backdropHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+    }
     Row(Modifier.padding(top = 16.dp)) {
         Btn(deleteT()) {
             app.update { it.copy(theme = "modern-dark") }
@@ -344,44 +349,46 @@ private fun FontPicker(app: AppState) {
     var query by remember { mutableStateOf("") }
     var open by remember { mutableStateOf(false) }
     val cur = app.settings.font
-    SectionTitle(fontT())
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        // the mouse wheel over the font name steps through the fonts, as in text editors
-        Box(Modifier.pointerInput(names) {
-            awaitPointerEventScope {
-                while (true) {
-                    val ev = awaitPointerEvent()
-                    if (ev.type != androidx.compose.ui.input.pointer.PointerEventType.Scroll || names.isEmpty()) continue
-                    val dy = ev.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                    if (dy == 0f) continue
-                    val i = names.indexOf(app.settings.font)
-                    val next = (if (i < 0) 0 else i + (if (dy > 0) 1 else -1)).coerceIn(0, names.size - 1)
-                    app.update { it.copy(font = names[next]) }
-                    ev.changes.forEach { it.consume() }
+    Fold(fontT()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // the mouse wheel over the font name steps through the fonts, as in text editors
+            Box(Modifier.pointerInput(names) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val ev = awaitPointerEvent()
+                        if (ev.type != androidx.compose.ui.input.pointer.PointerEventType.Scroll || names.isEmpty()) continue
+                        val dy = ev.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                        if (dy == 0f) continue
+                        val i = names.indexOf(app.settings.font)
+                        val next = (if (i < 0) 0 else i + (if (dy > 0) 1 else -1)).coerceIn(0, names.size - 1)
+                        app.update { it.copy(font = names[next]) }
+                        ev.changes.forEach { it.consume() }
+                    }
+                }
+            }) {
+                Btn((cur.ifEmpty { fontTheme() }) + "  ▾") { open = !open }
+            }
+            if (cur.isNotEmpty()) Btn(fontTheme()) { app.update { it.copy(font = "") } }
+        }
+        Text(fontSample(), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+        SwitchLine(crispT(), app.settings.crisp) { v -> app.update { it.copy(crisp = v) } }
+        Text(crispNote(), color = c.muted, fontSize = 11.sp)
+        if (open && names.isNotEmpty()) {
+            Field(query, { query = it }, Modifier.fillMaxWidth().padding(top = 8.dp), placeholder = fontSearch())
+            val shown = remember(query, names) { names.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) } }
+            androidx.compose.foundation.lazy.LazyColumn(
+                Modifier.padding(top = 6.dp).fillMaxWidth().height(240.dp).border(c.borderWidth, c.border, RoundedCornerShape(c.radius)),
+            ) {
+                items(shown.size) { i ->
+                    val n = shown[i]
+                    val fam = remember(n) { mlabeler.app.systemFontFamily(n) }
+                    Text(
+                        n, fontFamily = fam, fontSize = 15.sp, color = if (n == cur) c.accent else c.text, maxLines = 1,
+                        modifier = Modifier.fillMaxWidth().background(if (n == cur) c.accent.copy(alpha = 0.12f) else Color.Transparent)
+                            .clickable { app.update { it.copy(font = n) } }.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
                 }
             }
-        }) {
-            Btn((cur.ifEmpty { fontTheme() }) + "  ▾") { open = !open }
-        }
-        if (cur.isNotEmpty()) Btn(fontTheme()) { app.update { it.copy(font = "") } }
-    }
-    Text(fontSample(), color = c.muted, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
-    SwitchLine(crispT(), app.settings.crisp) { v -> app.update { it.copy(crisp = v) } }
-    Text(crispNote(), color = c.muted, fontSize = 11.sp)
-    if (!open || names.isEmpty()) return
-    Field(query, { query = it }, Modifier.fillMaxWidth().padding(top = 8.dp), placeholder = fontSearch())
-    val shown = remember(query, names) { names.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) } }
-    androidx.compose.foundation.lazy.LazyColumn(
-        Modifier.padding(top = 6.dp).fillMaxWidth().height(240.dp).border(c.borderWidth, c.border, RoundedCornerShape(c.radius)),
-    ) {
-        items(shown.size) { i ->
-            val n = shown[i]
-            val fam = remember(n) { mlabeler.app.systemFontFamily(n) }
-            Text(
-                n, fontFamily = fam, fontSize = 15.sp, color = if (n == cur) c.accent else c.text, maxLines = 1,
-                modifier = Modifier.fillMaxWidth().background(if (n == cur) c.accent.copy(alpha = 0.12f) else Color.Transparent)
-                    .clickable { app.update { it.copy(font = n) } }.padding(horizontal = 10.dp, vertical = 6.dp),
-            )
         }
     }
 }

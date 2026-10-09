@@ -71,86 +71,87 @@ fun OwnModelsSection(app: AppState) {
     LaunchedEffect(ready, tk.modelsVersion) {
         if (ready) mine = runCatching { tk.client().installedModels().filter { it.source == "import" } }.getOrDefault(emptyList())
     }
-    SectionTitle(title())
-    Text(hint(), color = c.muted, fontSize = 12.sp)
-    Text(pathT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Field(path, { path = it.trim().trim('"') }, Modifier.weight(1f), placeholder = "D:\\models\\model.pt")
-        if (Platform.hasNativeFolderPicker) {
-            Btn(fileBtn()) {
-                scope.launch {
-                    val p = withContext(Dispatchers.Default) { Platform.pickFileNative(pathT(), listOf("pt", "pth", "ckpt", "safetensors", "onnx", "zip", "rar", "7z")) }
-                    if (p != null) path = p
-                }
-            }
-            Btn(folderBtn()) {
-                scope.launch {
-                    val p = withContext(Dispatchers.Default) { Platform.pickFolderNative(pathT()) }
-                    if (p != null) path = p
-                }
-            }
-        }
-    }
-    Text(kindT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip(kindWfl(), engine == "wfl_asr") { engine = "wfl_asr" }
-        Chip(kindSofa(), engine == "sofa") { engine = "sofa" }
-        Chip(kindHfa(), engine == "hubertfa") { engine = "hubertfa" }
-        Chip(kindTifa(), engine == "tifa") { engine = "tifa" }
-        Chip(kindRefiner(), engine == "refiner") { engine = "refiner" }
-    }
-    Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
-        Column(Modifier.weight(1f)) {
-            Text(langT() + (LanguageNames.of(lang, "").takeIf { it.isNotEmpty() }?.let { " · $it" } ?: ""), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
-            Field(lang, { lang = it.trim().lowercase() }, Modifier.fillMaxWidth(), placeholder = langHint())
-        }
-        Column(Modifier.weight(2f)) {
-            Text(nameT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
-            Field(name, { name = it }, Modifier.fillMaxWidth(), placeholder = path.substringAfterLast('\\').substringAfterLast('/').substringBeforeLast('.'))
-        }
-    }
-    Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Btn(addBtn(), primary = true, enabled = path.isNotBlank() && !busy) {
-            busy = true
-            result = null
-            scope.launch {
-                try {
-                    if (!tk.ensure()) error(notReady())
-                    val file = path.substringAfterLast('\\').substringAfterLast('/')
-                    val stem = file.substringBeforeLast('.')
-                    // a checkpoint of a training run is named by its folder too (runs/ru/model_step5000.pt → ru-model_step5000)
-                    val parent = path.replace('\\', '/').substringBeforeLast('/', "").substringAfterLast('/')
-                    val id = name.ifBlank { if (parent.isNotEmpty()) "$parent-$stem" else stem }
-                        .lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-')
-                    val ids = tk.client().importModel(engine, path, id, name.ifBlank { null } ?: "$parent/$stem".trimStart('/'),
-                        lang.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() })
-                    result = true to (if (engine == "refiner") addedRefiner else added).format(ids.joinToString())
-                    tk.modelsVersion++
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    result = false to (e.message ?: e.toString())
-                } finally {
-                    busy = false
-                }
-            }
-        }
-        if (busy) Text(adding(), color = c.muted, fontSize = 12.sp)
-    }
-    result?.let { (ok, text) -> Text(text, color = if (ok) c.ok else c.danger, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)) }
-    if (!ready) Text(notReady(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-    if (mine.isNotEmpty()) {
-        Text(yours(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-        Column(Modifier.fillMaxWidth().background(c.panelAlt).padding(8.dp)) {
-            for (m in mine) Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(m.name.ifBlank { m.id }, color = c.text, fontSize = 13.sp)
-                    Text(m.id + " · " + m.engine + " · " + m.languages.joinToString { LanguageNames.of(it) }, color = c.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
-                }
-                Btn(removeBtn()) {
+    Fold(title()) {
+        Text(hint(), color = c.muted, fontSize = 12.sp)
+        Text(pathT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Field(path, { path = it.trim().trim('"') }, Modifier.weight(1f), placeholder = "D:\\models\\model.pt")
+            if (Platform.hasNativeFolderPicker) {
+                Btn(fileBtn()) {
                     scope.launch {
-                        runCatching { tk.client().removeModel(m.id) }
+                        val p = withContext(Dispatchers.Default) { Platform.pickFileNative(pathT(), listOf("pt", "pth", "ckpt", "safetensors", "onnx", "zip", "rar", "7z")) }
+                        if (p != null) path = p
+                    }
+                }
+                Btn(folderBtn()) {
+                    scope.launch {
+                        val p = withContext(Dispatchers.Default) { Platform.pickFolderNative(pathT()) }
+                        if (p != null) path = p
+                    }
+                }
+            }
+        }
+        Text(kindT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip(kindWfl(), engine == "wfl_asr") { engine = "wfl_asr" }
+            Chip(kindSofa(), engine == "sofa") { engine = "sofa" }
+            Chip(kindHfa(), engine == "hubertfa") { engine = "hubertfa" }
+            Chip(kindTifa(), engine == "tifa") { engine = "tifa" }
+            Chip(kindRefiner(), engine == "refiner") { engine = "refiner" }
+        }
+        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Text(langT() + (LanguageNames.of(lang, "").takeIf { it.isNotEmpty() }?.let { " · $it" } ?: ""), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                Field(lang, { lang = it.trim().lowercase() }, Modifier.fillMaxWidth(), placeholder = langHint())
+            }
+            Column(Modifier.weight(2f)) {
+                Text(nameT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                Field(name, { name = it }, Modifier.fillMaxWidth(), placeholder = path.substringAfterLast('\\').substringAfterLast('/').substringBeforeLast('.'))
+            }
+        }
+        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Btn(addBtn(), primary = true, enabled = path.isNotBlank() && !busy) {
+                busy = true
+                result = null
+                scope.launch {
+                    try {
+                        if (!tk.ensure()) error(notReady())
+                        val file = path.substringAfterLast('\\').substringAfterLast('/')
+                        val stem = file.substringBeforeLast('.')
+                        // a checkpoint of a training run is named by its folder too (runs/ru/model_step5000.pt → ru-model_step5000)
+                        val parent = path.replace('\\', '/').substringBeforeLast('/', "").substringAfterLast('/')
+                        val id = name.ifBlank { if (parent.isNotEmpty()) "$parent-$stem" else stem }
+                            .lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-')
+                        val ids = tk.client().importModel(engine, path, id, name.ifBlank { null } ?: "$parent/$stem".trimStart('/'),
+                            lang.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() })
+                        result = true to (if (engine == "refiner") addedRefiner else added).format(ids.joinToString())
                         tk.modelsVersion++
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        result = false to (e.message ?: e.toString())
+                    } finally {
+                        busy = false
+                    }
+                }
+            }
+            if (busy) Text(adding(), color = c.muted, fontSize = 12.sp)
+        }
+        result?.let { (ok, text) -> Text(text, color = if (ok) c.ok else c.danger, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)) }
+        if (!ready) Text(notReady(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+        if (mine.isNotEmpty()) {
+            Text(yours(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
+            Column(Modifier.fillMaxWidth().background(c.panelAlt).padding(8.dp)) {
+                for (m in mine) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(m.name.ifBlank { m.id }, color = c.text, fontSize = 13.sp)
+                        Text(m.id + " · " + m.engine + " · " + m.languages.joinToString { LanguageNames.of(it) }, color = c.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                    }
+                    Btn(removeBtn()) {
+                        scope.launch {
+                            runCatching { tk.client().removeModel(m.id) }
+                            tk.modelsVersion++
+                        }
                     }
                 }
             }
