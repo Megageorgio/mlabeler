@@ -43,6 +43,12 @@ expect fun imageFromArgb(width: Int, height: Int, pixels: IntArray): ImageBitmap
 /** A PNG, JPEG, WebP… picture from its file bytes, or null. */
 expect fun decodeImage(bytes: ByteArray): ImageBitmap?
 
+/**
+ * This image, made ready to be drawn many times over: drawing it then no longer copies its pixels each time
+ * (it must not be drawn into afterwards).
+ */
+expect fun ImageBitmap.readyToDraw(): ImageBitmap
+
 expect val resizeHorizontalIcon: PointerIcon
 
 /** Audio output for one clip at a time. */
