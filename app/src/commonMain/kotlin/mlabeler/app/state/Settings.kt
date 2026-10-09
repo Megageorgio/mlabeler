@@ -199,6 +199,8 @@ data class ToolkitSettings(
     val token: String = "",
     val lastModel: String = "",
     val lastLanguage: String = "",
+    /** Other languages that may occur in the text (TIFA models), e.g. en for English words in Chinese lyrics. */
+    val extraLanguages: List<String> = emptyList(),
     /** Model for recognising phonemes without lyrics. */
     val lastSegmentModel: String = "",
     /** Aligning without text: recognise the words with Whisper first (a large download on first use). */

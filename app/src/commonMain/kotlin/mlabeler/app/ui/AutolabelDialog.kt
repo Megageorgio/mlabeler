@@ -38,7 +38,7 @@ private val selectedPart = L("Selected part", "Выделенный фрагме
 private val wholeFile = L("Whole recording", "Всю запись")
 private val howT = L("How", "Как")
 private val byText = L("Place a known text", "Расставить известный текст")
-private val byText2 = L("SOFA, HubertFA · the text is needed", "SOFA, HubertFA · нужен текст")
+private val byText2 = L("SOFA, HubertFA, TIFA · the text is needed", "SOFA, HubertFA, TIFA · нужен текст")
 private val recognize = L("Recognise phonemes", "Распознать фонемы")
 private val recognize2 = L("WFL · no text needed", "WFL · текст не нужен")
 private val byTextAbout = L("The aligner places what is sung: words (turned into phonemes with the model's dictionary) or phonemes. It doesn't guess the text; without text it can only work after Whisper has recognised the words.",
@@ -116,6 +116,9 @@ private fun WflOptions(app: AppState) {
 }
 
 private val ownModelLink = L("Add your own model…", "Добавить свою модель…")
+private val otherLangs = L("Other languages in the text", "Другие языки в тексте")
+private val otherLangsNote = L("For example English words in Chinese lyrics. Their phonemes get the language in front: en/s.",
+    "Например, английские слова в китайском тексте. Их фонемы будут с языком впереди: en/s.")
 
 @Composable
 fun AutolabelDialog(app: AppState) {
@@ -137,6 +140,12 @@ fun AutolabelDialog(app: AppState) {
     val (langs, error) = rememberToolkitModels(app, task)
     var lang by remember(task) { mutableStateOf(settings.lastLanguage) }
     var model by remember(task) { mutableStateOf(if (recognizeMode) settings.lastSegmentModel else settings.lastModel) }
+    var extraLangs by remember { mutableStateOf(settings.extraLanguages) }
+    // a model that reads several languages in one text (TIFA): the other languages it knows
+    val modelEngine = langs?.firstNotNullOfOrNull { g -> g.models.firstOrNull { it.id == model }?.engine }
+    val otherLangCodes = if (modelEngine != "tifa" || recognizeMode) emptyList()
+        else langs.orEmpty().filter { g -> g.code != lang && g.code != "*" && g.models.any { it.id == model } }.map { it.code }
+    val extra = extraLangs.filter { it in otherLangCodes }
     LaunchedEffect(langs) {
         val l = langs ?: return@LaunchedEffect
         if (l.none { it.code == lang }) lang = l.firstOrNull { g -> g.models.any { it.id == model } }?.code ?: l.firstOrNull()?.code ?: ""
@@ -168,15 +177,16 @@ fun AutolabelDialog(app: AppState) {
             Btn(run(), primary = true, enabled = modelOk && error == null && !textMissing && (!batch || files.isNotEmpty())) {
                 app.update {
                     val t = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang)
-                    else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper)
+                    else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper,
+                        extraLanguages = if (otherLangCodes.isEmpty()) it.toolkit.extraLanguages else extra)
                     it.copy(toolkit = t)
                 }
                 val language = lang.takeIf { it.isNotEmpty() && it != "*" }
                 if (batch) {
                     val src = if (recognizeMode && batchSource == mlabeler.app.state.EditorState.BatchText.TxtNextToIt) mlabeler.app.state.EditorState.BatchText.None else batchSource
-                    ed.autolabelFiles(files, model, language, recognizeMode, src, phonemes, whisper && !recognizeMode)
+                    ed.autolabelFiles(files, model, language, recognizeMode, src, phonemes, whisper && !recognizeMode, extra)
                 } else ed.autolabel(range.first, range.second, model, language, if (recognizeMode) forced else text,
-                    phonemes && text.isNotBlank(), replace, recognize = recognizeMode, whisper = whisper && !recognizeMode)
+                    phonemes && text.isNotBlank(), replace, recognize = recognizeMode, whisper = whisper && !recognizeMode, extraLanguages = extra)
                 close()
             }
         }) {
@@ -233,6 +243,16 @@ fun AutolabelDialog(app: AppState) {
                         }
                     }
                 }
+            }
+            if (otherLangCodes.isNotEmpty()) {
+                Text(otherLangs(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (code in otherLangCodes) {
+                        val name = mlabeler.app.i18n.LanguageNames.of(code, langs.orEmpty().firstOrNull { it.code == code }?.name ?: code)
+                        Chip(name, code in extra) { extraLangs = if (code in extraLangs) extraLangs - code else extraLangs + code }
+                    }
+                }
+                Text(otherLangsNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
             Text(ownModelLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
                 .clickable { app.settingsPage = "Toolkit"; app.showAutolabel = false; app.showSettings = true })

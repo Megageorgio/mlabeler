@@ -552,7 +552,8 @@ class EditorState(
      * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown
      * as a comparison tier named after the model.
      */
-    fun autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean, recognize: Boolean = false, whisper: Boolean = false) {
+    fun autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean, recognize: Boolean = false, whisper: Boolean = false,
+                  extraLanguages: List<String> = emptyList()) {
         val a = audio ?: return
         val it = item ?: return
         toolkitJob?.cancel()
@@ -571,7 +572,7 @@ class EditorState(
                 val fileId = client.upload(it.name + "_part.wav", wav)
                 val job = if (recognize) {
                     client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter())
-                } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter())
+                } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages)
                 serverJob = job
                 val result = client.await(job) { p, stage ->
                     toolkitProgress = p
@@ -597,7 +598,8 @@ class EditorState(
                     modelResults[it.id] = modelResults[it.id].orEmpty() + Reference(model, "", part, from to to)
                     loadReferences()
                 }
-                app.message(if (replace) S.autolabelDone() else S.autolabelCompareDone())
+                val check = mlabeler.app.toolkit.ToolkitClient.diagnosisOf(result)?.let { "\n" + selfCheckText(it) }.orEmpty()
+                app.message((if (replace) S.autolabelDone() else S.autolabelCompareDone()) + check)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // stop the job on the toolkit side too
                 serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
@@ -629,7 +631,7 @@ class EditorState(
      */
     fun autolabelFiles(
         files: List<Item>, model: String, language: String?, recognize: Boolean, source: BatchText,
-        phonemes: Boolean, whisper: Boolean,
+        phonemes: Boolean, whisper: Boolean, extraLanguages: List<String> = emptyList(),
     ) {
         if (files.isEmpty()) return
         toolkitJob?.cancel()
@@ -637,6 +639,7 @@ class EditorState(
             val client = app.toolkit.client()
             var serverJob: String? = null
             val failed = mutableListOf<String>()
+            val unsure = mutableListOf<String>()
             var done = 0
             try {
                 toolkitBusySince = now()
@@ -672,7 +675,7 @@ class EditorState(
                                 else -> ""
                             }
                             if (text.isBlank() && !whisper) error(noText())
-                            client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter())
+                            client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter(), extraLanguages)
                         }
                         serverJob = job
                         val result = client.await(job) { p, stage ->
@@ -680,6 +683,7 @@ class EditorState(
                             toolkitBusy = head + " · " + stage.ifEmpty { S.toolkit() }
                         }
                         serverJob = null
+                        mlabeler.app.toolkit.ToolkitClient.diagnosisOf(result)?.takeIf { it.weak }?.let { unsure += f.name + " · " + selfCheckShort(it) }
                         val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, 0.0, a.duration)
                         fun merged(d: LabelDoc): LabelDoc {
                             var out = d
@@ -711,8 +715,9 @@ class EditorState(
                 }
                 labelIndex = null
                 docVersion++
-                if (failed.isEmpty()) app.message(batchDone.format(done))
-                else app.message(batchDoneWithErrors.format(done, failed.size) + "\n" + failed.joinToString("\n"), error = true)
+                val unsureText = if (unsure.isEmpty()) "" else "\n" + worthChecking() + "\n" + unsure.joinToString("\n")
+                if (failed.isEmpty()) app.message(batchDone.format(done) + unsureText)
+                else app.message(batchDoneWithErrors.format(done, failed.size) + "\n" + failed.joinToString("\n") + unsureText, error = true)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
                 withContext(kotlinx.coroutines.NonCancellable) { if (done > 0) app.message(batchStopped.format(done, files.size)) }
@@ -2438,6 +2443,22 @@ private val refinedT = L("Boundaries moved: {0}", "Сдвинуто границ
 private val refinedFilesT = L("Refined {0} files, boundaries moved: {1}", "Уточнено файлов: {0}, сдвинуто границ: {1}")
 private val batchFile = L("File {0} of {1}: {2}", "Файл {0} из {1}: {2}")
 private val batchDone = L("Labelled {0} files", "Размечено файлов: {0}")
+private val selfCheck = L("Self-check: the text fits the sound by {0}%, the phoneme spans by {1}%", "Самопроверка: текст совпадает со звуком на {0}%, участки фонем — на {1}%")
+private val selfCheckSkipped = L("{0} phonemes found no room, they are 1 ms long", "Фонем без места: {0}, у них длина 1 мс")
+private val selfCheckBrief = L("text {0}%, spans {1}%", "текст {0}%, участки {1}%")
+private val worthChecking = L("Worth checking, the aligner is unsure:", "Стоит проверить, выравниватель не уверен:")
+
+/** Low scores of the aligner's self-check: the text may not match the recording, or the boundaries may be off. */
+private val mlabeler.app.toolkit.ToolkitClient.Diagnosis.weak: Boolean
+    get() = (agreement ?: 1.0) < 0.8 || (confidence ?: 1.0) < 0.4 || skipped > 0
+
+private fun pct(v: Double?) = v?.let { kotlin.math.round(it * 100).toInt().toString() } ?: "—"
+
+private fun selfCheckText(d: mlabeler.app.toolkit.ToolkitClient.Diagnosis): String =
+    selfCheck.format(pct(d.agreement), pct(d.confidence)) + if (d.skipped > 0) "\n" + selfCheckSkipped.format(d.skipped) else ""
+
+private fun selfCheckShort(d: mlabeler.app.toolkit.ToolkitClient.Diagnosis): String =
+    selfCheckBrief.format(pct(d.agreement), pct(d.confidence)) + if (d.skipped > 0) " · " + selfCheckSkipped.format(d.skipped) else ""
 private val batchDoneWithErrors = L("Labelled {0} files, {1} with errors:", "Размечено файлов: {0}, с ошибками: {1}:")
 private val batchStopped = L("Stopped: {0} of {1} files labelled and saved", "Остановлено: размечено и сохранено {0} из {1}")
 private val noText = L("no text (a .txt with the same name, or Whisper)", "нет текста (.txt с тем же именем или Whisper)")

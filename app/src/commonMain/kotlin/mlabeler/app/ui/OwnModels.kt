@@ -42,6 +42,7 @@ private val kindT = L("What it does", "Что делает")
 private val kindWfl = L("Recognises phonemes without text (WFL-ASR)", "Распознаёт фонемы без текста (WFL-ASR)")
 private val kindSofa = L("Aligns to text (SOFA)", "Выравнивает по тексту (SOFA)")
 private val kindHfa = L("Aligns to text (HubertFA)", "Выравнивает по тексту (HubertFA)")
+private val kindTifa = L("Aligns to text (TIFA)", "Выравнивает по тексту (TIFA)")
 private val kindRefiner = L("Refines boundaries (mRefinerModel)", "Уточняет границы (mRefinerModel)")
 private val langT = L("Language", "Язык")
 private val langHint = L("code, e.g. ru", "код, например ru")
@@ -95,6 +96,7 @@ fun OwnModelsSection(app: AppState) {
         Chip(kindWfl(), engine == "wfl_asr") { engine = "wfl_asr" }
         Chip(kindSofa(), engine == "sofa") { engine = "sofa" }
         Chip(kindHfa(), engine == "hubertfa") { engine = "hubertfa" }
+        Chip(kindTifa(), engine == "tifa") { engine = "tifa" }
         Chip(kindRefiner(), engine == "refiner") { engine = "refiner" }
     }
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {

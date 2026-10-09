@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -189,9 +190,10 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
     /**
      * Starts alignment of [text] (words, or phonemes when [phonemes]); returns the job id. Empty text: the words are
      * first recognised with Whisper when [whisper], otherwise the toolkit reports that the text is missing.
+     * [extraLanguages]: other languages in the text (TIFA models).
      */
     suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean, whisper: Boolean = false,
-                      refine: mlabeler.app.state.RefineSettings? = null): String {
+                      refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList()): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -204,6 +206,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             }
             put("model", model)
             if (language != null) put("language", language)
+            if (extraLanguages.isNotEmpty()) put("extra_languages", buildJsonArray { extraLanguages.forEach { add(JsonPrimitive(it)) } })
             if (!whisper) put("transcribe", kotlinx.serialization.json.JsonNull)
             putRefine(refine)
             putJsonObject("output") {
@@ -311,13 +314,27 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         runCatching { call("POST", "/jobs/$jobId/cancel") }
     }
 
+    /** Self-check of one aligned file (TIFA): how well the text and the phoneme spans fit the sound. */
+    data class Diagnosis(val agreement: Double?, val confidence: Double?, val skipped: Int)
+
     companion object {
+        /** The aligner's self-check of an item, when it gives one. */
+        fun diagnosisOf(result: JsonObject, index: Int = 0): Diagnosis? {
+            val item = result["items"]?.jsonArray?.getOrNull(index)?.jsonObject ?: return null
+            val d = item["data"]?.jsonObject?.get("diagnosis") as? JsonObject ?: return null
+            return Diagnosis(
+                (d["agreement"] as? JsonPrimitive)?.doubleOrNull,
+                (d["confidence"] as? JsonPrimitive)?.doubleOrNull,
+                (d["skipped_phonemes"] as? JsonPrimitive)?.intOrNull ?: 0,
+            )
+        }
+
         /** Tiers of the first item's label, times shifted by [offset] seconds. */
         fun labelOf(result: JsonObject, offset: Double, duration: Double, index: Int = 0): LabelDoc {
             val item = result["items"]!!.jsonArray.getOrNull(index)?.jsonObject ?: throw ToolkitException("no result")
             if ((item["ok"] as? JsonPrimitive)?.content == "false") throw ToolkitException((item["error"] as? JsonPrimitive)?.content ?: "failed")
             val tiers = item["label"]?.jsonObject?.get("tiers")?.jsonObject ?: throw ToolkitException("no labels in the result")
-            val order = listOf("words", "phones")
+            val order = listOf("texts", "words", "phones")
             val names = tiers.keys.sortedBy { order.indexOf(it).let { i -> if (i < 0) 99 else i } }
             return LabelDoc(names.map { name ->
                 val ivs = tiers[name]!!.jsonArray.map { iv ->
