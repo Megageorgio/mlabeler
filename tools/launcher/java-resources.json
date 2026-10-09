@@ -1,0 +1,23 @@
+{
+  "RT_GROUP_ICON": {
+    "#2000": { "0409": "../../art/icon.ico" }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0409": {
+        "fixed": { "file_version": "0.0.0.0", "product_version": "0.0.0.0" },
+        "info": {
+          "0409": {
+            "CompanyName": "Megageorgio",
+            "FileDescription": "mLabeler",
+            "InternalName": "mLabeler",
+            "LegalCopyright": "MIT License",
+            "OriginalFilename": "mLabeler.exe",
+            "ProductName": "mLabeler",
+            "Comments": "The Java runtime (Eclipse Adoptium OpenJDK) that runs mLabeler. Source: https://github.com/Megageorgio/mlabeler"
+          }
+        }
+      }
+    }
+  }
+}

@@ -31,6 +31,8 @@ fun main(args: Array<String>) {
     }
     // old Windows has no DirectX 12, which the graphics library starts with: OpenGL (software drawing when that fails too)
     if (Platform.legacyWindows && System.getProperty("skiko.renderApi") == null) System.setProperty("skiko.renderApi", "OPENGL")
+    // the window shares the taskbar button of a pinned mLabeler.exe
+    joinLauncherOnTaskbar()
     // a crash leaves its report for the next start
     val previous = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { t, e -> CrashLog.write(e.stackTraceToString()); previous?.uncaughtException(t, e) }
