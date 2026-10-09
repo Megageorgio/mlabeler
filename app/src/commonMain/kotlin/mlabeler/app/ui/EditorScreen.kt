@@ -160,17 +160,38 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
             val sound = ed.soundMode && ed.mode == Mode.Labels
             if (sound) (if (l.showInspector && wc == WidthClass.Expanded && l.inspectorSide == "left") left else right).add(0, SidePanelId.Sound)
             fun width(w: Float, panels: List<SidePanelId>) = (if (SidePanelId.Sound in panels) w.coerceAtLeast(290f) else w).coerceIn(180f, 520f).dp
+            // a side opens and closes smoothly (its last panels stay drawn while it closes)
+            val lastLeft = remember { mutableStateOf(left.toList()) }
+            val lastRight = remember { mutableStateOf(right.toList()) }
+            if (left.isNotEmpty()) lastLeft.value = left.toList()
+            if (right.isNotEmpty()) lastRight.value = right.toList()
+            val sideMs = Motion.ms(170)
+            val slide = Motion.full()
+            fun enter(start: Boolean) = if (sideMs == 0) androidx.compose.animation.EnterTransition.None
+                else if (slide) androidx.compose.animation.expandHorizontally(androidx.compose.animation.core.tween(sideMs), if (start) Alignment.Start else Alignment.End) +
+                    androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(sideMs))
+                else androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(sideMs))
+            fun exit(start: Boolean) = if (sideMs == 0) androidx.compose.animation.ExitTransition.None
+                else if (slide) androidx.compose.animation.shrinkHorizontally(androidx.compose.animation.core.tween(sideMs), if (start) Alignment.Start else Alignment.End) +
+                    androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(sideMs))
+                else androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(sideMs))
             Row(Modifier.fillMaxSize()) {
-                if (left.isNotEmpty()) {
-                    PanelStack(app, ed, left, Modifier.width(width(l.filesWidth, left)).fillMaxHeight())
-                    VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(filesWidth = (it.layout.filesWidth + d).coerceIn(180f, 520f))) } }
+                androidx.compose.animation.AnimatedVisibility(left.isNotEmpty(), enter = enter(true), exit = exit(true)) {
+                    val panels = lastLeft.value
+                    Row(Modifier.fillMaxHeight()) {
+                        PanelStack(app, ed, panels, Modifier.width(width(l.filesWidth, panels)).fillMaxHeight())
+                        VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(filesWidth = (it.layout.filesWidth + d).coerceIn(180f, 520f))) } }
+                    }
                 }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     EditorBody(app, ed)
                 }
-                if (right.isNotEmpty()) {
-                    VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(180f, 520f))) } }
-                    PanelStack(app, ed, right, Modifier.width(width(l.inspectorWidth, right)).fillMaxHeight())
+                androidx.compose.animation.AnimatedVisibility(right.isNotEmpty(), enter = enter(false), exit = exit(false)) {
+                    val panels = lastRight.value
+                    Row(Modifier.fillMaxHeight()) {
+                        VSplitter(!app.settings.layout.locked) { d -> app.update { it.copy(layout = it.layout.copy(inspectorWidth = (it.layout.inspectorWidth - d).coerceIn(180f, 520f))) } }
+                        PanelStack(app, ed, panels, Modifier.width(width(l.inspectorWidth, panels)).fillMaxHeight())
+                    }
                 }
             }
             // medium width: details slide over the timeline
@@ -214,8 +235,9 @@ private fun EditorBody(app: AppState, ed: EditorState) {
             }
         }
     }
+    // the map of the recording is the scroll bar too; the plain one only without it
     if (ed.item != null && ed.audio != null && app.settings.layout.minimap) MiniMap(ed)
-    if (ed.item != null && ed.audio != null && app.settings.layout.scrollbar) TimeScrollBar(ed)
+    else if (ed.item != null && ed.audio != null && app.settings.layout.scrollbar) TimeScrollBar(ed)
     }
 }
 
@@ -479,7 +501,7 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
                     val sel = p == current
                     Text(
                         (if (p == SidePanelId.Files && app.settings.layout.entriesSeparate) S.files() else panelNames.getValue(p)()), fontSize = 13.sp, color = if (sel) c.text else c.muted, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(c.radius)).background(if (sel && panels.size > 1) c.panelAlt else c.panel.copy(alpha = 0f))
+                        modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(c.radius)).background(animatedColor(if (sel && panels.size > 1) c.panelAlt else c.panelAlt.copy(alpha = 0f)).value)
                             .clickable { chosen = p }.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
@@ -525,12 +547,15 @@ private fun PanelStack(app: AppState, ed: EditorState, panels: List<SidePanelId>
             }
             Divider()
         }
-        when (current) {
-            SidePanelId.Files -> SidePanel(ed, Modifier.weight(1f).fillMaxWidth())
-            SidePanelId.Entries -> EntriesPanel(ed, Modifier.weight(1f).fillMaxWidth().background(c.panel)) {}
-            SidePanelId.Details -> Inspector(ed, Modifier.weight(1f).fillMaxWidth())
-            SidePanelId.Notepad -> NotepadText(app, ed, Modifier.weight(1f).fillMaxWidth())
-            SidePanelId.Sound -> SoundPanel(app, ed, Modifier.weight(1f).fillMaxWidth(), titled = panels.size == 1)
+        // switching tabs fades from one panel to the other
+        androidx.compose.animation.Crossfade(current, Modifier.weight(1f).fillMaxWidth(), androidx.compose.animation.core.tween(Motion.ms(130)), label = "panel") { p ->
+            when (p) {
+                SidePanelId.Files -> SidePanel(ed, Modifier.fillMaxSize())
+                SidePanelId.Entries -> EntriesPanel(ed, Modifier.fillMaxSize().background(c.panel)) {}
+                SidePanelId.Details -> Inspector(ed, Modifier.fillMaxSize())
+                SidePanelId.Notepad -> NotepadText(app, ed, Modifier.fillMaxSize())
+                SidePanelId.Sound -> SoundPanel(app, ed, Modifier.fillMaxSize(), titled = panels.size == 1)
+            }
         }
     }
 }
