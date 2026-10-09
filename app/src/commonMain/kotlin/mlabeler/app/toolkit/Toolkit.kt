@@ -68,6 +68,13 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
 
     suspend fun health(): JsonElement = call("GET", "/health", timeoutMs = 8_000)
 
+    /** The toolkit's settings (secrets hidden). */
+    suspend fun settings(): JsonObject = call("GET", "/settings").jsonObject
+
+    /** Changes settings of the toolkit, e.g. "device" ("auto", "cpu", "cuda"); returns them all. */
+    suspend fun changeSettings(values: Map<String, String>): JsonObject =
+        call("POST", "/settings", buildJsonObject { for ((k, v) in values) put(k, v) }).jsonObject
+
     /** Jobs that haven't finished yet (queued, running, waiting). */
     suspend fun activeJobs(): Int = call("GET", "/jobs?active=true").jsonArray.size
 

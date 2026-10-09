@@ -734,6 +734,7 @@ private fun ToolkitPage(app: AppState) {
             Btn(ErrorTitles.updateToolkit(), enabled = !tk.updatingNow) { tk.updateNow() }
         }
     }
+    ToolkitDeviceSection(app)
     OwnModelsSection(app)
     ToolkitStorageSection(app)
     Fold(S.toolkitUrl()) {
