@@ -72,6 +72,11 @@ data class Tokens(
     val bgImageAlpha: Float = 0.35f,
     /** How solid the panels are (1 = not see-through); less lets the background show through them. */
     val panelAlpha: Float = 1f,
+    /**
+     * How solid the sound lanes are (waveform and spectrogram background, the spectrogram itself); below 0 it
+     * follows [panelAlpha] (half as see-through).
+     */
+    val laneAlpha: Float = -1f,
     /** How the program's own window title looks (menus in the window title): "" plain, "xp" blue and rounded, "classic" a flat stripe. */
     val windowStyle: String = "",
 )
@@ -193,11 +198,13 @@ fun AppTheme(tokens0: Tokens, font: FontFamily? = null, crisp: Boolean = false, 
     CrispShapes.on = crisp
     val t1 = if (crisp) tokens0.copy(crisp = true) else tokens0
     // see-through panels over a background picture or gradient
-    val tokens = if (t1.panelAlpha < 0.999f) t1.copy(
+    val lane = t1.effectiveLaneAlpha
+    val tokens = t1.copy(
         panel = t1.panel.copy(alpha = t1.panel.alpha * t1.panelAlpha),
         panelAlt = t1.panelAlt.copy(alpha = t1.panelAlt.alpha * (0.5f + t1.panelAlpha / 2)),
-        laneBg = t1.laneBg.copy(alpha = t1.laneBg.alpha * (0.5f + t1.panelAlpha / 2)),
-    ) else t1
+        laneBg = t1.laneBg.copy(alpha = t1.laneBg.alpha * lane),
+        laneAlpha = lane,
+    )
     val r = RoundedCornerShape(tokens.radius)
     val shapes = Shapes(extraSmall = r, small = r, medium = r, large = r, extraLarge = r)
     val family = font ?: if (tokens.mono) FontFamily.Monospace else FontFamily.Default
@@ -218,3 +225,6 @@ fun AppTheme(tokens0: Tokens, font: FontFamily? = null, crisp: Boolean = false, 
         MaterialTheme(colorScheme = scheme(tokens), shapes = shapes, typography = typography, content = content)
     }
 }
+
+/** [Tokens.laneAlpha] as used: set by the theme, or following the panels. */
+val Tokens.effectiveLaneAlpha: Float get() = if (laneAlpha >= 0f) laneAlpha.coerceIn(0.1f, 1f) else 0.5f + panelAlpha.coerceIn(0f, 1f) / 2

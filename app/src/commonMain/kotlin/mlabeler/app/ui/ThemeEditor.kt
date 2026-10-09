@@ -39,6 +39,7 @@ import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.theme.CustomTheme
 import mlabeler.app.theme.T
+import mlabeler.app.theme.effectiveLaneAlpha
 import mlabeler.app.theme.ThemeFiles
 import mlabeler.app.theme.Themes
 import mlabeler.app.theme.Tokens
@@ -216,6 +217,7 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
     }
     if (tokens.bgImage.isNotEmpty()) ValueSlider(imageAlphaT(), tokens.bgImageAlpha, 0.05f..1f, "%", factor = 100f) { change(tokens.copy(bgImageAlpha = it)) }
     ValueSlider(panelAlphaT(), tokens.panelAlpha, 0.2f..1f, "%", factor = 100f) { change(tokens.copy(panelAlpha = it)) }
+    ValueSlider(laneAlphaT(), tokens.effectiveLaneAlpha, 0.1f..1f, "%", factor = 100f) { change(tokens.copy(laneAlpha = it)) }
     Text(backdropHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
     Row(Modifier.padding(top = 16.dp)) {
         Btn(deleteT()) {
@@ -236,6 +238,7 @@ private val imageHint = L("a PNG or JPEG file", "файл PNG или JPEG")
 private val pickImageT = L("Choose…", "Выбрать…")
 private val imageAlphaT = L("How strongly the picture shows", "Насколько видна картинка")
 private val panelAlphaT = L("Panels solid", "Плотность панелей")
+private val laneAlphaT = L("Waveform and spectrogram solid", "Плотность волны и спектрограммы")
 private val backdropHint = L("Less solid panels let the gradient or picture show through them. The waveform and spectrogram stay as they are.",
     "Чем менее плотные панели, тем сильнее сквозь них виден градиент или картинка. Волна и спектрограмма не меняются.")
 

@@ -1087,6 +1087,7 @@ private fun DrawScope.drawTimeline(
             drawImage(
                 specImage, srcOffset = IntOffset.Zero, srcSize = IntSize(specImage.width, specImage.height),
                 dstOffset = IntOffset(0, g.specTop.toInt()), dstSize = IntSize(w.toInt(), (g.specBottom - g.specTop).toInt()),
+                alpha = c.laneAlpha.coerceIn(0.1f, 1f),
                 filterQuality = FilterQuality.Low,
             )
         }
