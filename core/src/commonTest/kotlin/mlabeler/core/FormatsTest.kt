@@ -311,7 +311,7 @@ class AutoOtoTest {
     fun otherLanguages() {
         val s = mlabeler.core.oto.Syllables
         val arpa = s.fromName("m_ah_s_t_ah_v")
-        assert(arpa.map { it.text } == listOf("m ah", "s t ah", "v"))
+        assertEquals(listOf("m ah", "s t ah", "v"), arpa.map { it.text })
         assertEquals("ARPA", mlabeler.core.oto.AutoOto.styleOf(arpa, mlabeler.core.oto.AutoOtoSettings()).name)
         val e = mlabeler.core.oto.AutoOto.entries("m_ah_s_t_ah_v.wav", listOf(
             mlabeler.core.oto.SyllableTiming(arpa[0], 0.30, 0.40, 0.80), mlabeler.core.oto.SyllableTiming(arpa[1], 0.80, 1.00, 1.40),

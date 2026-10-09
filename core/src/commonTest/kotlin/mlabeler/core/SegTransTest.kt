@@ -34,6 +34,6 @@ class SegTransTest {
     fun unnamedIntervalsBecomeSilence() {
         val doc = mlabeler.core.model.LabelDoc(listOf(IntervalTier("phones", listOf(0.0, 0.5, 1.0), listOf("", "a"))))
         assertEquals(listOf("Sil", "a"), SegFile.phonemes(doc))
-        assert(SegFile.write(doc).startsWith("nPhonemes 2\r\narticulationsAreStationaries 0\r\n"))
+        kotlin.test.assertTrue(SegFile.write(doc).startsWith("nPhonemes 2\r\narticulationsAreStationaries 0\r\n"))
     }
 }
