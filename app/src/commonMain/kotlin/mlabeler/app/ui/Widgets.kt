@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.platform.LocalDensity
@@ -551,4 +553,46 @@ fun Modifier.scrollWithHint(state: androidx.compose.foundation.ScrollState = and
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2, w / 2),
         )
     }.verticalScroll(state)
+}
+
+/**
+ * A scroll bar for a lazy list, to be put next to it: the thumb shows the part in view (by items) and can be
+ * dragged, a click on the track jumps there.
+ */
+@Composable
+fun LazyScrollbar(state: androidx.compose.foundation.lazy.LazyListState, modifier: Modifier = Modifier) {
+    val c = T.c
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val info = state.layoutInfo
+    val total = info.totalItemsCount
+    val visible = info.visibleItemsInfo.size
+    if (total == 0 || visible >= total) return
+    androidx.compose.foundation.layout.Box(
+        modifier.width(if (mlabeler.app.Platform.isMobile) 14.dp else 10.dp)
+            .pointerInput(total) {
+                fun jump(y: Float) {
+                    val f = (y / size.height).coerceIn(0f, 1f)
+                    scope.launch { state.scrollToItem(((total - visible) * f).toInt().coerceIn(0, total - 1)) }
+                }
+                awaitPointerEventScope {
+                    while (true) {
+                        val ev = awaitPointerEvent()
+                        val ch = ev.changes.firstOrNull() ?: continue
+                        if (ch.pressed) { jump(ch.position.y); ch.consume() }
+                    }
+                }
+            }
+            .then(Modifier.drawBehind {
+                val h = size.height
+                val thumb = (h * visible / total).coerceAtLeast(24.dp.toPx()).coerceAtMost(h)
+                val first = state.firstVisibleItemIndex.toFloat() / (total - visible).coerceAtLeast(1)
+                val top = (h - thumb) * first.coerceIn(0f, 1f)
+                val w = 4.dp.toPx()
+                val x = (size.width - w) / 2
+                drawRoundRect(c.border.copy(alpha = 0.35f), topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
+                    size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2, w / 2))
+                drawRoundRect(c.muted.copy(alpha = if (state.isScrollInProgress) 0.9f else 0.6f), topLeft = androidx.compose.ui.geometry.Offset(x, top),
+                    size = androidx.compose.ui.geometry.Size(w, thumb), cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2, w / 2))
+            }),
+    )
 }

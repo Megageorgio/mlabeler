@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -52,6 +53,10 @@ private val keptT = L("kept {0} of {1}", "оставлено {0} из {1}")
 private val keepFirstT = L("Keep one of each (the first)", "Оставить по одному (первый)")
 private val keepFirstHint = L("Where a transition is kept in several recordings, only the first of them (in the order of the list) keeps it. Check the result before saving.",
     "Где переход оставлен в нескольких записях, он остаётся только в первой из них (по порядку списка). Проверьте результат перед сохранением.")
+private val sortT = L("Order:", "Порядок:")
+private val sortNameT = L("By name", "По имени")
+private val sortKeptT = L("Kept most often", "Чаще оставлены")
+private val sortFoundT = L("Found most often", "Чаще встречаются")
 private val perFolderT = L("Repeats count only inside one folder (one pitch)", "Повторы считаются только внутри одной папки (одного питча)")
 private val perFolderHint = L("With a sub-folder per pitch, the same transition in another folder is not a repeat: each pitch keeps its own.",
     "Если в каждой подпапке свой питч, такой же переход в другой папке не считается повтором: у каждого питча остаётся свой.")
@@ -74,6 +79,7 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
     var filter by remember { mutableStateOf(1) }
     var query by remember { mutableStateOf("") }
     var open by remember { mutableStateOf<String?>(null) }
+    var sort by remember { mutableStateOf(0) }
     var busy by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { places = ed.unitPlaces { n, of -> reading = n to of } }
     fun kept(p: EditorState.UnitPlace) = changes[Triple(p.itemId, p.index, p.size)] ?: p.chosen
@@ -101,12 +107,24 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
         } else if (list.isEmpty()) {
             Text(noneT(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(18.dp))
         } else {
-            val counted = groups.map { (u, l) -> Triple(u, l, l.count { kept(it) }) }
+            val counted = groups.map { (u, l) -> Triple(u, l, l.count { kept(it) }) }.let { g ->
+                when (sort) {
+                    1 -> g.sortedWith(compareByDescending<Triple<String, List<EditorState.UnitPlace>, Int>> { it.third }.thenBy { it.first })
+                    2 -> g.sortedWith(compareByDescending<Triple<String, List<EditorState.UnitPlace>, Int>> { it.second.size }.thenBy { it.first })
+                    else -> g
+                }
+            }
             Column(Modifier.padding(horizontal = 18.dp)) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Chip(allT.format(counted.size), filter == 0) { filter = 0 }
                     Chip(repeatsT.format(counted.count { it.third > 1 }), filter == 1) { filter = 1 }
                     Chip(missingT.format(counted.count { it.third == 0 }), filter == 2) { filter = 2 }
+                }
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(sortT(), color = c.muted, fontSize = 12.sp)
+                    Chip(sortNameT(), sort == 0) { sort = 0 }
+                    Chip(sortKeptT(), sort == 1) { sort = 1 }
+                    Chip(sortFoundT(), sort == 2) { sort = 2 }
                 }
                 if (hasFolders) Tip(perFolderHint()) {
                     Row(Modifier.fillMaxWidth().padding(top = 6.dp).clickable { perFolder = !perFolder }, verticalAlignment = Alignment.CenterVertically) {
@@ -129,7 +147,9 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
             val shown = counted.filter { (u, _, n) ->
                 (filter == 0 || (filter == 1 && n > 1) || (filter == 2 && n == 0)) && (query.isBlank() || u.substringBefore('\n').contains(query.trim(), ignoreCase = true))
             }
-            LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 160.dp)) {
+            val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+            androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 160.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().padding(end = 14.dp), state = listState) {
                 items(shown, key = { it.first }) { (u, l, n) ->
                     Column(Modifier.fillMaxWidth()) {
                         Row(
@@ -149,7 +169,7 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 Toggle(k, { v -> set(p, v) })
-                                Text(Paths.name(p.itemId), color = c.text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Text(p.itemId.replace("/", " / "), color = c.text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                                 Text(formatTime(p.start), color = c.muted, fontSize = 11.sp)
                                 IconBtn(Icons.play, playT(), size = 28.dp) { ed.playPlace(p) }
                                 Btn(onlyThisT()) { l.forEach { o -> set(o, o === p) } }
@@ -160,6 +180,10 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
                         }
                     }
                 }
+            }
+            androidx.compose.foundation.layout.Box(Modifier.matchParentSize(), contentAlignment = Alignment.TopEnd) {
+                LazyScrollbar(listState, Modifier.fillMaxHeight().padding(end = 4.dp))
+            }
             }
         }
         androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(c.borderWidth).background(c.border.copy(alpha = 0.5f)))
