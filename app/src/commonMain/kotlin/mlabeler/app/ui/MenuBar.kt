@@ -181,7 +181,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
                 MSep, item(Commands.midiIn, ed, app), item(Commands.midiOut, ed, app),
                 MSep, item(Commands.f0Pencil, ed, app, checked = ed.f0Pencil), item(Commands.vuv, ed, app, checked = ed.vuvTool),
                 item(Commands.dynPencil, ed, app, checked = ed.dynPencil), item(Commands.dynApply, ed, app),
-                MSep, item(Commands.resynthWorld, ed, app), item(Commands.resynthNsf, ed, app),
+                MSep, item(Commands.resynthWorld, ed, app), item(Commands.resynthNsf, ed, app), item(Commands.resynthSave, ed, app),
             )))
             add(item(Commands.fillQueue, ed, app))
             add(item(Commands.batchRename, ed, app))

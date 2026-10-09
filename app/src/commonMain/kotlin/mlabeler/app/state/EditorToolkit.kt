@@ -87,6 +87,58 @@ fun EditorState.playResynth(method: String) {
 }
 
 /**
+ * Sings the whole recording again with the pitch as it is now (the analysed f0 with what was drawn) through the
+ * toolkit ("world" or "nsf") and saves it: in place of the recording ([asCopy] false; Ctrl+Z undoes it, the drawing
+ * goes since the sound has that pitch now) or as <name>_f0.wav next to it.
+ */
+fun EditorState.saveResynth(method: String, asCopy: Boolean) {
+    val a = audio ?: return
+    val it = item ?: return
+    val curve = pitchCurve ?: return app.message(S.pitchNotReady())
+    if (!asCopy && it.audioPath.substringAfterLast('.').lowercase() != "wav") return app.message(Cleanup.onlyWav(), error = true)
+    toolkitJob?.cancel()
+    toolkitJob = scope.launch {
+        val client = app.toolkit.client()
+        var serverJob: String? = null
+        try {
+            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+            if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+            toolkitBusy = S.uploading()
+            val wav = withContext(Dispatchers.Default) { Wav.encode16(a) }
+            val f0 = FloatArray(curve.values.size.coerceAtLeast(1)) { i -> curve.values.getOrNull(i)?.takeIf { v -> !v.isNaN() } ?: 0f }
+            val fileId = client.upload(it.name + "_resynth.wav", wav)
+            val job = client.resynth(fileId, f0, curve.hop, method)
+            serverJob = job
+            val result = client.await(job, { toolkitDetail = it }) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
+            serverJob = null
+            val path = (result["file"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: throw mlabeler.app.toolkit.ToolkitException("no file in the result")
+            val bytes = client.download(path)
+            if (asCopy) {
+                val out = Paths.join(Paths.parent(it.audioPath), Paths.stem(it.audioPath) + "_f0.wav")
+                withContext(Dispatchers.Default) { workspace.fs.write(out, bytes) }
+                rescan()
+                app.message(resynthSavedCopy.format(Paths.name(out)))
+            } else {
+                cleanup.replaceSound(bytes)
+                resetF0()
+                app.message(resynthSaved())
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
+            throw e
+        } catch (e: Exception) {
+            app.message(e.message ?: e.toString(), error = true)
+        } finally {
+            toolkitBusy = null
+            toolkitProgress = null
+        }
+    }
+}
+
+private val resynthSaved = L("The recording is sung with the drawn pitch now. Ctrl+Z undoes this.", "Запись теперь спета с нарисованной высотой. Отмена — Ctrl+Z.")
+private val resynthSavedCopy = L("Saved {0} next to the recording", "Сохранено рядом с записью: {0}")
+
+/**
  * Aligns [from]..[to] with [model]; the result replaces that part of the tiers ([replace]) or is shown
  * as a comparison tier named after the model.
  */

@@ -190,6 +190,7 @@ object Commands {
             "Вокодер — NSF-HiFiGAN от OpenVPI (CC BY-NC-SA 4.0: только некоммерческое использование); загружается при первом использовании.")())
         e.playResynth("nsf")
     }.only(Mode.Labels)
+    val resynthSave = Command("resynth-save", L("Save the sound with the drawn pitch…", "Сохранить звук с нарисованной высотой…"), emptyList()) { _, a -> a.showResynth = true }.only(Mode.Labels)
     val segments = Command("segments", L("Cut into segments…", "Нарезка на сегменты…"), emptyList()) { _, a -> a.showSegments = true }.only(Mode.Labels)
     val batchRename = Command("batch-rename", L("Rename in bulk…", "Пакетное переименование…"), listOf(ch('H', ctrl = true))) { _, a -> a.showBatchRename = true }
     val overlay = Command("overlay", S.overlayShort, listOf(ch('V'))) { _, a -> a.update { it.copy(layout = it.layout.copy(overlay = !it.layout.overlay)) } }
@@ -302,7 +303,7 @@ object Commands {
         leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
-        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf,
+        prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf, resynthSave,
         palette, settings, openFolder,
     )
 

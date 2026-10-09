@@ -174,6 +174,14 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         if (n > 0) app.message(loudnessApplied() + if (clipped > 0) "\n" + clippedT.format(clipped) else "")
     }
 
+    /** Puts [wav] in place of the recording (undone with Ctrl+Z; the first version is kept in .mlabeler/backup). */
+    suspend fun replaceSound(wav: ByteArray) {
+        val it = ed.item ?: return
+        val before = withContext(Dispatchers.Default) { ed.workspace.fs.read(it.audioPath) }
+        keepOriginal(it.audioPath, before)
+        ed.applyAudioEdit(it.audioPath, before, wav, null)
+    }
+
     /** Plays [range] (or what is on screen) with the drawn loudness, without changing the file. */
     fun previewDrawnLoudness(range: Pair<Double, Double>) = run("preview") {
         val a = ed.audio ?: return@run

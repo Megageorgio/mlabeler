@@ -922,6 +922,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                 IconBtn(Icons.undo, PianoTitles.undo(), enabled = ed.canUndoF0, size = 28.dp) { ed.undoF0() }
                 IconBtn(Icons.trash, PianoTitles.reset(), enabled = ed.f0Edits != null, size = 28.dp) { ed.resetF0() }
                 IconBtn(Icons.fit, PianoTitles.fit(), size = 28.dp) { ed.fitPitchRange() }
+                IconBtn(Icons.save, Commands.resynthSave.title(), size = 28.dp) { ed.app.showResynth = true }
             }
         }
         if (ed.mode == Mode.Labels && ed.power != null && gl.powerBottom - gl.powerTop > 40 * LocalDensity.current.density) {
