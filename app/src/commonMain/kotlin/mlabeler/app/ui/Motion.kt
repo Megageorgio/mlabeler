@@ -8,6 +8,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.clipRect
 
 /**
  * How the interface moves: "normal" (short fades, slides and colour changes), "reduced" (fades only, quicker) or
@@ -46,9 +47,12 @@ fun androidx.compose.ui.Modifier.themeBackground(): androidx.compose.ui.Modifier
         val iw = image.width.toFloat(); val ih = image.height.toFloat()
         val scale = maxOf(size.width / iw, size.height / ih)
         val w = iw * scale; val h = ih * scale
-        drawImage(image, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(image.width, image.height),
-            dstOffset = androidx.compose.ui.unit.IntOffset(((size.width - w) / 2).toInt(), ((size.height - h) / 2).toInt()),
-            dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()), alpha = c.bgImageAlpha.coerceIn(0f, 1f))
+        // (cut at the edges: drawBehind does not clip, and what sticks out would cover the title and menus above)
+        clipRect {
+            drawImage(image, srcOffset = androidx.compose.ui.unit.IntOffset.Zero, srcSize = androidx.compose.ui.unit.IntSize(image.width, image.height),
+                dstOffset = androidx.compose.ui.unit.IntOffset(((size.width - w) / 2).toInt(), ((size.height - h) / 2).toInt()),
+                dstSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()), alpha = c.bgImageAlpha.coerceIn(0f, 1f))
+        }
     })
     return m
 }
