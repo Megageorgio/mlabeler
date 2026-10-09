@@ -121,8 +121,18 @@ actual object Platform {
 actual fun imageFromArgb(width: Int, height: Int, pixels: IntArray): ImageBitmap =
     Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
 
-actual fun decodeImage(bytes: ByteArray): ImageBitmap? =
-    runCatching { android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
+actual fun decodeImage(bytes: ByteArray): ImageBitmap? = runCatching {
+    // a camera photo is read at a half, a quarter... of its size, keeping the longest side at least 4096
+    // (decoding all of it can run out of memory on a phone)
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    var sample = 1
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 4096) sample *= 2
+    val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)?.asImageBitmap()
+}.getOrNull()
+
+actual fun ImageBitmap.readyToDraw(): ImageBitmap = apply { prepareToDraw() }
 
 actual val resizeHorizontalIcon: PointerIcon = PointerIcon.Hand
 

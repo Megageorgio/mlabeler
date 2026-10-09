@@ -1,6 +1,7 @@
 package mlabeler.app
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -24,3 +25,9 @@ actual fun imageFromArgb(width: Int, height: Int, pixels: IntArray): ImageBitmap
 
 actual fun decodeImage(bytes: ByteArray): ImageBitmap? =
     runCatching { org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()
+
+actual fun ImageBitmap.readyToDraw(): ImageBitmap {
+    // every draw wraps the bitmap in a Skia image, which copies all its pixels while the bitmap may still change
+    asSkiaBitmap().setImmutable()
+    return this
+}
