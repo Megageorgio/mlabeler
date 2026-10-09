@@ -485,6 +485,17 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
 
     private fun copyTo(from: String, to: String) { fs.mkdirs(Paths.parent(to)); fs.copy(from, to) }
 
+    /** Moves [path] out of the folder into .mlabeler/backup/[folder]/ (as it lay there); returns where it went. */
+    fun moveToBackup(path: String, folder: String): String {
+        val to = Paths.join(Paths.join(Paths.join(metaDir, "backup"), folder), relative(path))
+        fs.mkdirs(Paths.parent(to))
+        move(path, to)
+        return to
+    }
+
+    /** A name for a backup folder made now. */
+    fun stamp(): String = timestamp()
+
     private fun move(from: String, to: String) {
         fs.copy(from, to)
         if (!fs.delete(from)) { fs.delete(to); throw IllegalStateException(Paths.name(from)) }

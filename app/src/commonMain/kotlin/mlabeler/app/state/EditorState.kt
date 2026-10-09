@@ -68,7 +68,7 @@ class EditorState(
     internal val scope: CoroutineScope,
 ) {
     var items by mutableStateOf<List<Item>>(emptyList())
-        private set
+        internal set
     var index by mutableIntStateOf(-1)
         private set
     val item: Item? get() = items.getOrNull(index)
@@ -225,7 +225,7 @@ class EditorState(
     var loadError by mutableStateOf<String?>(null)
         private set
 
-    private val histories = mutableMapOf<String, History<LabelDoc>>()
+    internal val histories = mutableMapOf<String, History<LabelDoc>>()
     private var history: History<LabelDoc>? = null
     /** Changes whenever the document or its saved state changes. */
     var docVersion by mutableIntStateOf(0)
@@ -284,7 +284,7 @@ class EditorState(
     var requestFocus: () -> Unit = {}
 
     private val player = AudioOut()
-    private val labelMtime = mutableMapOf<String, Long>()
+    internal val labelMtime = mutableMapOf<String, Long>()
     /** When each file's labels were last changed (ms), for the file list. */
     var labelTimes by mutableStateOf<Map<String, Long>>(emptyMap())
         private set
