@@ -21,6 +21,12 @@ private class MemFs : FileSystem {
     override fun size(path: String) = (files[path]?.size ?: 0).toLong()
     override fun lastModified(path: String) = 0L
     override fun delete(path: String) = files.remove(path) != null
+    override fun rename(from: String, to: String): Boolean {
+        val moved = files.keys.filter { it == from || it.startsWith("$from/") }
+        if (moved.isEmpty()) return false
+        for (k in moved) files[to + k.removePrefix(from)] = files.remove(k)!!
+        return true
+    }
     fun text(path: String) = files.getValue(path).decodeToString()
 }
 
@@ -32,6 +38,28 @@ class RecordingFilesTest {
         write("/v/sa.wav", wav)
         write("/v/oto.ini", "ka.wav=- ka,1,2,3,4,5\r\nsa.wav=- sa,1,2,3,4,5\r\nka.wav=a ka,1,2,3,4,5\r\n".encodeToByteArray())
         write("/v/transcriptions.csv", "name,ph_seq,ph_dur\nka,k a,0.1 0.2\nsa,s a,0.1 0.2\n".encodeToByteArray())
+    }
+
+    @Test
+    fun decomposedNamesBecomeComposed() {
+        // ga written as ka + the combining voiced mark, as macOS stores it
+        val ga = "\u304B\u3099"
+        val composed = "\u304C"
+        val fs = MemFs().apply {
+            write("/v/$ga.wav", byteArrayOf(1))
+            write("/v/sub$ga/a.wav", byteArrayOf(1))
+            write("/v/oto.ini", "$ga.wav=- $ga,1,2,3,4,5\r\n".encodeToByteArray())
+        }
+        val ws = Workspace("/v", fs)
+        Workspace.timestamp = { "T" }
+        val (names, otos) = ws.decomposedNames()
+        assertEquals(setOf("/v/sub$ga", "/v/$ga.wav"), names.toSet())
+        assertEquals(listOf("/v/oto.ini"), otos)
+        val (n, failed) = ws.normalizeNames()
+        assertEquals(3, n); assertTrue(failed.isEmpty())
+        assertTrue("/v/$composed.wav" in fs.files && "/v/sub$composed/a.wav" in fs.files)
+        assertEquals("$composed.wav=- $composed,1,2,3,4,5\r\n", fs.text("/v/oto.ini"))
+        assertTrue(ws.decomposedNames().first.isEmpty())
     }
 
     @Test

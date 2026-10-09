@@ -7,6 +7,8 @@ actual fun decodeText(bytes: ByteArray, charset: String): String = String(bytes,
 
 actual fun encodeText(text: String, charset: String): ByteArray = text.toByteArray(Charset.forName(charset))
 
+actual fun nfc(text: String): String = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFC)
+
 actual val PlatformFs: FileSystem = object : FileSystem {
     override fun exists(path: String) = File(path).exists()
     override fun isDirectory(path: String) = File(path).isDirectory
@@ -29,6 +31,7 @@ actual val PlatformFs: FileSystem = object : FileSystem {
         File(path).mkdirs()
     }
     override fun delete(path: String) = File(path).delete()
+    override fun rename(from: String, to: String) = File(from).renameTo(File(to))
     override fun size(path: String) = File(path).length()
     override fun lastModified(path: String) = File(path).lastModified()
 }

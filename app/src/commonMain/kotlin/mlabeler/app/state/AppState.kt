@@ -68,6 +68,7 @@ class AppState(private val scope: CoroutineScope) {
     var showConvert by mutableStateOf(false)
     var showResynth by mutableStateOf(false)
     var showUst by mutableStateOf(false)
+    var showNfc by mutableStateOf(false)
     /** The words of an aligner model being looked at (unknown ones and its own words). */
     var wordsCheck by mutableStateOf<mlabeler.app.ui.WordsCheck?>(null)
     var showUnitsOverview by mutableStateOf(false)

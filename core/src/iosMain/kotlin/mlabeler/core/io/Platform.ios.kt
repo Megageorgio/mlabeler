@@ -19,6 +19,7 @@ import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.create
 import platform.Foundation.dataUsingEncoding
 import platform.Foundation.dataWithBytes
+import platform.Foundation.precomposedStringWithCanonicalMapping
 import platform.Foundation.timeIntervalSince1970
 import platform.Foundation.writeToFile
 import platform.CoreFoundation.CFStringConvertEncodingToNSStringEncoding
@@ -63,6 +64,8 @@ actual fun encodeText(text: String, charset: String): ByteArray {
     return data?.toByteArray() ?: text.encodeToByteArray()
 }
 
+actual fun nfc(text: String): String = NSString.create(string = text).precomposedStringWithCanonicalMapping
+
 actual val PlatformFs: FileSystem = object : FileSystem {
     private val fm get() = NSFileManager.defaultManager
 
@@ -82,6 +85,7 @@ actual val PlatformFs: FileSystem = object : FileSystem {
         fm.createDirectoryAtPath(path, true, null, null)
     }
     override fun delete(path: String): Boolean = fm.removeItemAtPath(path, null)
+    override fun rename(from: String, to: String): Boolean = fm.moveItemAtPath(from, to, null)
     override fun size(path: String): Long =
         ((fm.attributesOfItemAtPath(path, null)?.get(NSFileSize)) as? NSNumber)?.longLongValue ?: 0L
     override fun lastModified(path: String): Long =

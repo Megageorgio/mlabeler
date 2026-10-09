@@ -294,6 +294,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         }))
         add(MSub(MenuTitles.datasetTools(), buildList {
             add(item(Commands.soundCheck, ed, app))
+            add(item(Commands.nfc, ed, app))
             if (!oto) add(item(Commands.summary, ed, app))
             if (!oto) add(item(Commands.phonemeCuts, ed, app))
             if (!oto && ed.items.any { it.labelFormat == mlabeler.core.format.LabelFormat.Seg }) add(item(Commands.unitsOverview, ed, app))

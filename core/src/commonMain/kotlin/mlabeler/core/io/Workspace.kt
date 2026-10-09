@@ -485,6 +485,58 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
 
     private fun copyTo(from: String, to: String) { fs.mkdirs(Paths.parent(to)); fs.copy(from, to) }
 
+    /**
+     * Files and folders under the root whose names are not in Unicode form C (decomposed, as macOS writes them:
+     * "か" + "゛" instead of "が"), deepest first; and the oto.ini files whose text is not.
+     */
+    fun decomposedNames(): Pair<List<String>, List<String>> {
+        val names = mutableListOf<String>()
+        val otos = mutableListOf<String>()
+        fun walk(dir: String, depth: Int) {
+            val children = try { fs.list(dir) } catch (_: Exception) { emptyList() }
+            for (c in children) {
+                val name = Paths.name(c)
+                if (name.startsWith(".")) continue
+                if (fs.isDirectory(c)) { if (depth < 6) walk(c, depth + 1) }
+                else if (name.equals("oto.ini", ignoreCase = true) || nfc(name).equals("oto.ini", ignoreCase = true)) {
+                    val text = runCatching { decodeGuess(fs.read(c), "Shift_JIS").first }.getOrNull()
+                    if (text != null && nfc(text) != text) otos += c
+                }
+                if (nfc(name) != name) names += c
+            }
+        }
+        walk(root, 0)
+        return names.sortedByDescending { it.count { ch -> ch == '/' || ch == '\\' } } to otos
+    }
+
+    /**
+     * Renames the files and folders of [decomposedNames] to form C and writes the oto.ini files in form C (their
+     * previous versions go to .mlabeler/backup); marks follow the renamed recordings. Returns the renamed count and
+     * the names that could not be renamed.
+     */
+    fun normalizeNames(): Pair<Int, List<String>> {
+        val (names, otos) = decomposedNames()
+        val stamp = timestamp()
+        for (p in otos) {
+            runCatching {
+                val (text, cs) = decodeGuess(fs.read(p), "Shift_JIS")
+                copyTo(p, Paths.join(Paths.join(Paths.join(metaDir, "backup"), "nfc-$stamp"), relative(p)))
+                fs.write(p, encodeText(nfc(text), cs))
+            }
+        }
+        var done = 0
+        val failed = mutableListOf<String>()
+        for (p in names) {
+            val to = Paths.join(Paths.parent(p), nfc(Paths.name(p)))
+            // through a temporary name: a file system that ignores the form would see the same name
+            val tmp = "$p.nfc-$stamp"
+            if (fs.rename(p, tmp) && fs.rename(tmp, to)) done++ else { fs.rename(tmp, p); failed += relative(p) }
+        }
+        updateState { s -> s.copy(items = s.items.mapKeys { (k, _) -> nfc(k) }, lastItem = s.lastItem?.let { nfc(it) }) }
+        scan()
+        return (done + otos.size) to failed
+    }
+
     /** Moves [path] out of the folder into .mlabeler/backup/[folder]/ (as it lay there); returns where it went. */
     fun moveToBackup(path: String, folder: String): String {
         val to = Paths.join(Paths.join(Paths.join(metaDir, "backup"), folder), relative(path))
