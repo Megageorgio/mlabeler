@@ -11,8 +11,8 @@ expect object SelfUpdate {
     val supported: Boolean
     /** A release file this installation can update itself from. */
     fun canUse(download: String?): Boolean
-    /** Downloads and unpacks [download]; [progress] goes 0..1. Throws on failure. */
-    suspend fun prepare(download: String, tag: String, progress: (Float) -> Unit)
+    /** Downloads and unpacks [download], checked against [sha256] when known; [progress] goes 0..1. Throws on failure. */
+    suspend fun prepare(download: String, tag: String, sha256: String?, progress: (Float) -> Unit)
     /** The tag of an update downloaded earlier and ready to be put in place, if any. */
     fun prepared(): String?
     fun discard()
