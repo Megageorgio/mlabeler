@@ -289,6 +289,7 @@ fun AutolabelDialog(app: AppState) {
                     }
                 }
             }
+            RefineAfterSwitch(app)
             if (!batch) Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(forCompare(), !replace) { replace = false }
                 Chip(replaceHere(), replace) { replace = true }

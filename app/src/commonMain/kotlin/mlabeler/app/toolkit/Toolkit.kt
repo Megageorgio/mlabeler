@@ -126,7 +126,38 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return json.parseToJsonElement(r.text).jsonObject["file_id"]!!.jsonPrimitive.content
     }
 
-    /** Starts forced alignment of one uploaded file; returns the job id. */
+    /** The "refine" option of a request: the boundaries are refined after labelling ([r] null = not). */
+    private fun kotlinx.serialization.json.JsonObjectBuilder.putRefine(r: mlabeler.app.state.RefineSettings?) {
+        if (r == null || r.model.isBlank()) return
+        putJsonObject("refine") { put("model", r.model); put("mode", r.mode) }
+    }
+
+    /**
+     * Starts refining the boundaries of [segments] (start, end, phoneme in seconds) of one uploaded file; returns
+     * the job id. The result has the same phonemes with the boundaries moved.
+     */
+    suspend fun refine(fileId: String, segments: List<Triple<Double, Double, String>>, model: String, mode: String): String {
+        val req = buildJsonObject {
+            putJsonObject("input") {
+                put("items", buildJsonArray {
+                    add(buildJsonObject {
+                        put("file_id", fileId)
+                        put("segments", buildJsonArray {
+                            for ((a, b, t) in segments) add(buildJsonArray { add(JsonPrimitive(a)); add(JsonPrimitive(b)); add(JsonPrimitive(t)) })
+                        })
+                    })
+                })
+            }
+            put("model", model)
+            put("mode", mode)
+            putJsonObject("output") {
+                put("formats", JsonArray(emptyList()))
+                put("return_labels", true)
+            }
+        }
+        return call("POST", "/refine", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
     /** One job aligning many uploaded files, each with its phonemes (in the same order in the result). */
     suspend fun alignPhonemes(files: List<Pair<String, List<String>>>, model: String, language: String?): String {
         val req = buildJsonObject {
@@ -153,7 +184,8 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
      * Starts alignment of [text] (words, or phonemes when [phonemes]); returns the job id. Empty text: the words are
      * first recognised with Whisper when [whisper], otherwise the toolkit reports that the text is missing.
      */
-    suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean, whisper: Boolean = false): String {
+    suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean, whisper: Boolean = false,
+                      refine: mlabeler.app.state.RefineSettings? = null): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -167,6 +199,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             put("model", model)
             if (language != null) put("language", language)
             if (!whisper) put("transcribe", kotlinx.serialization.json.JsonNull)
+            putRefine(refine)
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))
                 put("return_labels", true)
@@ -180,7 +213,8 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
      * places exactly these phonemes (forced alignment).
      */
     suspend fun segment(fileId: String, model: String, language: String? = null, phonemes: List<String> = emptyList(),
-                        options: mlabeler.app.state.WflSettings = mlabeler.app.state.WflSettings()): String {
+                        options: mlabeler.app.state.WflSettings = mlabeler.app.state.WflSettings(),
+                        refine: mlabeler.app.state.RefineSettings? = null): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -197,6 +231,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             put("viterbi_bias", options.viterbiBias.toDouble())
             put("silence_threshold", options.silenceThreshold.toDouble())
             put("min_silence_duration", options.minSilence.toDouble())
+            putRefine(refine)
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))
                 put("return_labels", true)

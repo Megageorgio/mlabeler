@@ -68,7 +68,8 @@ Android asks for access to all files, because label files are written next to th
 
 **Automatic labelling**
 - Through [mVocalToolkit](https://github.com/Megageorgio/mVocalToolkit), a separate helper program: aligning
-  by lyrics or phonemes, labelling without lyrics, lyrics from the recording, segmentation.
+  by lyrics or phonemes, labelling without lyrics, lyrics from the recording, segmentation, refining the
+  boundaries of ready labels with a refiner model (off by default).
 - On a computer mLabeler installs and starts the toolkit when needed. One running toolkit is shared by every
   program that uses it and stops when none of them needs it any more. Phones and tablets can use the toolkit
   of a computer in the same network.

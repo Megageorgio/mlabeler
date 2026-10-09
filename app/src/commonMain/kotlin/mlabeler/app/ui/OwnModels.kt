@@ -42,12 +42,14 @@ private val kindT = L("What it does", "Что делает")
 private val kindWfl = L("Recognises phonemes without text (WFL-ASR)", "Распознаёт фонемы без текста (WFL-ASR)")
 private val kindSofa = L("Aligns to text (SOFA)", "Выравнивает по тексту (SOFA)")
 private val kindHfa = L("Aligns to text (HubertFA)", "Выравнивает по тексту (HubertFA)")
+private val kindRefiner = L("Refines boundaries (mRefinerModel)", "Уточняет границы (mRefinerModel)")
 private val langT = L("Language", "Язык")
 private val langHint = L("code, e.g. ru", "код, например ru")
 private val nameT = L("Name in the list", "Название в списке")
 private val addBtn = L("Add the model", "Добавить модель")
 private val adding = L("Adding… (the checkpoint is copied)", "Добавление… (чекпоинт копируется)")
 private val added = L("Added: {0}. It is in the Autolabel window under its language.", "Добавлено: {0}. Модель доступна в окне авторазметки в разделе своего языка.")
+private val addedRefiner = L("Added: {0}. It is in Tools → Refine boundaries.", "Добавлено: {0}. Модель доступна в «Инструменты → Уточнить границы».")
 private val yours = L("Added before", "Добавленные раньше")
 private val removeBtn = L("Remove", "Удалить")
 private val notReady = L("The toolkit has to be running to add models.", "Чтобы добавлять модели, тулкит должен быть запущен.")
@@ -93,6 +95,7 @@ fun OwnModelsSection(app: AppState) {
         Chip(kindWfl(), engine == "wfl_asr") { engine = "wfl_asr" }
         Chip(kindSofa(), engine == "sofa") { engine = "sofa" }
         Chip(kindHfa(), engine == "hubertfa") { engine = "hubertfa" }
+        Chip(kindRefiner(), engine == "refiner") { engine = "refiner" }
     }
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
@@ -119,7 +122,7 @@ fun OwnModelsSection(app: AppState) {
                         .lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-')
                     val ids = tk.client().importModel(engine, path, id, name.ifBlank { null } ?: "$parent/$stem".trimStart('/'),
                         lang.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() })
-                    result = true to added.format(ids.joinToString())
+                    result = true to (if (engine == "refiner") addedRefiner else added).format(ids.joinToString())
                     tk.modelsVersion++
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e

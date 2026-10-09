@@ -201,6 +201,8 @@ data class ToolkitSettings(
     val whisper: Boolean = false,
     /** Phoneme recognition (WFL-ASR): see [mlabeler.app.toolkit.SegmentOptions]. */
     val wfl: WflSettings = WflSettings(),
+    /** Refinement of the phoneme boundaries after autolabelling (off by default). */
+    val refine: RefineSettings = RefineSettings(),
     /** Start the toolkit on this computer when it's needed and not running. */
     val autoStart: Boolean = true,
     /** `mvt` command or the folder it's in; empty = look in the usual places. */
@@ -429,6 +431,17 @@ fun LayoutSettings.togglePanel(p: String): LayoutSettings {
     }
     return l
 }
+
+/**
+ * A boundary refiner model moves the phoneme boundaries of a labelling to where they are in the sound (never the
+ * phonemes): after autolabelling when [enabled], or on ready labels by the command. [mode]: auto, normal, safe.
+ */
+@Serializable
+data class RefineSettings(
+    val enabled: Boolean = false,
+    val model: String = "mrefiner-ru-v0.1.0",
+    val mode: String = "auto",
+)
 
 /** Options of phoneme recognition without text (WFL-ASR); negative confidence = the model's own value. */
 @Serializable
