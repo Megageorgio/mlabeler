@@ -13,6 +13,7 @@ import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.Mode
+import mlabeler.app.state.niaoShown
 import mlabeler.app.state.togglePanel
 import mlabeler.app.state.toggleSide
 import mlabeler.core.format.OtoMarker
@@ -240,7 +241,7 @@ object Commands {
     val unitSingle = Command("unit-single", L("This phoneme held: keep or take away", "Эта фонема протяжно: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
     val unitsOverview = Command("units-overview", L("Transitions of the folder (.trans)…", "Переходы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
     val refine = Command("refine-boundaries", L("Refine boundaries…", "Уточнить границы…"), emptyList()) { _, a -> a.showRefine = true }.only(Mode.Labels)
-    val niao = Command("niaoniao", L("NiaoNiao voicebank…", "Банк NiaoNiao…"), emptyList()) { _, a -> a.showNiao = true }.only(Mode.Labels)
+    val niao = Command("niaoniao", L("NiaoNiao voicebank…", "Банк NiaoNiao…"), emptyList(), { it.niaoShown() }) { _, a -> a.showNiao = true }
     val nfc = Command("normalize-names", L("Normalise file names (files from a Mac)…", "Нормализовать имена файлов (файлы с Mac)…"), emptyList()) { _, a -> a.showNfc = true }
     val ust = Command("ust", L("UTAU sequence (.ust)…", "Партия UTAU (.ust)…"), emptyList()) { _, a -> a.showUst = true }
     val convert = Command("convert-labels", L("Convert label files…", "Перевести файлы разметки в другой формат…"), emptyList()) { _, a -> a.showConvert = true }.only(Mode.Labels)

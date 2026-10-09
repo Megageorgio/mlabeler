@@ -50,6 +50,7 @@ import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.Mode
+import mlabeler.app.state.niaoShown
 import mlabeler.app.state.ToolbarGroups
 import mlabeler.app.state.togglePanel
 
@@ -144,7 +145,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             if (!oto) add(item(Commands.exportDs, ed, app))
             if (!oto) add(item(Commands.convert, ed, app))
             add(item(Commands.ust, ed, app))
-            if (!oto) add(item(Commands.niao, ed, app))
+            if (ed.niaoShown()) add(item(Commands.niao, ed, app))
         }))
         add(MSub(MenuTitles.recording(), listOf(item(Commands.record, ed, app), item(Commands.karaoke, ed, app))))
         add(MSep)

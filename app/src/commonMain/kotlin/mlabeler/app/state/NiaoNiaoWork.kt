@@ -32,7 +32,7 @@ private fun EditorState.saveOpen() {
     if (labelsDirty) saveLabels(quiet = true)
 }
 
-/** The recordings of the folder (the open recording's folder) that are not 44.1 kHz mono: NiaoNiao reads only those. */
+/** The WAV recordings of the folder (the open recording's folder): NiaoNiao reads only WAV. */
 fun EditorState.niaoFiles(): List<Item> {
     val dir = item?.let { Paths.parent(it.audioPath) } ?: workspace.root
     return items.filter { Paths.parent(it.audioPath) == dir && Paths.ext(it.audioPath).equals("wav", true) }
@@ -149,6 +149,158 @@ fun EditorState.niaoPack(files: List<Item>, out: String, measure: Boolean, versi
     }
 }
 
+/**
+ * Sings every recording of [files] that has marks again on one pitch through the toolkit (WORLD), so the bank sounds
+ * steady: [target] Hz for all, or with null each its own (the pitch of its .inf). The recordings are replaced, the
+ * old ones go to .mlabeler/backup.
+ */
+fun EditorState.niaoFlatten(files: List<Item>, target: Double?) {
+    saveOpen()
+    runNiao(flattenT()) {
+        val client = app.toolkit.client()
+        if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+        val folder = "niaoniao-tone-" + workspace.stamp()
+        var done = 0
+        val failed = mutableListOf<String>()
+        for ((k, f) in files.withIndex()) {
+            val inf = readInf(f) ?: continue
+            toolkitBusy = progressT.format(k + 1, files.size, f.name)
+            toolkitProgress = k.toDouble() / files.size
+            try {
+                val a = readAudio(f)
+                val curve = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate) }
+                val hz = (target ?: if (inf.pitch > 0) inf.pitch else NiaoNiao.measure(inf, a.samples, a.sampleRate, curve).pitch).toFloat()
+                if (hz <= 0f) error(noPitchT())
+                // voiced frames on the one pitch, unvoiced ones stay unvoiced
+                val f0 = FloatArray(curve.values.size) { i -> if (curve.values[i] > 0f) hz else 0f }
+                val id = client.upload(Paths.stem(f.audioPath) + ".wav", withContext(Dispatchers.Default) { Wav.encode16(a) })
+                val job = client.resynth(id, f0, curve.hop, "world")
+                val res = try { client.await(job) { _, _ -> } } catch (e: kotlinx.coroutines.CancellationException) {
+                    withContext(kotlinx.coroutines.NonCancellable) { client.cancel(job) }
+                    throw e
+                }
+                val path = (res["file"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: error("no file in the result")
+                val bytes = client.download(path)
+                workspace.moveToBackup(f.audioPath, folder)
+                workspace.fs.write(f.audioPath, bytes)
+                val b = withContext(Dispatchers.Default) { Wav.decode(bytes) }
+                workspace.fs.write(infPath(f), NiaoNiao.measure(inf, b.samples, b.sampleRate).write().encodeToByteArray())
+                done++
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed += f.name + ": " + (e.message ?: e.toString())
+            }
+        }
+        if (files.any { it.id == item?.id }) reloadAudio()
+        flattenedT.format(done) + if (failed.isEmpty()) "" else "\n" + failed.joinToString("\n")
+    }
+}
+
+/** The pitches of the .inf of [files] by sound name (0 where there is none). */
+fun EditorState.niaoPitches(files: List<Item>): Map<String, Double> =
+    files.associate { f -> Paths.stem(f.audioPath) to (readInf(f)?.pitch ?: 0.0) }
+
+/** The full set of syllables: the file of the settings, else pinyin. */
+fun EditorState.niaoSyllables(): List<String> {
+    val path = app.settings.niao.syllables.trim()
+    if (path.isEmpty()) return NiaoNiao.PINYIN
+    val text = runCatching { mlabeler.core.io.decodeGuess(PlatformFs.read(path), "UTF-8").first }.getOrNull() ?: return NiaoNiao.PINYIN
+    return text.split(Regex("[\\s,;、，]+")).filter { it.isNotBlank() }
+}
+
+/** Checks the marks of [files]: syllables of the full set with no sound, pitches out of the range of the settings. */
+fun EditorState.niaoCheck(files: List<Item>): NiaoNiao.Report {
+    val n = app.settings.niao
+    return NiaoNiao.check(niaoPitches(files), niaoSyllables(), mlabeler.core.format.NoteNames.parse(n.low),
+        mlabeler.core.format.NoteNames.parse(n.high), n.spread.toDouble())
+}
+
+private fun EditorState.otoPath(files: List<Item>) = Paths.join(Paths.parent(files.first().audioPath), "oto.ini")
+
+/** The entries of the oto.ini next to [files], with its encoding. */
+private fun EditorState.readOto(files: List<Item>): Pair<List<mlabeler.core.format.OtoEntry>, String>? {
+    val path = otoPath(files)
+    if (!workspace.fs.exists(path)) return null
+    val (text, cs) = mlabeler.core.io.decodeGuess(workspace.fs.read(path), "Shift_JIS")
+    return mlabeler.core.format.OtoIni.read(text) to cs
+}
+
+/** True when an oto.ini lies next to [files]. */
+fun EditorState.niaoHasOto(files: List<Item>): Boolean = files.isNotEmpty() && workspace.fs.exists(otoPath(files))
+
+/** Saves what is open: the labels, or oto.ini in oto mode. */
+private fun EditorState.saveAll() {
+    saveOpen()
+    if (oto.dirty) oto.save(quiet = true)
+}
+
+/**
+ * Makes the .inf of [files] from the folder's oto.ini (the entry named as the file, else its first one); with [keep]
+ * the files that have an .inf keep it.
+ */
+fun EditorState.niaoFromOto(files: List<Item>, keep: Boolean) {
+    saveAll()
+    workspace.updateState { it.copy(defaultFormat = LabelFormat.Inf) }
+    runNiao(fromOtoT()) {
+        val entries = readOto(files)?.first ?: error(noOtoT())
+        val bySample = entries.groupBy { it.sample.lowercase() }
+        var done = 0
+        val failed = mutableListOf<String>()
+        for ((k, f) in files.withIndex()) {
+            toolkitBusy = progressT.format(k + 1, files.size, f.name)
+            toolkitProgress = k.toDouble() / files.size
+            if (keep && workspace.fs.exists(infPath(f))) continue
+            val list = bySample[Paths.name(f.audioPath).lowercase()]
+            if (list.isNullOrEmpty()) { failed += f.name + ": " + noEntryT(); continue }
+            val e = list.firstOrNull { it.alias == Paths.stem(f.audioPath) } ?: list.first()
+            try {
+                val a = readAudio(f)
+                val inf = withContext(Dispatchers.Default) { NiaoNiao.measure(NiaoNiao.fromOto(e, a.samples, a.sampleRate), a.samples, a.sampleRate) }
+                workspace.fs.write(infPath(f), inf.write().encodeToByteArray())
+                histories.remove(f.id)
+                done++
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed += f.name + ": " + (e.message ?: e.toString())
+            }
+        }
+        fromOtoDoneT.format(done) + if (failed.isEmpty()) "" else "\n" + failed.joinToString("\n")
+    }
+}
+
+/**
+ * Writes an oto.ini CV entry for every .inf of [files], named as the file: an entry of the same name and file is
+ * replaced, the others stay. The old oto.ini is copied to .mlabeler/backup.
+ */
+fun EditorState.niaoToOto(files: List<Item>) {
+    saveAll()
+    runNiao(toOtoT()) {
+        val path = otoPath(files)
+        val (old, cs0) = readOto(files) ?: (emptyList<mlabeler.core.format.OtoEntry>() to "Shift_JIS")
+        val made = mutableListOf<mlabeler.core.format.OtoEntry>()
+        for (f in files) {
+            val inf = readInf(f) ?: continue
+            val rate = runCatching { readAudio(f).sampleRate }.getOrDefault(NiaoNiao.SAMPLE_RATE)
+            made += NiaoNiao.toOto(Paths.name(f.audioPath), Paths.stem(f.audioPath), inf, rate)
+        }
+        if (made.isEmpty()) error(nothingT())
+        val keys = made.map { it.sample.lowercase() to it.alias }.toSet()
+        val entries = old.filter { (it.sample.lowercase() to it.alias) !in keys } + made
+        val text = mlabeler.core.format.OtoIni.write(entries)
+        // Chinese names do not fit Shift_JIS
+        val cs = if (runCatching { mlabeler.core.io.decodeText(mlabeler.core.io.encodeText(text, cs0), cs0) == text }.getOrDefault(false)) cs0 else "UTF-8"
+        if (workspace.fs.exists(path)) workspace.backupCopy(path)
+        workspace.fs.write(path, mlabeler.core.io.encodeText(text, cs))
+        oto.forget()
+        toOtoDoneT.format(made.size)
+    }
+}
+
+/** The NiaoNiao tools are offered: the folder has .inf marks, or the settings show them everywhere. */
+fun EditorState.niaoShown(): Boolean = app.settings.niao.always || isNiaoFolder()
+
 /** Unpacks the bank in [bank] (voice.d and inf.d) into [out]: a .wav and an .inf per sound. Returns how many. */
 suspend fun unpackNiaoBank(bank: String, out: String): Int = withContext(Dispatchers.Default) {
     val sounds = NiaoNiao.unpack(PlatformFs.read(Paths.join(bank, "inf.d")).decodeToString(), PlatformFs.read(Paths.join(bank, "voice.d")))
@@ -181,3 +333,12 @@ private val packedT = L("Packed {0} sounds into {1}", "Упаковано зву
 private val noExtrasT = L("No readme.txt, charactor.txt or head.png next to the recordings: add them to the bank by hand.",
     "Рядом с записями нет readme.txt, charactor.txt или head.png — добавьте их в банк вручную.")
 private val skippedT = L("Left out:", "Пропущены:")
+private val flattenT = L("One pitch for every sound", "Один тон для каждого звука")
+private val noPitchT = L("no pitch found", "высота не найдена")
+private val flattenedT = L("{0} recordings sung again on one pitch; the old ones are in .mlabeler/backup", "Записей, заново спетых на одной высоте: {0}; старые лежат в .mlabeler/backup")
+private val fromOtoT = L("Marks from oto.ini", "Метки из oto.ini")
+private val noOtoT = L("No oto.ini next to the recordings", "Рядом с записями нет oto.ini")
+private val noEntryT = L("no entry in oto.ini", "нет строки в oto.ini")
+private val fromOtoDoneT = L("Marks taken from oto.ini for {0} recordings", "Метки из oto.ini перенесены в записи: {0}")
+private val toOtoT = L("Writing oto.ini", "Запись oto.ini")
+private val toOtoDoneT = L("{0} entries written to oto.ini; the old file is in .mlabeler/backup", "В oto.ini записано строк: {0}; старый файл лежит в .mlabeler/backup")

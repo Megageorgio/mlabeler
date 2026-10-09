@@ -66,6 +66,7 @@ import mlabeler.app.i18n.L
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
+import mlabeler.app.state.isNiaoFolder
 import mlabeler.app.theme.T
 import mlabeler.app.theme.Themes
 import mlabeler.core.format.LabelFormat
@@ -462,6 +463,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
                     SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
                     ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
                 }
+                Fold(niaoTitleT()) { NiaoSection(app) }
             }
             Section.View -> {
                 Fold(scaleT()) {
@@ -782,6 +784,50 @@ private fun ToolkitPage(app: AppState) {
             }
         }
     }
+}
+
+private val niaoTitleT = L("NiaoNiao", "NiaoNiao")
+private val niaoAlwaysT = L("NiaoNiao tools in every folder", "Инструменты NiaoNiao в любой папке")
+private val niaoAlwaysHintT = L("Off: they appear only in a folder with .inf marks. On: also in other folders, to unpack a bank or make marks from oto.ini.",
+    "Выключено: они видны только в папке с метками .inf. Включено: и в других папках, чтобы распаковать банк или взять метки из oto.ini.")
+private val niaoSetT = L("Full set of syllables (text file; empty: Mandarin pinyin)", "Полный набор слогов (текстовый файл; пусто — пиньинь)")
+private val niaoRangeT = L("Pitch range, notes (empty: around the bank's middle pitch)", "Диапазон высоты, ноты (пусто — вокруг средней высоты банка)")
+private val niaoSpreadT = L("Allowed distance from the middle pitch", "Допустимое отклонение от средней высоты")
+
+/** NiaoNiao: where its tools are shown, and what the check of a bank compares with. */
+@Composable
+private fun NiaoSection(app: AppState) {
+    val c = T.c
+    val n = app.settings.niao
+    fun set(f: (mlabeler.app.state.NiaoSettings) -> mlabeler.app.state.NiaoSettings) = app.update { it.copy(niao = f(it.niao)) }
+    SwitchRow(niaoAlwaysT(), n.always) { v -> set { it.copy(always = v) } }
+    Text(niaoAlwaysHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+    // the rest matters only where the tools are
+    if (!n.always && app.editor?.isNiaoFolder() != true) return
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    Text(niaoSetT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        var path by remember { mutableStateOf(n.syllables) }
+        Field(path, { path = it; set { s -> s.copy(syllables = it.trim()) } }, Modifier.weight(1f))
+        if (mlabeler.app.Platform.hasNativeFolderPicker) Btn(doneSoundChooseT()) {
+            scope.launch {
+                val f = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    mlabeler.app.Platform.pickFileNative(niaoSetT(), listOf("txt"), null)
+                }
+                if (f != null) { path = f; set { s -> s.copy(syllables = f) } }
+            }
+        }
+    }
+    Text(niaoRangeT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        var low by remember { mutableStateOf(n.low) }
+        var high by remember { mutableStateOf(n.high) }
+        Field(low, { low = it; set { s -> s.copy(low = it.trim()) } }, Modifier.width(80.dp), placeholder = "C4")
+        Text("–", color = c.text)
+        Field(high, { high = it; set { s -> s.copy(high = it.trim()) } }, Modifier.width(80.dp), placeholder = "G4")
+    }
+    if (n.low.isBlank() || n.high.isBlank())
+        ValueSlider(niaoSpreadT(), n.spread.toFloat(), 1f..12f, " st", default = 2f) { v -> set { it.copy(spread = v.roundToInt()) } }
 }
 
 private val doneSoundT = L("Sound when long work ends", "Звук по окончании долгой работы")

@@ -25,6 +25,8 @@ import kotlinx.coroutines.withContext
 import mlabeler.app.i18n.L
 import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
+import mlabeler.app.state.isNiaoFolder
+import mlabeler.app.state.niaoShown
 import mlabeler.app.theme.T
 import mlabeler.core.audio.WavEdit
 import mlabeler.core.ds.Dataset
@@ -71,7 +73,9 @@ fun SegmentDialog(app: AppState) {
     var folder by remember { mutableStateOf(Paths.stem(item.audioPath) + "_parts") }
     var withLabels by remember { mutableStateOf(true) }
     var names by remember { mutableStateOf("") }
-    var niao by remember { mutableStateOf(ed.items.any { it.labelFormat == LabelFormat.Inf }) }
+    // NiaoNiao marks only where NiaoNiao is in use
+    val niaoShown = ed.niaoShown()
+    var niao by remember { mutableStateOf(ed.isNiaoFolder()) }
     val scope = rememberCoroutineScope()
     fun close() { app.showSegments = false; ed.requestFocus() }
 
@@ -176,7 +180,7 @@ fun SegmentDialog(app: AppState) {
                 Toggle(withLabels, { withLabels = it })
                 Text(withLabelsT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
             }
-            Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (niaoShown) Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Toggle(niao, { niao = it })
                 Text(niaoT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
             }

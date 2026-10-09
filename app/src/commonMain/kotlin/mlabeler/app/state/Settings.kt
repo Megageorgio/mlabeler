@@ -348,6 +348,7 @@ data class AppSettings(
     val clean: CleanSettings = CleanSettings(),
     val karaoke: KaraokeSettings = KaraokeSettings(),
     val doneSound: DoneSoundSettings = DoneSoundSettings(),
+    val niao: NiaoSettings = NiaoSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
@@ -498,4 +499,16 @@ data class WflSettings(
     val viterbiBias: Float = 5f,
     val silenceThreshold: Float = 0.005f,
     val minSilence: Float = 0.5f,
+)
+
+/** NiaoNiao voicebanks: shown in a folder of .inf marks, or everywhere when [always]. */
+@Serializable
+data class NiaoSettings(
+    val always: Boolean = false,
+    /** A text file with the full set of syllables (one per line or separated by spaces); empty = Mandarin pinyin. */
+    val syllables: String = "",
+    /** The range of pitches as note names ("C4"); empty = [spread] semitones around the bank's middle pitch. */
+    val low: String = "",
+    val high: String = "",
+    val spread: Int = 2,
 )

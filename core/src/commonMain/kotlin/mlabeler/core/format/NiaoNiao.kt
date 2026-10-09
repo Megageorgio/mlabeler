@@ -137,6 +137,81 @@ object NiaoNiao {
         return Inf(start, end, consonant, decay)
     }
 
+    /**
+     * The marks of an UTAU CV entry [e] of a recording: the start at the offset, the consonant ends at the end of the
+     * fixed part (else at the preutterance), the end at the cutoff. oto.ini has no decay, so it is where the
+     * loudness falls off, else the last fifth of the vowel.
+     */
+    fun fromOto(e: OtoEntry, samples: FloatArray, sampleRate: Int): Inf {
+        val lengthMs = samples.size * 1000.0 / sampleRate
+        fun s(ms: Double) = (ms * sampleRate / 1000).roundToInt().coerceIn(0, samples.size)
+        val start = s(e.offset)
+        val end = s(e.endMs(lengthMs)).coerceAtLeast(start)
+        val fixed = if (e.consonant > 0) e.consonant else e.preutterance
+        val consonant = s(e.offset + fixed).coerceIn(start, end)
+        val fall = if (end - start > 3) auto(samples.copyOfRange(start, end), sampleRate)?.decay?.plus(start) else null
+        val decay = (fall?.takeIf { it > consonant } ?: (end - (end - consonant) / 5)).coerceIn(consonant, end)
+        return Inf(start, end, consonant, decay)
+    }
+
+    /** A CV entry of oto.ini for [inf]: the offset at the start, the preutterance and the fixed part at the vowel. */
+    fun toOto(sample: String, alias: String, inf: Inf, sampleRate: Int): OtoEntry {
+        fun ms(x: Int) = (x * 1000.0 / sampleRate * 10).roundToInt() / 10.0
+        val offset = ms(inf.start)
+        val vowel = ms(inf.consonant) - offset
+        return OtoEntry(sample, alias, offset, vowel, -(ms(inf.end) - offset), vowel, (vowel / 3 * 10).roundToInt() / 10.0)
+    }
+
+    /** Mandarin syllables in pinyin (ü written as v), the set a NiaoNiao bank is usually recorded with. */
+    val PINYIN: List<String> = ("a o e ai ei ao ou an en ang eng er yi ya yo ye yao you yan yin yang ying yong wu wa wo wai wei wan wen wang weng yu yue yuan yun " +
+        "ba bo bai bei bao ban ben bang beng bi bie biao bian bin bing bu " +
+        "pa po pai pei pao pou pan pen pang peng pi pie piao pian pin ping pu " +
+        "ma mo me mai mei mao mou man men mang meng mi mie miao miu mian min ming mu " +
+        "fa fo fei fou fan fen fang feng fu " +
+        "da de dai dei dao dou dan den dang deng dong di die diao diu dian ding du duo dui duan dun " +
+        "ta te tai tao tou tan tang teng tong ti tie tiao tian ting tu tuo tui tuan tun " +
+        "na ne nai nei nao nou nan nen nang neng nong ni nie niao niu nian nin niang ning nu nuo nuan nv nve " +
+        "la le lai lei lao lou lan lang leng long li lia lie liao liu lian lin liang ling lu luo luan lun lv lve " +
+        "ga ge gai gei gao gou gan gen gang geng gong gu gua guo guai gui guan gun guang " +
+        "ka ke kai kei kao kou kan ken kang keng kong ku kua kuo kuai kui kuan kun kuang " +
+        "ha he hai hei hao hou han hen hang heng hong hu hua huo huai hui huan hun huang " +
+        "ji jia jie jiao jiu jian jin jiang jing jiong ju jue juan jun " +
+        "qi qia qie qiao qiu qian qin qiang qing qiong qu que quan qun " +
+        "xi xia xie xiao xiu xian xin xiang xing xiong xu xue xuan xun " +
+        "zha zhe zhi zhai zhei zhao zhou zhan zhen zhang zheng zhong zhu zhua zhuo zhuai zhui zhuan zhun zhuang " +
+        "cha che chi chai chao chou chan chen chang cheng chong chu chua chuo chuai chui chuan chun chuang " +
+        "sha she shi shai shei shao shou shan shen shang sheng shu shua shuo shuai shui shuan shun shuang " +
+        "re ri rao rou ran ren rang reng rong ru ruo rui ruan run " +
+        "za ze zi zai zei zao zou zan zen zang zeng zong zu zuo zui zuan zun " +
+        "ca ce ci cai cao cou can cen cang ceng cong cu cuo cui cuan cun " +
+        "sa se si sai sao sou san sen sang seng song su suo sui suan sun").split(' ')
+
+    /** What [check] found: syllables of the set with no sound, sounds not in the set, pitches out of range. */
+    class Report(
+        val missing: List<String>, val extra: List<String>,
+        /** Name and pitch (Hz) of the sounds below [low] or above [high] (MIDI numbers). */
+        val outOfRange: List<Pair<String, Double>>, val noPitch: List<String>,
+        val low: Double, val high: Double, val middle: Double,
+    )
+
+    /**
+     * Checks the sounds' [pitches] (Hz by name, 0 = not measured) against [full] (null: no set) and the range
+     * [low]..[high] in MIDI numbers; without a range it is [spread] semitones around the middle pitch of the bank.
+     */
+    fun check(pitches: Map<String, Double>, full: List<String>?, low: Double?, high: Double?, spread: Double): Report {
+        val names = pitches.keys.associateBy { it.lowercase() }
+        val set = full?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.distinct()
+        val missing = set?.filter { it !in names } ?: emptyList()
+        val extra = if (set == null) emptyList() else names.filterKeys { it !in set.toSet() }.values.sorted()
+        val midi = pitches.filterValues { it > 0 }.mapValues { mlabeler.core.dsp.Pitch.hzToMidi(it.value) }
+        val sorted = midi.values.sorted()
+        val middle = if (sorted.isEmpty()) 0.0 else sorted[sorted.size / 2]
+        val lo = low ?: (middle - spread)
+        val hi = high ?: (middle + spread)
+        val out = midi.filterValues { it < lo || it > hi }.keys.sorted().map { it to pitches.getValue(it) }
+        return Report(missing, extra, out, pitches.filterValues { it <= 0 }.keys.sorted(), lo, hi, middle)
+    }
+
     /** One sound of a bank: its name, its marks and its 16-bit samples from start to end. */
     class Sound(val name: String, val inf: Inf, val samples: ShortArray)
 

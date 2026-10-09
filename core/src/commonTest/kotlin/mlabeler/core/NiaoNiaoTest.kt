@@ -44,4 +44,28 @@ class NiaoNiaoTest {
         assertEquals((0.1 * 32768 * 2 / kotlin.math.PI).toInt().toDouble(), m.consonantLevel.toDouble(), 30.0)
         assertEquals(339.2, m.pitch)
     }
+
+    @Test
+    fun otoEntryBecomesMarksAndBack() {
+        val samples = FloatArray(44100) { i -> if (i in 4410 until 39690) 0.5f * kotlin.math.sin(i * 0.05f) else 0f }
+        val e = mlabeler.core.format.OtoEntry("ba.wav", "ba", 100.0, 60.0, -700.0, 60.0, 20.0)
+        val inf = NiaoNiao.fromOto(e, samples, 44100)
+        assertEquals(4410, inf.start)
+        assertEquals(7056, inf.consonant)
+        assertEquals(35280, inf.end)
+        kotlin.test.assertTrue(inf.decay in inf.consonant..inf.end)
+        val back = NiaoNiao.toOto("ba.wav", "ba", inf, 44100)
+        assertEquals(100.0, back.offset)
+        assertEquals(60.0, back.preutterance)
+        assertEquals(-700.0, back.cutoff)
+    }
+
+    @Test
+    fun checkFindsMissingSyllablesAndOddPitches() {
+        val r = NiaoNiao.check(mapOf("a" to 440.0, "ba" to 446.0, "o" to 600.0, "xx" to 0.0), listOf("a", "ba", "o", "e"), null, null, 2.0)
+        assertEquals(listOf("e"), r.missing)
+        assertEquals(listOf("xx"), r.extra)
+        assertEquals(listOf("o"), r.outOfRange.map { it.first })
+        assertEquals(listOf("xx"), r.noPitch)
+    }
 }
