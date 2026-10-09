@@ -70,7 +70,9 @@ Android asks for access to all files, because label files are written next to th
   copies of entries under new names by a pattern, the differences from another oto.ini entry by entry, the entries
   a `.ust` uses, file names from a Mac put in the composed form (NFC).
 - NiaoNiao voicebanks: the marks of each sound (.inf) edited as boundaries, placed automatically, packed into
-  `voice.d` and `inf.d`; a built bank can be unpacked back.
+  `voice.d` and `inf.d`; a built bank can be unpacked back. A long take is cut into sounds named from a syllable
+  list, each sound can be sung again on one pitch, the bank is checked for missing syllables and pitches out of
+  range, and marks go to and from a CV oto.ini.
 - Recording from a reclist with a level meter, click track and guide.
 
 **Automatic labelling**
