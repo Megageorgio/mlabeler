@@ -79,6 +79,9 @@ data class Tokens(
     val laneAlpha: Float = -1f,
     /** How the program's own window title looks (menus in the window title): "" plain, "xp" blue and rounded, "classic" a flat stripe. */
     val windowStyle: String = "",
+    /** Set by the app (not stored in theme files): the panel colours made solid, for menus, tooltips and dialogs. */
+    val popup: Color = Color.Unspecified,
+    val popupAlt: Color = Color.Unspecified,
 )
 
 private fun hex(v: Long) = Color(v or 0xFF000000)
@@ -215,6 +218,9 @@ fun AppTheme(tokens0: Tokens, font: FontFamily? = null, crisp: Boolean = false, 
     // see-through panels over a background picture or gradient
     val lane = t1.effectiveLaneAlpha
     val tokens = t1.copy(
+        // menus, tooltips and dialogs float over the rest of the window: always solid, or what is under them shows through
+        popup = t1.panel.copy(alpha = 1f),
+        popupAlt = t1.panelAlt.copy(alpha = 1f),
         panel = t1.panel.copy(alpha = t1.panel.alpha * t1.panelAlpha),
         panelAlt = t1.panelAlt.copy(alpha = t1.panelAlt.alpha * (0.5f + t1.panelAlpha / 2)),
         laneBg = t1.laneBg.copy(alpha = t1.laneBg.alpha * lane),

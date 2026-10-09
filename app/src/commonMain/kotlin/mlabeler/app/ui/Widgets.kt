@@ -86,7 +86,7 @@ fun Tip(text: String, content: @Composable () -> Unit) {
         tooltip = {
             val c = T.c
             PlainTooltip(
-                containerColor = c.panelAlt,
+                containerColor = c.popupAlt,
                 contentColor = c.text,
                 shape = RoundedCornerShape(if (c.square) 0.dp else c.radius),
                 modifier = Modifier.border(c.borderWidth, c.border, RoundedCornerShape(if (c.square) 0.dp else c.radius)),
@@ -317,7 +317,7 @@ fun Divider(vertical: Boolean = false) {
 fun Card(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val c = T.c
     val shape = RoundedCornerShape(if (c.square) 0.dp else c.radius * 1.5f)
-    Column(modifier.clip(shape).background(c.panel).border(c.borderWidth, c.border, shape)) { content() }
+    Column(modifier.clip(shape).background(c.popup).border(c.borderWidth, c.border, shape)) { content() }
 }
 
 fun formatTime(seconds: Double, precise: Boolean = true): String {

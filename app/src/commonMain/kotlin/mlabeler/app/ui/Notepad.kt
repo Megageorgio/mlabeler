@@ -122,7 +122,7 @@ fun FloatingNotepad(app: AppState, ed: EditorState) {
     val shape = RoundedCornerShape(c.radius)
     Box(
         Modifier.offset { IntOffset((x * density.density).roundToInt(), (y * density.density).roundToInt()) }
-            .size(w.dp, h.dp).shadow(8.dp, shape).clip(shape).background(c.panel).border(c.borderWidth, c.border, shape),
+            .size(w.dp, h.dp).shadow(8.dp, shape).clip(shape).background(c.popup).border(c.borderWidth, c.border, shape),
     ) {
         Column(Modifier.fillMaxSize()) {
             Row(
