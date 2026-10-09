@@ -505,6 +505,35 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             return@awaitEachGesture
                         }
 
+                        // the loudness lane with the pencil: the drawn line is the new loudness, right button erases
+                        if (ed.dynPencil && ed.power != null && ed.mode == Mode.Labels && g.powerBottom > g.powerTop &&
+                            down.position.y in g.powerTop..g.powerBottom && !first.buttons.isTertiaryPressed) {
+                            val top = g.powerTop
+                            val bottom = g.powerBottom
+                            fun dbAt(yy: Float) = (bottom - yy.coerceIn(top, bottom)) / (bottom - top) * 60f - 60f
+                            val erase = first.buttons.isSecondaryPressed
+                            ed.beginGainStroke()
+                            var lt = downTime
+                            var ld = dbAt(down.position.y)
+                            ed.drawGain(lt, if (erase) null else ld, lt, if (erase) null else ld)
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!chg.pressed) break
+                                if (chg.positionChange() != Offset.Zero) {
+                                    val t = timeAt(chg.position.x)
+                                    val d = dbAt(chg.position.y)
+                                    ed.drawGain(lt, if (erase) null else ld, t, if (erase) null else d)
+                                    lt = t
+                                    ld = d
+                                    ed.cursor = t
+                                    chg.consume()
+                                }
+                            }
+                            ed.endGainStroke()
+                            return@awaitEachGesture
+                        }
+
                         // the piano roll (pitch in its own lane): notes move up and down, the pencil draws f0
                         val pitchLane = g.pitchBottom > g.pitchTop && down.position.y in g.pitchTop..g.pitchBottom &&
                             ed.pitch != null && ed.mode == Mode.Labels && !first.buttons.isTertiaryPressed
@@ -517,6 +546,27 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             if (down.position.x < PIANO_KEYS * density) {
                                 // a click on the keys fits the range to the singing
                                 ed.fitPitchRange()
+                                return@awaitEachGesture
+                            }
+                            if (ed.vuvTool) {
+                                // left button: unvoiced, right button: voiced again
+                                val voiced = first.buttons.isSecondaryPressed
+                                ed.beginF0Stroke()
+                                var lt = downTime
+                                ed.setVoicing(lt, lt, voiced)
+                                while (true) {
+                                    val ev = awaitPointerEvent()
+                                    val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!chg.pressed) break
+                                    if (chg.positionChange() != Offset.Zero) {
+                                        val t = timeAt(chg.position.x)
+                                        ed.setVoicing(lt, t, voiced)
+                                        lt = t
+                                        ed.cursor = t
+                                        chg.consume()
+                                    }
+                                }
+                                ed.endF0Stroke()
                                 return@awaitEachGesture
                             }
                             if (ed.f0Pencil) {
@@ -863,10 +913,31 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                     .clip(mlabeler.app.theme.RoundedCornerShape(c.radius)).background(c.panel.copy(alpha = 0.85f)),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconBtn(Icons.edit, PianoTitles.pencil(), Commands.f0Pencil.keyLabel, active = ed.f0Pencil, size = 28.dp) { ed.f0Pencil = !ed.f0Pencil }
+                IconBtn(Icons.edit, PianoTitles.pencil(), Commands.f0Pencil.keyLabel, active = ed.f0Pencil, size = 28.dp) { ed.f0Pencil = !ed.f0Pencil; ed.vuvTool = false }
+                Tip(PianoTitles.vuv()) {
+                    Text("V/UV", color = if (ed.vuvTool) c.onAccent else c.text, fontSize = 11.sp,
+                        modifier = Modifier.clip(mlabeler.app.theme.RoundedCornerShape(c.radius)).background(if (ed.vuvTool) c.accent else Color.Transparent)
+                            .clickable { ed.vuvTool = !ed.vuvTool; ed.f0Pencil = false }.padding(horizontal = 6.dp, vertical = 6.dp))
+                }
                 IconBtn(Icons.undo, PianoTitles.undo(), enabled = ed.canUndoF0, size = 28.dp) { ed.undoF0() }
                 IconBtn(Icons.trash, PianoTitles.reset(), enabled = ed.f0Edits != null, size = 28.dp) { ed.resetF0() }
                 IconBtn(Icons.fit, PianoTitles.fit(), size = 28.dp) { ed.fitPitchRange() }
+            }
+        }
+        if (ed.mode == Mode.Labels && ed.power != null && gl.powerBottom - gl.powerTop > 40 * LocalDensity.current.density) {
+            val d = LocalDensity.current
+            Row(
+                Modifier.align(Alignment.TopEnd).offset { IntOffset(-(8 * d.density).toInt(), gl.powerTop.toInt() + (4 * d.density).toInt()) }
+                    .clip(mlabeler.app.theme.RoundedCornerShape(c.radius)).background(c.panel.copy(alpha = 0.85f)),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconBtn(Icons.edit, PianoTitles.dynPencil(), active = ed.dynPencil, size = 28.dp) { ed.dynPencil = !ed.dynPencil }
+                IconBtn(Icons.undo, PianoTitles.undo(), enabled = ed.canUndoGain, size = 28.dp) { ed.undoGain() }
+                IconBtn(Icons.trash, PianoTitles.dynReset(), enabled = ed.gainEdits != null, size = 28.dp) { ed.resetGain() }
+                IconBtn(Icons.play, PianoTitles.dynListen(), enabled = ed.gainEdits != null, size = 28.dp) {
+                    ed.cleanup.previewDrawnLoudness(ed.range ?: (ed.viewStart to ed.viewStart + ed.visibleDuration))
+                }
+                IconBtn(Icons.check, PianoTitles.dynApply(), enabled = ed.gainEdits != null && !ed.cleanup.busy, size = 28.dp) { ed.cleanup.applyDrawnLoudness() }
             }
         }
 
@@ -953,6 +1024,13 @@ internal fun InlineEditor(initial: String, offset: IntOffset, widthPx: Int, heig
 object PianoTitles {
     val pencil = mlabeler.app.i18n.L("Draw the pitch: left button draws, right button erases the drawing",
         "Рисовать высоту тона: левая кнопка рисует, правая стирает нарисованное")
+    val vuv = mlabeler.app.i18n.L("Voiced or not: the left button marks a part unvoiced, the right button voiced again",
+        "Звонкое или глухое: левая кнопка делает участок глухим, правая — снова звонким")
+    val dynPencil = mlabeler.app.i18n.L("Draw the loudness: the line is the new loudness, the right button erases the drawing",
+        "Рисовать громкость: линия — новая громкость, правая кнопка стирает нарисованное")
+    val dynReset = mlabeler.app.i18n.L("Forget the drawn loudness", "Убрать нарисованную громкость")
+    val dynListen = mlabeler.app.i18n.L("Listen with the drawn loudness (the selection or what is on screen)", "Прослушать с нарисованной громкостью (выделенное или видимое)")
+    val dynApply = mlabeler.app.i18n.L("Write the drawn loudness into the recording (Ctrl+Z undoes it)", "Записать нарисованную громкость в звук (отмена — Ctrl+Z)")
     val undo = mlabeler.app.i18n.L("Undo the last stroke", "Отменить последний штрих")
     val reset = mlabeler.app.i18n.L("Back to the pitch of the recording", "Вернуть высоту тона записи")
     val fit = mlabeler.app.i18n.L("Fit to the singing (Alt+wheel moves, Ctrl+Alt+wheel zooms)", "Подогнать под пение (Alt+колесо — сдвиг, Ctrl+Alt+колесо — масштаб)")

@@ -215,7 +215,13 @@ object Commands {
     val groupPhonemes = Command("group-phonemes", L("Group phonemes into notes", "Сгруппировать фонемы по нотам"), emptyList()) { e, _ -> e.groupPhonemes() }.only(Mode.Labels)
     val notesFromGroups = Command("notes-from-groups", L("Notes from groups and pitch", "Ноты по группам и высоте"), emptyList()) { e, _ -> e.notesFromGroups() }.only(Mode.Labels)
     val fillQueue = Command("fill-queue", L("Spread typed phonemes over the selection", "Расставить вписанные фонемы по выделенному"), emptyList()) { e, _ -> e.fillWithQueue() }.only(Mode.Labels)
-    val f0Pencil = Command("f0-pencil", L("Draw the pitch in the pitch lane", "Рисовать высоту тона на полосе высоты"), listOf(ch('E'))) { e, _ -> e.f0Pencil = !e.f0Pencil }.only(Mode.Labels)
+    val f0Pencil = Command("f0-pencil", L("Draw the pitch in the pitch lane", "Рисовать высоту тона на полосе высоты"), listOf(ch('E'))) { e, _ -> e.f0Pencil = !e.f0Pencil; e.vuvTool = false }.only(Mode.Labels)
+    val vuv = Command("f0-vuv", L("Mark voiced and unvoiced parts in the pitch lane", "Отмечать звонкие и глухие участки на полосе высоты"), emptyList()) { e, _ -> e.vuvTool = !e.vuvTool; e.f0Pencil = false }.only(Mode.Labels)
+    val dynPencil = Command("dyn-pencil", L("Draw the loudness in the loudness lane", "Рисовать громкость на полосе громкости"), emptyList()) { e, a ->
+        e.dynPencil = !e.dynPencil
+        if (e.dynPencil && !a.settings.layout.showPower) a.update { it.copy(layout = it.layout.copy(showPower = true)) }
+    }.only(Mode.Labels)
+    val dynApply = Command("dyn-apply", L("Write the drawn loudness into the recording", "Записать нарисованную громкость в звук"), emptyList()) { e, _ -> e.cleanup.applyDrawnLoudness() }.only(Mode.Labels)
     val reviewNext = Command("review-next", L("Next place to check (worst first)", "Следующее место для проверки (худшее первым)"), listOf(Chord(Key.N))) { e, _ -> e.reviewStep(1) }.only(Mode.Labels)
     val reviewPrev = Command("review-prev", L("Previous place to check", "Предыдущее место для проверки"), listOf(Chord(Key.N, shift = true))) { e, _ -> e.reviewStep(-1) }.only(Mode.Labels)
     val arrange = Command("arrange", L("Arrange panels and lanes", "Расставить панели и полосы"), emptyList()) { _, a -> a.arrangePanels = !a.arrangePanels }
@@ -293,7 +299,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf,

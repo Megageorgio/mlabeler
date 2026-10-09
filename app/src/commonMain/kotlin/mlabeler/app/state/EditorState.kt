@@ -201,6 +201,137 @@ class EditorState(
         saveF0Edits()
     }
 
+    // ---------- voicing and loudness drawn by hand ----------
+
+    /** The pitch lane marks parts unvoiced (left button) or voiced again (right button) instead of drawing. */
+    var vuvTool by mutableStateOf(false)
+
+    /**
+     * Marks [t0]..[t1] unvoiced, or voiced again: where the recording has a pitch there it comes back, elsewhere a
+     * pitch is drawn between the voiced parts on both sides.
+     */
+    fun setVoicing(t0: Double, t1: Double, voiced: Boolean) {
+        val p = pitch ?: return
+        val cur = pitchCurve ?: return
+        val e = f0Edits?.copyOf() ?: FloatArray(p.values.size) { Float.NaN }
+        if (e.isEmpty()) return
+        val a = (minOf(t0, t1) / p.hop).toInt().coerceIn(0, e.size - 1)
+        val b = (maxOf(t0, t1) / p.hop).toInt().coerceIn(0, e.size - 1)
+        if (!voiced) {
+            for (i in a..b) e[i] = 0f
+        } else {
+            fun on(i: Int) = cur.values[i] > 0f
+            var l = a - 1
+            while (l >= 0 && !on(l)) l--
+            var r = b + 1
+            while (r < e.size && !on(r)) r++
+            val lv = if (l >= 0) cur.values[l] else null
+            val rv = if (r < e.size) cur.values[r] else null
+            for (i in a..b) {
+                if (on(i)) continue
+                if (p.values[i] > 0f) { e[i] = Float.NaN; continue }
+                e[i] = when {
+                    lv != null && rv != null -> (lv * kotlin.math.exp(kotlin.math.ln((rv / lv).toDouble()) * (i - l) / (r - l))).toFloat()
+                    else -> lv ?: rv ?: 220f
+                }
+            }
+        }
+        f0Edits = e
+    }
+
+    /** Loudness drawn by hand: dB added to each frame of [power] (NaN = unchanged). */
+    var gainEdits by mutableStateOf<FloatArray?>(null)
+        private set
+    /** Drawing the loudness in the loudness lane. */
+    var dynPencil by mutableStateOf(false)
+    private val gainUndo = ArrayDeque<FloatArray?>()
+
+    /** The loudness shown: the analysed one with the drawn changes. */
+    val loudnessCurve: mlabeler.core.dsp.Curve?
+        get() {
+            val p = power ?: return null
+            val e = gainEdits ?: return p
+            return mlabeler.core.dsp.Curve(p.hop, FloatArray(p.values.size) { i -> p.values[i] + (e.getOrNull(i)?.takeIf { !it.isNaN() } ?: 0f) })
+        }
+
+    private fun gainPath(id: String) = Paths.join(Paths.join(workspace.metaDir, "gain"), id.replace('/', '_').replace('\\', '_') + ".gain")
+
+    private fun loadGainEdits() {
+        val it = item ?: return
+        val p = power ?: return
+        gainUndo.clear()
+        gainEdits = runCatching {
+            val lines = workspace.fs.read(gainPath(it.id)).decodeToString().lines().filter { l -> l.isNotBlank() }
+            val out = FloatArray(p.values.size) { Float.NaN }
+            for (l in lines.drop(1)) {
+                val (t, v) = l.trim().split(Regex("\\s+")).let { it[0].toDouble() to it[1].toFloat() }
+                val i = (t / p.hop).toInt()
+                if (i in out.indices) out[i] = v
+            }
+            out
+        }.getOrNull()
+    }
+
+    private fun saveGainEdits() {
+        val it = item ?: return
+        val p = power ?: return
+        val e = gainEdits
+        val path = gainPath(it.id)
+        runCatching {
+            if (e == null || e.all { v -> v.isNaN() }) { if (workspace.fs.exists(path)) workspace.fs.delete(path); return }
+            val sb = StringBuilder("hop ${p.hop}\n")
+            for (i in e.indices) if (!e[i].isNaN()) sb.append(((i * p.hop * 10000).toLong() / 10000.0)).append(' ').append(e[i]).append('\n')
+            workspace.fs.mkdirs(Paths.parent(path))
+            workspace.fs.write(path, sb.toString().encodeToByteArray())
+        }
+    }
+
+    fun beginGainStroke() {
+        gainUndo.addLast(gainEdits?.copyOf())
+        while (gainUndo.size > 50) gainUndo.removeFirst()
+    }
+
+    /** Draws the loudness from [t0] at [db0] to [t1] at [db1] (dB of full scale); null erases the drawing there. */
+    fun drawGain(t0: Double, db0: Float?, t1: Double, db1: Float?) {
+        val p = power ?: return
+        val e = gainEdits?.copyOf() ?: FloatArray(p.values.size) { Float.NaN }
+        if (e.isEmpty()) return
+        val a = (minOf(t0, t1) / p.hop).toInt().coerceIn(0, e.size - 1)
+        val b = (maxOf(t0, t1) / p.hop).toInt().coerceIn(0, e.size - 1)
+        for (i in a..b) {
+            if (db0 == null || db1 == null) { e[i] = Float.NaN; continue }
+            val f = if (b == a) 0f else (i - a).toFloat() / (b - a)
+            val target = if (t0 <= t1) db0 + (db1 - db0) * f else db1 + (db0 - db1) * f
+            e[i] = (target - p.values[i].coerceAtLeast(-60f)).coerceIn(-40f, 24f)
+        }
+        gainEdits = e
+    }
+
+    fun endGainStroke() = saveGainEdits()
+
+    fun undoGain() {
+        if (gainUndo.isEmpty()) return
+        gainEdits = gainUndo.removeLast()
+        saveGainEdits()
+    }
+
+    val canUndoGain: Boolean get() = gainUndo.isNotEmpty()
+
+    /** Forgets the drawn loudness (can be undone). */
+    fun resetGain() {
+        if (gainEdits == null) return
+        beginGainStroke()
+        gainEdits = null
+        saveGainEdits()
+    }
+
+    /** The drawn loudness was written into the sound: the drawing goes (the loudness is analysed again). */
+    internal fun gainApplied() {
+        gainUndo.clear()
+        gainEdits = null
+        saveGainEdits()
+    }
+
     /** Drags note [i] of [tier] up or down to MIDI [pitch]. */
     fun notePitchDragTo(tier: Int, i: Int, pitch: Double) {
         val base = noteDragBase ?: return
@@ -1146,6 +1277,9 @@ class EditorState(
         pitch = null
         f0Edits = null
         f0Pencil = false
+        vuvTool = false
+        gainEdits = null
+        dynPencil = false
         power = null
         formantsJob?.cancel()
         formants = null
@@ -1217,6 +1351,7 @@ class EditorState(
             loadReferences()
             peaks = withContext(Dispatchers.Default) { Peaks.build(a.samples, a.sampleRate) }
             power = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.power(a.samples, a.sampleRate) }
+            loadGainEdits()
             if (settings.layout.showPitch) pitch = withContext(Dispatchers.Default) { pitchOf(item, a) }
             computeSpectrogram(a)
             if (pitch == null) pitch = withContext(Dispatchers.Default) { pitchOf(item, a) }
@@ -1679,13 +1814,18 @@ class EditorState(
         selectNote(tier, i)
     }
 
-    /** Cuts note [i] at [time]; the right part is sung on the same syllable (a slur). */
+    /**
+     * Cuts note [i] at [time]; the right part is sung on the same syllable (a slur). Both parts get the pitch sung in
+     * them, when the pitch is known.
+     */
     fun splitNoteAt(tier: Int, time: Double) {
         val t = noteTier(tier) ?: return
         val (nt, k) = mlabeler.core.edit.NoteEdits.split(t, time) ?: return
         val right = nt.notes.getOrNull(k)
         val withSlur = if (right != null && k > 0) mlabeler.core.edit.NoteEdits.setSlur(nt, k, true) else nt
-        updateDoc { it.replace(tier, withSlur) }
+        val f0 = pitchCurve
+        val sung = if (f0 != null && k > 0 && nt.notes[k - 1].pitch != null) mlabeler.core.edit.NoteEdits.pitchFromCurve(withSlur, f0, true, setOf(k - 1, k)) else withSlur
+        updateDoc { it.replace(tier, sung) }
         selectNote(tier, k)
     }
 

@@ -145,6 +145,47 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         if (n > 0) app.message(gained.format(((db * 10).roundToInt() / 10.0).toString()) + if (clipped > 0) "\n" + clippedT.format(clipped) else "")
     }
 
+    /** The drawn loudness change at sample [i]: dB per frame of [hop] s, smooth between frames (NaN = none). */
+    private fun gainAt(edits: FloatArray, hop: Double, i: Int, rate: Int): Float {
+        val pos = i.toDouble() / rate / hop
+        val k = pos.toInt()
+        fun at(j: Int) = edits.getOrNull(j)?.takeIf { !it.isNaN() } ?: 0f
+        val f = (pos - k).toFloat()
+        return at(k) * (1 - f) + at(k + 1) * f
+    }
+
+    /** Writes the loudness drawn in the loudness lane into the recording (undone with Ctrl+Z); the drawing goes. */
+    fun applyDrawnLoudness() = run("dynamics") {
+        val edits = ed.gainEdits ?: return@run
+        val hop = ed.power?.hop ?: return@run
+        var clipped = 0
+        val n = modify { w, ch, x ->
+            var changed = 0
+            for (i in 0 until w.frames) {
+                val db = gainAt(edits, hop, i, w.sampleRate)
+                if (db == 0f) continue
+                val v = x[i] * 10.0.pow(db / 20.0).toFloat()
+                if (kotlin.math.abs(v) > 1f) clipped++
+                if (w.set(i, ch, v.coerceIn(-1f, 1f))) changed++
+            }
+            changed
+        }
+        ed.gainApplied()
+        if (n > 0) app.message(loudnessApplied() + if (clipped > 0) "\n" + clippedT.format(clipped) else "")
+    }
+
+    /** Plays [range] (or what is on screen) with the drawn loudness, without changing the file. */
+    fun previewDrawnLoudness(range: Pair<Double, Double>) = run("preview") {
+        val a = ed.audio ?: return@run
+        val edits = ed.gainEdits ?: return@run
+        val hop = ed.power?.hop ?: return@run
+        val (from, to) = samples(range, a)
+        val out = withContext(Dispatchers.Default) {
+            FloatArray(to - from) { k -> (a.samples[from + k] * 10.0.pow(gainAt(edits, hop, from + k, a.sampleRate) / 20.0).toFloat()).coerceIn(-1f, 1f) }
+        }
+        ed.playBuffer(Audio(a.sampleRate, out))
+    }
+
     /** Fades [range] in (from silence) or out (to silence) along a smooth curve. */
     fun fade(range: Pair<Double, Double>, fadeIn: Boolean) = run("fade") {
         modify { w, ch, x ->
@@ -354,6 +395,7 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         val profileShort = L("Select at least 50 ms of noise only", "Выделите хотя бы 50 мс, где только шум")
         val profileTaken = L("Noise profile taken", "Профиль шума получен")
         val noiseDone = L("Noise lowered ({0} samples changed)", "Шум снижен (изменено сэмплов: {0})")
+        val loudnessApplied = L("The drawn loudness is in the recording now. Ctrl+Z undoes this.", "Нарисованная громкость записана в звук. Отмена — Ctrl+Z.")
         val gained = L("Level changed by {0} dB. Ctrl+Z undoes this.", "Громкость изменена на {0} дБ. Отмена — Ctrl+Z.")
         val clippedT = L("{0} samples went past full scale and were clipped", "Сэмплов вышло за максимум и обрезано: {0}")
         val normalized = L("Level changed by {0} dB. Ctrl+Z undoes this.", "Громкость изменена на {0} дБ. Отмена — Ctrl+Z.")

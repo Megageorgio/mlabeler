@@ -636,6 +636,18 @@ internal fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer:
             var pen = false
             val i0 = max(0, (v0 / pitch.hop).toInt() - 1)
             val i1 = min(pitch.values.size - 1, (v1 / pitch.hop).toInt() + 1)
+            // marking voicing: the unvoiced parts are shaded
+            if (ed.vuvTool) {
+                var from = -1
+                for (i in i0..i1 + 1) {
+                    val unv = i <= i1 && !(pitch.values[i] > 0f)
+                    if (unv && from < 0) from = i
+                    if (!unv && from >= 0) {
+                        drawRect(c.text.copy(alpha = 0.08f), Offset(x(from * pitch.hop), top), Size(x(i * pitch.hop) - x(from * pitch.hop), bottom - top))
+                        from = -1
+                    }
+                }
+            }
             for (i in i0..i1) {
                 val f = pitch.values[i]
                 if (f <= 0f || f.isNaN()) { pen = false; continue }
@@ -703,6 +715,22 @@ internal fun DrawScope.drawCurves(ed: EditorState, g: Geom, c: Tokens, measurer:
         path.lineTo(x(i1 * power.hop), bottom)
         path.close()
         drawPath(path, c.wave.copy(alpha = 0.45f))
+        // the drawn loudness over the analysed one
+        val gains = ed.gainEdits
+        if (gains != null) {
+            val drawn = Path()
+            var pen = false
+            for (i in i0..i1) {
+                val gdb = gains.getOrNull(i) ?: Float.NaN
+                if (gdb.isNaN()) { pen = false; continue }
+                val db = (power.values[i].coerceAtLeast(-60f) + gdb).coerceIn(-60f, 0f)
+                val xx = x(i * power.hop)
+                val yy = bottom - (db + 60f) / 60f * (bottom - top)
+                if (pen) drawn.lineTo(xx, yy) else drawn.moveTo(xx, yy)
+                pen = true
+            }
+            drawPath(drawn, c.accent, style = Stroke(2.2f * px))
+        }
         safeText(measurer, "dB", Offset(4 * px, top + 2 * px), small)
     }
 }

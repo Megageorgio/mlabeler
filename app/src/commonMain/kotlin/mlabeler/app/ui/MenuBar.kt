@@ -179,6 +179,8 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
                 item(Commands.groupPhonemes, ed, app), item(Commands.notesFromGroups, ed, app), MSep,
                 item(Commands.pitchUp, ed, app), item(Commands.pitchDown, ed, app), item(Commands.notesFromAudio, ed, app),
                 MSep, item(Commands.midiIn, ed, app), item(Commands.midiOut, ed, app),
+                MSep, item(Commands.f0Pencil, ed, app, checked = ed.f0Pencil), item(Commands.vuv, ed, app, checked = ed.vuvTool),
+                item(Commands.dynPencil, ed, app, checked = ed.dynPencil), item(Commands.dynApply, ed, app),
                 MSep, item(Commands.resynthWorld, ed, app), item(Commands.resynthNsf, ed, app),
             )))
             add(item(Commands.fillQueue, ed, app))
