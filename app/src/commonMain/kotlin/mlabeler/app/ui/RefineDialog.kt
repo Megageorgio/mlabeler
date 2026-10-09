@@ -26,6 +26,8 @@ import mlabeler.app.state.EditorState
 import mlabeler.app.state.RefineSettings
 import mlabeler.app.theme.T
 import mlabeler.core.model.IntervalTier
+import mlabeler.app.state.refineBoundaries
+import mlabeler.app.state.refineFiles
 
 private val titleT = L("Refine boundaries", "Уточнение границ")
 private val aboutT = L(

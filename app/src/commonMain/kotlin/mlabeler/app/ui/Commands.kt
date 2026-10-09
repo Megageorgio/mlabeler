@@ -16,6 +16,7 @@ import mlabeler.app.state.Mode
 import mlabeler.app.state.togglePanel
 import mlabeler.app.state.toggleSide
 import mlabeler.core.format.OtoMarker
+import mlabeler.app.state.playResynth
 
 /** A key combination. "Ctrl" is Cmd on macOS. */
 data class Chord(val key: Key, val ctrl: Boolean = false, val shift: Boolean = false, val alt: Boolean = false) {
