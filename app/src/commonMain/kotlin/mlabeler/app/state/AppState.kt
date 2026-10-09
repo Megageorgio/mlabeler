@@ -302,8 +302,12 @@ class AppState(private val scope: CoroutineScope) {
         showSettings = false
     }
 
+    /** Closes the program (set by the window on computers); used to restart into a new version. */
+    var quit: (() -> Unit)? = null
+
     fun close() {
         editor?.saveAllOnClose()
         toolkit.close()
+        updater.onExit()
     }
 }

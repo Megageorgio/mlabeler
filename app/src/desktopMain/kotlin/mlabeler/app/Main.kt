@@ -42,6 +42,7 @@ private fun run(args: Array<String>) = application {
     val size = System.getenv("MLABELER_WINDOW")?.split('x')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val state = rememberWindowState(size = if (size != null) DpSize(size[0].dp, size[1].dp) else DpSize(1280.dp, 800.dp))
     val app = rememberAppState()
+    app.quit = { app.close(); exitApplication() }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         args.firstOrNull()?.let { app.openFolder(it) }
     }

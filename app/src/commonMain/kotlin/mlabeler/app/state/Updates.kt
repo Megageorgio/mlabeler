@@ -25,6 +25,8 @@ data class UpdateSettings(
     val checkOnStart: Boolean = true,
     /** A version the user chose to skip: not offered at start again (still shown in About). */
     val skipped: String = "",
+    /** Where the program can (Windows, Android): download a new version by itself and put it in place. */
+    val autoInstall: Boolean = true,
 )
 
 /**
@@ -71,13 +73,74 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
 
     val current: Version? = Version.parse(AppInfo.VERSION)
 
+    /** Downloading a new version: 0..1; null when not downloading. */
+    var progress by mutableStateOf<Float?>(null)
+        private set
+    /** The tag of a downloaded version ready to be put in place. */
+    var ready by mutableStateOf<String?>(null)
+        private set
+    /** The last thing that went wrong while downloading or installing. */
+    var installError by mutableStateOf("")
+        private set
+
+    /** This release can be downloaded and put in place by the program itself. */
+    fun canInstall(r: Release): Boolean = mlabeler.app.SelfUpdate.canUse(r.download)
+
     fun checkAtStart() {
+        // a version downloaded earlier: ready at once, or left over from before the update and removed
+        runCatching {
+            mlabeler.app.SelfUpdate.prepared()?.let { tag ->
+                val v = Version.parse(tag)
+                if (v != null && current != null && v > current) ready = tag else mlabeler.app.SelfUpdate.discard()
+            }
+        }
         if (!app.settings.updates.checkOnStart) return
         scope.launch {
             delay(2500)
             val r = check()
-            if (r != null && r.tag != app.settings.updates.skipped) offer = r
+            if (r != null && r.tag != app.settings.updates.skipped) {
+                // where it can, the program fetches the new version by itself and only then asks
+                if (ready != r.tag && app.settings.updates.autoInstall && canInstall(r)) prepare(r)
+                offer = r
+            }
         }
+    }
+
+    /** Downloads [r] and gets it ready to be put in place. */
+    fun download(r: Release) { if (progress == null) scope.launch { prepare(r) } }
+
+    private suspend fun prepare(r: Release) {
+        val url = r.download ?: return
+        if (progress != null) return
+        progress = 0f
+        installError = ""
+        try {
+            mlabeler.app.SelfUpdate.prepare(url, r.tag) { p -> progress = p }
+            ready = r.tag
+        } catch (e: Throwable) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            installError = failedDownload.format(e.message ?: e.toString())
+        } finally {
+            progress = null
+        }
+    }
+
+    /**
+     * Puts the downloaded version in place now: on Windows the program closes and the new version starts, on
+     * Android the system installer opens.
+     */
+    fun installNow() {
+        val err = mlabeler.app.SelfUpdate.install(restart = true)
+        if (err != null) { installError = err; return }
+        if (mlabeler.app.SelfUpdate.installsOnClose) app.quit?.invoke()
+    }
+
+    /** The program closes: a downloaded version is put in place (Windows), unless the user turned that off. */
+    fun onExit() {
+        val tag = ready ?: return
+        if (!app.settings.updates.autoInstall || !mlabeler.app.SelfUpdate.installsOnClose) return
+        if (tag == app.settings.updates.skipped) return
+        runCatching { mlabeler.app.SelfUpdate.install(restart = false) }
     }
 
     fun checkNow() { scope.launch { check() } }
@@ -139,5 +202,6 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
         const val REPO = "Megageorgio/mlabeler"
         val upToDate = mlabeler.app.i18n.L("This is the newest version", "Установлена последняя версия")
         val failed = mlabeler.app.i18n.L("Couldn't check for updates: {0}", "Не удалось проверить обновления: {0}")
+        val failedDownload = mlabeler.app.i18n.L("Couldn't download the update: {0}", "Не удалось скачать обновление: {0}")
     }
 }
