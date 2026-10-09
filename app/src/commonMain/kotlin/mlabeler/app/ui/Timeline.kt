@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import androidx.compose.material3.Text
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
@@ -378,7 +380,17 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
         else renderSpectrogram(spec, ed.viewStart, ed.pixelsPerSecond, size.width, view.maxFreq, colorLut)
     }
 
-    BoxWithConstraints(modifier.background(c.laneBg)) {
+    // a new file fades in instead of popping, and its spectrogram fades in once it is there (Settings → Interface →
+    // Animations; at once when they are off)
+    val motionOn = Motion.on()
+    val fadeMs = Motion.ms(180)
+    val fileAppear = remember(ed.item?.id) { androidx.compose.animation.core.Animatable(if (motionOn) 0.35f else 1f) }
+    androidx.compose.runtime.LaunchedEffect(ed.item?.id) { fileAppear.animateTo(1f, androidx.compose.animation.core.tween(fadeMs)) }
+    val specAppear = remember(spec != null, ed.item?.id) { androidx.compose.animation.core.Animatable(if (motionOn && spec == null) 0f else 1f) }
+    val specMs = Motion.ms(260)
+    androidx.compose.runtime.LaunchedEffect(spec != null, ed.item?.id) { if (spec != null) specAppear.animateTo(1f, androidx.compose.animation.core.tween(specMs)) }
+
+    BoxWithConstraints(modifier.background(c.laneBg).graphicsLayer { alpha = fileAppear.value }) {
         val tierStyle = TextStyle(fontSize = (layout.labelFontSize.coerceIn(8f, 48f) + if (Platform.isMobile) 2f else 0f).sp, color = c.tierText, fontFamily = T.font)
         val smallStyle = TextStyle(fontSize = 10.sp, color = c.muted, fontFamily = T.font)
 
@@ -398,6 +410,8 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     val t = ed.viewStart + ch.position.x / ed.pixelsPerSecond
                                     ed.cursor = t
                                     val r = g.region(ch.position.y, 8 * density)
+                                    val hb = if (ed.app.settings.hoverBoundary && ed.mode == Mode.Labels) hitBound(ed, g, r, ch.position.x, 6 * density) else null
+                                    if (hb != ed.hoverBound) ed.hoverBound = hb
                                     hoverIcon = when {
                                         r is Region.LaneSplit -> PointerIcon.Hand
                                         hitBound(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
@@ -408,7 +422,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                         else -> PointerIcon.Default
                                     }
                                 }
-                                PointerEventType.Exit -> if (ch.type == PointerType.Mouse) ed.cursor = null
+                                PointerEventType.Exit -> if (ch.type == PointerType.Mouse) { ed.cursor = null; ed.hoverBound = null }
                                 PointerEventType.Scroll -> {
                                     val d = ch.scrollDelta
                                     val mods = e.keyboardModifiers
@@ -796,7 +810,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
             }
             ed.setViewWidth(this.size.width)
             val g = geom(size, density, layout, tierCount)
-            drawTimeline(ed, g, c, doc, specImage, measurer, tierStyle, smallStyle)
+            drawTimeline(ed, g, c, doc, specImage, measurer, tierStyle, smallStyle, specAppear.value)
         }
         // the cursor follows the mouse and the playhead moves while playing: a separate layer, so the picture
         // under them isn't drawn again for every mouse move (that is slow on long recordings seen whole)

@@ -611,7 +611,7 @@ class EditorState(
 
     /** Replaces the matching tier with the reference's (undoable). */
     fun takeReference(r: Reference) {
-        updateDoc { d ->
+        updateDocShowingChanges { d ->
             var out = d
             for (t in r.doc.tiers.filterIsInstance<IntervalTier>()) {
                 val k = out.tierIndex(t.name).takeIf { it >= 0 } ?: out.phonemeTierIndex()
@@ -1335,8 +1335,10 @@ class EditorState(
         if (runCatching { undoAudio() }.getOrElse { app.message(it.message ?: it.toString(), error = true); true }) return
         if (mode == Mode.Oto) return oto.undo()
         val h = history ?: return
+        val before = committed
         if (h.undo()) {
             committed = h.current
+            showChanges(before, committed)
             fixSelection()
             docChanged()
         }
@@ -1346,8 +1348,10 @@ class EditorState(
         if (runCatching { redoAudio() }.getOrElse { app.message(it.message ?: it.toString(), error = true); true }) return
         if (mode == Mode.Oto) return oto.redo()
         val h = history ?: return
+        val before = committed
         if (h.redo()) {
             committed = h.current
+            showChanges(before, committed)
             fixSelection()
             docChanged()
         }
@@ -1920,6 +1924,49 @@ class EditorState(
         fixSelection()
     }
 
+    /** [updateDoc] for changes made for the user (autolabel, a plugin, refinement): what changed glows a moment. */
+    fun updateDocShowingChanges(transform: (LabelDoc) -> LabelDoc) {
+        val before = committed
+        updateDoc(transform)
+        showChanges(before, committed)
+    }
+
+    /** Spans of each interval tier (by index) that changed a moment ago; they glow while [changeGlow] fades. */
+    var changedSpans by mutableStateOf<Map<Int, List<Pair<Double, Double>>>>(emptyMap())
+        private set
+    /** 1 when something has just changed, down to 0 over a second or so. */
+    var changeGlow by mutableStateOf(0f)
+        private set
+    private var glowJob: Job? = null
+
+    /** Lets the intervals that differ between [before] and [after] glow for a moment (Settings → Interface → Animations). */
+    fun showChanges(before: LabelDoc?, after: LabelDoc?) {
+        if (!settings.flashChanges || settings.animations == "off" || before == null || after == null || before === after) return
+        val spans = changedSpansOf(before, after)
+        if (spans.isEmpty()) return
+        glowJob?.cancel()
+        changedSpans = spans
+        val ms = if (settings.animations == "reduced") 700 else 1400
+        glowJob = scope.launch {
+            val t0 = now()
+            try {
+                while (true) {
+                    val f = ((now() - t0).toDouble() / ms).coerceIn(0.0, 1.0)
+                    // stays bright a little, then fades out
+                    changeGlow = (1.0 - ((f - 0.25) / 0.75).coerceIn(0.0, 1.0)).let { it * it }.toFloat()
+                    if (f >= 1.0) break
+                    delay(16)
+                }
+            } finally {
+                changeGlow = 0f
+                changedSpans = emptyMap()
+            }
+        }
+    }
+
+    /** The boundary under the mouse pointer when it is to be highlighted (Settings → Interface → Animations). */
+    var hoverBound by mutableStateOf<mlabeler.core.edit.BoundRef?>(null)
+
     // ---------- view ----------
 
     fun clampView() {
@@ -1956,6 +2003,28 @@ class EditorState(
     private var fitLimit = Double.MAX_VALUE
 
     companion object {
+        /** For each interval tier of [after]: the spans of intervals that are not in the same tier of [before]. */
+        fun changedSpansOf(before: LabelDoc, after: LabelDoc): Map<Int, List<Pair<Double, Double>>> {
+            val out = mutableMapOf<Int, List<Pair<Double, Double>>>()
+            for ((k, t) in after.tiers.withIndex()) {
+                if (t !is IntervalTier) continue
+                val old = (before.tiers.firstOrNull { it is IntervalTier && it.name == t.name } ?: before.tiers.getOrNull(k)) as? IntervalTier
+                fun key(a: Double, b: Double, s: String) = Triple(kotlin.math.round(a * 10000), kotlin.math.round(b * 10000), s)
+                val known = old?.let { o -> (0 until o.size).map { i -> key(o.startOf(i), o.endOf(i), o.texts[i]) }.toHashSet() } ?: hashSetOf()
+                val spans = mutableListOf<Pair<Double, Double>>()
+                for (i in 0 until t.size) {
+                    if (key(t.startOf(i), t.endOf(i), t.texts[i]) in known) continue
+                    val a = t.startOf(i)
+                    val b = t.endOf(i)
+                    // neighbours that both changed glow as one span
+                    if (spans.isNotEmpty() && kotlin.math.abs(spans.last().second - a) < 1e-6) spans[spans.lastIndex] = spans.last().first to b
+                    else spans += a to b
+                }
+                if (spans.isNotEmpty()) out[k] = spans
+            }
+            return out
+        }
+
         /** How much of a long recording the first look shows, seconds. */
         const val FIRST_VIEW_SECONDS = 15.0
     }
@@ -1964,12 +2033,14 @@ class EditorState(
         val minPps = if (duration > 0) viewWidthPx / duration else 1.0
         val newPps = (pixelsPerSecond * factor).coerceIn(minPps, 20000.0)
         val anchorX = (anchorTime - viewStart) * pixelsPerSecond
+        viewGlide?.cancel()
         pixelsPerSecond = newPps
         viewStart = anchorTime - anchorX / newPps
         clampView()
     }
 
     fun scrollBy(px: Double) {
+        viewGlide?.cancel()
         viewStart += px / pixelsPerSecond
         clampView()
     }
@@ -1982,16 +2053,63 @@ class EditorState(
             return
         }
         val margin = vis * 0.1
-        if (from < viewStart + margin) viewStart = from - margin
-        else if (to > viewStart + vis - margin) viewStart = to - vis + margin
-        clampView()
+        val start = viewGlideTarget?.first ?: viewStart
+        val target = when {
+            from < start + margin -> from - margin
+            to > start + vis - margin -> to - vis + margin
+            else -> return
+        }
+        glideTo(target, pixelsPerSecond)
     }
 
     fun zoomTo(from: Double, to: Double) {
         val len = max(to - from, 0.02)
-        pixelsPerSecond = (viewWidthPx / (len * 1.2)).coerceIn(1.0, 20000.0)
-        viewStart = from - len * 0.1
+        glideTo(from - len * 0.1, (viewWidthPx / (len * 1.2)).coerceIn(1.0, 20000.0))
+    }
+
+    private var viewGlide: Job? = null
+    /** Where the view is gliding to (start, pixels per second), while it is. */
+    private var viewGlideTarget: Pair<Double, Double>? = null
+
+    /**
+     * Puts the view at [start] with [pps] (kept within the recording): it glides there when the interface may
+     * move and smooth jumps are on (Settings → Interface → Animations), otherwise it is there at once. Scrolling
+     * or zooming by hand stops a glide.
+     */
+    private fun glideTo(start: Double, pps: Double) {
+        viewGlide?.cancel()
+        viewGlideTarget = null
+        val s0 = viewStart
+        val p0 = pixelsPerSecond
+        // the target as the view would have it
+        viewStart = start; pixelsPerSecond = pps
         clampView()
+        val s1 = viewStart
+        val p1 = pixelsPerSecond
+        val ms = if (!settings.smoothView) 0 else when (settings.animations) { "off" -> 0; "reduced" -> 90; else -> 180 }
+        if (ms == 0 || viewWidthPx <= 1f || (kotlin.math.abs(s1 - s0) * p1 < 1.0 && kotlin.math.abs(p1 - p0) < 1e-6)) return
+        viewStart = s0; pixelsPerSecond = p0
+        viewGlideTarget = s1 to p1
+        viewGlide = scope.launch {
+            val t0 = now()
+            try {
+                while (true) {
+                    val f = ((now() - t0).toDouble() / ms).coerceIn(0.0, 1.0)
+                    val e = 1 - (1 - f) * (1 - f) * (1 - f)
+                    // the zoom changes evenly on a log scale; the middle of the view travels in a straight line
+                    val pps = kotlin.math.exp(kotlin.math.ln(p0) + (kotlin.math.ln(p1) - kotlin.math.ln(p0)) * e)
+                    val mid0 = s0 + viewWidthPx / p0 / 2
+                    val mid1 = s1 + viewWidthPx / p1 / 2
+                    pixelsPerSecond = pps
+                    viewStart = mid0 + (mid1 - mid0) * e - viewWidthPx / pps / 2
+                    if (f >= 1.0) break
+                    delay(16)
+                }
+                viewStart = s1; pixelsPerSecond = p1
+            } finally {
+                viewGlideTarget = null
+            }
+        }
     }
 
     fun zoomSelection() {

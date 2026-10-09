@@ -298,6 +298,12 @@ data class AppSettings(
     val tipsAtStart: Boolean = true,
     /** How the interface moves: "normal", "reduced" or "off" (see [mlabeler.app.ui.Motion]). */
     val animations: String = "normal",
+    /** Jumps of the view (to a selection, a found place, a difference) glide instead of happening at once. */
+    val smoothView: Boolean = true,
+    /** The boundary under the pointer is drawn thicker before it is grabbed. */
+    val hoverBoundary: Boolean = false,
+    /** What autolabel, a plugin, undo or redo changed glows for a moment. */
+    val flashChanges: Boolean = true,
     /** The tip the next start shows. */
     val tipNext: Int = 0,
     /** Phones: "landscape", "portrait" or "auto". */

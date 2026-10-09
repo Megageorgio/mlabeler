@@ -114,6 +114,7 @@ internal fun DrawScope.drawTimeline(
     measurer: androidx.compose.ui.text.TextMeasurer,
     tierStyle: TextStyle,
     smallStyle: TextStyle,
+    specAlpha: Float = 1f,
 ) {
     val pps = ed.pixelsPerSecond
     val v0 = ed.viewStart
@@ -155,7 +156,7 @@ internal fun DrawScope.drawTimeline(
             drawImage(
                 specImage, srcOffset = IntOffset.Zero, srcSize = IntSize(specImage.width, specImage.height),
                 dstOffset = IntOffset(0, g.specTop.toInt()), dstSize = IntSize(w.toInt(), (g.specBottom - g.specTop).toInt()),
-                alpha = c.laneAlpha.coerceIn(0.1f, 1f),
+                alpha = c.laneAlpha.coerceIn(0.1f, 1f) * specAlpha.coerceIn(0f, 1f),
                 filterQuality = FilterQuality.Low,
             )
         }
@@ -341,7 +342,21 @@ internal fun DrawScope.drawTimeline(
         drawRect(tierColor, Offset(0f, top), Size(3 * px, g.tierH))
         clipRect(0f, top, w, bottom) {
             when (tier) {
-                is IntervalTier -> drawIntervalTier(ed, k, tier, top, bottom, c, measurer, tierStyle, problemsByTier[k].orEmpty(), ::x, tEnd)
+                is IntervalTier -> {
+                    drawIntervalTier(ed, k, tier, top, bottom, c, measurer, tierStyle, problemsByTier[k].orEmpty(), ::x, tEnd)
+                    // what autolabel, a plugin or undo has just changed, fading out
+                    val glow = ed.changeGlow
+                    if (glow > 0f) ed.changedSpans[k]?.forEach { (a, b) ->
+                        if (b >= v0 && a <= tEnd) {
+                            val xa = x(a)
+                            drawRect(c.accent.copy(alpha = 0.32f * glow), Offset(xa, top), Size(max(x(b) - xa, 2 * px), g.tierH))
+                        }
+                    }
+                    ed.hoverBound?.takeIf { it.tier == k && it.bound < tier.bounds.size }?.let { hb ->
+                        val xx = x(tier.bounds[hb.bound])
+                        drawLine(c.accent, Offset(xx, top), Offset(xx, bottom), 3 * px)
+                    }
+                }
                 is PointTier -> for (p in tier.points) {
                     if (p.time < v0 || p.time > tEnd) continue
                     val xx = x(p.time)

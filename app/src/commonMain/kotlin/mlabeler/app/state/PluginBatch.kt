@@ -65,7 +65,7 @@ class PluginBatch(val plugin: Plugin, private val params: Map<String, JsonElemen
         for (r in changedFiles) {
             val after = r.after ?: continue
             runCatching {
-                if (r.item.id == ed.item?.id) ed.updateDoc { after }
+                if (r.item.id == ed.item?.id) ed.updateDocShowingChanges { after }
                 else ed.writeOtherLabels(r.item, after, r.duration)
                 n++
             }

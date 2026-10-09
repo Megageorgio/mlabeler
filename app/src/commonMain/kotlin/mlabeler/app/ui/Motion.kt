@@ -31,7 +31,8 @@ import kotlin.math.roundToInt
 
 /**
  * How the interface moves: "normal" (short fades, slides and colour changes), "reduced" (fades only, quicker) or
- * "off". Only the interface moves: nothing that is edited (boundaries, the cursor, the zoom) is ever animated.
+ * "off". Only the interface moves: nothing that is edited (boundaries, the cursor) is ever animated. The view
+ * glides on jumps (to a selection, a found place) and changes glow a moment, each with its own switch.
  */
 object Motion {
     val Local = staticCompositionLocalOf { "normal" }
