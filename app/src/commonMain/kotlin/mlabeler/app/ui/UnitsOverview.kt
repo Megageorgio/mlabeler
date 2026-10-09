@@ -1,6 +1,7 @@
 package mlabeler.app.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -151,7 +152,7 @@ fun UnitsOverviewDialog(app: AppState, ed: EditorState) {
             androidx.compose.foundation.layout.Box(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 160.dp)) {
             LazyColumn(Modifier.fillMaxWidth().padding(end = 14.dp), state = listState) {
                 items(shown, key = { it.first }) { (u, l, n) ->
-                    Column(Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth().then(if (Motion.on()) Modifier.animateContentSize(androidx.compose.animation.core.tween(Motion.ms(160))) else Modifier)) {
                         Row(
                             Modifier.fillMaxWidth().clickable { open = if (open == u) null else u }.padding(horizontal = 18.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically,

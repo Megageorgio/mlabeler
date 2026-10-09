@@ -37,6 +37,7 @@ fun App(app: AppState = rememberAppState()) {
     CompositionLocalProvider(
         LocalDensity provides Density(base.density * scale, base.fontScale),
         mlabeler.app.ui.LocalKeepBarsFree provides (!Platform.isMobile || !st.fullscreen || st.avoidCutout),
+        mlabeler.app.ui.Motion.Local provides st.animations,
     ) {
         val font = androidx.compose.runtime.remember(st.font) { systemFontFamily(st.font) }
         AppTheme(Themes.byId(app.settings.theme), font, crisp = app.settings.crisp) {

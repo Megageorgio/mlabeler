@@ -65,6 +65,13 @@ data class Tokens(
     val boundWidth: Float = 1f,
     /** "dash", "dot" or "solid". */
     val boundStyle: String = "dash",
+    /** The window's background: a gradient of these colours (top left to bottom right) instead of [bg]; none by default. */
+    val bgGradient: List<Color> = emptyList(),
+    /** A picture over the background (a file path), and how strongly it shows (0..1). */
+    val bgImage: String = "",
+    val bgImageAlpha: Float = 0.35f,
+    /** How solid the panels are (1 = not see-through); less lets the background show through them. */
+    val panelAlpha: Float = 1f,
 )
 
 private fun hex(v: Long) = Color(v or 0xFF000000)
@@ -181,7 +188,13 @@ private fun scheme(t: Tokens): ColorScheme {
 fun AppTheme(tokens0: Tokens, font: FontFamily? = null, crisp: Boolean = false, content: @Composable () -> Unit) {
     // without smoothing: corners keep their radius but are drawn as pixel steps, text has hard pixel edges
     CrispShapes.on = crisp
-    val tokens = if (crisp) tokens0.copy(crisp = true) else tokens0
+    val t1 = if (crisp) tokens0.copy(crisp = true) else tokens0
+    // see-through panels over a background picture or gradient
+    val tokens = if (t1.panelAlpha < 0.999f) t1.copy(
+        panel = t1.panel.copy(alpha = t1.panel.alpha * t1.panelAlpha),
+        panelAlt = t1.panelAlt.copy(alpha = t1.panelAlt.alpha * (0.5f + t1.panelAlpha / 2)),
+        laneBg = t1.laneBg.copy(alpha = t1.laneBg.alpha * (0.5f + t1.panelAlpha / 2)),
+    ) else t1
     val r = RoundedCornerShape(tokens.radius)
     val shapes = Shapes(extraSmall = r, small = r, medium = r, large = r, extraLarge = r)
     val family = font ?: if (tokens.mono) FontFamily.Monospace else FontFamily.Default

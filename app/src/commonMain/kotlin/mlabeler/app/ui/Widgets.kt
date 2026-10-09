@@ -151,7 +151,7 @@ fun Btn(text: String, primary: Boolean = false, enabled: Boolean = true, modifie
         else -> c.panel
     }
     Row(
-        modifier.height(if (Platform.isMobile) 44.dp else 32.dp).clip(shape).background(if (enabled) bg else c.panelAlt)
+        modifier.height(if (Platform.isMobile) 44.dp else 32.dp).clip(shape).background(animatedColor(if (enabled) bg else c.panelAlt).value)
             .border(c.borderWidth, if (primary) c.accent else c.border, shape)
             .hoverable(source)
             .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick)
@@ -171,8 +171,8 @@ fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(if (c.square) 0.dp else 50.dp)
     Box(
         Modifier.height(if (Platform.isMobile) 40.dp else 26.dp).clip(shape)
-            .background(if (selected) c.accent.copy(alpha = if (c.square) 1f else 0.2f) else Color.Transparent)
-            .border(c.borderWidth, if (selected) c.accent else c.border, shape)
+            .background(animatedColor(if (selected) c.accent.copy(alpha = if (c.square) 1f else 0.2f) else Color.Transparent).value)
+            .border(c.borderWidth, animatedColor(if (selected) c.accent else c.border).value, shape)
             .clickable(onClick = onClick).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
     ) {

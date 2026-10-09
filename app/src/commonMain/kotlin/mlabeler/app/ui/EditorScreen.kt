@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
@@ -105,7 +107,7 @@ fun EditorScreen(app: AppState, ed: EditorState) {
         focus.requestFocus()
     }
     BoxWithConstraints(
-        Modifier.fillMaxSize().background(c.bg)
+        Modifier.fillMaxSize().themeBackground()
             .windowInsetsPadding(mlabeler.app.ui.screenInsets())
             .focusRequester(focus)
             .focusable()
@@ -212,6 +214,7 @@ private fun EditorBody(app: AppState, ed: EditorState) {
             }
         }
     }
+    if (ed.item != null && ed.audio != null && app.settings.layout.minimap) MiniMap(ed)
     if (ed.item != null && ed.audio != null && app.settings.layout.scrollbar) TimeScrollBar(ed)
     }
 }
@@ -408,7 +411,16 @@ fun SidePanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () -> Un
 fun MessageToast(app: AppState, bottom: Dp) {
     val c = T.c
     val m = app.message ?: return
-    Box(Modifier.fillMaxSize().padding(bottom = bottom, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
+    // a new message rises in softly (when the interface may move)
+    val full = Motion.full()
+    val on = Motion.on()
+    val appear = androidx.compose.runtime.remember(m) { androidx.compose.animation.core.Animatable(if (on) 0f else 1f) }
+    val ms = Motion.ms(180)
+    androidx.compose.runtime.LaunchedEffect(m) { appear.animateTo(1f, androidx.compose.animation.core.tween(ms)) }
+    Box(Modifier.fillMaxSize().padding(bottom = bottom, start = 16.dp, end = 16.dp).graphicsLayer {
+        alpha = appear.value
+        if (full) translationY = (1f - appear.value) * 14.dp.toPx()
+    }, contentAlignment = Alignment.BottomCenter) {
         if (m.error && m.hasDetails) {
             Row(
                 Modifier.widthIn(max = 640.dp).clip(RoundedCornerShape(c.radius)).background(c.danger)

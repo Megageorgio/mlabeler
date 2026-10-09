@@ -63,6 +63,9 @@ object ThemeFiles {
         put("colors", buildJsonObject { for ((k, f) in colorKeys) put(k, hex(f(t))) })
         put("tierColors", JsonArray(t.tierColors.map { JsonPrimitive(hex(it)) }))
         put("spectrogram", JsonArray(t.spectrogram.map { JsonPrimitive(hex(it)) }))
+        if (t.bgGradient.isNotEmpty()) put("bgGradient", JsonArray(t.bgGradient.map { JsonPrimitive(hex(it)) }))
+        if (t.bgImage.isNotEmpty()) { put("bgImage", t.bgImage); put("bgImageAlpha", t.bgImageAlpha) }
+        if (t.panelAlpha < 1f) put("panelAlpha", t.panelAlpha)
     })
 
     fun decode(text: String): Pair<Tokens, String>? = runCatching {
@@ -90,6 +93,10 @@ object ThemeFiles {
             boundLine = o["boundLine"]?.jsonPrimitive?.content?.let { color(it) } ?: base.boundLine,
             boundWidth = o["boundWidth"]?.jsonPrimitive?.floatOrNull ?: base.boundWidth,
             boundStyle = o["boundStyle"]?.jsonPrimitive?.content ?: base.boundStyle,
+            bgGradient = o["bgGradient"]?.jsonArray?.mapNotNull { color(it.jsonPrimitive.content) }?.takeIf { it.size >= 2 } ?: base.bgGradient,
+            bgImage = o["bgImage"]?.jsonPrimitive?.content ?: base.bgImage,
+            bgImageAlpha = o["bgImageAlpha"]?.jsonPrimitive?.floatOrNull ?: base.bgImageAlpha,
+            panelAlpha = (o["panelAlpha"]?.jsonPrimitive?.floatOrNull ?: base.panelAlpha).coerceIn(0.2f, 1f),
         )
         t to (o["name"]?.jsonPrimitive?.content ?: t.id)
     }.getOrNull()

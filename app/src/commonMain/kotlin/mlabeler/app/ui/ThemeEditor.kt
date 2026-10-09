@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -186,6 +188,31 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
     SectionTitle(spectrogramT())
     Box(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(c.radius)).background(Brush.horizontalGradient(tokens.spectrogram)))
     ColorList(tokens.spectrogram, minCount = 2) { change(tokens.copy(spectrogram = it)) }
+    SectionTitle(backdropT())
+    SwitchLine(gradientT(), tokens.bgGradient.size >= 2) { on ->
+        change(tokens.copy(bgGradient = if (on) listOf(tokens.bg, tokens.accent.copy(alpha = 1f).let { a -> androidx.compose.ui.graphics.lerp(tokens.bg, a, 0.25f) }) else emptyList()))
+    }
+    if (tokens.bgGradient.size >= 2) {
+        Box(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(c.radius)).background(Brush.horizontalGradient(tokens.bgGradient)))
+        ColorList(tokens.bgGradient, minCount = 2) { change(tokens.copy(bgGradient = it)) }
+    }
+    Text(imageT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Field(tokens.bgImage, { change(tokens.copy(bgImage = it.trim().trim('"'))) }, Modifier.weight(1f), placeholder = imageHint())
+        if (mlabeler.app.Platform.hasNativeFolderPicker) {
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            Btn(pickImageT()) {
+                scope.launch {
+                    val p = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { mlabeler.app.Platform.pickFileNative(imageT(), listOf("png", "jpg", "jpeg", "webp", "bmp")) }
+                    if (p != null) change(tokens.copy(bgImage = p))
+                }
+            }
+        }
+        if (tokens.bgImage.isNotEmpty()) IconBtn(Icons.close, deleteT(), size = 28.dp) { change(tokens.copy(bgImage = "")) }
+    }
+    if (tokens.bgImage.isNotEmpty()) ValueSlider(imageAlphaT(), tokens.bgImageAlpha, 0.05f..1f, "%", factor = 100f) { change(tokens.copy(bgImageAlpha = it)) }
+    ValueSlider(panelAlphaT(), tokens.panelAlpha, 0.2f..1f, "%", factor = 100f) { change(tokens.copy(panelAlpha = it)) }
+    Text(backdropHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
     Row(Modifier.padding(top = 16.dp)) {
         Btn(deleteT()) {
             app.update { it.copy(theme = "modern-dark") }
@@ -193,6 +220,16 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
         }
     }
 }
+
+private val backdropT = L("Window background", "Фон окна")
+private val gradientT = L("Gradient", "Градиент")
+private val imageT = L("Picture", "Картинка")
+private val imageHint = L("a PNG or JPEG file", "файл PNG или JPEG")
+private val pickImageT = L("Choose…", "Выбрать…")
+private val imageAlphaT = L("How strongly the picture shows", "Насколько видна картинка")
+private val panelAlphaT = L("Panels solid", "Плотность панелей")
+private val backdropHint = L("Less solid panels let the gradient or picture show through them. The waveform and spectrogram stay as they are.",
+    "Чем менее плотные панели, тем сильнее сквозь них виден градиент или картинка. Волна и спектрограмма не меняются.")
 
 @Composable
 private fun SwitchLine(title: String, value: Boolean, onChange: (Boolean) -> Unit) {

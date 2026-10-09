@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.isAltPressed
@@ -112,6 +114,14 @@ private object CheckTitles {
 }
 
 private val tipsAtStartT = mlabeler.app.i18n.L("Tip of the day at start", "Совет дня при запуске")
+private val minimapT = mlabeler.app.i18n.L("Map of the whole recording over the scroll bar", "Карта всей записи над полосой прокрутки")
+private val phonemeColorsT = mlabeler.app.i18n.L("Phonemes tinted by kind (vowels, consonants, pauses)", "Подсветка фонем по типу (гласные, согласные, паузы)")
+private val animationsT = mlabeler.app.i18n.L("Animations", "Анимации")
+private val animNormalT = mlabeler.app.i18n.L("Normal", "Обычные")
+private val animReducedT = mlabeler.app.i18n.L("Reduced", "Уменьшенные")
+private val animOffT = mlabeler.app.i18n.L("Off", "Выключены")
+private val animationsHint = mlabeler.app.i18n.L("Windows, messages and buttons appear and change softly. What you edit — boundaries, the cursor, the zoom — never moves by itself.",
+    "Окна, сообщения и кнопки появляются и меняются плавно. То, что вы редактируете, — границы, курсор, масштаб — само никогда не движется.")
 private val searchSettingsT = mlabeler.app.i18n.L("Search settings", "Поиск настроек")
 private val scaleButtonT = mlabeler.app.i18n.L("Interface size button (in percent) on the toolbar", "Кнопка размера интерфейса (в процентах) на панели")
 private val detailT = mlabeler.app.i18n.L("Detail", "Чёткость")
@@ -194,7 +204,18 @@ fun androidx.compose.foundation.layout.ColumnScope.DialogContent(
 @Composable
 fun Overlay(onDismiss: () -> Unit, maxWidth: Int = 560, dim: Boolean = true, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     // a new interface size lays the window out afresh: otherwise it keeps its old height in pixels and gets cramped
-    androidx.compose.runtime.key(androidx.compose.ui.platform.LocalDensity.current.density) { OverlayBox(onDismiss, maxWidth, dim, content) }
+    // a short fade and lift when it opens (when the interface may move)
+    val on = Motion.on()
+    val full = Motion.full()
+    val appear = remember { androidx.compose.animation.core.Animatable(if (on) 0f else 1f) }
+    val ms = Motion.ms(170)
+    androidx.compose.runtime.LaunchedEffect(Unit) { appear.animateTo(1f, androidx.compose.animation.core.tween(ms)) }
+    Box(Modifier.fillMaxSize().graphicsLayer {
+        alpha = appear.value
+        if (full) translationY = (1f - appear.value) * 10.dp.toPx()
+    }) {
+        androidx.compose.runtime.key(androidx.compose.ui.platform.LocalDensity.current.density) { OverlayBox(onDismiss, maxWidth, dim, content) }
+    }
 }
 
 @Composable
@@ -751,6 +772,13 @@ private fun InterfacePage(app: AppState) {
     if (!mlabeler.app.Platform.isMobile) SwitchRow(MenuTitles.menuBar(), s.menuBar) { v -> app.update { it.copy(menuBar = v) } }
     SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }
     SwitchRow(tipsAtStartT(), s.tipsAtStart) { v -> app.update { it.copy(tipsAtStart = v) } }
+    SwitchRow(minimapT(), s.layout.minimap) { v -> app.update { it.copy(layout = it.layout.copy(minimap = v)) } }
+    SwitchRow(phonemeColorsT(), s.layout.phonemeColors) { v -> app.update { it.copy(layout = it.layout.copy(phonemeColors = v)) } }
+    SectionTitle(animationsT())
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((v, t) in listOf("normal" to animNormalT(), "reduced" to animReducedT(), "off" to animOffT())) Chip(t, s.animations == v) { app.update { it.copy(animations = v) } }
+    }
+    Text(animationsHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
     SwitchRow(MenuTitles.filesPanel(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
     SwitchRow(MenuTitles.detailsPanel(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
     if (s.statusBar) {
@@ -1011,6 +1039,12 @@ internal object SettingsHelp {
             h("General", S.avoidCutout, "Phones: nothing is drawn under the camera cutout.", "Телефоны: ничего не рисуется под вырезом камеры."),
 
             h("Interface", MenuTitles.menuBar, "File, Edit, View… menus at the top of the window.", "Меню «Файл», «Правка», «Вид»… вверху окна."),
+            h("Interface", minimapT, "A thin strip with the whole recording: its loudness, the labelled parts and the part on screen; a click or a drag there moves the view.",
+                "Тонкая полоса со всей записью: громкость, размеченные места и видимая часть; щелчок или перетаскивание по ней двигает вид."),
+            h("Interface", phonemeColorsT, "Vowels, consonants and pauses get a light tint of the theme's colours on the phoneme lane.",
+                "Гласные, согласные и паузы на дорожке фонем слегка подкрашиваются цветами темы."),
+            h("Interface", animationsT, "Normal: short fades and slides. Reduced: quicker fades only. Off: everything at once.",
+                "Обычные — короткие появления и сдвиги. Уменьшенные — только быстрые появления. Выключены — всё сразу."),
             h("Interface", tipsAtStartT, "At every start a tip about a less obvious feature or setting; Help → Tip of the day shows them any time.",
                 "При каждом запуске — совет о неочевидной функции или настройке; Справка → Совет дня показывает их в любое время."),
             h("Interface", MenuTitles.statusBar, "The line at the bottom: phoneme number, done files, scale and more; below it you choose what it shows.",

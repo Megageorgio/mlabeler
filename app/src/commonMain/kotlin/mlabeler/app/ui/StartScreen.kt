@@ -59,7 +59,7 @@ fun StartScreen(app: AppState) {
         return
     }
     var dropHover by remember { mutableStateOf(false) }
-    BoxWithConstraints(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())
+    BoxWithConstraints(Modifier.fillMaxSize().themeBackground().windowInsetsPadding(mlabeler.app.ui.screenInsets())
         .fileDrop({ dropHover = it }) { app.openDropped(it) }) {
         if (dropHover) DropHint(dropOpen())
         val wide = maxWidth > 760.dp
@@ -121,7 +121,7 @@ fun FolderBrowser(start: String, onPick: (String) -> Unit, onCancel: () -> Unit)
     }
     val folders = remember(entries) { entries.filter { PlatformFs.isDirectory(it) }.sortedWith(compareBy(naturalOrder()) { Paths.name(it).lowercase() }) }
     val audioCount = remember(entries) { entries.count { Paths.ext(it) in AUDIO_EXTENSIONS } }
-    Column(Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())) {
+    Column(Modifier.fillMaxSize().themeBackground().windowInsetsPadding(mlabeler.app.ui.screenInsets())) {
         Row(Modifier.fillMaxWidth().height(52.dp).background(c.panel).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBtn(Icons.back, S.cancel()) { onCancel() }
             IconBtn(Icons.up, S.up(), enabled = Paths.parent(dir).isNotEmpty() && Paths.parent(dir) != dir) { dir = Paths.parent(dir).ifEmpty { "/" } }

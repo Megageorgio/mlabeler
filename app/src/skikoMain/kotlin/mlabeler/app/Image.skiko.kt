@@ -21,3 +21,6 @@ actual fun imageFromArgb(width: Int, height: Int, pixels: IntArray): ImageBitmap
     val info = ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.PREMUL)
     return Image.makeRaster(info, bytes, width * 4).toComposeImageBitmap()
 }
+
+actual fun decodeImage(bytes: ByteArray): ImageBitmap? =
+    runCatching { org.jetbrains.skia.Image.makeFromEncoded(bytes).toComposeImageBitmap() }.getOrNull()

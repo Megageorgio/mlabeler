@@ -40,6 +40,9 @@ expect object Platform {
 /** Creates an image from ARGB pixels. */
 expect fun imageFromArgb(width: Int, height: Int, pixels: IntArray): ImageBitmap
 
+/** A PNG, JPEG, WebP… picture from its file bytes, or null. */
+expect fun decodeImage(bytes: ByteArray): ImageBitmap?
+
 expect val resizeHorizontalIcon: PointerIcon
 
 /** Audio output for one clip at a time. */

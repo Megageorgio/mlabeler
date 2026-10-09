@@ -121,6 +121,9 @@ actual object Platform {
 actual fun imageFromArgb(width: Int, height: Int, pixels: IntArray): ImageBitmap =
     Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
 
+actual fun decodeImage(bytes: ByteArray): ImageBitmap? =
+    runCatching { android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
+
 actual val resizeHorizontalIcon: PointerIcon = PointerIcon.Hand
 
 actual class AudioOut actual constructor() {

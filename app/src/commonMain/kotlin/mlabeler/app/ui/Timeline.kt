@@ -1322,6 +1322,12 @@ private fun DrawScope.drawIntervalTier(
     val first = tier.indexAt(ed.viewStart).let { if (it < 0) 0 else it }
     val h = bottom - top
     val problemIdx = problems.associateBy { it.ref.index }
+    // a light tint by the kind of phoneme, in the theme's own lane colours
+    val tint = ed.app.settings.layout.phonemeColors && (k == ed.doc?.phonemeTierIndex() || tier.name == mlabeler.core.format.SegUnits.TIER)
+    val tintAlpha = if (c.dark) 0.11f else 0.09f
+    val vowelTint = c.tierColors.getOrElse(0) { c.accent }.copy(alpha = tintAlpha)
+    val consonantTint = c.tierColors.getOrElse(1) { c.accent }.copy(alpha = tintAlpha * 0.8f)
+    val pauseTint = c.muted.copy(alpha = tintAlpha * 0.5f)
     // zoomed far out short phonemes are everywhere: marks are thinned out like the boundaries
     var lastMark = Float.NEGATIVE_INFINITY
     for (i in first until tier.size) {
@@ -1338,6 +1344,13 @@ private fun DrawScope.drawIntervalTier(
         val text = tier.texts[i]
         if (text.isEmpty()) {
             drawRect(c.text.copy(alpha = 0.03f), Offset(a, top), Size(b - a, h))
+        } else if (tint && !selected) {
+            val col = when (mlabeler.core.model.PhonemeKinds.of(text)) {
+                mlabeler.core.model.PhonemeKinds.Kind.Vowel -> vowelTint
+                mlabeler.core.model.PhonemeKinds.Kind.Consonant -> consonantTint
+                mlabeler.core.model.PhonemeKinds.Kind.Pause -> pauseTint
+            }
+            drawRect(col, Offset(a, top), Size(b - a, h))
         }
         // a phoneme squeezed between two boundaries that look like one line: a small mark shows it's there
         if (b - a < 5 * px && tier.durationOf(i) < 0.03 && (a + b) / 2 - lastMark > 12 * px) {

@@ -68,6 +68,10 @@ data class LayoutSettings(
     val showNotepad: Boolean = false,
     /** An ordinary scroll bar under the picture. */
     val scrollbar: Boolean = true,
+    /** A strip over the scroll bar with the whole recording: its sound, what is labelled, where the view is. */
+    val minimap: Boolean = true,
+    /** Phonemes tinted gently by kind (vowels, consonants, pauses). */
+    val phonemeColors: Boolean = false,
     val notepadX: Float = 40f,
     val notepadY: Float = 40f,
     val notepadW: Float = 320f,
@@ -290,6 +294,8 @@ data class AppSettings(
     val seenHelp: Boolean = false,
     /** A tip about a less obvious feature at every start. */
     val tipsAtStart: Boolean = true,
+    /** How the interface moves: "normal", "reduced" or "off" (see [mlabeler.app.ui.Motion]). */
+    val animations: String = "normal",
     /** The tip the next start shows. */
     val tipNext: Int = 0,
     /** Phones: "landscape", "portrait" or "auto". */
