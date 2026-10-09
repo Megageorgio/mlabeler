@@ -15,8 +15,12 @@ import kotlin.math.roundToInt
  * period long at its pitch marks and laid out again at the new period, so the timbre stays and the length too.
  */
 object AutoTune {
-    /** [scale]: allowed pitch classes (0 = C … 11 = B); null = every semitone. */
-    fun process(x: FloatArray, sampleRate: Int, amount: Double = 1.0, scale: Set<Int>? = null): FloatArray {
+    /**
+     * [scale]: allowed pitch classes (0 = C … 11 = B); null = every semitone. [guide]: the note to sing at a sample
+     * (MIDI, e.g. the pitch of the original singer at that moment) or null where there is none; the voice goes to
+     * that note in the octave nearest to it, elsewhere to the nearest allowed note.
+     */
+    fun process(x: FloatArray, sampleRate: Int, amount: Double = 1.0, scale: Set<Int>? = null, guide: ((Int) -> Double?)? = null): FloatArray {
         if (x.isEmpty()) return x
         val hopS = 0.005
         val f0 = Pitch.yin(x, sampleRate, hopS).values
@@ -42,8 +46,16 @@ object AutoTune {
         // the note each voiced stretch is pulled to: the nearest allowed one, kept until the voice is clearly nearer
         // another (no flicker between two notes)
         var held = Double.NaN
-        fun target(f: Float): Double {
+        fun target(f: Float, at: Int): Double {
             val midi = 69 + 12 * ln(f / 440.0) / ln(2.0)
+            val g = guide?.invoke(at)
+            if (g != null && !g.isNaN()) {
+                // the guide's note (rounded: its vibrato and slides are not copied) in the singer's octave
+                val inOctave = g + 12 * kotlin.math.round((midi - g) / 12)
+                if (held.isNaN() || abs(inOctave - held) > 0.6) held = kotlin.math.round(inOctave)
+                val note = midi + (held - midi) * amount
+                return 440.0 * 2.0.pow((note - 69) / 12)
+            }
             fun nearest(v: Double): Double {
                 if (scale == null || scale.isEmpty()) return kotlin.math.round(v)
                 var best = kotlin.math.round(v); var d = Double.MAX_VALUE
@@ -66,7 +78,7 @@ object AutoTune {
             val f = pitchAt(mark)
             val pa = if (f > 0f) (sampleRate / f).roundToInt().coerceAtLeast(16) else unvoicedPeriod
             if (f <= 0f) held = Double.NaN
-            val ps = if (f > 0f) (sampleRate / target(f)).coerceAtLeast(16.0) else pa.toDouble()
+            val ps = if (f > 0f) (sampleRate / target(f, mark)).coerceAtLeast(16.0) else pa.toDouble()
             // a two-period piece around the analysis mark, Hann-windowed, centred on the synthesis time (the windows
             // keep their own shape: their spacing is what makes the new pitch; the level follows the spacing)
             val gain = (ps / pa).toFloat()

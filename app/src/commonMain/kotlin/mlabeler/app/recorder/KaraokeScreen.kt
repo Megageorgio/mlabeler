@@ -92,8 +92,10 @@ private val recordT = L("Record from here (R)", "Записать отсюда (
 private val stopRecT = L("Stop recording", "Остановить запись")
 private val autotuneT = L("With autotune", "С автотюном")
 private val autotuneBusyT = L("Tuning…", "Тюнится…")
-private val autotuneHint = L("Plays the take with every note pulled to the nearest semitone at once, the well-known robotic effect. Just for fun: the saved take stays as it was sung.",
-    "Проигрывает дубль, в котором каждая нота сразу притянута к ближайшему полутону, — тот самый «роботный» эффект. Просто для забавы: сохранённый дубль остаётся как спет.")
+private val autotuneHint = L(
+    "Plays the take over the music with every note pulled at once to the note the song's own singer sings there (after \"Make a backing track\"; otherwise to the nearest semitone), the well-known robotic effect. Just for fun: the saved take stays as it was sung.",
+    "Проигрывает дубль поверх музыки, и каждая нота сразу притянута к ноте, которую в этом месте поёт исполнитель песни (после «Создать минус»; без этого — к ближайшему полутону), — тот самый «роботный» эффект. Просто для забавы: сохранённый дубль остаётся как спет.",
+)
 private val lastTakeT = L("Listen to {0}", "Прослушать {0}")
 private val editT = L("Edit the lines", "Править строки")
 private val doneT = L("Done", "Готово")

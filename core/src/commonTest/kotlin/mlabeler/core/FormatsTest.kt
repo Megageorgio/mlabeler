@@ -321,6 +321,10 @@ class AutoOtoTest {
         assertEquals(listOf("ai", "uang"), s.fromName("mai_zhuang").map { it.vowel })
         assertTrue(s.romajiJapanese(listOf("ka_ki_ku", "sa-shi-su", "kye_kyo")))
         assertEquals(listOf("か", "き", "きぇ"), s.fromName("ka_ki_kye", kana = true).map { it.text })
+        val rec = s.reclist("# list\nay_er_iy\n\nb_y_uw_w\n")
+        assertEquals("b_y_uw_w", s.reclistLine("00001", rec, zeroBased = true))
+        assertEquals("ay_er_iy", s.reclistLine("1", rec, zeroBased = false))
+        assertEquals(null, s.reclistLine("ka_ki", rec, zeroBased = true))
     }
 
     @Test

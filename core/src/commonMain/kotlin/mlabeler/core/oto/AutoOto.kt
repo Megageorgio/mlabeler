@@ -216,6 +216,18 @@ object Syllables {
         return ok >= stems.size * 0.6
     }
 
+    /**
+     * The line of a reclist that a numbered sample ("00117") was recorded from: banks recorded with a numbered
+     * reclist name their files by line number. [zeroBased]: the first line is 0 (a "00000" file exists).
+     */
+    fun reclistLine(stem: String, reclist: List<String>, zeroBased: Boolean): String? {
+        val n = stem.trim().takeIf { it.isNotEmpty() && it.all { c -> c.isDigit() } }?.toIntOrNull() ?: return null
+        return reclist.getOrNull(if (zeroBased) n else n - 1)?.trim()?.takeIf { it.isNotEmpty() }
+    }
+
+    /** Lines of a reclist file: one recording per line, blank lines and "#" comments left out. */
+    fun reclist(text: String): List<String> = text.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+
     fun fromName(stem: String, kana: Boolean = false): List<Syllable> {
         val name = stem.trim().trimStart('_', '-', ' ')
         if (name.any { Kana.isKana(it) }) {

@@ -46,4 +46,13 @@ class AutoTuneTest {
         val m = median(Pitch.yin(y, sr).values)
         assertTrue(kotlin.math.abs(m - 523f) < 6f || kotlin.math.abs(m - 587f) < 6f, "got $m")
     }
+
+    @Test
+    fun followsTheGuide() {
+        val sr = 22050
+        // sung at 447 Hz (MIDI 69.2), the guide says D: the nearest D is D5 (74, 587 Hz)
+        val y = AutoTune.process(voice(sr, 1.0) { 447.0 }, sr, guide = { 62.0 })
+        val m = median(Pitch.yin(y, sr).values)
+        assertTrue(kotlin.math.abs(m - 587f) < 8f, "got $m")
+    }
 }

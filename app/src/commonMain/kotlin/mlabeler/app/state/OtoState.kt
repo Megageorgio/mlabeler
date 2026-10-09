@@ -288,6 +288,12 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                 ed.beginToolkitWork("oto 0/${targets.size}")
                 // read every sample first; with an aligner they all go to the toolkit as one job (a job per file
                 // spends most of its time starting and finishing, not aligning)
+                // numbered samples ("00117.wav") take their phonemes from the reclist they were recorded from
+                val reclist = runCatching {
+                    val f = ed.workspace.fs.list(dir).filter { p -> Paths.ext(p).equals("txt", true) && Paths.name(p).contains("reclist", true) }.minOrNull()
+                    f?.let { p -> mlabeler.core.oto.Syllables.reclist(mlabeler.core.io.decodeGuess(ed.workspace.fs.read(p), "UTF-8").first) }
+                }.getOrNull() ?: emptyList()
+                val zeroBased = ed.items.any { x -> Paths.parent(x.audioPath) == dir && Paths.stem(x.audioPath).all { c -> c.isDigit() } && Paths.stem(x.audioPath).toIntOrNull() == 0 }
                 // romaji names of a Japanese bank give kana aliases, as such banks have them
                 val kana = mlabeler.core.oto.Syllables.romajiJapanese(ed.items.filter { x -> Paths.parent(x.audioPath) == dir }.map { x -> Paths.stem(x.audioPath) })
                 class Sample(val name: String, val syl: List<mlabeler.core.oto.Syllable>, val audio: mlabeler.core.audio.Audio)
@@ -296,7 +302,8 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                     ed.toolkitBusy = readingT.format(k + 1, targets.size)
                     ed.toolkitProgress = if (aligner != null) 0.1 * k / targets.size else k.toDouble() / targets.size
                     val name = Paths.name(it.audioPath)
-                    val syl = mlabeler.core.oto.Syllables.fromName(Paths.stem(it.audioPath), kana)
+                    val stem = Paths.stem(it.audioPath)
+                    val syl = mlabeler.core.oto.Syllables.fromName(mlabeler.core.oto.Syllables.reclistLine(stem, reclist, zeroBased) ?: stem, kana)
                     if (syl.isEmpty()) { failed++; continue }
                     val audio = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                         val bytes = ed.workspace.fs.read(it.audioPath)

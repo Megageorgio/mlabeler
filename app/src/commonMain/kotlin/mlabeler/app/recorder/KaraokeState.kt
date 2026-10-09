@@ -517,6 +517,7 @@ class KaraokeState(
             }
             lastTake = take
             lastTakeName = name
+            lastTakeAt = TakePlace(start, lat, speed, semitones, played)
             leaked = leak
             takes = (takes + TakeInfo(name, take, sc, leak)).takeLast(12)
             app.message(takeSaved.format(if (split) "${name}_NN.wav" else "$name.wav", Paths.name(folder)))
@@ -526,23 +527,48 @@ class KaraokeState(
 
     fun playLastTake() { lastTake?.let { playTake(it) } }
 
+    /** Where the last take was sung: its song time, the sound card delay, tempo, key and what was played. */
+    private class TakePlace(val start: Double, val latency: Double, val speed: Double, val semitones: Int, val played: Audio?)
+    private var lastTakeAt: TakePlace? = null
+
     /** The last take is being pulled to the notes for [playTuned]. */
     var tuning by mutableStateOf(false)
     private var tuned: Pair<Audio, Audio>? = null
 
-    /** Plays the last take with the "autotune" effect: every sung note pulled to the nearest semitone at once. */
+    /**
+     * Plays the last take with the "autotune" effect over the backing it was sung to: every note pulled at once to
+     * the note the song's own singer sings there (when the song's voice was separated), otherwise to the nearest
+     * semitone.
+     */
     fun playTuned() {
         val take = lastTake ?: return
+        val at = lastTakeAt
         if (tuning) return
         scope.launch {
             val a = tuned?.takeIf { it.first === take }?.second ?: run {
                 tuning = true
                 try {
-                    withContext(Dispatchers.Default) { Audio(take.sampleRate, mlabeler.core.dsp.AutoTune.process(take.samples, take.sampleRate)) }
+                    val ref = refPitch
+                    withContext(Dispatchers.Default) { tune(take, at, ref) }
                 } finally { tuning = false }
             }.also { tuned = take to it }
             playTake(a)
         }
+    }
+
+    private fun tune(take: Audio, at: TakePlace?, ref: FloatArray?): Audio {
+        // song time of a sample of the take: where it started, at the tempo it was sung, less the sound card delay
+        val guide: ((Int) -> Double?)? = if (ref == null || at == null) null else { i ->
+            val t = at.start + i.toDouble() / take.sampleRate * at.speed - at.latency
+            ref.getOrNull((t / PITCH_HOP).toInt())?.takeIf { !it.isNaN() }?.let { it.toDouble() + at.semitones }
+        }
+        val voice = mlabeler.core.dsp.AutoTune.process(take.samples, take.sampleRate, guide = guide)
+        val played = at?.played ?: return Audio(take.sampleRate, voice)
+        // laid over the backing as it was heard (at its sample rate), the voice a little louder
+        val v = if (played.sampleRate == take.sampleRate) voice else mlabeler.core.dsp.Stretch.resample(voice, take.sampleRate.toDouble() / played.sampleRate)
+        val from = ((at.start - at.latency) / at.speed * played.sampleRate).toInt().coerceAtLeast(0)
+        val out = FloatArray(v.size) { j -> (played.samples.getOrElse(from + j) { 0f } * 0.6f + v[j]).coerceIn(-1f, 1f) }
+        return Audio(played.sampleRate, out)
     }
 
     fun playTake(t: Audio) {
