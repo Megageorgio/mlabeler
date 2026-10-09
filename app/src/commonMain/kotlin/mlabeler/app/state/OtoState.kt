@@ -49,6 +49,73 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
 
     fun referenceFor(e: OtoEntry): OtoEntry? = reference?.second?.firstOrNull { it.sample.equals(e.sample, true) && it.alias == e.alias }
 
+    /** Entry [index] takes the values of the compared oto.ini (one undo step). */
+    fun takeReference(index: Int) {
+        val e = entries.getOrNull(index) ?: return
+        val o = referenceFor(e) ?: return
+        replace(index, o.copy(sample = e.sample, alias = e.alias))
+    }
+
+    /** Adds the entries only the compared oto.ini has, each after the last entry of its sample (one undo step). */
+    fun addMissingFromReference(): Int {
+        val other = reference?.second ?: return 0
+        val list = entries.toMutableList()
+        val have = list.map { it.sample.lowercase() + "|" + it.alias }.toMutableSet()
+        var n = 0
+        for (o in other) {
+            if (!have.add(o.sample.lowercase() + "|" + o.alias)) continue
+            val at = list.indexOfLast { it.sample.equals(o.sample, true) }.let { if (it < 0) list.size else it + 1 }
+            list.add(at, o)
+            n++
+        }
+        if (n > 0) commit(list)
+        return n
+    }
+
+    /**
+     * Copies every entry whose alias [pattern] matches, the copy named by [replacement] ($1… for groups), right after
+     * it; copies whose alias the sample already has are left out. One undo step; returns how many were added.
+     */
+    fun duplicateMatching(pattern: Regex, replacement: String): Int {
+        val list = mutableListOf<OtoEntry>()
+        val have = entries.map { it.sample.lowercase() + "|" + it.alias }.toMutableSet()
+        var n = 0
+        for (e in entries) {
+            list += e
+            if (!pattern.containsMatchIn(e.alias)) continue
+            val alias = pattern.replace(e.alias, replacement)
+            if (alias == e.alias || !have.add(e.sample.lowercase() + "|" + alias)) continue
+            list += e.copy(alias = alias)
+            n++
+        }
+        if (n > 0) commit(list)
+        return n
+    }
+
+    /** What the copies of [duplicateMatching] would be: alias → alias of the copy. */
+    fun previewDuplicates(pattern: Regex, replacement: String): List<Pair<String, String>> {
+        val have = entries.map { it.sample.lowercase() + "|" + it.alias }.toMutableSet()
+        return entries.mapNotNull { e ->
+            if (!pattern.containsMatchIn(e.alias)) return@mapNotNull null
+            val alias = pattern.replace(e.alias, replacement)
+            if (alias == e.alias || !have.add(e.sample.lowercase() + "|" + alias)) null else e.alias to alias
+        }
+    }
+
+    /**
+     * After a marker was moved by hand: the next entry, or the entry marked done, or both, as set in the settings
+     * (only for the marker chosen there, when one is).
+     */
+    private fun afterEdit(m: OtoMarker, index: Int) {
+        val s = app.settings.edit
+        if (s.otoAfterEdit == "none") return
+        if (s.otoAfterMarker.isNotEmpty() && s.otoAfterMarker != m.name) return
+        val e = entries.getOrNull(index) ?: return
+        if (s.otoAfterEdit == "done" || s.otoAfterEdit == "done-next") setMarks(e) { it.copy(done = true) }
+        if (s.otoAfterEdit == "next" || s.otoAfterEdit == "done-next") if (index + 1 < entries.size) select(index + 1)
+    }
+    private var dragMarker: OtoMarker? = null
+
     /** Forgets loaded oto.ini files (after they were written by something else). */
     fun invalidate() {
         books.clear()
@@ -163,6 +230,7 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
 
     fun dragTo(m: OtoMarker, timeSec: Double, invertLock: Boolean) {
         val base = dragBase ?: return
+        dragMarker = m
         dragPreview = OtoEdits.move(base, m, timeSec * 1000, lengthMs, locked(m) != invertLock)
     }
 
@@ -170,9 +238,14 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         val p = dragPreview
         val i = selected
         val e = current()
+        val m = dragMarker
         dragPreview = null
         dragBase = null
-        if (p != null && i != null && e != null) replace(i, OtoEdits.set(e, p, lengthMs))
+        dragMarker = null
+        if (p != null && i != null && e != null) {
+            replace(i, OtoEdits.set(e, p, lengthMs))
+            if (m != null) afterEdit(m, i)
+        }
     }
 
     /** Preutterance drags the whole set, like in most oto editors; Shift switches it. */
@@ -182,6 +255,7 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         val i = selected ?: return
         val e = current() ?: return
         replace(i, OtoEdits.set(e, OtoEdits.move(absolute(e), m, timeSec * 1000, lengthMs, false), lengthMs))
+        afterEdit(m, i)
     }
 
     /** Sets a value as written in oto.ini (relative ms). */

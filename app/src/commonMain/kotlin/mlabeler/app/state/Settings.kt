@@ -124,6 +124,10 @@ data class EditSettings(
     val saveOnSwitch: Boolean = true,
     val newFormat: LabelFormat = LabelFormat.Lab,
     val otoLockedDrag: Boolean = true,
+    /** oto: after a marker is moved by hand: "none", "next" (the next entry), "done" (marked done) or "done-next". */
+    val otoAfterEdit: String = "none",
+    /** Only after this marker ([mlabeler.core.format.OtoMarker] name); empty = any. */
+    val otoAfterMarker: String = "",
     /** Play a short piece around a boundary while it is dragged. */
     val playOnDrag: Boolean = false,
     /** Which phoneme a boundary "belongs" to: "end" = the one that ends at it, "start" = the one that starts at it.

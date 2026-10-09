@@ -146,4 +146,38 @@ object OtoCompare {
             meanMs = sums.mapValues { (m, s) -> s / (counts[m] ?: 1) },
         )
     }
+
+    /** One entry that differs: here and there with markers apart by [minMs] or more, or only on one side. */
+    data class Difference(
+        val sample: String,
+        val alias: String,
+        /** Index in [mine], null when only the other has it. */
+        val mine: Int?,
+        /** The other's entry, null when only mine has it. */
+        val theirs: OtoEntry?,
+        /** Marker to how far mine is from theirs (ms, positive = later). */
+        val deltas: Map<OtoMarker, Double> = emptyMap(),
+    ) {
+        val largest: Double get() = deltas.values.maxOfOrNull { kotlin.math.abs(it) } ?: 0.0
+    }
+
+    /** The entries that differ, the most different first, then those only here, then those only there. */
+    fun differences(mine: List<OtoEntry>, other: List<OtoEntry>, minMs: Double = 10.0): List<Difference> {
+        val key = { e: OtoEntry -> e.sample.lowercase() + "|" + e.alias }
+        val theirs = other.associateBy(key)
+        val changed = mutableListOf<Difference>()
+        val onlyHere = mutableListOf<Difference>()
+        for ((i, e) in mine.withIndex()) {
+            val o = theirs[key(e)]
+            if (o == null) { onlyHere += Difference(e.sample, e.alias, i, null); continue }
+            val a = e.absolute(0.0)
+            val b = o.absolute(0.0)
+            val d = OtoMarker.entries.filter { m -> !(m == OtoMarker.Right && (e.cutoff >= 0 || o.cutoff >= 0)) }
+                .associateWith { m -> a.get(m) - b.get(m) }.filterValues { kotlin.math.abs(it) >= minMs }
+            if (d.isNotEmpty()) changed += Difference(e.sample, e.alias, i, o, d)
+        }
+        val keysMine = mine.map(key).toSet()
+        val onlyThere = other.filter { key(it) !in keysMine }.map { Difference(it.sample, it.alias, null, it) }
+        return changed.sortedByDescending { it.largest } + onlyHere + onlyThere
+    }
 }
