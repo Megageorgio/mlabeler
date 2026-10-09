@@ -243,95 +243,132 @@ object UnitPitchFile {
 }
 
 /**
- * The units of a .trans (pairs of neighbouring phonemes, or single held phonemes) as a tier next to the phonemes,
- * so that only the wanted ones are kept: a pair is drawn from the middle of its first phoneme to the middle of
- * its second, a single phoneme over its middle half; the text is the phonemes with a space between them.
+ * The transitions of a .trans (the bracketed units: changes between neighbouring phonemes, or single held phonemes)
+ * as a lane next to the phonemes, drawn as their articulation files have them: a transition of n phonemes is n
+ * intervals named after its phonemes, from where the change starts, through each change of phoneme, to where it
+ * ends; transitions are apart (an unnamed gap between them) or touch. The k-th transition of the .trans has its
+ * articulation in the file with the extension .as<k> (.as0, .as1…).
  */
 object SegUnits {
-    const val TIER = "units"
+    const val TIER = "transitions"
 
-    /** Where the unit [unit] would be at phoneme [i] of [ph]: its start and end. */
-    fun span(ph: IntervalTier, i: Int, size: Int): Pair<Double, Double> =
-        if (size == 1) {
-            val s = ph.startOf(i); val d = ph.durationOf(i)
-            (s + d / 4) to (s + d * 3 / 4)
-        } else (ph.startOf(i) + ph.endOf(i)) / 2 to (ph.startOf(i + size - 1) + ph.endOf(i + size - 1)) / 2
+    /** A transition on the lane: its phonemes, the phoneme of the .seg it starts in, its boundaries (seconds). */
+    data class Unit(val phonemes: List<String>, val index: Int, val bounds: List<Double>)
+
+    /** Widths of a new transition: how far before and after the change of phoneme it reaches. */
+    data class Widths(val beforeMs: Double = 35.0, val afterMs: Double = 23.0)
 
     private fun names(ph: IntervalTier) = ph.texts.map { it.trim().ifEmpty { SegFile.SILENCE } }
 
-    /**
-     * The tier for [units] in the order of the .trans; [near]: for each unit, a time it should be at (from the
-     * articulation file), else the first place not taken yet.
-     */
-    fun tier(ph: IntervalTier, units: List<List<String>>, near: List<Double?> = emptyList()): IntervalTier {
+    /** The phoneme names of [ph] as the .seg writes them (an unnamed interval is a silence). */
+    fun phonemeNames(ph: IntervalTier): List<String> = names(ph)
+
+    /** Where a new transition of [size] phonemes from phoneme [i] of [ph] goes: a little around each change. */
+    fun defaultBounds(ph: IntervalTier, i: Int, size: Int, w: Widths = Widths()): List<Double> {
+        if (size == 1) {
+            val s = ph.startOf(i); val d = ph.durationOf(i)
+            return listOf(s + d / 4, s + d * 3 / 4)
+        }
+        val mids = (1 until size).map { ph.startOf(i + it) }
+        val first = ph.startOf(i); val last = ph.endOf(i + size - 1)
+        val b0 = maxOf(mids.first() - w.beforeMs / 1000, first + (mids.first() - first) / 4)
+        val bn = minOf(mids.last() + w.afterMs / 1000, last - (last - mids.last()) / 4)
+        return listOf(b0) + mids + bn
+    }
+
+    /** The lane for [units] (phonemes, and their boundaries when known), each at the first free place it fits. */
+    fun lane(ph: IntervalTier, units: List<Pair<List<String>, List<Double>?>>): IntervalTier {
         val names = names(ph)
         val taken = mutableSetOf<Int>()
         val items = mutableListOf<Triple<Double, Double, String>>()
-        for ((k, u) in units.withIndex()) {
+        for ((u, known) in units) {
             if (u.isEmpty()) continue
-            val places = (0..names.size - u.size).filter { i -> names.subList(i, i + u.size) == u }
-            if (places.isEmpty()) continue
-            val t = near.getOrNull(k)
-            val i = if (t != null) places.minBy { i -> kotlin.math.abs((ph.startOf(i) + ph.endOf(i + u.size - 1)) / 2 - t) }
-            else places.firstOrNull { it !in taken } ?: places.first()
-            taken += i
-            val (s, e) = span(ph, i, u.size)
-            items += Triple(s, e, u.joinToString(" "))
+            val bounds = known?.takeIf { it.size == u.size + 1 } ?: run {
+                val places = (0..names.size - u.size).filter { i -> names.subList(i, i + u.size) == u }
+                val i = places.firstOrNull { it !in taken } ?: places.firstOrNull() ?: return@run null
+                taken += i
+                defaultBounds(ph, i, u.size)
+            } ?: continue
+            known?.let { b -> ph.indexAt((b.first() + b.last()) / 2).let { taken += it } }
+            for (k in u.indices) items += Triple(bounds[k], bounds[k + 1], u[k])
         }
         return nonOverlapping(TIER, items, ph.start, ph.end)
     }
-
-    /** The units of [units] (a units tier), in time order. */
-    fun units(units: IntervalTier): List<List<String>> =
-        units.texts.filter { it.isNotBlank() }.map { it.trim().split(Regex("\\s+")) }
-
-    /** The phoneme index each named interval of [units] stands on (its middle), or -1. */
-    fun places(units: IntervalTier, ph: IntervalTier): List<Pair<List<String>, Int>> =
-        (0 until units.size).filter { units.texts[it].isNotBlank() }.map { j ->
-            val u = units.texts[j].trim().split(Regex("\\s+"))
-            val first = ph.indexAt(units.startOf(j) + 1e-9)
-            u to first
-        }
 
     /**
-     * Adds the unit of [size] phonemes starting at phoneme [i] of [ph] to [units] (null: no tier yet), or takes it
-     * away when it is there.
+     * The transitions on [lane]: runs of named intervals. A run goes on while each next interval is named after the
+     * phoneme of the .seg that follows the one before; otherwise (two transitions that touch) a new one starts.
      */
-    fun toggle(units: IntervalTier?, ph: IntervalTier, i: Int, size: Int): IntervalTier {
+    fun parse(lane: IntervalTier, ph: IntervalTier): List<Unit> {
         val names = names(ph)
-        if (i < 0 || i + size > names.size) return units ?: nonOverlapping(TIER, emptyList(), ph.start, ph.end)
-        val text = names.subList(i, i + size).joinToString(" ")
-        val (s, e) = span(ph, i, size)
-        val items = mutableListOf<Triple<Double, Double, String>>()
-        var removed = false
-        if (units != null) for (j in 0 until units.size) {
-            if (units.texts[j].isBlank()) continue
-            val mid = (units.startOf(j) + units.endOf(j)) / 2
-            if (units.texts[j].trim() == text && mid > s - 1e-6 && mid < e + 1e-6) { removed = true; continue }
-            items += Triple(units.startOf(j), units.endOf(j), units.texts[j])
+        val out = mutableListOf<Unit>()
+        var cur = mutableListOf<Int>()
+        var start = -1
+        var idx = -1
+        // the phoneme an interval named [text] stands for: of that name, the nearest to it
+        fun phonemeOf(j: Int): Int {
+            val text = lane.texts[j].trim()
+            val a = lane.startOf(j); val b = lane.endOf(j)
+            // the named intervals that follow it without a gap
+            val ahead = mutableListOf(text)
+            var k = j + 1
+            while (k < lane.size && lane.texts[k].isNotBlank()) { ahead += lane.texts[k].trim(); k++ }
+            fun match(i: Int): Int { var m = 0; while (m < ahead.size && names.getOrNull(i + m) == ahead[m]) m++; return m }
+            // where most of them follow in the .seg, then the most overlap with the interval
+            fun overlap(i: Int) = minOf(b, ph.endOf(i)) - maxOf(a, ph.startOf(i))
+            return names.indices.filter { names[it] == text }.maxWithOrNull(compareBy<Int>({ minOf(match(it), 2) }, { overlap(it) }))
+                ?: ph.indexAt((a + b) / 2)
         }
-        if (!removed) items += Triple(s, e, text)
+        fun flush() {
+            if (cur.isEmpty()) return
+            out += Unit(cur.map { lane.texts[it].trim() }, start, listOf(lane.startOf(cur.first())) + cur.map { lane.endOf(it) })
+            cur = mutableListOf()
+        }
+        for (j in 0 until lane.size) {
+            val text = lane.texts[j].trim()
+            if (text.isEmpty()) { flush(); continue }
+            if (cur.isNotEmpty() && names.getOrNull(idx + 1) == text) { cur += j; idx++; continue }
+            flush()
+            cur += j
+            start = phonemeOf(j)
+            idx = start
+        }
+        flush()
+        return out
+    }
+
+    /** The phonemes of each transition on [lane], in time order (what the .trans lists). */
+    fun units(lane: IntervalTier, ph: IntervalTier): List<List<String>> = parse(lane, ph).map { it.phonemes }
+
+    /** The places (first phoneme, number of phonemes) of the transitions on [lane]. */
+    fun placesOf(lane: IntervalTier, ph: IntervalTier): List<Pair<Int, Int>> = parse(lane, ph).map { it.index to it.phonemes.size }
+
+    /** Adds the transition of [size] phonemes from phoneme [i] (a little around its changes), or takes it away. */
+    fun toggle(lane: IntervalTier?, ph: IntervalTier, i: Int, size: Int): IntervalTier {
+        val names = names(ph)
+        val have = lane?.let { parse(it, ph) }.orEmpty()
+        val there = have.any { it.index == i && it.phonemes.size == size }
+        val kept = have.filterNot { it.index == i && it.phonemes.size == size }.map { it.phonemes to it.bounds }
+        if (there || i < 0 || i + size > names.size) return rebuild(kept, ph)
+        return rebuild(kept + (names.subList(i, i + size) to defaultBounds(ph, i, size)), ph)
+    }
+
+    /** The lane with only the transitions at [places]: those already on [old] stay as they are, new ones are added. */
+    fun tierAt(ph: IntervalTier, places: List<Pair<Int, Int>>, old: IntervalTier?): IntervalTier {
+        val names = names(ph)
+        val have = old?.let { parse(it, ph) }.orEmpty()
+        val want = places.toSet()
+        val kept = have.filter { (it.index to it.phonemes.size) in want }
+        val added = want.filter { p -> kept.none { it.index == p.first && it.phonemes.size == p.second } }
+            .filter { (i, n) -> i >= 0 && n >= 1 && i + n <= names.size }
+            .map { (i, n) -> names.subList(i, i + n) to defaultBounds(ph, i, n) }
+        return rebuild(kept.map { it.phonemes to it.bounds } + added, ph)
+    }
+
+    private fun rebuild(units: List<Pair<List<String>, List<Double>>>, ph: IntervalTier): IntervalTier {
+        val items = units.flatMap { (u, b) -> u.indices.map { k -> Triple(b[k], b[k + 1], u[k]) } }
         return nonOverlapping(TIER, items, ph.start, ph.end)
     }
-
-    /** The units tier for the units at these places of [ph]: (first phoneme, number of phonemes), in any order. */
-    fun tierAt(ph: IntervalTier, places: List<Pair<Int, Int>>): IntervalTier {
-        val names = names(ph)
-        val items = places.filter { (i, n) -> i >= 0 && n >= 1 && i + n <= names.size }.distinct().map { (i, n) ->
-            val (s, e) = span(ph, i, n)
-            Triple(s, e, names.subList(i, i + n).joinToString(" "))
-        }
-        return nonOverlapping(TIER, items, ph.start, ph.end)
-    }
-
-    /** The places (first phoneme, number of phonemes) of the named units of [units] on [ph]. */
-    fun placesOf(units: IntervalTier, ph: IntervalTier): List<Pair<Int, Int>> {
-        val names = names(ph)
-        return places(units, ph).mapNotNull { (u, i) -> if (i >= 0 && i + u.size <= names.size && names.subList(i, i + u.size) == u) i to u.size else null }
-    }
-
-    /** The phoneme names of [ph] as the .seg writes them (an unnamed interval is a silence). */
-    fun phonemeNames(ph: IntervalTier): List<String> = names(ph)
 
     /** An interval tier from [items] that may overlap: a later start is moved to the end of the one before. */
     private fun nonOverlapping(name: String, items: List<Triple<Double, Double, String>>, start: Double, end: Double): IntervalTier {
@@ -349,73 +386,35 @@ object SegUnits {
         return IntervalTier(name, bounds, texts)
     }
 
-    /** Widths of the change between two phonemes in an articulation: before and after the boundary. */
-    data class Widths(val beforeMs: Double = 35.0, val afterMs: Double = 23.0, val marginMs: Double = 300.0)
-
     /**
-     * The blocks of the articulation file for the units now chosen (units of two or more phonemes). A unit that
-     * had a block keeps it while its phonemes are where they were in [oldPh] (the labels as last saved); a new unit
-     * or one whose phonemes moved gets a new block made from the phonemes: the cut from [Widths.marginMs] before
-     * its first phoneme to as long after its last, a boundary at each change of phoneme, the change starting
-     * [Widths.beforeMs] before the first one and ending [Widths.afterMs] after the last, all on the grid of 256
-     * samples; [voiced] says whether a stretch of time has pitch.
+     * The articulation of transition [u] for its file: [old] (the file as it was) when the transition is where it
+     * was; otherwise the boundaries of the lane on the grid of 256 samples, in a cut from 300 ms before its first
+     * phoneme (of [ph]) to 300 ms after its last (the old cut while it still holds them); [voiced] tells whether a
+     * stretch has pitch.
      */
-    fun blocksFor(
-        old: List<ArticulationFile.Block>, units: IntervalTier, ph: IntervalTier, oldPh: IntervalTier?,
-        sampleRate: Int, samples: Int, voiced: (Double, Double) -> Boolean, widths: Widths = Widths(),
-    ): List<ArticulationFile.Block> {
-        val names = names(ph)
-        val oldNames = oldPh?.let { names(it) }
-        val used = mutableSetOf<Int>()
-        val out = mutableListOf<ArticulationFile.Block>()
-        for ((u, i) in places(units, ph)) {
-            if (u.size < 2 || i < 0 || i + u.size > names.size || names.subList(i, i + u.size) != u) continue
-            val s = ph.startOf(i); val e = ph.endOf(i + u.size - 1)
-            val k = old.indices.firstOrNull { k ->
-                k !in used && old[k].phonemes == u && old[k].times(sampleRate).let { t -> t.size >= 2 && t[t.size / 2] in (s - 0.05)..(e + 0.05) }
-            }
-            val unchanged = oldPh != null && oldNames != null && i + u.size <= oldNames.size && oldNames.subList(i, i + u.size) == u &&
-                (i..i + u.size).all { j -> kotlin.math.abs(oldPh.bounds[j] - ph.bounds[j]) < 1e-6 }
-            // labels not changed here: the block stays as it was, even when it doesn't fit them (it may have been
-            // made or checked elsewhere after them)
-            val same = if (unchanged) k ?: old.indices.firstOrNull { it !in used && old[it].phonemes == u } else null
-            if (same != null) {
-                used += same
-                out += old[same]
-                continue
-            }
-            if (k != null) used += k
-            out += make(ph, i, u, sampleRate, samples, voiced, widths, k?.let { old[it] })
+    fun block(u: Unit, ph: IntervalTier, old: ArticulationFile.Block?, sampleRate: Int, samples: () -> Int, voiced: (Double, Double) -> Boolean): ArticulationFile.Block {
+        if (old != null && old.phonemes == u.phonemes) {
+            val t = old.times(sampleRate)
+            if (t.size == u.bounds.size && t.zip(u.bounds).all { (a, b) -> kotlin.math.abs(a - b) < 1e-6 }) return old
         }
-        return out
-    }
-
-    private fun make(
-        ph: IntervalTier, i: Int, u: List<String>, sr: Int, samples: Int, voiced: (Double, Double) -> Boolean,
-        w: Widths, old: ArticulationFile.Block?,
-    ): ArticulationFile.Block {
         val g = 256L
-        fun down(t: Double) = kotlin.math.floor(t * sr / g).toLong() * g
-        fun up(t: Double) = kotlin.math.ceil(t * sr / g).toLong() * g
+        val sr = sampleRate
         fun near(t: Double) = kotlin.math.round(t * sr / g).toLong() * g
-        val first = ph.startOf(i)
-        val last = ph.endOf(i + u.size - 1)
-        val maxEnd = samples.toLong() / g * g
-        val off = down(maxOf(0.0, first - w.marginMs / 1000)).coerceAtLeast(0)
-        val end = minOf(maxEnd, up(last + w.marginMs / 1000)).coerceAtLeast(off + g)
-        // the changes of phoneme, then the start and end of the whole change
-        val mids = (1 until u.size).map { near(ph.startOf(i + it)) }.toMutableList()
-        val lo = up(first)
-        val hi = down(last)
-        val b0 = maxOf(mids.first() - (w.beforeMs / 1000 * sr / g).toLong().coerceAtLeast(1) * g, lo).let { if (it >= mids.first()) mids.first() - g else it }
-        val bn = minOf(mids.last() + (w.afterMs / 1000 * sr / g).toLong().coerceAtLeast(1) * g, hi).let { if (it <= mids.last()) mids.last() + g else it }
-        val all = listOf(b0) + mids + bn
-        // voiced: whether each phoneme has pitch
-        val voicedList = (u.indices).map { k -> voiced(ph.startOf(i + k), ph.endOf(i + k)) }
+        val grid = u.bounds.map { near(it) }.toMutableList()
+        for (k in 1 until grid.size) if (grid[k] <= grid[k - 1]) grid[k] = grid[k - 1] + g
+        val maxEnd = samples().toLong() / g * g
+        val i = u.index.coerceIn(0, ph.size - 1)
+        val last = (i + u.phonemes.size - 1).coerceIn(0, ph.size - 1)
+        var off = kotlin.math.floor(maxOf(0.0, ph.startOf(i) - 0.3) * sr / g).toLong() * g
+        var end = minOf(maxEnd, kotlin.math.ceil((ph.endOf(last) + 0.3) * sr / g).toLong() * g)
+        if (old != null && old.cutOffset <= grid.first() && old.cutOffset + old.cutLength >= grid.last()) { off = old.cutOffset; end = old.cutOffset + old.cutLength }
+        off = minOf(off, grid.first())
+        end = maxOf(end, grid.last())
+        val voicedList = u.phonemes.indices.map { k -> voiced(ph.startOf((i + k).coerceAtMost(ph.size - 1)), ph.endOf((i + k).coerceAtMost(ph.size - 1))) }
         return ArticulationFile.Block(
-            phonemes = u, cutOffset = off, cutLength = end - off,
-            boundaries = all.map { (it - off).toDouble() / sr },
-            revised = true, voiced = voicedList, other = old?.other ?: emptyList(),
+            phonemes = u.phonemes, cutOffset = off, cutLength = end - off,
+            boundaries = grid.map { (it - off).toDouble() / sr }, revised = true, voiced = voicedList,
+            other = old?.other ?: emptyList(),
         )
     }
 }

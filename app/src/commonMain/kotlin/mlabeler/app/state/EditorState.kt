@@ -1095,12 +1095,15 @@ class EditorState(
             val ph = d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier ?: continue
             val names = mlabeler.core.format.SegUnits.phonemeNames(ph)
             val unitsTier = d.tiers.filterIsInstance<IntervalTier>().firstOrNull { t -> t.name == mlabeler.core.format.SegUnits.TIER }
-            val chosen = unitsTier?.let { u -> mlabeler.core.format.SegUnits.placesOf(u, ph) }.orEmpty().toSet()
-            val places = (chosen + (0 until names.size - 1).map { i -> i to 2 }).distinct()
+            val parsed = unitsTier?.let { u -> mlabeler.core.format.SegUnits.parse(u, ph) }.orEmpty()
+            val chosen = parsed.associateBy { u -> u.index to u.phonemes.size }
+            val places = (chosen.keys + (0 until names.size - 1).map { i -> i to 2 }).distinct()
             for ((i, size) in places) {
                 // the unlabelled rest after the labels (they may end before the sound) is not a phoneme
-                if (i + size - 1 == ph.size - 1 && ph.texts.last().isEmpty()) continue
-                out += UnitPlace(it.id, names.subList(i, i + size).joinToString(" "), i, size, ph.startOf(i), ph.endOf(i + size - 1), (i to size) in chosen)
+                if (i < 0 || i + size > names.size || (i + size - 1 == ph.size - 1 && ph.texts.last().isEmpty())) continue
+                // a kept transition plays as the lane has it, another a little around its change
+                val b = chosen[i to size]?.bounds ?: mlabeler.core.format.SegUnits.defaultBounds(ph, i, size)
+                out += UnitPlace(it.id, names.subList(i, i + size).joinToString(" "), i, size, b.first(), b.last(), (i to size) in chosen)
             }
         }
         progress(segs.size, segs.size)
@@ -1126,8 +1129,8 @@ class EditorState(
             if (id == item?.id) {
                 val d = committed ?: continue
                 val ph = d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier ?: continue
-                val t = mlabeler.core.format.SegUnits.tierAt(ph, places)
                 val u = d.tierIndex(mlabeler.core.format.SegUnits.TIER)
+                val t = mlabeler.core.format.SegUnits.tierAt(ph, places, d.tiers.getOrNull(u) as? IntervalTier)
                 updateDoc { x -> if (u >= 0) x.replace(u, t) else x.copy(tiers = x.tiers + t) }
                 saveLabels(quiet = true)
                 n++
@@ -1138,8 +1141,8 @@ class EditorState(
                     val a = Wav.decode(workspace.fs.read(it.audioPath))
                     val d = workspace.readLabels(it, a.duration)
                     val ph = d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier ?: return@runCatching false
-                    val t = mlabeler.core.format.SegUnits.tierAt(ph, places)
                     val u = d.tierIndex(mlabeler.core.format.SegUnits.TIER)
+                    val t = mlabeler.core.format.SegUnits.tierAt(ph, places, d.tiers.getOrNull(u) as? IntervalTier)
                     workspace.writeLabels(it, if (u >= 0) d.replace(u, t) else d.copy(tiers = d.tiers + t), a.duration)
                     histories.remove(it.id)
                     true

@@ -213,21 +213,30 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
     }
 
     /**
-     * A .seg's labels with the units of its .trans as a tier ([mlabeler.core.format.SegUnits.TIER]), placed where its
-     * .as0 has them when there is one.
+     * A .seg's labels with the transitions of its .trans as a lane ([mlabeler.core.format.SegUnits.TIER]): the k-th
+     * where its articulation file (.as<k>) has it, a little around its changes of phoneme when there is none.
      */
     private fun segWithUnits(segPath: String, doc: LabelDoc): LabelDoc {
         val ph = doc.tiers.getOrNull(doc.phonemeTierIndex()) as? mlabeler.core.model.IntervalTier ?: return doc
         val transPath = Paths.withExt(segPath, "trans")
         val trans = if (fs.exists(transPath)) runCatching { decodeGuess(fs.read(transPath), "UTF-8").first }.getOrNull() else null
         val units = trans?.let { mlabeler.core.format.TransFile.units(it) } ?: return doc
-        val as0 = Paths.withExt(segPath, "as0")
-        val near = runCatching {
-            val blocks = mlabeler.core.format.ArticulationFile.read(decodeGuess(fs.read(as0), "UTF-8").first)
-            val rate = wavRate(Paths.withExt(segPath, "wav")) ?: 44100
-            units.map { u -> blocks.firstOrNull { it.phonemes == u }?.times(rate)?.let { t -> t[t.size / 2] } }
-        }.getOrDefault(emptyList())
-        return doc.copy(tiers = doc.tiers + mlabeler.core.format.SegUnits.tier(ph, units, near))
+        val rate = wavRate(Paths.withExt(segPath, "wav")) ?: 44100
+        val blocks = articulations(segPath, units.size)
+        val known = units.mapIndexed { k, u -> u to blocks.getOrNull(k)?.takeIf { it.phonemes == u }?.times(rate) }
+        return doc.copy(tiers = doc.tiers + mlabeler.core.format.SegUnits.lane(ph, known))
+    }
+
+    /**
+     * The articulation of each of [count] transitions: .as<k> for the k-th (or the k-th block of a .as0 that has
+     * them all, as written by earlier versions).
+     */
+    private fun articulations(segPath: String, count: Int): List<mlabeler.core.format.ArticulationFile.Block?> {
+        fun read(k: Int) = Paths.withExt(segPath, "as$k").takeIf { fs.exists(it) }?.let { p ->
+            runCatching { mlabeler.core.format.ArticulationFile.read(decodeGuess(fs.read(p), "UTF-8").first) }.getOrNull()
+        }
+        val first = read(0).orEmpty()
+        return (0 until count).map { k -> if (k == 0) first.firstOrNull() else read(k)?.firstOrNull() ?: first.getOrNull(k)?.takeIf { first.size > 1 } }
     }
 
     /** The sample rate in a WAV header, or null. */
@@ -288,11 +297,12 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                 val oldTrans = if (fs.exists(transPath)) runCatching { fs.read(transPath).decodeToString() }.getOrNull() else null
                 val unitsTier = doc.tiers.filterIsInstance<mlabeler.core.model.IntervalTier>().firstOrNull { t -> t.name == mlabeler.core.format.SegUnits.TIER }
                 val ph = doc.tiers.getOrNull(doc.phonemeTierIndex()) as? mlabeler.core.model.IntervalTier
+                val parsed = if (unitsTier != null && ph != null) mlabeler.core.format.SegUnits.parse(unitsTier, ph) else null
                 val trans = mlabeler.core.format.TransFile.write(mlabeler.core.format.SegFile.phonemes(doc), oldTrans,
-                    units = unitsTier?.let { mlabeler.core.format.SegUnits.units(it) })
+                    units = parsed?.map { it.phonemes })
                 writeBeside(transPath, oldTrans, trans)
-                // the articulation segmentation follows the units and the phonemes (made from them where they changed)
-                if (unitsTier != null && ph != null) runCatching { writeArticulation(item, path, old, unitsTier, ph) }
+                // each transition's articulation file follows the lane
+                if (parsed != null && ph != null) runCatching { writeArticulations(item, path, parsed, ph) }
                 mlabeler.core.format.SegFile.write(doc, old)
             }
             LabelFormat.Lab -> HtkLab.write(doc)
@@ -326,16 +336,14 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
         fs.write(path, text.encodeToByteArray())
     }
 
-    /** Settings of the articulation files made from the labels. */
-    var articulationWidths = mlabeler.core.format.SegUnits.Widths()
-
-    private fun writeArticulation(item: Item, segPath: String, oldSeg: String?, units: mlabeler.core.model.IntervalTier, ph: mlabeler.core.model.IntervalTier) {
-        val path = Paths.withExt(segPath, "as0")
-        val oldText = if (fs.exists(path)) runCatching { decodeGuess(fs.read(path), "UTF-8").first }.getOrNull() else null
-        val oldBlocks = oldText?.let { runCatching { mlabeler.core.format.ArticulationFile.read(it) }.getOrNull() } ?: emptyList()
-        if (oldText == null && mlabeler.core.format.SegUnits.units(units).none { it.size >= 2 }) return
-        val audio = mlabeler.core.audio.Wav.decode(fs.read(item.audioPath))
-        val oldPh = oldSeg?.let { runCatching { mlabeler.core.format.SegFile.read(it).tiers.firstOrNull() as? mlabeler.core.model.IntervalTier }.getOrNull() }
+    /**
+     * Writes .as<k> for the k-th transition of [units] (of two or more phonemes) where it changed; a file left
+     * without a transition (it was taken away) goes to the backup folder.
+     */
+    private fun writeArticulations(item: Item, segPath: String, units: List<mlabeler.core.format.SegUnits.Unit>, ph: mlabeler.core.model.IntervalTier) {
+        val old = articulations(segPath, maxOf(units.size, 1))
+        val legacy = Paths.withExt(segPath, "as0").let { p -> fs.exists(p) && runCatching { mlabeler.core.format.ArticulationFile.read(decodeGuess(fs.read(p), "UTF-8").first).size > 1 }.getOrDefault(false) }
+        val audio by lazy { mlabeler.core.audio.Wav.decode(fs.read(item.audioPath)) }
         val pitch by lazy { mlabeler.core.dsp.Pitch.yin(audio.samples, audio.sampleRate, 0.005) }
         fun voiced(a: Double, b: Double): Boolean {
             val v = pitch.values
@@ -343,9 +351,28 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             if (i1 <= i0) return false
             return (i0 until i1).count { v[it] > 0f } * 2 >= (i1 - i0)
         }
-        val blocks = mlabeler.core.format.SegUnits.blocksFor(oldBlocks, units, ph, oldPh, audio.sampleRate, audio.samples.size, ::voiced, articulationWidths)
-        if (blocks == oldBlocks && oldText != null) return
-        writeBeside(path, oldText, mlabeler.core.format.ArticulationFile.write(blocks))
+        val rate = wavRate(item.audioPath) ?: 44100
+        for ((k, u) in units.withIndex()) {
+            val path = Paths.withExt(segPath, "as$k")
+            if (u.phonemes.size < 2) { retire(path); continue }
+            val prev = old.getOrNull(k)
+            val block = mlabeler.core.format.SegUnits.block(u, ph, prev, rate, { audio.samples.size }, ::voiced)
+            if (block == prev && !(k == 0 && legacy)) continue
+            val oldText = if (fs.exists(path)) runCatching { decodeGuess(fs.read(path), "UTF-8").first }.getOrNull() else null
+            writeBeside(path, oldText, mlabeler.core.format.ArticulationFile.write(listOf(block)))
+        }
+        // files of transitions taken away
+        var k = units.size
+        while (fs.exists(Paths.withExt(segPath, "as$k"))) { retire(Paths.withExt(segPath, "as$k")); k++ }
+    }
+
+    /** Moves a file no longer used to the backup folder. */
+    private fun retire(path: String) {
+        if (!fs.exists(path)) return
+        runCatching {
+            fs.copy(path, Paths.join(Paths.join(metaDir, "backup"), Paths.stem(path) + ".${timestamp()}." + Paths.ext(path)))
+            fs.delete(path)
+        }
     }
 
     /**

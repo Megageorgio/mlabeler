@@ -72,7 +72,7 @@ object MenuTitles {
     val view = L("View", "Вид")
     val go = L("Go", "Переход")
     val tools = L("Tools", "Инструменты")
-    val units = L("Units of the transcription (.trans)", "Единицы транскрипции (.trans)")
+    val units = L("Transitions (.trans)", "Переходы (.trans)")
     val help = L("Help", "Справка")
     val closeFolder = L("Close folder", "Закрыть папку")
     val openFolder = L("Open folder…", "Открыть папку…")

@@ -38,10 +38,10 @@ import mlabeler.app.state.EditorState
 import mlabeler.app.theme.T
 import mlabeler.core.io.Paths
 
-private val titleT = L("Units of the folder (.trans)", "Единицы папки (.trans)")
+private val titleT = L("Transitions of the folder (.trans)", "Переходы папки (.trans)")
 private val aboutT = L(
-    "Every change between two phonemes in the .seg/.trans recordings of the folder, with the units the transcriptions keep. A unit kept in several recordings only makes the voicebank bigger: listen to them and keep the best one. Kept units are ticked; a click on a tick changes it.",
-    "Все переходы между фонемами в записях .seg/.trans этой папки и единицы, которые оставлены в транскрипциях. Единица, оставленная в нескольких записях, только утяжеляет банк: прослушайте их и оставьте лучшую. Оставленные отмечены галочкой; щелчок по ней меняет выбор.",
+    "Every transition between two phonemes in the .seg/.trans recordings of the folder, and where the transcriptions keep it. A transition kept in several recordings only makes the voicebank bigger: listen to them and keep the best one. Kept ones are switched on; a click changes it.",
+    "Все переходы между фонемами в записях .seg/.trans этой папки и где они оставлены в транскрипциях. Переход, оставленный в нескольких записях, только утяжеляет банк: прослушайте их и оставьте лучший. Оставленные включены; щелчок меняет выбор.",
 )
 private val readingT = L("Reading the recordings… {0} of {1}", "Чтение записей… {0} из {1}")
 private val noneT = L("No .seg/.trans recordings in this folder", "В этой папке нет записей .seg/.trans")
@@ -49,13 +49,13 @@ private val allT = L("All ({0})", "Все ({0})")
 private val repeatsT = L("Kept more than once ({0})", "Оставлены несколько раз ({0})")
 private val missingT = L("Kept nowhere ({0})", "Нигде не оставлены ({0})")
 private val keptT = L("kept {0} of {1}", "оставлено {0} из {1}")
-private val keepFirstT = L("Keep one of each (the first)", "Оставить по одной (первую)")
-private val keepFirstHint = L("Where a unit is kept in several recordings, only the first of them (in the order of the list) keeps it. Check the result before saving.",
-    "Где единица оставлена в нескольких записях, она остаётся только в первой из них (по порядку списка). Проверьте результат перед сохранением.")
-private val onlyThisT = L("Only this one", "Только эту")
+private val keepFirstT = L("Keep one of each (the first)", "Оставить по одному (первый)")
+private val keepFirstHint = L("Where a transition is kept in several recordings, only the first of them (in the order of the list) keeps it. Check the result before saving.",
+    "Где переход оставлен в нескольких записях, он остаётся только в первой из них (по порядку списка). Проверьте результат перед сохранением.")
+private val onlyThisT = L("Only here", "Только здесь")
 private val applyT = L("Save ({0} files)", "Сохранить (файлов: {0})")
-private val savedT = L("Units saved in {0} files", "Единицы сохранены в файлах: {0}")
-private val searchT = L("Unit, e.g. b' a", "Единица, например b' a")
+private val savedT = L("Transitions saved in {0} files", "Переходы сохранены в файлах: {0}")
+private val searchT = L("Transition, e.g. b' a", "Переход, например b' a")
 private val playT = L("Listen", "Прослушать")
 private val openT = L("Open the recording", "Открыть запись")
 

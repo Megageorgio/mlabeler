@@ -226,9 +226,9 @@ object Commands {
     val help = Command("help", L("Help", "Справка"), listOf(Chord(Key.F1))) { _, a -> a.showHelp = true }
     val tips = Command("tips", L("Tip of the day…", "Совет дня…"), emptyList()) { _, a -> a.showTips = true }
     val speed = Command("speed", L("Playback speed", "Скорость воспроизведения"), listOf(ch('Y'))) { e, _ -> e.cycleSpeed() }
-    val unitPair = Command("unit-pair", L("The change from this phoneme to the next: a unit or not", "Переход от этой фонемы к следующей: единица или нет"), emptyList()) { e, _ -> e.toggleUnit(2) }.only(Mode.Labels)
-    val unitSingle = Command("unit-single", L("This phoneme held: a unit or not", "Эта фонема протяжно: единица или нет"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
-    val unitsOverview = Command("units-overview", L("Units of the folder (.trans)…", "Единицы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
+    val unitPair = Command("unit-pair", L("Transition from this phoneme to the next: keep or take away", "Переход от этой фонемы к следующей: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(2) }.only(Mode.Labels)
+    val unitSingle = Command("unit-single", L("This phoneme held: keep or take away", "Эта фонема протяжно: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
+    val unitsOverview = Command("units-overview", L("Transitions of the folder (.trans)…", "Переходы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
     val refine = Command("refine-boundaries", L("Refine boundaries…", "Уточнить границы…"), emptyList()) { _, a -> a.showRefine = true }.only(Mode.Labels)
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
     val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: клик выбирает, перетаскивание двигает"), listOf(Chord(Key.One)), { it.app.settings.edit.tools }) { _, a ->

@@ -30,37 +30,39 @@ class ArticulationTest {
     private val ph = IntervalTier("phones", listOf(0.0, 0.4, 0.5, 0.8, 1.2), listOf("Sil", "b", "a", "Sil"))
 
     @Test
-    fun unitsAreChosen() {
-        val t = SegUnits.tier(ph, listOf(listOf("b", "a")))
-        assertEquals(listOf(listOf("b", "a")), SegUnits.units(t))
-        // only the transition from the silence wanted: the old one away, the new one in
-        var u = SegUnits.toggle(t, ph, 1, 2)
-        assertEquals(emptyList(), SegUnits.units(u))
-        u = SegUnits.toggle(u, ph, 0, 2)
-        assertEquals(listOf(listOf("Sil", "b")), SegUnits.units(u))
-        assertEquals("Sil b a Sil\r\n[Sil b]", TransFile.write(listOf("Sil", "b", "a", "Sil"), "Sil b a Sil\r\n[b a]", units = SegUnits.units(u)))
+    fun transitionsAreShortAndApart() {
+        val lane = SegUnits.lane(ph, listOf(listOf("b", "a") to null))
+        // a little around the change of phoneme, an unnamed gap on both sides
+        val u = SegUnits.parse(lane, ph).single()
+        assertEquals(listOf("b", "a"), u.phonemes)
+        assertEquals(1, u.index)
+        assertEquals(0.5, u.bounds[1], 1e-9)
+        assertTrue(u.bounds[0] > 0.4 && u.bounds[2] < 0.8)
+        assertTrue(lane.texts.first().isEmpty() && lane.texts.last().isEmpty())
+        // only the transition from the silence wanted
+        var l = SegUnits.toggle(lane, ph, 1, 2)
+        assertEquals(emptyList(), SegUnits.units(l, ph))
+        l = SegUnits.toggle(l, ph, 0, 2)
+        assertEquals(listOf(listOf("Sil", "b")), SegUnits.units(l, ph))
+        assertEquals("Sil b a Sil\r\n[Sil b]", TransFile.write(listOf("Sil", "b", "a", "Sil"), "Sil b a Sil\r\n[b a]", units = SegUnits.units(l, ph)))
         assertEquals(listOf(listOf("b", "a")), TransFile.units("Sil b a Sil\r\n[b a]\r\n"))
+        // two that touch are still two
+        val both = SegUnits.lane(ph, listOf(listOf("Sil", "b") to listOf(0.3, 0.4, 0.45), listOf("b", "a") to listOf(0.45, 0.5, 0.55)))
+        assertEquals(listOf(listOf("Sil", "b"), listOf("b", "a")), SegUnits.units(both, ph))
     }
 
     @Test
-    fun articulationsMadeFromThePhonemes() {
-        val units = SegUnits.tier(ph, listOf(listOf("b", "a")))
-        val made = SegUnits.blocksFor(emptyList(), units, ph, null, 44100, 44100 * 2, { _, _ -> true })
-        assertEquals(1, made.size)
-        val b = made[0]
+    fun articulationFromTheLane() {
+        val u = SegUnits.parse(SegUnits.lane(ph, listOf(listOf("b", "a") to null)), ph).single()
+        val b = SegUnits.block(u, ph, null, 44100, { 44100 * 2 }, { _, _ -> true })
         assertEquals(0L, b.cutOffset % 256)
-        assertEquals(0L, b.cutLength % 256)
         assertTrue(b.cutOffset / 44100.0 <= 0.4 - 0.29)
         val t = b.times(44100)
         assertEquals(0.5, t[1], 256.0 / 44100)
-        assertTrue(t[0] < t[1] && t[1] < t[2] && t[0] >= 0.4 && t[2] <= 0.8)
-        assertEquals(true, b.revised)
-        // kept while the phonemes stay; made again when they move
-        val kept = SegUnits.blocksFor(listOf(b.copy(boundaries = b.boundaries.map { it + 0.001 })), units, ph, ph, 44100, 88200, { _, _ -> true })
-        assertEquals(b.boundaries[1] + 0.001, kept[0].boundaries[1], 1e-9)
-        val moved = IntervalTier("phones", listOf(0.0, 0.4, 0.55, 0.8, 1.2), ph.texts)
-        val again = SegUnits.blocksFor(kept, SegUnits.tier(moved, listOf(listOf("b", "a"))), moved, ph, 44100, 88200, { _, _ -> false })
-        assertEquals(0.55, again[0].times(44100)[1], 256.0 / 44100)
-        assertEquals(listOf(false, false), again[0].voiced)
+        assertTrue(t.zip(u.bounds).all { (x, y) -> kotlin.math.abs(x - y) <= 128.0 / 44100 })
+        assertEquals(listOf(true, true), b.voiced)
+        // unchanged: the old one as it was
+        val again = SegUnits.parse(SegUnits.lane(ph, listOf(listOf("b", "a") to b.times(44100))), ph).single()
+        assertTrue(SegUnits.block(again, ph, b, 44100, { error("not needed") }, { _, _ -> error("not needed") }) === b)
     }
 }
