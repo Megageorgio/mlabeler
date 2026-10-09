@@ -44,9 +44,17 @@ private fun run(args: Array<String>) = application {
     val size = System.getenv("MLABELER_WINDOW")?.split('x')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val state = rememberWindowState(size = if (size != null) DpSize(size[0].dp, size[1].dp) else DpSize(1280.dp, 800.dp))
     val app = rememberAppState()
-    // the window goes at once; the toolkit is told on the way out (the process waits for that, a few seconds at most)
-    androidx.compose.runtime.remember { Runtime.getRuntime().addShutdownHook(Thread { app.toolkit.close() }) }
-    app.quit = { app.close(stopToolkit = false); exitApplication() }
+    // the window is hidden at once; the toolkit is told while the program still runs normally (a shutdown hook
+    // can't load the classes it needs any more), then the program ends
+    val awtWindow = androidx.compose.runtime.remember { arrayOfNulls<java.awt.Window>(1) }
+    app.quit = {
+        app.close(stopToolkit = false)
+        awtWindow[0]?.isVisible = false
+        Thread({
+            runCatching { app.toolkit.close() }
+            java.awt.EventQueue.invokeLater { exitApplication() }
+        }, "mlabeler-exit").start()
+    }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         args.firstOrNull()?.let { app.openFolder(it) }
     }
@@ -60,6 +68,7 @@ private fun run(args: Array<String>) = application {
         undecorated = ownTitle && !mac,
     ) {
         window.minimumSize = java.awt.Dimension(360, 480)
+        awtWindow[0] = window
         // every size drawn on its own: the system takes the one that fits the title bar and the taskbar,
         // instead of shrinking one big picture pixel by pixel
         androidx.compose.runtime.LaunchedEffect(Unit) { appIcons?.let { window.iconImages = it } }
