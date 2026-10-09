@@ -161,6 +161,7 @@ object S {
     val themeModernLight = L("Light", "Светлая")
     val themeRetro = L("Retro", "Ретро")
     val themeFairy = L("Retro Fairy", "Ретро-фея")
+    val themeMintaka = L("Mintaka", "Mintaka")
     val themeContrast = L("High contrast", "Контрастная")
     val interfaceScale = L("Interface size", "Размер интерфейса")
     val editing = L("Editing", "Редактирование")

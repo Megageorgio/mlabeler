@@ -155,7 +155,22 @@ object Themes {
         boundLine = hex(0xff008b), boundWidth = 1f, boundStyle = "dash",
     )
 
-    val builtIn = listOf(modernDark, modernLight, retro, fairy, contrast)
+    /** Autumn browns with slate accents, dark ink on light lanes. */
+    val mintaka = Tokens(
+        id = "mintaka", dark = true,
+        bg = hex(0x864b2f), panel = hex(0xb58866), panelAlt = hex(0x87674d), border = hex(0x2a2c3a),
+        text = hex(0x040401), muted = Color(0xe5040401), accent = hex(0x393c4f), onAccent = hex(0xa98b6e),
+        danger = hex(0x86330c), ok = hex(0x1c3a30), warn = hex(0xbf8a44),
+        laneBg = hex(0xf8e3db), wave = hex(0x100806), waveCenter = hex(0x000000),
+        bound = hex(0x374f62), boundSelected = hex(0x52a3c1), intervalSelected = Color(0x3379a3b9), intervalHover = Color(0x14ffffff),
+        playhead = hex(0x374f62), cursor = Color(0x99100806), selectionRange = Color(0x3c86330c),
+        tierText = hex(0xe6e8ec), tierColors = listOf(Color(0x26000000), Color(0x98ffffff)),
+        spectrogram = listOf(hex(0xcfc1b2), hex(0x776e66), hex(0x302c29)),
+        radius = 4.dp, borderWidth = 1.5.dp, square = false, mono = true,
+        boundLine = Color(0xe5374f62), boundWidth = 1f, boundStyle = "dash",
+    )
+
+    val builtIn = listOf(modernDark, modernLight, retro, fairy, contrast, mintaka)
 
     /** Themes from files (see ThemeFiles). */
     var custom by androidx.compose.runtime.mutableStateOf<List<CustomTheme>>(emptyList())

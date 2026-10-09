@@ -73,7 +73,7 @@ fun SetupDialog(app: AppState) {
             }
             SetupItem(SetupTitles.theme(), SetupTitles.themeHint()) {
                 val names = mapOf("modern-dark" to S.themeModernDark(), "modern-light" to S.themeModernLight(), "retro" to S.themeRetro(),
-                    "retro-fairy" to S.themeFairy(), "contrast" to S.themeContrast())
+                    "retro-fairy" to S.themeFairy(), "contrast" to S.themeContrast(), "mintaka" to S.themeMintaka())
                 for (t in mlabeler.app.theme.Themes.builtIn) ThemeSwatch(t, names[t.id] ?: t.id, s.theme == t.id) { app.update { it.copy(theme = t.id) } }
             }
             SetupItem(SetupTitles.size(), SetupTitles.sizeHint()) {
