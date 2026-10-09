@@ -305,9 +305,19 @@ class AppState(private val scope: CoroutineScope) {
     /** Closes the program (set by the window on computers); used to restart into a new version. */
     var quit: (() -> Unit)? = null
 
-    fun close() {
+    /** Closes the program, first asking about unsaved labels (when "save when switching files" is off). */
+    fun requestQuit() {
+        val q = quit ?: return
+        leaveFolderThen(q)
+    }
+
+    /**
+     * Saves and lets go of what the program holds. [stopToolkit] false: the window does that after it is gone
+     * (telling the toolkit can take a few seconds when it is busy or gone).
+     */
+    fun close(stopToolkit: Boolean = true) {
         editor?.saveAllOnClose()
-        toolkit.close()
+        if (stopToolkit) toolkit.close()
         updater.onExit()
     }
 }
