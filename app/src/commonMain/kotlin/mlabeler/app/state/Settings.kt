@@ -322,6 +322,7 @@ data class AppSettings(
     val status: StatusSettings = StatusSettings(),
     val updates: UpdateSettings = UpdateSettings(),
     val clean: CleanSettings = CleanSettings(),
+    val karaoke: KaraokeSettings = KaraokeSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
@@ -441,6 +442,17 @@ data class RefineSettings(
     val enabled: Boolean = false,
     val model: String = "mrefiner-ru-v0.1.0",
     val mode: String = "auto",
+)
+
+/**
+ * Karaoke: how loud the music is (0..1.5), which model separates the voice from the music ("auto": chosen by the
+ * computer) and which one recognises the words.
+ */
+@Serializable
+data class KaraokeSettings(
+    val musicLevel: Float = 1f,
+    val separation: String = "auto",
+    val whisper: String = "whisper-large-v3-turbo",
 )
 
 /** Options of phoneme recognition without text (WFL-ASR); negative confidence = the model's own value. */

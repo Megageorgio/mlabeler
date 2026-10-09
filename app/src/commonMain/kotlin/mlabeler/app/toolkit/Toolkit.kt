@@ -247,16 +247,18 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
     }
 
     /** Starts separating the voice from the music of one uploaded file; returns the job id. */
-    suspend fun separate(fileId: String): String {
+    suspend fun separate(fileId: String, model: String = "auto"): String {
         val req = buildJsonObject {
             putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) }) }
+            put("model", model)
         }
         return call("POST", "/separate", req).jsonObject["id"]!!.jsonPrimitive.content
     }
 
     /** Starts recognising the words of one uploaded file (phrases with times); returns the job id. */
-    suspend fun transcribe(fileId: String, language: String?, prompt: String? = null): String {
+    suspend fun transcribe(fileId: String, language: String?, prompt: String? = null, model: String? = null): String {
         val req = buildJsonObject {
+            if (model != null) put("model", model)
             putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) }) }
             if (language != null) put("language", language)
             if (prompt != null) put("initial_prompt", prompt)

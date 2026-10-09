@@ -90,19 +90,6 @@ private val takeT = L("Take name", "Имя дубля")
 private val intoT = L("Takes go to {0}, with the sung lines next to them as .txt", "Дубли сохраняются в {0}, рядом — спетые строки в .txt")
 private val recordT = L("Record from here (R)", "Записать отсюда (R)")
 private val stopRecT = L("Stop recording", "Остановить запись")
-private val followNotesT = L("Notes", "Ноты")
-private val followHalfT = L("Half", "Наполовину")
-private val followAllT = L("Singer's line", "Интонация автора")
-private val followHint = L(
-    "What the autotune takes from the song's singer: only the notes (the robotic effect), the whole pitch line with vibrato and slides (your voice sung the way they sing), or half of it. The line fits best where you sing in time with the original.",
-    "Что автотюн берёт у исполнителя песни: только ноты («роботный» эффект), всю линию высоты с вибрато и подъездами (твой голос поёт так, как поёт он) или наполовину. Линия ложится лучше там, где поёшь в такт с оригиналом.",
-)
-private val autotuneT = L("With autotune", "С автотюном")
-private val autotuneBusyT = L("Tuning…", "Тюнится…")
-private val autotuneHint = L(
-    "Plays the take over the music with every note pulled at once to the note the song's own singer sings there (after \"Make a backing track\"; otherwise to the nearest semitone), the well-known robotic effect. Just for fun: the saved take stays as it was sung.",
-    "Проигрывает дубль поверх музыки, и каждая нота сразу притянута к ноте, которую в этом месте поёт исполнитель песни (после «Создать минус»; без этого — к ближайшему полутону), — тот самый «роботный» эффект. Просто для забавы: сохранённый дубль остаётся как спет.",
-)
 private val lastTakeT = L("Listen to {0}", "Прослушать {0}")
 private val editT = L("Edit the lines", "Править строки")
 private val doneT = L("Done", "Готово")
@@ -221,6 +208,7 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
     var editing by remember { mutableStateOf(false) }
     var pasting by remember { mutableStateOf(false) }
     var adding by remember { mutableStateOf(false) }
+    var options by remember { mutableStateOf(false) }
     LaunchedEffect(k) { kotlinx.coroutines.delay(150); runCatching { focus.requestFocus() } }
     fun addSong() {
         val picked = if (Platform.hasNativeFolderPicker) Platform.pickFileNative(addSongT(), listOf("wav", "mp3", "flac", "ogg", "m4a", "opus", "aiff")) else null
@@ -250,6 +238,7 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                     Text(k.song ?: "", color = c.muted, fontSize = 11.sp, maxLines = 1)
                 }
                 if (k.dirty) { Btn(S.save()) { k.save() }; Spacer(Modifier.width(6.dp)) }
+                IconBtn(Icons.settings, optionsT()) { options = true }
                 Btn(addSongT(), icon = Icons.plus) { addSong() }
             }
             Divider()
@@ -288,6 +277,10 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
             // key, tempo and what to do with a take
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(musicT(), color = c.muted, fontSize = 12.sp)
+                val level = app.settings.karaoke.musicLevel
+                for ((v, t) in listOf(0.25f to "25%", 0.5f to "50%", 0.75f to "75%", 1f to "100%")) Chip(t, kotlin.math.abs(level - v) < 0.01f) { k.updateMusicLevel(v) }
+                Spacer(Modifier.width(8.dp))
                 Text(keyT(), color = c.muted, fontSize = 12.sp)
                 IconBtn(Icons.nudgeLeft, keyDownT(), size = 30.dp, enabled = !k.recording) { k.updateKey(k.semitones - 1) }
                 Text((if (k.semitones > 0) "+" else "") + k.semitones, color = if (k.semitones != 0) c.accent else c.text, fontSize = 13.sp, modifier = Modifier.width(28.dp), textAlign = TextAlign.Center)
@@ -364,23 +357,13 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                 Text(takeT(), color = c.muted, fontSize = 12.sp)
                 Field(k.takeName, { k.takeName = it }, Modifier.width(180.dp))
                 if (k.lastTake != null && !k.recording) Btn(lastTakeT.format(k.lastTakeName), icon = Icons.play) { k.playLastTake() }
-                if (k.lastTake != null && !k.recording) mlabeler.app.ui.Tip(autotuneHint()) {
-                    Btn(if (k.tuning) autotuneBusyT() else autotuneT(), enabled = !k.tuning) { k.playTuned() }
-                }
-                // what the autotune takes from the song's singer (only with the song's voice separated)
-                if (k.lastTake != null && !k.recording && k.refPitch != null) mlabeler.app.ui.Tip(followHint()) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        mlabeler.app.ui.Chip(followNotesT(), k.tuneFollow == 0.0) { k.tuneFollow = 0.0 }
-                        mlabeler.app.ui.Chip(followHalfT(), k.tuneFollow == 0.5) { k.tuneFollow = 0.5 }
-                        mlabeler.app.ui.Chip(followAllT(), k.tuneFollow == 1.0) { k.tuneFollow = 1.0 }
-                    }
-                }
                 Text(intoT.format(Paths.name(k.folder)) + ". " + headphonesT(), color = c.muted, fontSize = 11.sp, maxLines = 2, modifier = Modifier.weight(1f))
             }
             if (!Platform.isMobile) Text(keysT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
         }
         mlabeler.app.ui.MessageToast(app, 24.dp)
         if (pasting) PasteLyrics(k) { pasting = false; focus.requestFocus() }
+        if (options) KaraokeOptions(app) { options = false; focus.requestFocus() }
         if (adding && k.songs.isNotEmpty()) AddSong(k) { adding = false; focus.requestFocus() }
     }
 }
@@ -532,3 +515,46 @@ private fun PasteLyrics(k: KaraokeState, onClose: () -> Unit) {
     }
 }
 
+
+private val optionsT = L("Karaoke settings", "Настройки караоке")
+private val musicT = L("Music", "Музыка")
+private val separationModelT = L("Separating the voice from the music", "Отделение голоса от музыки")
+private val sepAutoT = L("Auto", "Авто")
+private val sepAutoHint = L("BS-Roformer with an NVIDIA graphics card, MDX-Net without one", "BS-Roformer, если есть видеокарта NVIDIA, иначе MDX-Net")
+private val sepFastT = L("Fast (MDX-Net)", "Быстро (MDX-Net)")
+private val sepBestT = L("Best (BS-Roformer)", "Лучше всего (BS-Roformer)")
+private val sepMelT = L("Mel-Roformer", "Mel-Roformer")
+private val sepNote = L("Roformer models are slow without a graphics card (minutes per song). A song is separated once; to separate it again with another model, remove its parts in the songs folder.",
+    "Модели Roformer без видеокарты работают медленно (минуты на песню). Песня отделяется один раз; чтобы отделить её заново другой моделью, удалите её части в папке песен.")
+private val whisperT = L("Recognising the words", "Распознавание слов")
+private val whSmallT = L("Fast (small)", "Быстро (small)")
+private val whMediumT = L("Medium", "Средне (medium)")
+private val whTurboT = L("Accurate (large-v3-turbo)", "Точно (large-v3-turbo)")
+private val whLargeT = L("Most accurate (large-v3, slow)", "Точнее всего (large-v3, медленно)")
+private val whNote = L("Each model is downloaded on first use. Without a graphics card the small ones are several times faster.",
+    "Каждая модель загружается при первом использовании. Без видеокарты маленькие модели в несколько раз быстрее.")
+
+/** Karaoke settings: the models that separate the voice and recognise the words (kept in the settings). */
+@Composable
+private fun KaraokeOptions(app: AppState, onClose: () -> Unit) {
+    val c = T.c
+    val s = app.settings.karaoke
+    fun set(f: (mlabeler.app.state.KaraokeSettings) -> mlabeler.app.state.KaraokeSettings) = app.update { it.copy(karaoke = f(it.karaoke)) }
+    mlabeler.app.ui.Overlay(onClose, 560) {
+        DialogContent(footer = { Btn(S.close(), primary = true) { onClose() } }) {
+            Text(optionsT(), color = c.text, fontSize = 17.sp)
+            mlabeler.app.ui.SectionTitle(separationModelT())
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for ((id, t) in listOf("auto" to sepAutoT(), "separation-vocals-mdx-fast" to sepFastT(), "separation-vocals-bs-roformer" to sepBestT(), "separation-vocals-melband-roformer" to sepMelT()))
+                    Chip(t, s.separation == id) { set { it.copy(separation = id) } }
+            }
+            Text(sepAutoHint() + ". " + sepNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+            mlabeler.app.ui.SectionTitle(whisperT())
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                for ((id, t) in listOf("whisper-small" to whSmallT(), "whisper-medium" to whMediumT(), "whisper-large-v3-turbo" to whTurboT(), "whisper-large-v3" to whLargeT()))
+                    Chip(t, s.whisper == id) { set { it.copy(whisper = id) } }
+            }
+            Text(whNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}

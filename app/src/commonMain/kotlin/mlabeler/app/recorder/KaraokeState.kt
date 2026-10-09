@@ -330,17 +330,28 @@ class KaraokeState(
 
     /** What plays in the headphones: the backing track with some of the song's voice, or the whole song. */
     private fun mixed(): Audio? {
-        val m = music ?: return audio
+        val level = app.settings.karaoke.musicLevel
+        val m = music ?: return audio?.let { a -> if (level == 1f) a else Audio(a.sampleRate, FloatArray(a.samples.size) { i -> (a.samples[i] * level).coerceIn(-1f, 1f) }) }
         val v = voice
         val g = guideLevel
-        if (v == null || g <= 0.001f || v.sampleRate != m.sampleRate) return m
-        val out = FloatArray(m.samples.size) { i -> (m.samples[i] + g * v.samples.getOrElse(i) { 0f }).coerceIn(-1f, 1f) }
+        if ((v == null || g <= 0.001f || v.sampleRate != m.sampleRate) && level == 1f) return m
+        val out = FloatArray(m.samples.size) { i ->
+            val voicePart = if (v != null && v.sampleRate == m.sampleRate) g * v.samples.getOrElse(i) { 0f } else 0f
+            (m.samples[i] * level + voicePart).coerceIn(-1f, 1f)
+        }
         return Audio(m.sampleRate, out)
+    }
+
+    /** Sets how loud the music is and plays on with it. */
+    fun updateMusicLevel(v: Float) {
+        app.update { it.copy(karaoke = it.karaoke.copy(musicLevel = v.coerceIn(0f, 1.5f))) }
+        prepared = null
+        if (playing && !recording) play()
     }
 
     /** The backing as heard: mixed, then in the chosen key and tempo (made once per setting). */
     private suspend fun backing(): Audio? {
-        val key = listOf(music ?: audio ?: return null, voice ?: 0, guideLevel, semitones, speed)
+        val key = listOf(music ?: audio ?: return null, voice ?: 0, guideLevel, semitones, speed, app.settings.karaoke.musicLevel)
         prepared?.let { (k, a) -> if (k == key) return a }
         val base = mixed() ?: return null
         val a = if (semitones == 0 && speed == 1.0) base else {
@@ -517,7 +528,6 @@ class KaraokeState(
             }
             lastTake = take
             lastTakeName = name
-            lastTakeAt = TakePlace(start, lat, speed, semitones, played)
             leaked = leak
             takes = (takes + TakeInfo(name, take, sc, leak)).takeLast(12)
             app.message(takeSaved.format(if (split) "${name}_NN.wav" else "$name.wav", Paths.name(folder)))
@@ -526,54 +536,6 @@ class KaraokeState(
     }
 
     fun playLastTake() { lastTake?.let { playTake(it) } }
-
-    /** Where the last take was sung: its song time, the sound card delay, tempo, key and what was played. */
-    private class TakePlace(val start: Double, val latency: Double, val speed: Double, val semitones: Int, val played: Audio?)
-    private var lastTakeAt: TakePlace? = null
-
-    /** The last take is being pulled to the notes for [playTuned]. */
-    var tuning by mutableStateOf(false)
-    private var tuned: Triple<Audio, Double, Audio>? = null
-
-    /** How much of the song's singer the autotune takes: 0 only the notes, 1 the whole pitch line (vibrato, slides). */
-    var tuneFollow by mutableDoubleStateOf(0.0)
-
-    /**
-     * Plays the last take with the "autotune" effect over the backing it was sung to: every note pulled at once to
-     * the note the song's own singer sings there (when the song's voice was separated), otherwise to the nearest
-     * semitone.
-     */
-    fun playTuned() {
-        val take = lastTake ?: return
-        val at = lastTakeAt
-        if (tuning) return
-        scope.launch {
-            val follow = tuneFollow
-            val a = tuned?.takeIf { it.first === take && it.second == follow }?.third ?: run {
-                tuning = true
-                try {
-                    val ref = refPitch
-                    withContext(Dispatchers.Default) { tune(take, at, ref, follow) }
-                } finally { tuning = false }
-            }.also { tuned = Triple(take, follow, it) }
-            playTake(a)
-        }
-    }
-
-    private fun tune(take: Audio, at: TakePlace?, ref: FloatArray?, follow: Double): Audio {
-        // song time of a sample of the take: where it started, at the tempo it was sung, less the sound card delay
-        val guide: ((Int) -> Double?)? = if (ref == null || at == null) null else { i ->
-            val t = at.start + i.toDouble() / take.sampleRate * at.speed - at.latency
-            ref.getOrNull((t / PITCH_HOP).toInt())?.takeIf { !it.isNaN() }?.let { it.toDouble() + at.semitones }
-        }
-        val voice = mlabeler.core.dsp.AutoTune.process(take.samples, take.sampleRate, guide = guide, follow = follow)
-        val played = at?.played ?: return Audio(take.sampleRate, voice)
-        // laid over the backing as it was heard (at its sample rate), the voice a little louder
-        val v = if (played.sampleRate == take.sampleRate) voice else mlabeler.core.dsp.Stretch.resample(voice, take.sampleRate.toDouble() / played.sampleRate)
-        val from = ((at.start - at.latency) / at.speed * played.sampleRate).toInt().coerceAtLeast(0)
-        val out = FloatArray(v.size) { j -> (played.samples.getOrElse(from + j) { 0f } * 0.6f + v[j]).coerceIn(-1f, 1f) }
-        return Audio(played.sampleRate, out)
-    }
 
     fun playTake(t: Audio) {
         stop()
@@ -720,7 +682,7 @@ class KaraokeState(
             // a decoded WAV: the separator keeps the input's encoding and fails on MP3 and the like
             val id = upload(client, name, audio)
             busy = separatingT()
-            val job = client.separate(id)
+            val job = client.separate(id, app.settings.karaoke.separation)
             val res = try { client.await(job) { p, stage -> progress = p; stageText = stage } } catch (e: kotlinx.coroutines.CancellationException) { client.cancel(job); throw e }
             val files = itemOf(res)["files"]?.jsonObject ?: throw ToolkitException("no files in the result")
             busy = fetchingT()
@@ -751,7 +713,8 @@ class KaraokeState(
             if (voice == null) separateIn(client, name)
             val id = upload(client, name, voice)
             busy = recognisingT()
-            val job = client.transcribe(id, language.trim().ifEmpty { null }, lines.joinToString(" ") { it.text }.take(400).ifBlank { null })
+            val job = client.transcribe(id, language.trim().ifEmpty { null }, lines.joinToString(" ") { it.text }.take(400).ifBlank { null },
+                app.settings.karaoke.whisper)
             val res = try { client.await(job) { p, stage -> progress = p; stageText = stage } } catch (e: kotlinx.coroutines.CancellationException) { client.cancel(job); throw e }
             val segs = itemOf(res)["data"]?.jsonObject?.get("transcription")?.jsonObject?.get("segments")?.jsonArray.orEmpty()
             // credits the recognizer invents over music are dropped, long phrases are cut into screen lines
