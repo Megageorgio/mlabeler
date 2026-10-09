@@ -65,6 +65,10 @@ fun AutolabelBusy(ed: EditorState) {
             // earlier steps, then the current one with its numbers
             for (s in ed.toolkitSteps) Text("✓ $s", color = c.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             Text(stage, color = c.text, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+            // the numbers of the step: which file is downloading, how much of it, how fast, how long still
+            val job = ed.toolkitDetail
+            job?.fileLine()?.let { Text(it, color = c.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp)) }
+            job?.numbers()?.let { Text(it, color = c.text, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp)) }
             val p = ed.toolkitProgress
             if (p != null && p > 0) {
                 LinearProgressIndicator(

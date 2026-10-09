@@ -23,6 +23,19 @@ class PluginsTest {
     }
 
     @Test
+    fun changesCountsIntervalsThatDiffer() {
+        val a = LabelDoc(listOf(IntervalTier("phones", listOf(0.0, 0.5, 1.0, 1.5), listOf("pau", "a", "k"))))
+        assertEquals(0, mlabeler.app.state.PluginBatch.changes(a, a))
+        val renamed = LabelDoc(listOf(IntervalTier("phones", listOf(0.0, 0.5, 1.0, 1.5), listOf("SP", "a", "k"))))
+        assertEquals(1, mlabeler.app.state.PluginBatch.changes(a, renamed))
+        // a moved boundary changes the two intervals around it
+        val moved = LabelDoc(listOf(IntervalTier("phones", listOf(0.0, 0.6, 1.0, 1.5), listOf("pau", "a", "k"))))
+        assertEquals(2, mlabeler.app.state.PluginBatch.changes(a, moved))
+        val merged = LabelDoc(listOf(IntervalTier("phones", listOf(0.0, 1.0, 1.5), listOf("pau", "k"))))
+        assertEquals(2, mlabeler.app.state.PluginBatch.changes(a, merged))
+    }
+
+    @Test
     fun otoSetValue() = runBlocking {
         val e = listOf(OtoEntry("a.wav", "- ka", 100.0, 50.0, -300.0, 80.0, 20.0), OtoEntry("a.wav", "a ki", 400.0, 50.0, -300.0, 80.0, 20.0))
         val r = Plugins.run(builtin("oto-set-value"), mapOf("value" to JsonPrimitive("preutterance"), "expr" to JsonPrimitive("v + 10"),

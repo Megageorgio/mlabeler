@@ -732,6 +732,7 @@ private fun ToolkitPage(app: AppState) {
         }
     }
     OwnModelsSection(app)
+    ToolkitStorageSection(app)
     Fold(S.toolkitUrl()) {
         var url by remember { mutableStateOf(s.toolkit.url) }
         var token by remember { mutableStateOf(s.toolkit.token) }

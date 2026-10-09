@@ -52,6 +52,12 @@ private object SetupTitles {
     val toolkit = L("Automatic labelling (toolkit)", "Автоматическая разметка (тулкит)")
     val toolkitHint = L("A separate helper program does the automatic labelling. When it is installed, it can start automatically whenever it is needed and stop once no program uses it.",
         "Автоматическую разметку выполняет отдельная программа-помощник. Если она установлена, она может запускаться автоматически, когда нужна, и закрываться, когда больше не используется.")
+    val saving = L("Saving the labels", "Сохранение разметки")
+    val savingHint = L("Changes can be saved when you go to another file, and also every so often while you work in one file, so a power cut or a crash loses little.",
+        "Изменения могут сохраняться при переходе к другому файлу, а также время от времени, пока вы работаете в одном файле: при сбое или отключении питания почти ничего не потеряется.")
+    val autosaveEvery = L("Also save every", "Ещё сохранять каждые")
+    val autosaveOff = L("never", "никогда")
+    val minutes = L("min", "мин")
     val next = L("Next", "Дальше")
     val back = L("Back", "Назад")
 }
@@ -86,6 +92,21 @@ fun SetupDialog(app: AppState) {
                 }
                 if (s.updates.checkOnStart) for (ch in listOf("stable", "beta", "alpha")) Tip(UpdateTitles.channelHint()) {
                     Chip(UpdateTitles.channelName(ch), s.updates.channel == ch) { app.update { it.copy(updates = it.updates.copy(channel = ch)) } }
+                }
+            }
+            SetupItem(SetupTitles.saving(), SetupTitles.savingHint()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Toggle(s.edit.saveOnSwitch, { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } })
+                    Text(S.saveOnSwitch(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp, end = 12.dp))
+                }
+                Text(SetupTitles.autosaveEvery(), color = c.text, fontSize = 13.sp)
+                for (secs in listOf(0, 30, 60, 120, 300)) {
+                    val name = when {
+                        secs == 0 -> SetupTitles.autosaveOff()
+                        secs < 60 -> "$secs ${S.secondsShort()}"
+                        else -> "${secs / 60} ${SetupTitles.minutes()}"
+                    }
+                    Chip(name, s.edit.autosaveSeconds == secs) { app.update { it.copy(edit = it.edit.copy(autosaveSeconds = secs)) } }
                 }
             }
             Platform.portableDir?.let { PortableNote(it) }

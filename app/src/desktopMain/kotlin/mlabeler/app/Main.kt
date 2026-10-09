@@ -44,7 +44,9 @@ private fun run(args: Array<String>) = application {
     val size = System.getenv("MLABELER_WINDOW")?.split('x')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val state = rememberWindowState(size = if (size != null) DpSize(size[0].dp, size[1].dp) else DpSize(1280.dp, 800.dp))
     val app = rememberAppState()
-    app.quit = { app.close(); exitApplication() }
+    // the window goes at once; the toolkit is told on the way out (the process waits for that, a few seconds at most)
+    androidx.compose.runtime.remember { Runtime.getRuntime().addShutdownHook(Thread { app.toolkit.close() }) }
+    app.quit = { app.close(stopToolkit = false); exitApplication() }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         args.firstOrNull()?.let { app.openFolder(it) }
     }
@@ -52,7 +54,7 @@ private fun run(args: Array<String>) = application {
     val ownTitle = androidx.compose.runtime.remember { app.settings.titleBarMenu }
     val mac = Platform.isMac
     Window(
-        onCloseRequest = { app.close(); exitApplication() },
+        onCloseRequest = { app.requestQuit() },
         state = state,
         title = app.editor?.let { e -> e.item?.name?.let { "$it — mLabeler" } } ?: "mLabeler",
         undecorated = ownTitle && !mac,

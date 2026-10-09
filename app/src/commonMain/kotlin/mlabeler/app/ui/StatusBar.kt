@@ -107,7 +107,9 @@ private fun StatusItem(app: AppState, ed: EditorState, id: String, st: StatusSet
             // the progress is the observed value; the picture's own counter changes without telling anyone
             if (ed.audio != null && (spec == null || ed.spectrogramProgress < spec.frames)) StatusText(S.analysing())
             ed.toolkitBusy?.let { b ->
-                StatusText(S.toolkit() + ": " + b, color = c.accent)
+                val numbers = ed.toolkitDetail?.numbers()?.let { " · $it" }.orEmpty()
+                val pct = ed.toolkitProgress?.takeIf { it > 0 }?.let { " · ${(it * 100).toInt()}%" }.orEmpty()
+                StatusText(S.toolkit() + ": " + b + numbers + pct, color = c.accent)
                 Text("×", color = c.muted, fontSize = 14.sp, modifier = Modifier.clickable { ed.cancelToolkit() })
             }
         }

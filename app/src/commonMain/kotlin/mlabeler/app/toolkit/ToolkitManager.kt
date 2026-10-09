@@ -297,11 +297,15 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         }
     }
 
+    private var closed = false
+
     /**
      * The app closes: it stops using the toolkit. When no other program uses it and it was started for programs
      * (by this app or another), it is stopped now, so nothing stays running and no folder stays busy.
      */
     fun close() {
+        if (closed) return
+        closed = true
         pingJob?.cancel()
         val c = client()
         val id = clientId

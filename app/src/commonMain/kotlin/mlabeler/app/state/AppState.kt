@@ -103,6 +103,22 @@ class AppState(private val scope: CoroutineScope) {
             }
         }
     }
+    /** A labels plugin tried on many files, waiting to be applied (shown in the plugins dialog). */
+    var pluginBatch by mutableStateOf<PluginBatch?>(null)
+
+    /** Tries a labels plugin on [files] and shows what it would change; nothing is written yet. */
+    fun checkPluginOnFiles(p: mlabeler.app.plugins.Plugin, params: Map<String, kotlinx.serialization.json.JsonElement>, files: List<mlabeler.core.io.Item>) {
+        val ed = editor ?: return
+        update { it.copy(pluginParams = it.pluginParams + (p.info.name to kotlinx.serialization.json.JsonObject(params).toString())) }
+        pluginBatch?.cancel()
+        pluginBatch = PluginBatch(p, params, files).also { it.check(ed, scope) }
+    }
+
+    fun closePluginBatch() {
+        pluginBatch?.cancel()
+        pluginBatch = null
+    }
+
     var recorder by mutableStateOf<mlabeler.app.recorder.RecorderState?>(null)
         private set
 
@@ -305,9 +321,19 @@ class AppState(private val scope: CoroutineScope) {
     /** Closes the program (set by the window on computers); used to restart into a new version. */
     var quit: (() -> Unit)? = null
 
-    fun close() {
+    /** Closes the program, first asking about unsaved labels (when "save when switching files" is off). */
+    fun requestQuit() {
+        val q = quit ?: return
+        leaveFolderThen(q)
+    }
+
+    /**
+     * Saves and lets go of what the program holds. [stopToolkit] false: the window does that after it is gone
+     * (telling the toolkit can take a few seconds when it is busy or gone).
+     */
+    fun close(stopToolkit: Boolean = true) {
         editor?.saveAllOnClose()
-        toolkit.close()
+        if (stopToolkit) toolkit.close()
         updater.onExit()
     }
 }

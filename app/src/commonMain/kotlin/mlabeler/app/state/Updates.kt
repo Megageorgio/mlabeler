@@ -57,7 +57,7 @@ data class Version(val major: Int, val minor: Int, val patch: Int, val stage: In
 }
 
 /** A release on GitHub: its version, its page and the file for this platform (null: the page is opened). */
-data class Release(val version: Version, val tag: String, val page: String, val download: String?, val name: String)
+data class Release(val version: Version, val tag: String, val page: String, val download: String?, val name: String, val sha256: String? = null)
 
 /** Looks for newer versions of mLabeler among the releases of its repository. */
 class Updater(private val app: AppState, private val scope: CoroutineScope) {
@@ -115,7 +115,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
         progress = 0f
         installError = ""
         try {
-            mlabeler.app.SelfUpdate.prepare(url, r.tag) { p -> progress = p }
+            mlabeler.app.SelfUpdate.prepare(url, r.tag, r.sha256) { p -> progress = p }
             ready = r.tag
         } catch (e: Throwable) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -132,7 +132,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
     fun installNow() {
         val err = mlabeler.app.SelfUpdate.install(restart = true)
         if (err != null) { installError = err; return }
-        if (mlabeler.app.SelfUpdate.installsOnClose) app.quit?.invoke()
+        if (mlabeler.app.SelfUpdate.installsOnClose) app.requestQuit()
     }
 
     /** The program closes: a downloaded version is put in place (Windows), unless the user turned that off. */
@@ -182,6 +182,11 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
         val assets = (o["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map {
             ((it["name"] as? JsonPrimitive)?.content ?: "") to ((it["browser_download_url"] as? JsonPrimitive)?.content ?: "")
         }
+        // GitHub gives each file's checksum as "sha256:<hex>"
+        val digests = (o["assets"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.associate {
+            ((it["browser_download_url"] as? JsonPrimitive)?.content ?: "") to
+                (it["digest"] as? JsonPrimitive)?.content?.takeIf { d -> d.startsWith("sha256:") }?.removePrefix("sha256:")
+        }
         val os = Platform.name.lowercase()
         fun find(vararg parts: String) = assets.firstOrNull { (n, _) -> parts.all { p -> n.lowercase().contains(p) } }?.second
         val file = when {
@@ -195,7 +200,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
             else -> null // Linux: .deb or the portable archive, the person picks on the release page
         }
         return Release(v, tag, (o["html_url"] as? JsonPrimitive)?.content ?: "https://github.com/$REPO/releases", file,
-            (o["name"] as? JsonPrimitive)?.content ?: tag)
+            (o["name"] as? JsonPrimitive)?.content ?: tag, file?.let { digests[it] })
     }
 
     companion object {

@@ -23,10 +23,10 @@ actual object SelfUpdate {
     actual val supported: Boolean get() = installDir != null
     actual fun canUse(download: String?): Boolean = supported && download?.lowercase()?.endsWith(".zip") == true
 
-    actual suspend fun prepare(download: String, tag: String, progress: (Float) -> Unit) {
+    actual suspend fun prepare(download: String, tag: String, sha256: String?, progress: (Float) -> Unit) {
         discard()
         val zip = File(updates, "$tag.zip")
-        downloadFile(download, zip) { progress(it * 0.9f) }
+        downloadFile(download, zip, sha256) { progress(it * 0.9f) }
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val into = File(updates, tag)
             into.deleteRecursively()
@@ -87,8 +87,8 @@ actual object SelfUpdate {
 internal fun updateScript(pid: Long, src: File, dir: File, updates: File, readyFile: File, tag: String, start: File, restart: Boolean): String {
     fun q(f: File) = "'" + f.path.replace("'", "''") + "'"
     // runs after this program is gone: the new folders are copied next to the old ones first, then swapped by
-    // renaming, so a failed copy leaves the old version working; the settings, data, toolkit and the
-    // "portable" marker are never touched
+    // renaming, so a failed copy leaves the old version working, and a swap that fails half way puts the old
+    // folders back; the settings, data, toolkit and the "portable" marker are never touched
     return """
         ${'$'}log = ${q(File(updates, "update.log"))}
         function L(${'$'}m) { Add-Content -LiteralPath ${'$'}log -Value ((Get-Date).ToString('s') + ' ' + ${'$'}m) }
@@ -117,7 +117,22 @@ internal fun updateScript(pid: Long, src: File, dir: File, updates: File, readyF
             L ('updated to ' + ${q(File(tag))})
         } catch { ${'$'}ok = ${'$'}false; L ('update failed: ' + ${'$'}_) }
         ${'$'}ErrorActionPreference = 'Continue'
-        foreach (${'$'}d in @('app', 'runtime', 'natives')) { Remove-Item -LiteralPath (Join-Path ${'$'}dst (${'$'}d + '.old')) -Recurse -Force -ErrorAction SilentlyContinue }
+        if (-not ${'$'}ok) {
+            # back to the old version: each folder already swapped comes back from .old, the new copies go
+            foreach (${'$'}d in @('app', 'runtime', 'natives')) {
+                ${'$'}t = Join-Path ${'$'}dst ${'$'}d; ${'$'}o = Join-Path ${'$'}dst (${'$'}d + '.old')
+                if (Test-Path -LiteralPath ${'$'}o) {
+                    if (Test-Path -LiteralPath ${'$'}t) { Remove-Item -LiteralPath ${'$'}t -Recurse -Force -ErrorAction SilentlyContinue }
+                    Move-Item -LiteralPath ${'$'}o -Destination ${'$'}t -ErrorAction SilentlyContinue
+                    if (Test-Path -LiteralPath ${'$'}o) { L ('could not put back ' + ${'$'}d) } else { L ('put back ' + ${'$'}d) }
+                }
+                Remove-Item -LiteralPath (${'$'}t + '.new') -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+        # an .old folder goes only when the folder it stood for is there
+        foreach (${'$'}d in @('app', 'runtime', 'natives')) {
+            if (Test-Path -LiteralPath (Join-Path ${'$'}dst ${'$'}d)) { Remove-Item -LiteralPath (Join-Path ${'$'}dst (${'$'}d + '.old')) -Recurse -Force -ErrorAction SilentlyContinue }
+        }
         if (${'$'}ok) { Remove-Item -LiteralPath ${q(readyFile)} -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath ${q(File(updates, tag))} -Recurse -Force -ErrorAction SilentlyContinue }
         if (${if (restart) "\$true" else "\$false"}) { Start-Process -FilePath ${q(start)} -WorkingDirectory ${'$'}dst }
     """.trimIndent()

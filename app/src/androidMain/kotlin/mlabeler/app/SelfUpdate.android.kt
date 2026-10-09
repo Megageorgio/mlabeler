@@ -13,9 +13,9 @@ actual object SelfUpdate {
     actual val supported: Boolean = true
     actual fun canUse(download: String?): Boolean = download?.lowercase()?.endsWith(".apk") == true
 
-    actual suspend fun prepare(download: String, tag: String, progress: (Float) -> Unit) {
+    actual suspend fun prepare(download: String, tag: String, sha256: String?, progress: (Float) -> Unit) {
         discard()
-        downloadFile(download, apk(tag), progress)
+        downloadFile(download, apk(tag), sha256, progress)
         readyFile.writeText(tag)
     }
 

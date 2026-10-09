@@ -551,6 +551,17 @@ private val compareHint = mlabeler.app.i18n.L(
     "Показать разметку тех же файлов из другой папки (другая модель, другой человек) под этой и отметить различия.")
 private val addFolder = mlabeler.app.i18n.L("Add folder…", "Добавить папку…")
 private val useThese = mlabeler.app.i18n.L("Use these labels", "Использовать эту разметку")
+private val prevDiff = mlabeler.app.i18n.L("Previous place where they differ", "Предыдущее место, где они расходятся")
+private val nextDiff = mlabeler.app.i18n.L("Next place where they differ (a boundary 30 ms or more away, or another text)",
+    "Следующее место, где они расходятся (граница дальше 30 мс или другой текст)")
+private val diffCount = mlabeler.app.i18n.L("{0} places differ", "мест с расхождениями: {0}")
+private val noDiff = mlabeler.app.i18n.L("no differences", "расхождений нет")
+private val wholeFolder = mlabeler.app.i18n.L("Whole folder", "Вся папка")
+private val wholeFolderHint = mlabeler.app.i18n.L("The same numbers over every file that has labels in this folder, and the files that differ most",
+    "Те же числа по всем файлам, у которых есть разметка в этой папке, и файлы с самыми большими расхождениями")
+private val folderLine = mlabeler.app.i18n.L("{0} files: {1}", "файлов: {0}; {1}")
+private val worstFiles = mlabeler.app.i18n.L("Differ most:", "Сильнее всего расходятся:")
+private val counting = mlabeler.app.i18n.L("Counting…", "Подсчёт…")
 private val showRef = mlabeler.app.i18n.L("Show under the labels", "Показать под разметкой")
 private val hideRef = mlabeler.app.i18n.L("Hide (stays in this list)", "Скрыть (останется в этом списке)")
 private val noMatch = mlabeler.app.i18n.L("no labels for this file", "для этого файла разметки нет")
@@ -593,7 +604,67 @@ private fun CompareSection(ed: EditorState) {
                         color = c.muted, fontSize = 12.sp,
                     )
                 }
-                Btn(useThese(), modifier = Modifier.padding(top = 4.dp)) { ed.takeReference(r) }
+                // walking through the places where they differ
+                var places by remember(r) { mutableStateOf<Int?>(null) }
+                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    IconBtn(Icons.nudgeLeft, prevDiff(), size = 26.dp) { places = ed.goToDifference(r, forward = false) }
+                    IconBtn(Icons.nudgeRight, nextDiff(), size = 26.dp) { places = ed.goToDifference(r, forward = true) }
+                    places?.let { Text(if (it == 0) noDiff() else diffCount.format(it), color = c.muted, fontSize = 12.sp) }
+                    Spacer(Modifier.weight(1f))
+                }
+                var folderShown by remember(dir) { mutableStateOf(false) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Btn(useThese()) { ed.takeReference(r) }
+                    if (dir.isNotEmpty()) Tip(wholeFolderHint()) { Btn(wholeFolder()) { folderShown = !folderShown } }
+                }
+                if (folderShown) FolderCompare(ed, dir)
+            }
+        }
+    }
+}
+
+/** "Whole folder": the comparison with [dir] over all files, and the files that differ most. */
+@Composable
+private fun FolderCompare(ed: EditorState, dir: String) {
+    val c = T.c
+    var result by remember(dir) { mutableStateOf<Pair<mlabeler.core.check.CompareStats, List<Pair<mlabeler.core.io.Item, Double>>>?>(null) }
+    var files by remember(dir) { mutableStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(dir, ed.docVersion) {
+        result = null
+        result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val pairs = mutableListOf<Pair<IntervalTier, IntervalTier>>()
+            val perFile = mutableListOf<Pair<mlabeler.core.io.Item, Double>>()
+            for (item in ed.items) {
+                val own = ed.currentLabels(item) ?: continue
+                val ref = runCatching { ed.workspace.readLabelsIn(dir, item.name, own.end) }.getOrNull() ?: continue
+                val these = ref.tiers.filterIsInstance<IntervalTier>().mapNotNull { t -> mlabeler.core.check.Compare.counterpart(own, t)?.let { it to t } }
+                if (these.isEmpty()) continue
+                pairs += these
+                perFile += item to mlabeler.core.check.Compare.pooled(these).meanMs
+            }
+            files = perFile.size
+            mlabeler.core.check.Compare.pooled(pairs) to perFile.sortedByDescending { it.second }.take(8)
+        }
+    }
+    val r = result
+    androidx.compose.foundation.layout.Column(Modifier.padding(top = 6.dp)) {
+        if (r == null) { Text(counting(), color = c.muted, fontSize = 12.sp); return@Column }
+        val st = r.first
+        Text(
+            folderLine.format(files, statsLine.format(
+                kotlin.math.round(st.meanMs * 10) / 10, kotlin.math.round(st.medianMs * 10) / 10,
+                kotlin.math.round(st.within20 * 100).toInt(), st.textMismatches,
+            )),
+            color = c.text, fontSize = 12.sp,
+        )
+        if (r.second.isNotEmpty()) Text(worstFiles(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        for ((item, ms) in r.second) {
+            Row(
+                Modifier.fillMaxWidth().clickable { ed.items.indexOfFirst { it.id == item.id }.takeIf { it >= 0 }?.let { ed.open(it) } }.padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(item.name, color = c.text, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                Text("${kotlin.math.round(ms * 10) / 10} ms", color = if (ms >= 30) c.danger else if (ms >= 10) c.warn else c.ok, fontSize = 12.sp)
             }
         }
     }

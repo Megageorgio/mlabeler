@@ -30,6 +30,8 @@ import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.theme.T
 import mlabeler.core.model.IntervalTier
+import mlabeler.app.state.autolabel
+import mlabeler.app.state.autolabelFiles
 
 private val title = L("Autolabel", "Авторазметка")
 private val partLine = L("{0} – {1} ({2})", "{0} – {1} ({2})")

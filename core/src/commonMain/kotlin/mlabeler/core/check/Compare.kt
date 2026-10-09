@@ -33,9 +33,38 @@ object Compare {
         k < 0 || main.texts[k] != ref.texts[i]
     }
 
+    /**
+     * Times (seconds, in order) worth a look: boundaries of [ref] at least [minMs] from any of [main], and the
+     * middles of intervals with another text. The outer edges are left out.
+     */
+    fun differences(main: IntervalTier, ref: IntervalTier, minMs: Double = 30.0): List<Double> {
+        val d = boundDeltas(main, ref)
+        val out = mutableListOf<Double>()
+        for (i in 1 until d.size - 1) if (d[i] * 1000 >= minMs) out += ref.bounds[i]
+        val mism = textMismatch(main, ref)
+        for (i in mism.indices) if (mism[i]) out += (ref.startOf(i) + ref.endOf(i)) / 2
+        return out.sorted().fold(mutableListOf()) { acc, t -> if (acc.isEmpty() || t - acc.last() > 0.005) acc += t; acc }
+    }
+
+    /** [stats] over many files at once: the boundaries of all of them pooled. */
+    fun pooled(pairs: List<Pair<IntervalTier, IntervalTier>>): CompareStats {
+        val d = pairs.flatMap { (main, ref) -> innerDeltasMs(main, ref) }.sorted()
+        return CompareStats(
+            bounds = d.size,
+            meanMs = if (d.isEmpty()) 0.0 else d.average(),
+            medianMs = if (d.isEmpty()) 0.0 else d[d.size / 2],
+            within20 = if (d.isEmpty()) 1.0 else d.count { it < 20 }.toDouble() / d.size,
+            textMismatches = pairs.sumOf { (main, ref) -> textMismatch(main, ref).count { it } },
+            intervals = pairs.sumOf { it.second.size },
+        )
+    }
+
+    // the outer edges say little about alignment quality
+    private fun innerDeltasMs(main: IntervalTier, ref: IntervalTier): List<Double> =
+        boundDeltas(main, ref).let { if (it.size > 2) it.copyOfRange(1, it.size - 1) else it }.map { it * 1000 }
+
     fun stats(main: IntervalTier, ref: IntervalTier): CompareStats {
-        // the outer edges say little about alignment quality
-        val d = boundDeltas(main, ref).let { if (it.size > 2) it.copyOfRange(1, it.size - 1) else it }.map { it * 1000 }.sorted()
+        val d = innerDeltasMs(main, ref).sorted()
         val mism = textMismatch(main, ref).count { it }
         return CompareStats(
             bounds = d.size,
