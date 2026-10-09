@@ -50,6 +50,11 @@ private val folderT = L("Save to (folder next to the recording; a \"/\" in a seg
 private val withLabelsT = L("With labels", "С разметкой")
 private val saveT = L("Save the segments", "Сохранить сегменты")
 private val savedT = L("Saved segments: {0} in {1}", "Сохранено сегментов: {0} в {1}")
+private val namesT = L("Names from a list (separated by spaces or lines), in the order of the segments", "Имена по списку (через пробел или с новой строки), по порядку сегментов")
+private val namesBtnT = L("Name the segments", "Назвать сегменты")
+private val namesFileT = L("From a file…", "Из файла…")
+private val namedT = L("Named {0} segments; {1} names left over", "Названо сегментов: {0}; лишних имён: {1}")
+private val niaoT = L("NiaoNiao marks (.inf) for each part, placed from the loudness", "Метки NiaoNiao (.inf) для каждой части, по громкости")
 private val existsT = L("{0} already exists; nothing was written", "{0} уже существует; ничего не записано")
 
 /** Marking pieces of a long recording on a "segments" lane and saving each as its own file. */
@@ -65,6 +70,8 @@ fun SegmentDialog(app: AppState) {
     val named = seg?.let { t -> (0 until t.size).filter { t.texts[it].isNotBlank() } } ?: emptyList()
     var folder by remember { mutableStateOf(Paths.stem(item.audioPath) + "_parts") }
     var withLabels by remember { mutableStateOf(true) }
+    var names by remember { mutableStateOf("") }
+    var niao by remember { mutableStateOf(ed.items.any { it.labelFormat == LabelFormat.Inf }) }
     val scope = rememberCoroutineScope()
     fun close() { app.showSegments = false; ed.requestFocus() }
 
@@ -103,7 +110,12 @@ fun SegmentDialog(app: AppState) {
                                 val path = targets[n]
                                 fs.mkdirs(Paths.parent(path))
                                 fs.write(path, w.slice((a * w.sampleRate).toInt(), (b * w.sampleRate).toInt()))
-                                if (withLabels) {
+                                if (niao) {
+                                    val part = mlabeler.core.audio.Wav.decode(fs.read(path))
+                                    mlabeler.core.format.NiaoNiao.auto(part.samples, part.sampleRate)
+                                        ?.let { mlabeler.core.format.NiaoNiao.measure(it, part.samples, part.sampleRate) }
+                                        ?.let { fs.write(Paths.withExt(path, "inf"), it.write().encodeToByteArray()) }
+                                } else if (withLabels) {
                                     val part = Edits.crop(labels, a, b, duration)
                                     val text = if (fmt == LabelFormat.TextGrid) TextGridFormat.write(part, b - a) else HtkLab.write(part)
                                     fs.write(Paths.withExt(path, fmt.extension), text.encodeToByteArray())
@@ -139,11 +151,34 @@ fun SegmentDialog(app: AppState) {
                 }
             }
             Text(if (seg == null) noneT() else countT.format(named.size), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
+            if (seg != null && named.isNotEmpty()) {
+                Text(namesT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Field(names, { names = it }, Modifier.weight(1f))
+                    if (mlabeler.app.Platform.hasNativeFolderPicker) Btn(namesFileT()) {
+                        scope.launch {
+                            val f = withContext(Dispatchers.Default) { mlabeler.app.Platform.pickFileNative(namesFileT(), listOf("txt"), Paths.parent(item.audioPath)) }
+                            if (f != null) names = runCatching { mlabeler.core.io.decodeGuess(ed.workspace.fs.read(f), "UTF-8").first }.getOrDefault("")
+                                .split(Regex("[\\s,]+")).filter { it.isNotBlank() }.joinToString(" ")
+                        }
+                    }
+                    Btn(namesBtnT(), enabled = names.isNotBlank()) {
+                        val list = names.split(Regex("[\\s,]+")).filter { it.isNotBlank() }
+                        val t = seg
+                        ed.updateDoc { d -> d.replace(segIndex, IntervalTier(t.name, t.bounds, t.texts.mapIndexed { i, x -> named.indexOf(i).let { k -> if (k >= 0 && k < list.size) list[k] else x } }, t.confidence)) }
+                        app.message(namedT.format(minOf(list.size, named.size), (list.size - named.size).coerceAtLeast(0)))
+                    }
+                }
+            }
             Text(folderT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
             Field(folder, { folder = it }, Modifier.fillMaxWidth().padding(top = 4.dp))
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Toggle(withLabels, { withLabels = it })
                 Text(withLabelsT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
+            }
+            Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Toggle(niao, { niao = it })
+                Text(niaoT(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))
             }
         }
     }
