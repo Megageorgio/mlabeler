@@ -124,7 +124,7 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             }
             val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate)
             if (replace) {
-                updateDoc { d ->
+                updateDocShowingChanges { d ->
                     var out = d
                     for (pt in part.tiers.filterIsInstance<IntervalTier>()) {
                         val k = out.tierIndex(pt.name).takeIf { k -> k >= 0 } ?: if (pt.name == "phones") out.phonemeTierIndex() else -1
@@ -224,7 +224,7 @@ fun EditorState.autolabelFiles(
                         return out
                     }
                     if (f.id == item?.id) {
-                        updateDoc { d -> merged(d) }
+                        updateDocShowingChanges { d -> merged(d) }
                         saveLabels(quiet = true)
                     } else {
                         writeOtherLabels(f, merged(current ?: LabelDoc.empty(a.duration)), a.duration,
@@ -310,7 +310,7 @@ fun EditorState.refineBoundaries(from: Double, to: Double, r: RefineSettings) {
             if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
             toolkitBusy = S.uploading()
             val (out, moved) = refinedDoc(client, it.name, a, d, from, to, r) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
-            if (moved > 0) updateDoc { out }
+            if (moved > 0) updateDocShowingChanges { out }
             app.message(refinedT.format(moved))
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -356,7 +356,7 @@ fun EditorState.refineFiles(files: List<Item>, r: RefineSettings) {
                     moved += m
                     if (m > 0) {
                         if (f.id == item?.id) {
-                            updateDoc { out }
+                            updateDocShowingChanges { out }
                             saveLabels(quiet = true)
                         } else writeOtherLabels(f, out, a.duration)
                     }

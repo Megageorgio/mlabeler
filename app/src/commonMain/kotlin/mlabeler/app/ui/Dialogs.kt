@@ -122,8 +122,11 @@ private val animationsT = mlabeler.app.i18n.L("Animations", "Анимации")
 private val animNormalT = mlabeler.app.i18n.L("Normal", "Обычные")
 private val animReducedT = mlabeler.app.i18n.L("Reduced", "Уменьшенные")
 private val animOffT = mlabeler.app.i18n.L("Off", "Выключены")
-private val animationsHint = mlabeler.app.i18n.L("Windows, messages and buttons appear and change softly. What you edit — boundaries, the cursor, the zoom — never moves by itself.",
-    "Окна, сообщения и кнопки появляются и меняются плавно. То, что вы редактируете, — границы, курсор, масштаб — само никогда не движется.")
+private val animationsHint = mlabeler.app.i18n.L("Windows, messages and buttons appear and change softly. What you edit — boundaries, the cursor — never moves by itself.",
+    "Окна, сообщения и кнопки появляются и меняются плавно. То, что вы редактируете, — границы, курсор — само никогда не движется.")
+private val smoothViewT = mlabeler.app.i18n.L("The view glides to a selection, a found place or a difference instead of jumping", "Вид плавно переходит к выделению, найденному месту или расхождению, а не прыгает")
+private val flashChangesT = mlabeler.app.i18n.L("What autolabel, a plugin, undo or redo changed glows for a moment", "То, что изменили авторазметка, плагин, отмена или повтор, на мгновение подсвечивается")
+private val hoverBoundaryT = mlabeler.app.i18n.L("The boundary under the mouse pointer is highlighted", "Граница под указателем мыши подсвечивается")
 private val searchSettingsT = mlabeler.app.i18n.L("Search settings", "Поиск настроек")
 private val scaleButtonT = mlabeler.app.i18n.L("Interface size button (in percent) on the toolbar", "Кнопка размера интерфейса (в процентах) на панели")
 private val detailT = mlabeler.app.i18n.L("Detail", "Чёткость")
@@ -799,6 +802,12 @@ private fun InterfacePage(app: AppState) {
             for ((v, t) in listOf("normal" to animNormalT(), "reduced" to animReducedT(), "off" to animOffT())) Chip(t, s.animations == v) { app.update { it.copy(animations = v) } }
         }
         Text(animationsHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+        // these follow the choice above: shorter when reduced, none when off
+        if (s.animations != "off") {
+            SwitchRow(smoothViewT(), s.smoothView) { v -> app.update { it.copy(smoothView = v) } }
+            SwitchRow(flashChangesT(), s.flashChanges) { v -> app.update { it.copy(flashChanges = v) } }
+        }
+        if (!mlabeler.app.Platform.isMobile) SwitchRow(hoverBoundaryT(), s.hoverBoundary) { v -> app.update { it.copy(hoverBoundary = v) } }
     }
     if (s.statusBar) Fold(MenuTitles.statusBar()) {
         StatusBarSettings(app) { t, v, f -> SwitchRow(t, v, f) }
@@ -1073,6 +1082,12 @@ internal object SettingsHelp {
                 "Гласные, согласные и паузы на дорожке фонем слегка подкрашиваются цветами темы."),
             h("Interface", animationsT, "Normal: short fades and slides. Reduced: quicker fades only. Off: everything at once.",
                 "Обычные — короткие появления и сдвиги. Уменьшенные — только быстрые появления. Выключены — всё сразу."),
+            h("Interface", smoothViewT, "Going to a selection, a search result, a place to review or a difference of a comparison moves the view smoothly (shorter with reduced animations).",
+                "Переход к выделению, результату поиска, месту проверки или расхождению сравнения плавно сдвигает вид (быстрее при уменьшенных анимациях)."),
+            h("Interface", flashChangesT, "The intervals that changed glow in the accent colour and fade out in about a second.",
+                "Изменившиеся интервалы подсвечиваются цветом акцента и гаснут примерно за секунду."),
+            h("Interface", hoverBoundaryT, "Before you grab a boundary, the one that would move is drawn thicker. Off by default.",
+                "Прежде чем вы схватите границу, та, что сдвинется, рисуется толще. По умолчанию выключено."),
             h("Interface", tipsAtStartT, "At every start a tip about a less obvious feature or setting; Help → Tip of the day shows them any time.",
                 "При каждом запуске — совет о неочевидной функции или настройке; Справка → Совет дня показывает их в любое время."),
             h("Interface", MenuTitles.statusBar, "The line at the bottom: phoneme number, done files, scale and more; below it you choose what it shows.",

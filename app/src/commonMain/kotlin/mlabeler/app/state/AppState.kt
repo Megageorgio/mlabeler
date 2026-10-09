@@ -94,7 +94,7 @@ class AppState(private val scope: CoroutineScope) {
             try {
                 val oto = p.info.target == "oto"
                 val r = mlabeler.app.plugins.Plugins.run(p, params, if (oto) null else ed.doc, if (oto) ed.oto.entries else null, ed.item?.name ?: "", ed.duration)
-                r.doc?.let { d -> ed.updateDoc { mlabeler.core.edit.Edits.fitToDuration(d, ed.duration) } }
+                r.doc?.let { d -> ed.updateDocShowingChanges { mlabeler.core.edit.Edits.fitToDuration(d, ed.duration) } }
                 r.entries?.let { ed.oto.replaceAll(it) }
                 val text = listOfNotNull(r.report, r.logs.takeIf { it.isNotEmpty() }?.joinToString("\n")).joinToString("\n")
                 message(text.ifEmpty { mlabeler.app.i18n.S.pluginDone() })
