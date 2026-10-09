@@ -16,6 +16,8 @@ fun main(args: Array<String>) {
             if (d.isDirectory && d.canWrite()) System.setProperty(key, d.path)
         }
     }
+    // old Windows has no DirectX 12, which the graphics library starts with: OpenGL (software drawing when that fails too)
+    if (Platform.legacyWindows && System.getProperty("skiko.renderApi") == null) System.setProperty("skiko.renderApi", "OPENGL")
     // a crash leaves its report for the next start
     val previous = Thread.getDefaultUncaughtExceptionHandler()
     Thread.setDefaultUncaughtExceptionHandler { t, e -> CrashLog.write(e.stackTraceToString()); previous?.uncaughtException(t, e) }

@@ -35,6 +35,7 @@ actual object Platform {
         (NSSearchPathForDirectoriesInDomains(kind, NSUserDomainMask, true).firstOrNull() as? String) ?: "/tmp"
 
     actual val portableDir: String? = null
+    actual val legacyWindows: Boolean = false
     actual fun dataDir(): String {
         val d = dir(NSApplicationSupportDirectory) + "/mLabeler"
         NSFileManager.defaultManager.createDirectoryAtPath(d, true, null, null)

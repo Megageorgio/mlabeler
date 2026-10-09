@@ -14,6 +14,8 @@ Ready builds for every platform are on the [Releases](https://github.com/Megageo
 - **Windows** — a `.zip` that needs no installation (unpack and run `mLabeler.exe`), the `.msi` installer, or the fully
   portable `-portable.zip`: the settings, the toolkit, its Python and models all stay in the program folder and nothing
   is written anywhere else (a USB stick or a separate disk will do; the toolkit and models take several gigabytes);
+- **old Windows (7, 8.1)** — the experimental `-windows7-legacy-x64-no-toolkit.zip`: the same program without
+  mVocalToolkit of its own (it doesn't run there); autolabel can use the toolkit of another computer in the network;
 - **macOS** — `.dmg`;
 - **Linux** — `.deb` for Debian and Ubuntu, or a `.tar.gz` for any distribution (unpack and run `bin/mLabeler`);
 - **Android** — `.apk`;
@@ -23,7 +25,7 @@ Ready builds for every platform are on the [Releases](https://github.com/Megageo
 
 | System | Minimum |
 |---|---|
-| Windows | Windows 10 or 11, 64-bit |
+| Windows | Windows 10 or 11, 64-bit (7 SP1 and 8.1: the experimental build without the toolkit) |
 | macOS | macOS 12 or newer, a Mac with Apple Silicon (M1 or newer) |
 | Linux | a current 64-bit (x86-64) distribution |
 | Android | Android 8.0 or newer |

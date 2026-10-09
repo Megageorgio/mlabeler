@@ -124,8 +124,9 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
         val file = when {
             os == "android" -> find(".apk")
             // the fully portable build updates to the portable archive, the others never to it
+            os.contains("win") && Platform.legacyWindows -> find("windows", "legacy", ".zip")
             os.contains("win") && Platform.portableDir != null -> find("windows", "portable", ".zip")
-            os.contains("win") -> assets.firstOrNull { (n, _) -> n.lowercase().let { it.contains("windows") && it.endsWith(".zip") && !it.contains("portable") } }?.second
+            os.contains("win") -> assets.firstOrNull { (n, _) -> n.lowercase().let { it.contains("windows") && it.endsWith(".zip") && !it.contains("portable") && !it.contains("legacy") } }?.second
                 ?: find(".msi")
             os.contains("mac") -> find(".dmg")
             os == "ios" -> null

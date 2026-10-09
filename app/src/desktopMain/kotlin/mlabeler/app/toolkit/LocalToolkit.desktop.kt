@@ -13,7 +13,8 @@ actual object LocalToolkit {
     private var last: Process? = null
 
 
-    actual val supported: Boolean = true
+    // old Windows: Python and uv no longer run there; the toolkit of another computer can be used instead
+    actual val supported: Boolean = !mlabeler.app.Platform.legacyWindows
     actual val running: Boolean get() = process?.isAlive == true
 
     private fun exe(name: String) = if (windows) "$name.exe" else name

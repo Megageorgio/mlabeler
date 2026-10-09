@@ -674,6 +674,7 @@ private fun ToolkitPage(app: AppState) {
     SectionTitle(S.toolkit())
     Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
     mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
+    if (mlabeler.app.Platform.legacyWindows) LegacyNote()
     ToolkitStatus(app, reinstall = true)
     if (tk.canRunHere) Row(Modifier.padding(top = 6.dp)) {
         Btn(ErrorTitles.updateToolkit(), enabled = !tk.updatingNow) { tk.updateNow() }
@@ -930,6 +931,7 @@ private fun AboutPage(app: AppState) {
     Text("mLabeler ${mlabeler.app.AppInfo.VERSION}", color = c.text, fontSize = 15.sp)
     Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
     mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
+    if (mlabeler.app.Platform.legacyWindows) LegacyNote()
     UpdateSection(app) { t, v, f -> SwitchRow(t, v, f) }
     SectionTitle(AboutTitles.author())
     person("m", listOf(
@@ -1137,6 +1139,23 @@ internal fun Modifier.settingFocus(title: String): Modifier {
     androidx.compose.runtime.LaunchedEffect(focus) { kotlinx.coroutines.delay(150); requester.bringIntoView() }
     return this.bringIntoViewRequester(requester).background(T.c.accent.copy(alpha = 0.18f))
 }
+
+/** The notice of the build for old Windows: no toolkit of its own. */
+@Composable
+internal fun LegacyNote() {
+    val c = T.c
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp).clip(RoundedCornerShape(c.radius)).background(c.warn.copy(alpha = 0.12f))
+        .border(c.borderWidth, c.warn.copy(alpha = 0.5f), RoundedCornerShape(c.radius)).padding(10.dp)) {
+        Text(legacyTitleT(), color = c.text, fontSize = 13.sp)
+        Text(legacyNoteT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+private val legacyTitleT = mlabeler.app.i18n.L("Build for old Windows, without mVocalToolkit", "Сборка для старых Windows, без mVocalToolkit")
+private val legacyNoteT = mlabeler.app.i18n.L(
+    "Made for Windows 7 and 8.1 (64-bit). The toolkit can't be installed here; autolabel works through the toolkit of another computer in the network. On Windows 10 and 11 the usual build is better.",
+    "Для Windows 7 и 8.1 (64-бит). Тулкит здесь не устанавливается; авторазметка работает через тулкит другого компьютера в сети. На Windows 10 и 11 лучше обычная сборка.",
+)
 
 /** The notice of the fully portable build: where everything is kept and that it needs room. */
 @Composable

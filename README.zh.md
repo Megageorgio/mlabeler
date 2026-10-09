@@ -13,6 +13,8 @@
 
 - **Windows**：免安装 `.zip`（解压后运行 `mLabeler.exe`）、`.msi` 安装程序，或完全便携的 `-portable.zip`：设置、工具包及其
   Python 和模型都保存在程序文件夹中，不会向其他任何位置写入文件（可放在 U 盘或单独的磁盘上；工具包和模型占用数 GB）；
+- **旧版 Windows（7、8.1）**：实验性的 `-windows7-legacy-x64-no-toolkit.zip`，同一程序但不含 mVocalToolkit（它无法在这些系统上运行）；
+  自动标注可以使用同一网络中另一台电脑上的工具包；
 - **macOS**：`.dmg`；
 - **Linux**：适用于 Debian 和 Ubuntu 的 `.deb`，或适用于任何发行版的 `.tar.gz`（解压后运行 `bin/mLabeler`）；
 - **Android**：`.apk`；
@@ -22,7 +24,7 @@
 
 | 系统 | 最低要求 |
 |---|---|
-| Windows | Windows 10 或 11，64 位 |
+| Windows | Windows 10 或 11，64 位（7 SP1 和 8.1：不含工具包的实验性版本） |
 | macOS | macOS 12 或更高版本，搭载 Apple 芯片（M1 及更新）的 Mac |
 | Linux | 较新的 64 位（x86-64）发行版 |
 | Android | Android 8.0 或更高版本 |

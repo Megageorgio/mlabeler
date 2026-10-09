@@ -72,6 +72,7 @@ actual object Platform {
     actual val systemLanguage: String get() = Locale.getDefault().language
 
     actual val portableDir: String? = null
+    actual val legacyWindows: Boolean = false
     actual fun dataDir(): String = AndroidContext.context.filesDir.path
     actual fun homeDir(): String = Environment.getExternalStorageDirectory().path
 

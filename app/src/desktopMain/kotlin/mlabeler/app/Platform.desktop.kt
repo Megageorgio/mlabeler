@@ -23,6 +23,11 @@ actual object Platform {
     actual val systemLanguage: String = Locale.getDefault().language
 
     actual val portableDir: String? = System.getProperty("mlabeler.portable")?.takeIf { it.isNotBlank() }
+    actual val legacyWindows: Boolean = System.getProperty("mlabeler.legacy") == "1" || run {
+        // also any build started on Windows older than 10 (version 6.x)
+        val os = System.getProperty("os.name").orEmpty()
+        os.startsWith("Windows") && (System.getProperty("os.version")?.substringBefore('.')?.toIntOrNull() ?: 10) < 10
+    }
 
     actual fun dataDir(): String {
         val home = System.getProperty("user.home")

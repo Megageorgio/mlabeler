@@ -114,6 +114,10 @@ func main() {
 		// -XX:-UsePerfData: no hsperfdata folder in the system's temporary folder
 		args = append([]string{"-XX:-UsePerfData", "-Dmlabeler.portable=" + dir, "-Djava.io.tmpdir=" + filepath.Join(dir, "data", "tmp")}, args...)
 	}
+	// the build for old Windows (a "legacy" file next to mLabeler.exe): no toolkit, OpenGL drawing
+	if _, err := os.Stat(filepath.Join(dir, "legacy")); err == nil {
+		args = append([]string{"-Dmlabeler.legacy=1", "-Dskiko.renderApi=OPENGL"}, args...)
+	}
 	args = append(args, os.Args[1:]...)
 	cmd := exec.Command(java, args...)
 	if portable {

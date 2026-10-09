@@ -49,6 +49,10 @@ private val phoneHint = L(
     "On a phone or tablet the toolkit runs on a computer. On the computer: open mLabeler, Settings → Autolabel, turn on \"Let phones connect\" — then type the address and token shown there into the fields below.",
     "На телефоне или планшете тулкит работает на компьютере. На компьютере: mLabeler → Настройки → Авторазметка → включите «Разрешить подключение с телефона» и введите сюда показанные там адрес и токен.",
 )
+private val legacyHint = L(
+    "This build for old Windows has no toolkit of its own (it doesn't run there). Autolabel can use the toolkit of another computer in the network: there open mLabeler, Settings → Autolabel, turn on \"Let phones connect\", then type the address and token shown there into the fields below.",
+    "В этой сборке для старых Windows нет своего тулкита (он там не работает). Авторазметка может пользоваться тулкитом другого компьютера в сети: на нём mLabeler → Настройки → Авторазметка → включите «Разрешить подключение с телефона» и введите сюда показанные там адрес и токен.",
+)
 private val showLog = L("Log…", "Журнал…")
 private val reinstallBtn = L("Reinstall", "Переустановить")
 private val reinstallSure = L("Click again to reinstall", "Нажмите ещё раз")
@@ -108,7 +112,7 @@ fun ToolkitStatus(app: AppState, checkOnShow: Boolean = true, reinstall: Boolean
         if (confirmReinstall) Text(reinstallHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         if (tk.status == Status.Missing && LocalToolkit.supported) Text(installHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         if (!LocalToolkit.supported && tk.status != Status.Ready && tk.status != Status.Checking) {
-            Text(phoneHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+            Text(if (mlabeler.app.Platform.legacyWindows) legacyHint() else phoneHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
         }
         if (tk.status == Status.Installing || tk.status == Status.Starting) InstallStats(tk)
         if (logOpen || tk.status == Status.Installing) {
