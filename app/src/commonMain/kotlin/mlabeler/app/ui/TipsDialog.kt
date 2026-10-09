@@ -127,8 +127,8 @@ private val tips = listOf(
         L("Labels are saved when you go to another file; this can be turned off in Settings → General, then changes wait until you save. The same page has autosave every N seconds, for long sessions in one file.",
             "Разметка сохраняется при переходе к другому файлу; в Настройки → Общие это можно выключить, тогда изменения ждут явного сохранения. Там же есть автосохранение каждые N секунд — для долгой работы в одном файле.")),
     Tip(L("Many label formats", "Много форматов разметки"),
-        L("The program reads and writes .lab, Praat .TextGrid, Audacity labels, DiffSinger .ds and transcriptions.csv, .seg with .trans and UTAU oto.ini, and imports vLabeler projects (.lbp). A file is saved back in the format it came in.",
-            "Программа читает и записывает .lab, .TextGrid из Praat, метки Audacity, .ds и transcriptions.csv DiffSinger, .seg с .trans и oto.ini UTAU, а также импортирует проекты vLabeler (.lbp). Файл сохраняется обратно в том формате, в котором был.")),
+        L("The program reads and writes .lab, Praat .TextGrid, Audacity labels, DiffSinger .ds and transcriptions.csv and UTAU oto.ini, and imports vLabeler projects (.lbp). A file is saved back in the format it came in.",
+            "Программа читает и записывает .lab, .TextGrid из Praat, метки Audacity, .ds и transcriptions.csv DiffSinger и oto.ini UTAU, а также импортирует проекты vLabeler (.lbp). Файл сохраняется обратно в том формате, в котором был.")),
 )
 
 private val tipOfDay = L("Tip of the day", "Совет дня")

@@ -95,8 +95,8 @@ private val showFileT = L("Show in file manager", "Показать в пров�
 private val openT = L("Open", "Открыть")
 private val renameTitle = L("Rename the recording", "Переименование записи")
 private val renameAbout = L(
-    "Every file named after it gets the new name too: labels of any format, .trans, MIDI, UTAU caches (.frq…), here and in the label folders. Its oto.ini entries, transcriptions.csv rows, marks and drawn pitch follow.",
-    "Новое имя получат и все файлы, названные по записи: разметка любого формата, .trans, MIDI, кэши UTAU (.frq…) — рядом с ней и в папках разметки. Её записи в oto.ini, строки transcriptions.csv, отметки и нарисованная высота тона тоже переедут.",
+    "Every file named after it gets the new name too: labels of any format, MIDI, UTAU caches (.frq…), here and in the label folders. Its oto.ini entries, transcriptions.csv rows, marks and drawn pitch follow.",
+    "Новое имя получат и все файлы, названные по записи: разметка любого формата, MIDI, кэши UTAU (.frq…) — рядом с ней и в папках разметки. Её записи в oto.ini, строки transcriptions.csv, отметки и нарисованная высота тона тоже переедут.",
 )
 private val renameWill = L("Will be renamed: {0} files, oto entries: {1}, transcriptions.csv rows: {2}", "Будет переименовано: файлов — {0}, записей oto — {1}, строк transcriptions.csv — {2}")
 private val nameTaken = L("Can't: {0}", "Нельзя: {0}")
