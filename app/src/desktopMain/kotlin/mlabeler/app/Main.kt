@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.toComposeImageBitmap
 
 fun main(args: Array<String>) {
     // where the graphics and folder-dialog libraries unpack themselves if they are not next to the program:
@@ -85,6 +86,8 @@ private class OwnFrame(
 ) : mlabeler.app.ui.WindowFrame {
     override val maximized get() = state.placement != WindowPlacement.Floating
     override val systemButtons = mac
+    override val icon: androidx.compose.ui.graphics.painter.Painter? = appIcons?.firstOrNull { it.getWidth(null) == 32 }
+        ?.let { runCatching { androidx.compose.ui.graphics.painter.BitmapPainter((it as java.awt.image.BufferedImage).toComposeImageBitmap()) }.getOrNull() }
     override fun minimize() { state.isMinimized = true }
     override fun toggleMaximize() {
         if (state.placement == WindowPlacement.Floating) {

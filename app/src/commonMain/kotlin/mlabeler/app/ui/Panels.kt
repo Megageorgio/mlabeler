@@ -2,6 +2,7 @@
 
 package mlabeler.app.ui
 
+import androidx.compose.foundation.layout.fillMaxHeight
 import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -137,7 +138,8 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
         } else if (list.isEmpty()) {
             Text(S.nothingFound(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state) {
+        androidx.compose.foundation.layout.Box(Modifier.weight(1f).fillMaxWidth()) {
+        LazyColumn(Modifier.fillMaxSize(), state = state) {
             items(rows, key = { r -> r.item?.id ?: ("dir:" + r.dir) }) { r ->
                 if (r.item == null) {
                     // a folder heading
@@ -210,6 +212,8 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                 }
                 }
             }
+        }
+        LazyScrollbar(state, Modifier.align(Alignment.CenterEnd).fillMaxHeight(), label = { n -> rows.getOrNull(n)?.let { r -> r.item?.let { Paths.name(it.id) } ?: r.dir.ifEmpty { Paths.name(ed.workspace.root) } } })
         }
         Divider()
         val done = ed.items.count { ed.marks(it).done }

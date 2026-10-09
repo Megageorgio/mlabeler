@@ -1,5 +1,7 @@
 package mlabeler.app.ui
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -140,7 +142,8 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                 val shown = visible.size > 2 && activeRow > visible.first().index && activeRow < visible.last().index
                 if (!shown) listState.scrollToItem((activeRow - (visible.size / 2).coerceAtLeast(3)).coerceAtLeast(0))
             }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState) {
+            androidx.compose.foundation.layout.Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(Modifier.fillMaxSize(), state = listState) {
                 itemsIndexed(list, key = { _, it -> "${it.item}/${it.tier}/${it.index}" }) { pos, e ->
                     val active = e.item == ed.index && sel != null && sel.index == e.index &&
                         doc?.tiers?.getOrNull(sel.tier)?.name == e.tier
@@ -188,6 +191,8 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                     }
                     }
                 }
+            }
+            LazyScrollbar(listState, Modifier.align(Alignment.CenterEnd).fillMaxHeight(), label = { n -> list.getOrNull(n)?.text?.ifEmpty { "∅" } })
             }
         }
         Divider()

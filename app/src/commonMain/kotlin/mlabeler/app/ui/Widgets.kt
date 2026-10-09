@@ -7,6 +7,8 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.hoverable
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.fillMaxSize
@@ -556,43 +558,94 @@ fun Modifier.scrollWithHint(state: androidx.compose.foundation.ScrollState = and
 }
 
 /**
- * A scroll bar for a lazy list, to be put next to it: the thumb shows the part in view (by items) and can be
- * dragged, a click on the track jumps there.
+ * A scroll bar for a lazy list, to be put over its right edge: the thumb shows the part in view (by items);
+ * grabbing it and moving goes anywhere in the list at once, a press on the track jumps there.
+ * [label] names the row at the top while dragging (shown next to the thumb), e.g. a file name.
  */
 @Composable
-fun LazyScrollbar(state: androidx.compose.foundation.lazy.LazyListState, modifier: Modifier = Modifier) {
+fun LazyScrollbar(
+    state: androidx.compose.foundation.lazy.LazyListState,
+    modifier: Modifier = Modifier,
+    label: ((Int) -> String?)? = null,
+) {
     val c = T.c
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val info = state.layoutInfo
     val total = info.totalItemsCount
     val visible = info.visibleItemsInfo.size
     if (total == 0 || visible >= total) return
+    var dragging by remember { mutableStateOf(false) }
+    val source = remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var height by remember { mutableStateOf(0f) }
+    val minThumb = with(density) { 28.dp.toPx() }
+    fun thumbOf(h: Float) = (h * visible / total).coerceAtLeast(minThumb).coerceAtMost(h)
+    fun topOf(h: Float): Float {
+        val first = state.firstVisibleItemIndex.toFloat() / (total - visible).coerceAtLeast(1)
+        return (h - thumbOf(h)) * first.coerceIn(0f, 1f)
+    }
     androidx.compose.foundation.layout.Box(
-        modifier.width(if (mlabeler.app.Platform.isMobile) 14.dp else 10.dp)
-            .pointerInput(total) {
-                fun jump(y: Float) {
-                    val f = (y / size.height).coerceIn(0f, 1f)
-                    scope.launch { state.scrollToItem(((total - visible) * f).toInt().coerceIn(0, total - 1)) }
-                }
+        modifier.width(if (mlabeler.app.Platform.isMobile) 16.dp else 12.dp)
+            .onSizeChanged { height = it.height.toFloat() }
+            .hoverable(source)
+            .pointerInput(total, visible) {
                 awaitPointerEventScope {
                     while (true) {
-                        val ev = awaitPointerEvent()
-                        val ch = ev.changes.firstOrNull() ?: continue
-                        if (ch.pressed) { jump(ch.position.y); ch.consume() }
+                        val down = awaitPointerEvent()
+                        val ch0 = down.changes.firstOrNull() ?: continue
+                        if (!ch0.pressed) continue
+                        val h = size.height.toFloat()
+                        val thumb = thumbOf(h)
+                        val top0 = topOf(h)
+                        // grabbing the thumb keeps it under the pointer where it was taken; elsewhere its middle comes to the pointer
+                        val grab = if (ch0.position.y in top0..(top0 + thumb)) ch0.position.y - top0 else thumb / 2
+                        fun go(y: Float) {
+                            val f = ((y - grab) / (h - thumb).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                            scope.launch { state.scrollToItem(((total - visible) * f).toInt().coerceIn(0, total - 1)) }
+                        }
+                        dragging = true
+                        go(ch0.position.y); ch0.consume()
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            val ch = ev.changes.firstOrNull() ?: break
+                            if (!ch.pressed) { ch.consume(); break }
+                            go(ch.position.y); ch.consume()
+                        }
+                        dragging = false
                     }
                 }
             }
-            .then(Modifier.drawBehind {
+            .drawBehind {
                 val h = size.height
-                val thumb = (h * visible / total).coerceAtLeast(24.dp.toPx()).coerceAtMost(h)
-                val first = state.firstVisibleItemIndex.toFloat() / (total - visible).coerceAtLeast(1)
-                val top = (h - thumb) * first.coerceIn(0f, 1f)
-                val w = 4.dp.toPx()
+                val thumb = thumbOf(h)
+                val top = topOf(h)
+                val wide = dragging || hovered
+                val w = (if (wide) 7.dp else 4.dp).toPx()
                 val x = (size.width - w) / 2
-                drawRoundRect(c.border.copy(alpha = 0.35f), topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
-                    size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2, w / 2))
-                drawRoundRect(c.muted.copy(alpha = if (state.isScrollInProgress) 0.9f else 0.6f), topLeft = androidx.compose.ui.geometry.Offset(x, top),
-                    size = androidx.compose.ui.geometry.Size(w, thumb), cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2, w / 2))
-            }),
-    )
+                val r = androidx.compose.ui.geometry.CornerRadius(if (c.square) 0f else w / 2)
+                drawRoundRect(c.border.copy(alpha = if (wide) 0.45f else 0.3f), topLeft = androidx.compose.ui.geometry.Offset(x, 0f),
+                    size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = r)
+                drawRoundRect(if (dragging) c.accent else c.muted.copy(alpha = if (wide || state.isScrollInProgress) 0.9f else 0.6f),
+                    topLeft = androidx.compose.ui.geometry.Offset(x, top), size = androidx.compose.ui.geometry.Size(w, thumb), cornerRadius = r)
+            },
+    ) {
+        // while dragging: which row the list is at, and where in the whole list
+        if (dragging && label != null && height > 0f) {
+            val i = state.firstVisibleItemIndex
+            val text = label(i)
+            if (text != null) {
+                val y = topOf(height)
+                Text(
+                    "$text  ·  ${i + 1}/$total", color = c.onAccent, fontSize = 12.sp, maxLines = 1, softWrap = false,
+                    modifier = Modifier
+                        .layout { m, _ ->
+                            val p = m.measure(androidx.compose.ui.unit.Constraints())
+                            layout(0, 0) { p.place(-p.width - 6.dp.roundToPx(), y.toInt().coerceAtMost((height - p.height).toInt().coerceAtLeast(0))) }
+                        }
+                        .clip(RoundedCornerShape(c.radius)).background(c.accent).padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+        }
+    }
 }

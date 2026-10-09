@@ -2,6 +2,8 @@
 
 package mlabeler.app.ui
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.widthIn
 import mlabeler.app.theme.RoundedCornerShape
@@ -139,7 +141,8 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
             }
         }
         if (entries.isEmpty()) Text(noEntries(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = state) {
+        androidx.compose.foundation.layout.Box(Modifier.weight(1f).fillMaxWidth()) {
+        LazyColumn(Modifier.fillMaxSize(), state = state) {
             items(list, key = { it.index }) { (i, e) ->
                 val sel = i == ed.oto.selected
                 Row(
@@ -163,6 +166,8 @@ fun OtoEntryList(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                     Text(Paths.stem(e.sample), color = if (sel && c.square) c.onAccent else c.muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(0.8f))
                 }
             }
+        }
+        LazyScrollbar(state, Modifier.align(Alignment.CenterEnd).fillMaxHeight(), label = { n -> list.getOrNull(n)?.value?.alias })
         }
         Divider()
         Text(entriesCount.format(entries.size), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))

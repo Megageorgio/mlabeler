@@ -72,6 +72,8 @@ data class Tokens(
     val bgImageAlpha: Float = 0.35f,
     /** How solid the panels are (1 = not see-through); less lets the background show through them. */
     val panelAlpha: Float = 1f,
+    /** How the program's own window title looks (menus in the window title): "" plain, "xp" blue and rounded, "classic" a flat stripe. */
+    val windowStyle: String = "",
 )
 
 private fun hex(v: Long) = Color(v or 0xFF000000)
@@ -119,6 +121,7 @@ object Themes {
         playhead = hex(0xff0000), cursor = Color(0xaa000000), selectionRange = Color(0x30000080),
         tierText = hex(0x000000), tierColors = listOf(hex(0x000080), hex(0x006000), hex(0x806000), hex(0x800080), hex(0x008080)),
         spectrogram = gray.reversed(), radius = 0.dp, borderWidth = 1.dp, square = true, mono = true, checkboxes = true,
+        windowStyle = "xp",
     )
 
     val contrast = Tokens(

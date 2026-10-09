@@ -60,6 +60,7 @@ object ThemeFiles {
         if (t.boundLine != Color.Unspecified) put("boundLine", hex(t.boundLine))
         put("boundWidth", t.boundWidth)
         put("boundStyle", t.boundStyle)
+        put("windowStyle", t.windowStyle)
         put("colors", buildJsonObject { for ((k, f) in colorKeys) put(k, hex(f(t))) })
         put("tierColors", JsonArray(t.tierColors.map { JsonPrimitive(hex(it)) }))
         put("spectrogram", JsonArray(t.spectrogram.map { JsonPrimitive(hex(it)) }))
@@ -93,6 +94,7 @@ object ThemeFiles {
             boundLine = o["boundLine"]?.jsonPrimitive?.content?.let { color(it) } ?: base.boundLine,
             boundWidth = o["boundWidth"]?.jsonPrimitive?.floatOrNull ?: base.boundWidth,
             boundStyle = o["boundStyle"]?.jsonPrimitive?.content ?: base.boundStyle,
+            windowStyle = o["windowStyle"]?.jsonPrimitive?.content ?: base.windowStyle,
             bgGradient = o["bgGradient"]?.jsonArray?.mapNotNull { color(it.jsonPrimitive.content) }?.takeIf { it.size >= 2 } ?: base.bgGradient,
             bgImage = o["bgImage"]?.jsonPrimitive?.content ?: base.bgImage,
             bgImageAlpha = o["bgImageAlpha"]?.jsonPrimitive?.floatOrNull ?: base.bgImageAlpha,

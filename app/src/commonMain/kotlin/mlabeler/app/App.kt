@@ -18,6 +18,7 @@ import mlabeler.app.ui.CommandPalette
 import mlabeler.app.ui.EditorScreen
 import mlabeler.app.ui.SettingsDialog
 import mlabeler.app.ui.StartScreen
+import mlabeler.app.ui.windowEdge
 
 @Composable
 fun rememberAppState(): AppState {
@@ -42,8 +43,9 @@ fun App(app: AppState = rememberAppState()) {
         val font = androidx.compose.runtime.remember(st.font) { systemFontFamily(st.font) }
         AppTheme(Themes.byId(app.settings.theme), font, crisp = app.settings.crisp) {
             StorageAccess {
-              androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
-                mlabeler.app.ui.LocalWindowFrame.current?.let { mlabeler.app.ui.TitleBar(app, it) }
+              val frame = mlabeler.app.ui.LocalWindowFrame.current
+              androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().windowEdge(frame)) {
+                frame?.let { mlabeler.app.ui.TitleBar(app, it) }
                 Box(Modifier.weight(1f).fillMaxSize()) {
                     val ed = app.editor
                     val rec = app.recorder

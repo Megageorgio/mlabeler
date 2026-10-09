@@ -183,6 +183,10 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
     Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for ((k, t) in listOf("dash" to dashT, "dot" to dotT, "solid" to solidT)) Chip(t(), tokens.boundStyle == k) { change(tokens.copy(boundStyle = k)) }
     }
+    SectionTitle(windowStyleT())
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for ((k, t) in listOf("" to winPlainT, "xp" to winXpT, "classic" to winClassicT)) Chip(t(), tokens.windowStyle == k) { change(tokens.copy(windowStyle = k)) }
+    }
     SectionTitle(tierColorsT())
     ColorList(tokens.tierColors, minCount = 1) { change(tokens.copy(tierColors = it)) }
     SectionTitle(spectrogramT())
@@ -221,6 +225,10 @@ private fun ThemeEditor(app: AppState, theme: CustomTheme) {
     }
 }
 
+private val windowStyleT = L("Window title (when the menus are in it)", "Заголовок окна (когда меню в нём)")
+private val winPlainT = L("Plain", "Обычный")
+private val winXpT = L("Blue, rounded buttons", "Синий, круглые кнопки")
+private val winClassicT = L("Classic stripe", "Классическая полоса")
 private val backdropT = L("Window background", "Фон окна")
 private val gradientT = L("Gradient", "Градиент")
 private val imageT = L("Picture", "Картинка")
