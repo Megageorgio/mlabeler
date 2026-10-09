@@ -69,6 +69,8 @@ Android asks for access to all files, because label files are written next to th
 - An oto editor with automatic oto for CV / VCV / CVVC banks: the next entry or a done mark after an edit,
   copies of entries under new names by a pattern, the differences from another oto.ini entry by entry, the entries
   a `.ust` uses, file names from a Mac put in the composed form (NFC).
+- NiaoNiao voicebanks: the marks of each sound (.inf) edited as boundaries, placed automatically, packed into
+  `voice.d` and `inf.d`; a built bank can be unpacked back.
 - Recording from a reclist with a level meter, click track and guide.
 
 **Automatic labelling**
