@@ -118,6 +118,7 @@ private fun WflOptions(app: AppState) {
 }
 
 private val ownModelLink = L("Add your own model…", "Добавить свою модель…")
+private val checkTextsLink = L("Check the texts of the files, recognise the empty ones…", "Проверить тексты файлов, распознать пустые…")
 private val checkWordsLink = L("Check the words and own words of the model…", "Проверить слова и собственные слова модели…")
 private val otherLangs = L("Other languages in the text", "Другие языки в тексте")
 private val otherLangsNote = L("For example English words in Chinese lyrics. Their phonemes get the language in front: en/s.",
@@ -172,6 +173,8 @@ fun AutolabelDialog(app: AppState) {
     // the whole file goes into the labels by default; a part is compared first
     var replace by remember(whole) { mutableStateOf(whole && (doc == null || doc.tiers.all { t -> (t as? IntervalTier)?.texts?.all { it.isEmpty() } ?: true })) }
     val textMissing = !recognizeMode && !batch && text.isBlank() && !whisper
+    var reviewTexts by remember { mutableStateOf(false) }
+    if (reviewTexts) TextsDialog(ed, ed.batchFiles(which), lang.takeIf { it.isNotEmpty() && it != "*" }) { reviewTexts = false }
     Overlay({ close() }, 640) {
         DialogContent(footer = {
             Btn(S.cancel()) { close() }
@@ -288,6 +291,7 @@ fun AutolabelDialog(app: AppState) {
                             Chip(asPhonemes(), phonemes) { phonemes = true }
                         }
                         Text(fromFileNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                        Text(checkTextsLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp).clickable { reviewTexts = true })
                     }
                 } else {
                     SectionTitle(textTitle())
