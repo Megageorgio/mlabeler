@@ -309,6 +309,9 @@ fun AutolabelDialog(app: AppState) {
                         Text(whisperT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
                         Toggle(whisper, { whisper = it })
                     }
+                    if (whisper) Column(Modifier.padding(top = 6.dp)) {
+                        WhisperModelChoice(settings.whisperModel) { id -> app.update { it.copy(toolkit = it.toolkit.copy(whisperModel = id)) } }
+                    }
                 }
             }
             RefineAfterSwitch(app)

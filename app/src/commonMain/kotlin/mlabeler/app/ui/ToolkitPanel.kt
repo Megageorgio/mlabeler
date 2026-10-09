@@ -178,3 +178,22 @@ private fun InstallStats(tk: mlabeler.app.toolkit.ToolkitManager) {
     Text(parts.joinToString("  ·  "), color = c.text, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
     log.lastOrNull()?.let { Text(it, color = c.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) }
 }
+
+private val whSmallT = L("Fast (small)", "Быстро (small)")
+private val whMediumT = L("Medium", "Средне (medium)")
+private val whTurboT = L("Accurate (large-v3-turbo)", "Точно (large-v3-turbo)")
+private val whLargeT = L("Most accurate (large-v3, slow)", "Точнее всего (large-v3, медленно)")
+private val whNote = L("Each model is downloaded on first use. Without a graphics card the small ones are several times faster.",
+    "Каждая модель загружается при первом использовании. Без видеокарты маленькие модели в несколько раз быстрее.")
+
+/** The Whisper models of the toolkit's catalogue, from the fastest to the most accurate. */
+@Composable
+fun WhisperModelChoice(selected: String, onPick: (String) -> Unit) {
+    val c = T.c
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+        for ((id, t) in listOf("whisper-small" to whSmallT(), "whisper-medium" to whMediumT(), "whisper-large-v3-turbo" to whTurboT(), "whisper-large-v3" to whLargeT()))
+            Chip(t, selected == id) { onPick(id) }
+    }
+    Text(whNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+}

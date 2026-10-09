@@ -223,7 +223,8 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
      * [extraLanguages]: other languages in the text (TIFA models).
      */
     suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean, whisper: Boolean = false,
-                      refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList()): String {
+                      refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList(),
+                      whisperModel: String? = null): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -238,6 +239,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             if (language != null) put("language", language)
             if (extraLanguages.isNotEmpty()) put("extra_languages", buildJsonArray { extraLanguages.forEach { add(JsonPrimitive(it)) } })
             if (!whisper) put("transcribe", kotlinx.serialization.json.JsonNull)
+            else if (!whisperModel.isNullOrBlank()) putJsonObject("transcribe") { put("model", whisperModel) }
             putRefine(refine)
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))

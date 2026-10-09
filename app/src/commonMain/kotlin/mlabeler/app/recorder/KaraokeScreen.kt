@@ -527,12 +527,6 @@ private val sepMelT = L("Mel-Roformer", "Mel-Roformer")
 private val sepNote = L("Roformer models are slow without a graphics card (minutes per song). A song is separated once; to separate it again with another model, remove its parts in the songs folder.",
     "Модели Roformer без видеокарты работают медленно (минуты на песню). Песня отделяется один раз; чтобы отделить её заново другой моделью, удалите её части в папке песен.")
 private val whisperT = L("Recognising the words", "Распознавание слов")
-private val whSmallT = L("Fast (small)", "Быстро (small)")
-private val whMediumT = L("Medium", "Средне (medium)")
-private val whTurboT = L("Accurate (large-v3-turbo)", "Точно (large-v3-turbo)")
-private val whLargeT = L("Most accurate (large-v3, slow)", "Точнее всего (large-v3, медленно)")
-private val whNote = L("Each model is downloaded on first use. Without a graphics card the small ones are several times faster.",
-    "Каждая модель загружается при первом использовании. Без видеокарты маленькие модели в несколько раз быстрее.")
 
 /** Karaoke settings: the models that separate the voice and recognise the words (kept in the settings). */
 @Composable
@@ -550,11 +544,7 @@ private fun KaraokeOptions(app: AppState, onClose: () -> Unit) {
             }
             Text(sepAutoHint() + ". " + sepNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             mlabeler.app.ui.SectionTitle(whisperT())
-            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                for ((id, t) in listOf("whisper-small" to whSmallT(), "whisper-medium" to whMediumT(), "whisper-large-v3-turbo" to whTurboT(), "whisper-large-v3" to whLargeT()))
-                    Chip(t, s.whisper == id) { set { it.copy(whisper = id) } }
-            }
-            Text(whNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+            mlabeler.app.ui.WhisperModelChoice(s.whisper) { id -> set { it.copy(whisper = id) } }
         }
     }
 }

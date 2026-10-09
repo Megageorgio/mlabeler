@@ -205,6 +205,8 @@ data class ToolkitSettings(
     val lastSegmentModel: String = "",
     /** Aligning without text: recognise the words with Whisper first (a large download on first use). */
     val whisper: Boolean = false,
+    /** The Whisper model that recognises the words for autolabelling. */
+    val whisperModel: String = "whisper-large-v3-turbo",
     /** Phoneme recognition (WFL-ASR): see [mlabeler.app.toolkit.SegmentOptions]. */
     val wfl: WflSettings = WflSettings(),
     /** Refinement of the phoneme boundaries after autolabelling (off by default). */
