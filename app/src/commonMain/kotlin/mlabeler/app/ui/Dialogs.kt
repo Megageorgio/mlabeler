@@ -607,7 +607,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
 }
 
 @Composable
-private fun SwitchRow(title: String, value: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, value: Boolean, onChange: (Boolean) -> Unit) {
     val c = T.c
     Row(Modifier.fillMaxWidth().settingFocus(title).clickable { onChange(!value) }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {

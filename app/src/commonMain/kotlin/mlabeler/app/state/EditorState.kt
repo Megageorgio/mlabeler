@@ -1078,6 +1078,134 @@ class EditorState(
         }
     }
 
+    // ---------- several files at once ----------
+
+    /** Files picked in the list (by id) for doing something with all of them; the open file is apart from this. */
+    var pickedFiles by mutableStateOf<Set<String>>(emptySet())
+    private var pickAnchor: String? = null
+
+    /** Ctrl+click: one file in or out of the picked ones. */
+    fun togglePicked(item: Item) {
+        pickedFiles = if (item.id in pickedFiles) pickedFiles - item.id else pickedFiles + item.id
+        pickAnchor = item.id
+    }
+
+    /** Shift+click: every listed file from the last picked one to [item]. */
+    fun pickRange(item: Item) {
+        val list = filtered().map { it.second.id }
+        val a = list.indexOf(pickAnchor ?: this.item?.id).takeIf { it >= 0 } ?: list.indexOf(this.item?.id)
+        val b = list.indexOf(item.id)
+        if (a < 0 || b < 0) { togglePicked(item); return }
+        pickedFiles = pickedFiles + list.subList(minOf(a, b), maxOf(a, b) + 1)
+    }
+
+    fun clearPicked() { pickedFiles = emptySet(); pickAnchor = null }
+
+    /** The picked files in the order of the list. */
+    fun pickedItems(): List<Item> = items.filter { it.id in pickedFiles }
+
+    /** Moves the files [ids] (with everything named after them) to the folder's trash, as [trashFile] does one. */
+    fun trashFiles(ids: Set<String>) {
+        finishEditing()
+        if (dirty) save(quiet = true)
+        stop()
+        val openId = item?.id
+        var moved = 0
+        var dest = ""
+        val failed = mutableListOf<String>()
+        for (id in ids) {
+            val it = workspace.items.firstOrNull { x -> x.id == id } ?: continue
+            try {
+                dest = workspace.trash(it)
+                histories.remove(id)
+                moved++
+            } catch (e: Exception) {
+                failed += Paths.name(it.audioPath) + ": " + (e.message ?: e.toString())
+            }
+        }
+        oto.forget()
+        items = workspace.items
+        labelIndex = null
+        readLabelTimes()
+        marksVersion++
+        clearPicked()
+        index = items.indexOfFirst { x -> x.id == openId }
+        if (index < 0 && items.isNotEmpty()) open(0)
+        if (failed.isEmpty()) app.message(trashedManyT.format(moved, workspace.relative(dest)))
+        else app.message(fileOpFailedT.format(failed.joinToString("; ")), error = true)
+    }
+
+    /**
+     * Joins the recordings [files] (in this order) into a new one named [name] next to the first, [gap] seconds of
+     * silence between them, with their labels: every interval tier of any of them, its times moved along (a file
+     * without that tier leaves it unlabelled there). The labels are in the first file's format. With [removeOld] the
+     * joined files go to the trash. Returns false when it couldn't (the message says why).
+     */
+    fun mergeFiles(files: List<Item>, name: String, gap: Double, removeOld: Boolean): Boolean {
+        if (files.size < 2) return false
+        finishEditing()
+        if (dirty) save(quiet = true)
+        stop()
+        val first = files.first()
+        val dir = Paths.parent(first.audioPath)
+        val wavPath = Paths.join(dir, name.trim() + ".wav")
+        if (name.isBlank() || name.any { it in "/\\:*?\"<>|" }) { app.message(fileOpFailedT.format(badMergeNameT()), error = true); return false }
+        if (workspace.fs.exists(wavPath)) { app.message(fileOpFailedT.format(mergeExistsT.format(Paths.name(wavPath))), error = true); return false }
+        return try {
+            val parts = files.map { f ->
+                val bytes = workspace.fs.read(f.audioPath)
+                val a = if (Wav.isWav(bytes)) Wav.decode(bytes) else Platform.decodeAudio(f.audioPath) ?: error(S.unsupportedAudio())
+                val d = runCatching { if (f.id == item?.id) committed else null }.getOrNull() ?: runCatching { workspace.readLabels(f, a.duration) }.getOrNull()
+                Triple(f, a, d)
+            }
+            val rate = parts.first().second.sampleRate
+            val sounds = parts.map { (_, a, _) -> if (a.sampleRate == rate) a.samples else mlabeler.core.dsp.Stretch.resample(a.samples, a.sampleRate.toDouble() / rate) }
+            val gapN = (gap * rate).toInt().coerceAtLeast(0)
+            val all = FloatArray(sounds.sumOf { it.size } + gapN * (sounds.size - 1))
+            val offsets = mutableListOf<Double>()
+            var pos = 0
+            for ((k, x) in sounds.withIndex()) {
+                offsets += pos.toDouble() / rate
+                x.copyInto(all, pos)
+                pos += x.size + if (k < sounds.size - 1) gapN else 0
+            }
+            val total = all.size.toDouble() / rate
+            // the tiers by name, in the order they first turn up
+            val names = parts.flatMap { (_, _, d) -> d?.tiers?.filterIsInstance<IntervalTier>()?.map { it.name } ?: emptyList() }.distinct()
+            val tiers = names.map { tierName ->
+                val ivs = mutableListOf<Triple<Double, Double, String>>()
+                for ((k, part) in parts.withIndex()) {
+                    val t = part.third?.tiers?.filterIsInstance<IntervalTier>()?.firstOrNull { it.name == tierName } ?: continue
+                    val o = offsets[k]
+                    val len = sounds[k].size.toDouble() / rate
+                    for (i in 0 until t.size) {
+                        if (t.texts[i].isEmpty()) continue
+                        val a = t.startOf(i).coerceIn(0.0, len)
+                        val b = t.endOf(i).coerceIn(0.0, len)
+                        if (b > a) ivs += Triple(o + a, o + b, t.texts[i])
+                    }
+                }
+                IntervalTier.fromIntervals(tierName, ivs, total)
+            }
+            val doc = if (tiers.isEmpty()) LabelDoc.empty(total) else LabelDoc(tiers)
+            workspace.fs.write(wavPath, Wav.encode16(Audio(rate, all)))
+            items = workspace.scan()
+            val newItem = items.first { it.audioPath == wavPath }
+            workspace.writeLabels(newItem, doc, total, first.labelFormat ?: workspace.state.defaultFormat)
+            if (removeOld) trashFiles(files.map { it.id }.toSet()) else { items = workspace.scan(); clearPicked() }
+            items = workspace.items
+            labelIndex = null
+            readLabelTimes()
+            marksVersion++
+            items.indexOfFirst { it.audioPath == wavPath }.takeIf { it >= 0 }?.let { open(it) }
+            app.message(mergedT.format(files.size, Paths.name(wavPath)))
+            true
+        } catch (e: Exception) {
+            app.message(fileOpFailedT.format(e.message ?: e.toString()), error = true)
+            false
+        }
+    }
+
     /** Scans the folder again, keeping the open file. */
     fun rescan() {
         val id = item?.id
@@ -2241,5 +2369,9 @@ private val reviewEnd = L("That was the last of {0} places in this file; PgDn op
 private val reviewPos = L("Place {0} of {1}", "Место {0} из {1}")
 
 private val renamedFileT = mlabeler.app.i18n.L("Renamed: {0} → {1}", "Переименовано: {0} → {1}")
+private val trashedManyT = mlabeler.app.i18n.L("Files moved to the trash: {0} ({1})", "Перемещено в корзину файлов: {0} ({1})")
+private val mergedT = mlabeler.app.i18n.L("Joined {0} recordings into {1}", "Склеено записей: {0}, в {1}")
+private val mergeExistsT = mlabeler.app.i18n.L("{0} already exists", "{0} уже существует")
+private val badMergeNameT = mlabeler.app.i18n.L("the name is empty or has characters a file name can't have", "имя пустое или в нём есть недопустимые символы")
 private val trashedT = mlabeler.app.i18n.L("{0} was moved to {1}", "{0} перемещён в {1}")
 private val fileOpFailedT = mlabeler.app.i18n.L("Couldn't do it: {0}", "Не получилось: {0}")

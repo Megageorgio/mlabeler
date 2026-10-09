@@ -56,6 +56,8 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showBatchRename && ed != null) mlabeler.app.ui.BatchRenameDialog(app)
                     if (ed != null) app.renamingFile?.let { i -> mlabeler.app.ui.RenameFileDialog(ed, i) { app.renamingFile = null } }
                     if (ed != null) app.trashingFile?.let { i -> mlabeler.app.ui.TrashFileDialog(ed, i) { app.trashingFile = null } }
+                    if (ed != null && app.mergingFiles) mlabeler.app.ui.MergeFilesDialog(ed) { app.mergingFiles = false }
+                    if (ed != null && app.trashingPicked) mlabeler.app.ui.TrashFilesDialog(ed) { app.trashingPicked = false }
                     if (app.showSegments && ed != null) mlabeler.app.ui.SegmentDialog(app)
                     if (app.updater.offer != null) mlabeler.app.ui.UpdateOfferDialog(app)
                     if (app.showWorkspace && ed != null) mlabeler.app.ui.WorkspaceDialog(app)

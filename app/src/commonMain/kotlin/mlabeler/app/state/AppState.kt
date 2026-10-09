@@ -45,6 +45,8 @@ class AppState(private val scope: CoroutineScope) {
     /** The recording whose rename or removal is being asked about (index in the file list). */
     var renamingFile by mutableStateOf<Int?>(null)
     var trashingFile by mutableStateOf<Int?>(null)
+    var mergingFiles by mutableStateOf(false)
+    var trashingPicked by mutableStateOf(false)
     /** A name to rename everywhere, filled into the bulk renaming when it opens from an entry's menu. */
     var batchRenameFrom: String? = null
     var showSegments by mutableStateOf(false)

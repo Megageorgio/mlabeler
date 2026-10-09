@@ -118,6 +118,20 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                 state.animateScrollToItem(maxOf(0, pos - 3))
             }
         }
+        // what can be done with the picked files
+        if (ed.pickedFiles.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().background(c.panelAlt).padding(start = 10.dp, end = 4.dp, top = 2.dp, bottom = 6.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(pickedCountT.format(ed.pickedFiles.size), color = c.text, fontSize = 12.sp, maxLines = 1, softWrap = false,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    IconBtn(Icons.close, unpickT(), size = 28.dp) { ed.clearPicked() }
+                }
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (ed.pickedFiles.size > 1) Btn(mergeBtnT()) { ed.app.mergingFiles = true }
+                    Btn(trashBtnT()) { ed.app.trashingPicked = true }
+                }
+            }
+        }
         if (ed.items.isEmpty()) {
             Text(S.noFiles(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(14.dp))
         } else if (list.isEmpty()) {
@@ -153,8 +167,16 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                 Row(
                     Modifier.fillMaxWidth()
                         .heightIn(min = if (Platform.isMobile) 52.dp else 34.dp)
-                        .background(if (current) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else if (menuFor == item.id) c.panelAlt else c.panel)
-                        .withContextMenu(onMenu = { menuFor = item.id }) { ed.open(i); onOpened() }
+                        .background(if (current) c.accent.copy(alpha = if (c.square) 1f else 0.16f) else if (item.id in ed.pickedFiles) c.accent.copy(alpha = 0.09f) else if (menuFor == item.id) c.panelAlt else c.panel)
+                        .withContextMenuMods(onMenu = { menuFor = item.id }) { ctrl, shift ->
+                            when {
+                                ctrl -> ed.togglePicked(item)
+                                shift -> ed.pickRange(item)
+                                // on phones, while files are picked a tap picks more
+                                Platform.isMobile && ed.pickedFiles.isNotEmpty() -> ed.togglePicked(item)
+                                else -> { ed.clearPicked(); ed.open(i); onOpened() }
+                            }
+                        }
                         .padding(horizontal = 12.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -169,6 +191,7 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                         ),
                     )
                     Spacer(Modifier.width(10.dp))
+                    if (item.id in ed.pickedFiles) { Icon(Icons.check, null, Modifier.size(14.dp), tint = c.accent); Spacer(Modifier.width(6.dp)) }
                     Column(Modifier.weight(1f)) {
                         Text(Paths.name(item.id), color = fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val sub = buildList {
