@@ -90,6 +90,7 @@ Backups in `<folder>/.mlabeler/backup/`.
 | UTAU `oto.ini` | ✓ | ✓ | encoding detection, negative/positive cutoff, negative overlap |
 | vLabeler project `.lbp` | ✓ | — | import entries |
 | MIDI | ✓ | ✓ | notes tier |
+| UTAU sequence `.ust` | ✓ | — | notes and words; oto entries a song uses |
 
 Audio: WAV in every PCM variant (8-bit unsigned, 16/24/32-bit, float, extensible, RF64) in common code; mp3,
 flac, ogg, m4a through the platform decoder.

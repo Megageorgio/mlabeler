@@ -46,6 +46,7 @@ Android asks for access to all files, because label files are written next to th
 **Labels**
 - Opens a folder with recordings and finds the labels next to them: `.lab`, `.TextGrid`, Audacity labels,
   DiffSinger `.ds` and `transcriptions.csv`, UTAU `oto.ini`. vLabeler projects (`.lbp`) can be imported.
+  Label files of a folder can be converted to another of these formats at once.
 - Phoneme and word tiers: moving boundaries by mouse, finger or keys, cutting, joining, renaming,
   ripple and linked moves, bulk renaming across the whole folder.
 - Waveform, spectrogram, pitch, loudness and optional formants, separately or overlaid in one picture.
@@ -55,21 +56,28 @@ Android asks for access to all files, because label files are written next to th
 
 **Notes and pitch**
 - A piano roll with notes from phoneme groups, pitch drawing, key snapping, MIDI.
-- Listening with the drawn pitch (WORLD or the DiffSinger vocoder).
+- Listening with the drawn pitch (WORLD or the DiffSinger vocoder) and saving the recording sung with it;
+  voiced and unvoiced parts marked by hand; the loudness drawn and written into the sound.
+- Notes and lyrics from a UTAU sequence (`.ust`).
 - Export of a DiffSinger dataset (`wavs/` + `transcriptions.csv`), with long recordings cut at pauses.
 
 **Sound**
 - A sound editing mode in which the labels are locked: cutting, silence, normalising, fades, trimming silence,
-  click repair and noise reduction. Every change can be undone, and the original file is kept.
+  level change, click repair and noise reduction. Every change can be undone, and the original file is kept.
 
 **oto and recording**
-- An oto editor with automatic oto for CV / VCV / CVVC banks.
+- An oto editor with automatic oto for CV / VCV / CVVC banks: the next entry or a done mark after an edit,
+  copies of entries under new names by a pattern, the differences from another oto.ini entry by entry, the entries
+  a `.ust` uses, file names from a Mac put in the composed form (NFC).
 - Recording from a reclist with a level meter, click track and guide.
 
 **Automatic labelling**
 - Through [mVocalToolkit](https://github.com/Megageorgio/mVocalToolkit), a separate helper program: aligning
   by lyrics or phonemes, labelling without lyrics, lyrics from the recording, segmentation, refining the
-  boundaries of ready labels with a refiner model (off by default).
+  boundaries of ready labels with a refiner model (off by default). The Whisper model can be chosen; the texts of
+  many files can be checked before aligning; words missing in a model's dictionary get a G2P guess and can be kept
+  as the model's own words; the phonemes of the words tier can be made by the dictionary and G2P.
+- The toolkit can work on the graphics card or the processor, as chosen in the settings.
 - On a computer mLabeler installs and starts the toolkit when needed. One running toolkit is shared by every
   program that uses it and stops when none of them needs it any more. Phones and tablets can use the toolkit
   of a computer in the same network.
@@ -77,7 +85,9 @@ Android asks for access to all files, because label files are written next to th
 **Interface**
 - Work environments (ready sets of panels, lanes and buttons), themes with full colour editing,
   rebindable keys and mouse buttons, a command list (Ctrl+K), searchable settings and help (F1).
-- Plugins in JavaScript that run on every platform.
+- Plugins in JavaScript that run on every platform: labels, notes, marks, oto entries, the pitch and the text
+  files of the folder.
+- An optional sound when long work such as autolabelling ends.
 - Languages: English, Russian, Japanese, Chinese (Simplified), Korean, French, German, Spanish, Portuguese.
 
 ## Building from source
