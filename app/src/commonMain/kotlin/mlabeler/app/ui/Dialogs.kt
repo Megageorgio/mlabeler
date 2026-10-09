@@ -784,6 +784,38 @@ private fun ToolkitPage(app: AppState) {
     }
 }
 
+private val doneSoundT = L("Sound when long work ends", "Звук по окончании долгой работы")
+private val doneSoundOnT = L("Play a sound when autolabelling, refining, cleaning or a plugin over many files ends", "Проигрывать звук, когда заканчивается авторазметка, уточнение, чистка или плагин по многим файлам")
+private val doneSoundFileT = L("Sound file (WAV)", "Файл звука (WAV)")
+private val doneSoundMinT = L("Only after work that took at least", "Только после работы, которая шла не меньше")
+private val doneSoundTryT = L("Listen", "Прослушать")
+private val doneSoundChooseT = L("Choose…", "Выбрать…")
+
+/** The sound played when long work ends: on or off, which file, after how long. None by default. */
+@Composable
+private fun DoneSoundSection(app: AppState) {
+    val c = T.c
+    val d = app.settings.doneSound
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    fun set(f: (mlabeler.app.state.DoneSoundSettings) -> mlabeler.app.state.DoneSoundSettings) = app.update { it.copy(doneSound = f(it.doneSound)) }
+    SwitchRow(doneSoundOnT(), d.enabled) { v -> set { it.copy(enabled = v) } }
+    Text(doneSoundFileT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        var path by remember { mutableStateOf(d.path) }
+        Field(path, { path = it; set { s -> s.copy(path = it.trim()) } }, Modifier.weight(1f))
+        if (mlabeler.app.Platform.hasNativeFolderPicker) Btn(doneSoundChooseT()) {
+            scope.launch {
+                val f = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    mlabeler.app.Platform.pickFileNative(doneSoundFileT(), listOf("wav", "mp3", "ogg", "flac"), null)
+                }
+                if (f != null) { path = f; set { s -> s.copy(path = f, enabled = true) } }
+            }
+        }
+        Btn(doneSoundTryT(), enabled = d.path.isNotBlank()) { app.playDoneSound() }
+    }
+    ValueSlider(doneSoundMinT(), d.minSeconds.toFloat(), 0f..600f, " s", default = 20f) { v -> set { it.copy(minSeconds = v.toInt()) } }
+}
+
 @Composable
 private fun InterfacePage(app: AppState) {
     val c = T.c
@@ -811,6 +843,7 @@ private fun InterfacePage(app: AppState) {
         }
         if (!mlabeler.app.Platform.isMobile) SwitchRow(hoverBoundaryT(), s.hoverBoundary) { v -> app.update { it.copy(hoverBoundary = v) } }
     }
+    Fold(doneSoundT()) { DoneSoundSection(app) }
     if (s.statusBar) Fold(MenuTitles.statusBar()) {
         StatusBarSettings(app) { t, v, f -> SwitchRow(t, v, f) }
     }

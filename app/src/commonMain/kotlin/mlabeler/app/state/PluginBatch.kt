@@ -35,6 +35,7 @@ class PluginBatch(val plugin: Plugin, private val params: Map<String, JsonElemen
 
     /** Tries the plugin on every file without writing anything. */
     fun check(ed: EditorState, scope: CoroutineScope) {
+        val start = ed.now()
         job = scope.launch {
             try {
                 for (f in files) {
@@ -57,6 +58,7 @@ class PluginBatch(val plugin: Plugin, private val params: Map<String, JsonElemen
                 }
             } finally {
                 checking = false
+                ed.app.workFinished(start)
             }
         }
     }

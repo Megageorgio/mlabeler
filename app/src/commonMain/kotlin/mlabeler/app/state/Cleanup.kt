@@ -380,9 +380,11 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
     private fun run(what: String, block: suspend () -> Unit) {
         if (busy) return
         busy = true
+        val start = ed.now()
         ed.workScope.launch {
             try {
                 block()
+                app.workFinished(start)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {

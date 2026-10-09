@@ -347,6 +347,7 @@ data class AppSettings(
     val updates: UpdateSettings = UpdateSettings(),
     val clean: CleanSettings = CleanSettings(),
     val karaoke: KaraokeSettings = KaraokeSettings(),
+    val doneSound: DoneSoundSettings = DoneSoundSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
@@ -477,6 +478,16 @@ data class KaraokeSettings(
     val musicLevel: Float = 1f,
     val separation: String = "auto",
     val whisper: String = "whisper-large-v3-turbo",
+)
+
+/** A sound played when long work (autolabelling and the like) ends: off and without a sound by default. */
+@Serializable
+data class DoneSoundSettings(
+    val enabled: Boolean = false,
+    /** The sound file (WAV, or what the platform can decode). */
+    val path: String = "",
+    /** Only after work that took at least this long, seconds. */
+    val minSeconds: Int = 20,
 )
 
 /** Options of phoneme recognition without text (WFL-ASR); negative confidence = the model's own value. */

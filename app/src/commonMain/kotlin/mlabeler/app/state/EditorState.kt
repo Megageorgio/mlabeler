@@ -642,7 +642,14 @@ class EditorState(
     /** What the toolkit is doing for this folder, in words; null when nothing. */
     var toolkitBusy: String?
         get() = busyText
-        set(v) { busyText = v; if (v == null) toolkitDetail = null }
+        set(v) {
+            val was = busyText != null
+            busyText = v
+            if (v == null) {
+                toolkitDetail = null
+                if (was && toolkitBusySince > 0) app.workFinished(toolkitBusySince)
+            }
+        }
     /** The toolkit job being waited for: its step and numbers (a download's megabytes, files done). */
     var toolkitDetail by mutableStateOf<mlabeler.app.toolkit.JobProgress?>(null)
     /** When the current toolkit work began (ms) and its earlier steps, for the busy panel. */

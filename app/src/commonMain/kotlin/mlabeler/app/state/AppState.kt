@@ -118,6 +118,33 @@ class AppState(private val scope: CoroutineScope) {
             }
         }
     }
+    private var donePlayer: mlabeler.app.AudioOut? = null
+
+    /** Long work that began at [since] (ms) ended: the sound of [DoneSoundSettings] when it took long enough. */
+    fun workFinished(since: Long) {
+        val s = settings.doneSound
+        if (!s.enabled || s.path.isBlank()) return
+        if (kotlin.time.Clock.System.now().toEpochMilliseconds() - since < s.minSeconds * 1000L) return
+        playDoneSound()
+    }
+
+    /** Plays the sound of [DoneSoundSettings] (also to try it in the settings). */
+    fun playDoneSound() {
+        val path = settings.doneSound.path
+        if (path.isBlank()) return
+        scope.launch {
+            runCatching {
+                val a = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    val bytes = mlabeler.core.io.PlatformFs.read(path)
+                    if (mlabeler.core.audio.Wav.isWav(bytes)) mlabeler.core.audio.Wav.decode(bytes) else Platform.decodeAudio(path)
+                } ?: return@launch
+                val p = donePlayer ?: mlabeler.app.AudioOut().also { donePlayer = it }
+                p.stop()
+                p.play(a, 0, a.samples.size, false)
+            }.onFailure { message(it.message ?: it.toString(), error = true) }
+        }
+    }
+
     /** What a plugin sees of the open folder: its files with their marks, the open file's marks and pitch. */
     fun pluginContext(ed: EditorState, oto: Boolean): mlabeler.app.plugins.PluginContext {
         val files = ed.items.map { f ->
