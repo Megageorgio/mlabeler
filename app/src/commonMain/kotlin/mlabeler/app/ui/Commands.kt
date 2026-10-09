@@ -17,6 +17,7 @@ import mlabeler.app.state.togglePanel
 import mlabeler.app.state.toggleSide
 import mlabeler.core.format.OtoMarker
 import mlabeler.app.state.playResynth
+import mlabeler.app.state.phonemesFromWords
 
 /** A key combination. "Ctrl" is Cmd on macOS. */
 data class Chord(val key: Key, val ctrl: Boolean = false, val shift: Boolean = false, val alt: Boolean = false) {
@@ -231,6 +232,16 @@ object Commands {
     val unitSingle = Command("unit-single", L("This phoneme held: keep or take away", "Эта фонема протяжно: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
     val unitsOverview = Command("units-overview", L("Transitions of the folder (.trans)…", "Переходы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
     val refine = Command("refine-boundaries", L("Refine boundaries…", "Уточнить границы…"), emptyList()) { _, a -> a.showRefine = true }.only(Mode.Labels)
+    val g2p = Command("phonemes-from-words", L("Phonemes from the words (dictionary and G2P of the aligner model)", "Фонемы по словам (словарь и G2P модели выравнивания)"), emptyList()) { e, a ->
+        val t = a.settings.toolkit
+        if (t.lastModel.isBlank()) { a.message(L("Choose an aligner model in Autolabel first", "Сначала выберите модель выравнивания в авторазметке")()); a.showAutolabel = true }
+        else e.phonemesFromWords(t.lastModel, t.lastLanguage.takeIf { it.isNotEmpty() && it != "*" })
+    }.only(Mode.Labels)
+    val modelWords = Command("model-words", L("Own words of the aligner model…", "Собственные слова модели выравнивания…"), emptyList()) { _, a ->
+        val t = a.settings.toolkit
+        if (t.lastModel.isBlank()) { a.message(L("Choose an aligner model in Autolabel first", "Сначала выберите модель выравнивания в авторазметке")()); a.showAutolabel = true }
+        else a.wordsCheck = WordsCheck(t.lastModel, t.lastLanguage.takeIf { it.isNotEmpty() && it != "*" })
+    }.only(Mode.Labels)
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
     val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: клик выбирает, перетаскивание двигает"), listOf(Chord(Key.One)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "cursor")) }
@@ -280,7 +291,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, segments, resynthWorld, resynthNsf,

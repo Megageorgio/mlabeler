@@ -77,6 +77,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showSummary && ed != null) mlabeler.app.ui.DatasetSummaryDialog(app, ed)
                     if (app.showPhonemeCuts && ed != null) mlabeler.app.ui.PhonemeCutsDialog(app, ed)
                     if (app.showRefine && ed != null) mlabeler.app.ui.RefineDialog(app, ed)
+                    app.wordsCheck?.let { mlabeler.app.ui.WordsDialog(app, it) }
                     if (app.showUnitsOverview && ed != null) mlabeler.app.ui.UnitsOverviewDialog(app, ed)
                     if (app.showSoundCheck && ed != null) mlabeler.app.ui.SoundCheckDialog(app, ed)
                     if (app.pendingLeave != null) mlabeler.app.ui.LeaveDialog(app)

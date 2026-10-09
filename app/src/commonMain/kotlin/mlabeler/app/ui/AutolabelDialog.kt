@@ -118,6 +118,7 @@ private fun WflOptions(app: AppState) {
 }
 
 private val ownModelLink = L("Add your own model…", "Добавить свою модель…")
+private val checkWordsLink = L("Check the words and own words of the model…", "Проверить слова и собственные слова модели…")
 private val otherLangs = L("Other languages in the text", "Другие языки в тексте")
 private val otherLangsNote = L("For example English words in Chinese lyrics. Their phonemes get the language in front: en/s.",
     "Например, английские слова в китайском тексте. Их фонемы будут с языком впереди: en/s.")
@@ -313,6 +314,13 @@ fun AutolabelDialog(app: AppState) {
                         WhisperModelChoice(settings.whisperModel) { id -> app.update { it.copy(toolkit = it.toolkit.copy(whisperModel = id)) } }
                     }
                 }
+            }
+            if (!recognizeMode && !(batch && batchSource == mlabeler.app.state.EditorState.BatchText.Labels) && !(phonemes && !batch)
+                && langs?.any { g -> g.models.any { it.id == model } } == true) {
+                Text(checkWordsLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp).clickable {
+                    val language = lang.takeIf { it.isNotEmpty() && it != "*" }
+                    app.wordsCheck = if (batch) WordsCheck(model, language, files = ed.batchFiles(which)) else WordsCheck(model, language, text = text)
+                })
             }
             RefineAfterSwitch(app)
             if (!batch) Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

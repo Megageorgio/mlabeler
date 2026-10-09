@@ -65,6 +65,8 @@ class AppState(private val scope: CoroutineScope) {
     var showSummary by mutableStateOf(false)
     var showPhonemeCuts by mutableStateOf(false)
     var showRefine by mutableStateOf(false)
+    /** The words of an aligner model being looked at (unknown ones and its own words). */
+    var wordsCheck by mutableStateOf<mlabeler.app.ui.WordsCheck?>(null)
     var showUnitsOverview by mutableStateOf(false)
     var showSoundCheck by mutableStateOf(false)
     val toolkit = mlabeler.app.toolkit.ToolkitManager(this, scope)

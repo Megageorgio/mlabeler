@@ -224,7 +224,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
      */
     suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean, whisper: Boolean = false,
                       refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList(),
-                      whisperModel: String? = null): String {
+                      whisperModel: String? = null, skipUnknown: Boolean = false): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -240,6 +240,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             if (extraLanguages.isNotEmpty()) put("extra_languages", buildJsonArray { extraLanguages.forEach { add(JsonPrimitive(it)) } })
             if (!whisper) put("transcribe", kotlinx.serialization.json.JsonNull)
             else if (!whisperModel.isNullOrBlank()) putJsonObject("transcribe") { put("model", whisperModel) }
+            if (skipUnknown) put("skip_unknown_words", true)
             putRefine(refine)
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))
@@ -279,6 +280,49 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             }
         }
         return call("POST", "/segment", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
+    /** What an aligner model makes of a text: its words, the phonemes of each (null = unknown), the words it lacks. */
+    data class TextPhonemes(val words: List<String>, val phonemes: List<List<String>?>, val unknown: List<String>, val guessed: Map<String, List<String>>)
+
+    private fun textRequest(texts: List<String>, model: String, language: String?) = buildJsonObject {
+        put("texts", buildJsonArray { texts.forEach { add(JsonPrimitive(it)) } })
+        put("model", model)
+        if (language != null) put("language", language)
+    }
+
+    private fun strings(e: JsonElement?): List<String> = (e as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
+
+    private fun textPhonemes(o: JsonObject) = TextPhonemes(
+        strings(o["tokens"]),
+        (o["phonemes"] as? JsonArray)?.map { p -> (p as? JsonArray)?.let { strings(it) } }.orEmpty(),
+        strings(o["unknown_words"]),
+        (o["guessed"] as? JsonObject)?.mapNotNull { (k, v) -> (v as? JsonArray)?.let { k to strings(it) } }?.toMap().orEmpty(),
+    )
+
+    /**
+     * Words and phonemes of [texts] by the dictionary of [model], its own words and a G2P for the rest
+     * ([check]: only the words it lacks, with G2P guesses). The first call may install the model and its engine.
+     */
+    suspend fun phonemize(texts: List<String>, model: String, language: String?, check: Boolean = false): List<TextPhonemes> =
+        call("POST", if (check) "/text/validate" else "/text/g2p", textRequest(texts, model, language), timeoutMs = 600_000)
+            .jsonObject["items"]!!.jsonArray.map { textPhonemes(it.jsonObject) }
+
+    /** The own words of [model] ({} from toolkits that keep none). */
+    suspend fun words(model: String): Map<String, List<String>> = runCatching {
+        call("GET", "/models/${model.encodeUrl()}/words").jsonObject.mapValues { (_, v) -> strings(v) }
+    }.getOrElse { e -> if (e is ToolkitException && (e.message == "Not Found" || e.message == "HTTP 404" || e.message == "HTTP 405")) emptyMap() else throw e }
+
+    suspend fun setWords(model: String, words: Map<String, List<String>>): Map<String, List<String>> {
+        val body = buildJsonObject { for ((w, ph) in words) put(w, buildJsonArray { ph.forEach { add(JsonPrimitive(it)) } }) }
+        return call("PUT", "/models/${model.encodeUrl()}/words", body).jsonObject.mapValues { (_, v) -> strings(v) }
+    }
+
+    private fun String.encodeUrl() = buildString {
+        for (b in this@encodeUrl.encodeToByteArray()) {
+            val ch = (b.toInt() and 0xFF).toChar()
+            if (ch.isLetterOrDigit() && ch.code < 128 || ch in "-_.~") append(ch) else append('%' + (b.toInt() and 0xFF).toString(16).padStart(2, '0').uppercase())
+        }
     }
 
     /** Starts separating the voice from the music of one uploaded file; returns the job id. */

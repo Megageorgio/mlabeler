@@ -73,6 +73,7 @@ object MenuTitles {
     val view = L("View", "Вид")
     val go = L("Go", "Переход")
     val tools = L("Tools", "Инструменты")
+    val words = L("Words and phonemes", "Слова и фонемы")
     val units = L("Transitions (.trans)", "Переходы (.trans)")
     val help = L("Help", "Справка")
     val closeFolder = L("Close folder", "Закрыть папку")
@@ -273,7 +274,10 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         if (oto) { add(MSep); add(item(Commands.home, ed, app)); add(item(Commands.end, ed, app)) }
     }
     val tools = buildList {
-        if (oto) add(item(Commands.autoOto, ed, app)) else { add(item(Commands.autolabel, ed, app)); add(item(Commands.refine, ed, app)) }
+        if (oto) add(item(Commands.autoOto, ed, app)) else {
+            add(item(Commands.autolabel, ed, app)); add(item(Commands.refine, ed, app))
+            add(MSub(MenuTitles.words(), listOf(item(Commands.g2p, ed, app), item(Commands.modelWords, ed, app))))
+        }
         add(MSub(MenuTitles.soundTools(), buildList {
             if (!oto) add(item(Commands.soundMode, ed, app, checked = ed.soundMode))
             add(item(Commands.cleanup, ed, app))
