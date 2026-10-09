@@ -221,9 +221,12 @@ private fun OverlayBox(onDismiss: () -> Unit, maxWidth: Int, dim: Boolean, conte
         var size by remember { mutableStateOf<androidx.compose.ui.unit.DpSize?>(null) }
         val boxW = this.maxWidth
         val boxH = this.maxHeight
+        // a dragged-in corner stops at a size where the window still reads well (or the whole screen, if smaller)
+        val minW = minOf(maxWidth, 480).dp
+        val minH = 360.dp
         Box(
             Modifier.padding(top = 56.dp).offset { androidx.compose.ui.unit.IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-                .then(size?.let { Modifier.size(it.width.coerceIn(320.dp, boxW), it.height.coerceIn(200.dp, boxH)) }
+                .then(size?.let { Modifier.size(it.width.coerceIn(minOf(minW, boxW), boxW), it.height.coerceIn(minOf(minH, boxH), boxH)) }
                     ?: Modifier.widthIn(max = maxWidth.dp).fillMaxWidth().heightIn(max = boxH - 96.dp)),
         ) {
             // as tall as the content until the corner is dragged, then exactly the dragged size
@@ -247,7 +250,12 @@ private fun OverlayBox(onDismiss: () -> Unit, maxWidth: Int, dim: Boolean, conte
                         detectDragGestures { ch, d ->
                             ch.consume()
                             val cur = size ?: with(density) { androidx.compose.ui.unit.DpSize(cardSize.width.toDp(), cardSize.height.toDp()) }
-                            size = with(density) { androidx.compose.ui.unit.DpSize(cur.width + d.x.toDp(), cur.height + d.y.toDp()) }
+                            size = with(density) {
+                                androidx.compose.ui.unit.DpSize(
+                                    (cur.width + d.x.toDp()).coerceIn(minOf(minW, boxW), boxW),
+                                    (cur.height + d.y.toDp()).coerceIn(minOf(minH, boxH), boxH),
+                                )
+                            }
                         }
                     },
             ) {
@@ -334,10 +342,18 @@ fun SettingsDialog(app: AppState) {
     var query by remember { mutableStateOf("") }
     var focusTitle by remember { mutableStateOf<String?>(null) }
     Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820, dim = app.settings.settingsDim) {
-        Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(S.settings(), color = c.text, fontSize = 18.sp, modifier = Modifier.weight(1f))
-            Field(query, { query = it }, Modifier.width(220.dp), placeholder = searchSettingsT())
-            IconBtn(Icons.close, S.close()) { app.showSettings = false }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // on a small window the search goes under the title instead of squeezing it
+            val tight = maxWidth < 460.dp
+            Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(S.settings(), color = c.text, fontSize = 18.sp, maxLines = 1, softWrap = false,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    if (!tight) Field(query, { query = it }, Modifier.width(220.dp), placeholder = searchSettingsT())
+                    IconBtn(Icons.close, S.close()) { app.showSettings = false }
+                }
+                if (tight) Field(query, { query = it }, Modifier.fillMaxWidth().padding(end = 12.dp, top = 4.dp), placeholder = searchSettingsT())
+            }
         }
         Divider()
         BoxWithConstraints(Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 240.dp)) {
