@@ -65,31 +65,32 @@ fun UpdateSection(app: AppState, switchRow: @Composable (String, Boolean, (Boole
     val c = T.c
     val u = app.updater
     val s = app.settings.updates
-    SectionTitle(UpdateTitles.section())
-    Text(UpdateTitles.channel(), color = c.text, fontSize = 13.sp)
-    FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (ch in listOf("stable", "beta", "alpha")) Chip(UpdateTitles.channelName(ch), s.channel == ch) {
-            app.update { it.copy(updates = it.updates.copy(channel = ch)) }
-            u.checkNow()
+    Fold(UpdateTitles.section()) {
+        Text(UpdateTitles.channel(), color = c.text, fontSize = 13.sp)
+        FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (ch in listOf("stable", "beta", "alpha")) Chip(UpdateTitles.channelName(ch), s.channel == ch) {
+                app.update { it.copy(updates = it.updates.copy(channel = ch)) }
+                u.checkNow()
+            }
         }
+        Text(UpdateTitles.channelHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        switchRow(UpdateTitles.checkOnStart(), s.checkOnStart) { v -> app.update { it.copy(updates = it.updates.copy(checkOnStart = v)) } }
+        if (mlabeler.app.SelfUpdate.supported) {
+            switchRow(UpdateTitles.autoInstall(), s.autoInstall) { v -> app.update { it.copy(updates = it.updates.copy(autoInstall = v)) } }
+            Text((if (mlabeler.app.SelfUpdate.installsOnClose) UpdateTitles.autoInstallHint else UpdateTitles.autoInstallHintPhone)(), color = c.muted, fontSize = 12.sp)
+        }
+        val uri = androidx.compose.ui.platform.LocalUriHandler.current
+        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Btn(if (u.checking) UpdateTitles.checking() else UpdateTitles.checkNow(), enabled = !u.checking) { u.checkNow() }
+            val r = u.available
+            if (r != null) {
+                Text(UpdateTitles.available.format(label(r)), color = c.accent, fontSize = 13.sp)
+                UpdateButton(app, r) { runCatching { uri.openUri(r.download ?: r.page) } }
+            } else if (u.lastResult.isNotEmpty()) Text(u.lastResult, color = c.muted, fontSize = 12.sp)
+        }
+        u.progress?.let { p -> UpdateProgress(p, u.available?.let { label(it) } ?: "") }
+        if (u.installError.isNotEmpty()) Text(u.installError, color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
     }
-    Text(UpdateTitles.channelHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-    switchRow(UpdateTitles.checkOnStart(), s.checkOnStart) { v -> app.update { it.copy(updates = it.updates.copy(checkOnStart = v)) } }
-    if (mlabeler.app.SelfUpdate.supported) {
-        switchRow(UpdateTitles.autoInstall(), s.autoInstall) { v -> app.update { it.copy(updates = it.updates.copy(autoInstall = v)) } }
-        Text((if (mlabeler.app.SelfUpdate.installsOnClose) UpdateTitles.autoInstallHint else UpdateTitles.autoInstallHintPhone)(), color = c.muted, fontSize = 12.sp)
-    }
-    val uri = androidx.compose.ui.platform.LocalUriHandler.current
-    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Btn(if (u.checking) UpdateTitles.checking() else UpdateTitles.checkNow(), enabled = !u.checking) { u.checkNow() }
-        val r = u.available
-        if (r != null) {
-            Text(UpdateTitles.available.format(label(r)), color = c.accent, fontSize = 13.sp)
-            UpdateButton(app, r) { runCatching { uri.openUri(r.download ?: r.page) } }
-        } else if (u.lastResult.isNotEmpty()) Text(u.lastResult, color = c.muted, fontSize = 12.sp)
-    }
-    u.progress?.let { p -> UpdateProgress(p, u.available?.let { label(it) } ?: "") }
-    if (u.installError.isNotEmpty()) Text(u.installError, color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
 }
 
 /** Download, install or restart: what fits the state of [r] here. */

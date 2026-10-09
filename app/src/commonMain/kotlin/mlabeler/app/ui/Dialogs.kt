@@ -178,6 +178,7 @@ private fun PlacementPad(x: Float, y: Float, onChange: (Float, Float) -> Unit) {
 }
 
 private val whatToShow = mlabeler.app.i18n.L("What to show", "Что показывать")
+private val scaleT = mlabeler.app.i18n.L("Size and scale", "Размер и масштаб")
 
 /**
  * The inside of a dialog: [content] scrolls, [footer] (the final buttons, right-aligned) always stays visible
@@ -364,6 +365,7 @@ fun SettingsDialog(app: AppState) {
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { app.settingsPage = "" } }
     var query by remember { mutableStateOf("") }
     var focusTitle by remember { mutableStateOf<String?>(null) }
+    val folds = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
     Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820, dim = app.settings.settingsDim) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // on a small window the search goes under the title instead of squeezing it
@@ -394,7 +396,7 @@ fun SettingsDialog(app: AppState) {
                         }
                     }
                 }
-            } else androidx.compose.runtime.CompositionLocalProvider(LocalSettingFocus provides focusTitle) {
+            } else androidx.compose.runtime.CompositionLocalProvider(LocalSettingFocus provides focusTitle, LocalFolds provides folds) {
             if (narrow) {
                 Column {
                     Row(
@@ -440,155 +442,165 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
     Column(modifier.scrollWithHint().padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
         when (section) {
             Section.General -> {
-                SectionTitle(S.language())
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for ((code, name) in Lang.available) Chip(name, Lang.current == code) { app.update { it.copy(language = code) } }
+                Fold(S.language()) {
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for ((code, name) in Lang.available) Chip(name, Lang.current == code) { app.update { it.copy(language = code) } }
+                    }
                 }
-                if (mlabeler.app.Platform.isMobile) {
-                    SectionTitle(S.screen())
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                if (mlabeler.app.Platform.isMobile) Fold(S.screen()) {
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         for ((v, t) in listOf("landscape" to S.landscape(), "portrait" to S.portrait(), "auto" to S.autoRotate())) Chip(t, s.orientation == v) { app.update { it.copy(orientation = v) } }
                     }
                     SwitchRow(S.fullscreen(), s.fullscreen) { v -> app.update { it.copy(fullscreen = v) } }
                     if (s.fullscreen) SwitchRow(S.avoidCutout(), s.avoidCutout) { v -> app.update { it.copy(avoidCutout = v) } }
                 }
-                SectionTitle(S.files())
-                SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
-                SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
-                ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
+                Fold(S.files()) {
+                    SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
+                    SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
+                    ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
+                }
             }
             Section.View -> {
-                ValueSlider(S.interfaceScale(), s.scale, 0.5f..2f, "%", factor = 100f, default = dScale, live = false) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
-                SwitchRow(scaleButtonT(), s.toolbar.scaleButton ?: mlabeler.app.Platform.isMobile) { v -> app.update { it.copy(toolbar = it.toolbar.copy(scaleButton = v)) } }
-                SwitchRow(keepZoomT(), s.edit.keepZoom) { v -> app.update { it.copy(edit = it.edit.copy(keepZoom = v)) } }
-                SectionTitle(whatToShow())
-                SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
-                SwitchRow(namesOnAudioT(), s.layout.namesOnAudio) { v -> app.update { it.copy(layout = it.layout.copy(namesOnAudio = v)) } }
-                if (s.layout.namesOnAudio) {
-                    Text(namesWhereT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
-                    PlacementPad(s.layout.namesX, s.layout.namesY) { x, y -> app.update { it.copy(layout = it.layout.copy(namesX = x, namesY = y)) } }
+                Fold(scaleT()) {
+                    ValueSlider(S.interfaceScale(), s.scale, 0.5f..2f, "%", factor = 100f, default = dScale, live = false) { v -> app.update { it.copy(scale = (v * 100).roundToInt() / 100f) } }
+                    SwitchRow(scaleButtonT(), s.toolbar.scaleButton ?: mlabeler.app.Platform.isMobile) { v -> app.update { it.copy(toolbar = it.toolbar.copy(scaleButton = v)) } }
+                    SwitchRow(keepZoomT(), s.edit.keepZoom) { v -> app.update { it.copy(edit = it.edit.copy(keepZoom = v)) } }
                 }
-                ValueSlider(S.labelFontSize(), s.layout.labelFontSize, 8f..48f, "sp", default = dL.labelFontSize) { v -> app.update { it.copy(layout = it.layout.copy(labelFontSize = v.roundToInt().toFloat())) } }
-                if (s.layout.overlay) ValueSlider(S.overlayWaveFillAlpha(), s.layout.overlayWaveFillAlpha, 0.05f..1f, "%", factor = 100f,
-                    default = mlabeler.app.state.LayoutSettings().overlayWaveFillAlpha) { v -> app.update { it.copy(layout = it.layout.copy(overlayWaveFillAlpha = v)) } }
-                if (s.layout.overlay) ValueSlider(S.overlayDim(), s.layout.overlayDim, 0f..0.8f, "%", factor = 100f, default = dL.overlayDim) { v -> app.update { it.copy(layout = it.layout.copy(overlayDim = v)) } }
-                SwitchRow(S.tiersOnTop(), s.layout.tiersOnTop) { v -> app.update { it.copy(layout = it.layout.copy(tiersOnTop = v)) } }
-                SwitchRow(S.waveform(), s.layout.showWaveform) { v -> app.update { it.copy(layout = it.layout.copy(showWaveform = v)) } }
-                SwitchRow(S.spectrogram(), s.layout.showSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(showSpectrogram = v)) } }
-                SwitchRow(S.pitch(), s.layout.showPitch) { v -> app.update { it.copy(layout = it.layout.copy(showPitch = v)) } }
-                if (s.layout.showPitch) SwitchRow(S.pitchOver(), s.layout.pitchOverSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(pitchOverSpectrogram = v)) } }
-                SwitchRow(S.power(), s.layout.showPower) { v -> app.update { it.copy(layout = it.layout.copy(showPower = v)) } }
-                SwitchRow(Commands.formants.title(), s.layout.showFormants) { v -> app.update { it.copy(layout = it.layout.copy(showFormants = v)) } }
-                SwitchRow(S.toggleFiles(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
-                SwitchRow(S.toggleInspector(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
+                Fold(whatToShow()) {
+                    SwitchRow(S.overlay(), s.layout.overlay) { v -> app.update { it.copy(layout = it.layout.copy(overlay = v)) } }
+                    SwitchRow(namesOnAudioT(), s.layout.namesOnAudio) { v -> app.update { it.copy(layout = it.layout.copy(namesOnAudio = v)) } }
+                    if (s.layout.namesOnAudio) {
+                        Text(namesWhereT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
+                        PlacementPad(s.layout.namesX, s.layout.namesY) { x, y -> app.update { it.copy(layout = it.layout.copy(namesX = x, namesY = y)) } }
+                    }
+                    ValueSlider(S.labelFontSize(), s.layout.labelFontSize, 8f..48f, "sp", default = dL.labelFontSize) { v -> app.update { it.copy(layout = it.layout.copy(labelFontSize = v.roundToInt().toFloat())) } }
+                    if (s.layout.overlay) ValueSlider(S.overlayWaveFillAlpha(), s.layout.overlayWaveFillAlpha, 0.05f..1f, "%", factor = 100f,
+                        default = mlabeler.app.state.LayoutSettings().overlayWaveFillAlpha) { v -> app.update { it.copy(layout = it.layout.copy(overlayWaveFillAlpha = v)) } }
+                    if (s.layout.overlay) ValueSlider(S.overlayDim(), s.layout.overlayDim, 0f..0.8f, "%", factor = 100f, default = dL.overlayDim) { v -> app.update { it.copy(layout = it.layout.copy(overlayDim = v)) } }
+                    SwitchRow(S.tiersOnTop(), s.layout.tiersOnTop) { v -> app.update { it.copy(layout = it.layout.copy(tiersOnTop = v)) } }
+                    SwitchRow(S.waveform(), s.layout.showWaveform) { v -> app.update { it.copy(layout = it.layout.copy(showWaveform = v)) } }
+                    SwitchRow(S.spectrogram(), s.layout.showSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(showSpectrogram = v)) } }
+                    SwitchRow(S.pitch(), s.layout.showPitch) { v -> app.update { it.copy(layout = it.layout.copy(showPitch = v)) } }
+                    if (s.layout.showPitch) SwitchRow(S.pitchOver(), s.layout.pitchOverSpectrogram) { v -> app.update { it.copy(layout = it.layout.copy(pitchOverSpectrogram = v)) } }
+                    SwitchRow(S.power(), s.layout.showPower) { v -> app.update { it.copy(layout = it.layout.copy(showPower = v)) } }
+                    SwitchRow(Commands.formants.title(), s.layout.showFormants) { v -> app.update { it.copy(layout = it.layout.copy(showFormants = v)) } }
+                    SwitchRow(S.toggleFiles(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
+                    SwitchRow(S.toggleInspector(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
+                }
             }
             Section.Spectrogram -> {
-                SectionTitle(S.colors())
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Chip(S.theme(), s.view.palette.isEmpty()) { app.update { it.copy(view = it.view.copy(palette = "")) } }
-                    for (p in Themes.palettes.keys) Chip(p, s.view.palette == p) { app.update { it.copy(view = it.view.copy(palette = p)) } }
+                Fold(S.colors()) {
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Chip(S.theme(), s.view.palette.isEmpty()) { app.update { it.copy(view = it.view.copy(palette = "")) } }
+                        for (p in Themes.palettes.keys) Chip(p, s.view.palette == p) { app.update { it.copy(view = it.view.copy(palette = p)) } }
+                    }
+                    ValueSlider(S.brightness(), s.view.brightness, -0.5f..0.5f, factor = 100f, default = dV.brightness) { v -> app.update { it.copy(view = it.view.copy(brightness = v)) } }
+                    ValueSlider(S.contrast(), s.view.contrast, 0.5f..3f, "%", factor = 100f, default = dV.contrast) { v -> app.update { it.copy(view = it.view.copy(contrast = v)) } }
                 }
-                ValueSlider(S.brightness(), s.view.brightness, -0.5f..0.5f, factor = 100f, default = dV.brightness) { v -> app.update { it.copy(view = it.view.copy(brightness = v)) } }
-                ValueSlider(S.contrast(), s.view.contrast, 0.5f..3f, "%", factor = 100f, default = dV.contrast) { v -> app.update { it.copy(view = it.view.copy(contrast = v)) } }
-                SectionTitle(detailT())
-                Text(detailHint(), color = c.muted, fontSize = 12.sp)
-                FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    for ((name, preset) in detailPresets) {
-                        val (w, hop, bands) = preset
-                        Chip(name(), s.view.windowMs == w && s.view.hopMs == hop && s.view.bands == bands) {
-                            app.update { it.copy(view = it.view.copy(windowMs = w, hopMs = hop, bands = bands)) }
+                Fold(detailT()) {
+                    Text(detailHint(), color = c.muted, fontSize = 12.sp)
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        for ((name, preset) in detailPresets) {
+                            val (w, hop, bands) = preset
+                            Chip(name(), s.view.windowMs == w && s.view.hopMs == hop && s.view.bands == bands) {
+                                app.update { it.copy(view = it.view.copy(windowMs = w, hopMs = hop, bands = bands)) }
+                            }
                         }
                     }
+                    ValueSlider(S.windowMs(), s.view.windowMs, 5f..80f, S.msUnit(), default = dV.windowMs) { v -> app.update { it.copy(view = it.view.copy(windowMs = v.roundToInt().toFloat())) } }
+                    ValueSlider(S.hopMs(), s.view.hopMs, 0f..20f, S.msUnit(), decimals = 1, default = dV.hopMs) { v -> app.update { it.copy(view = it.view.copy(hopMs = (v * 2).roundToInt() / 2f)) } }
+                    ValueSlider(S.bands(), s.view.bands.toFloat(), 64f..384f, default = dV.bands.toFloat()) { v -> app.update { it.copy(view = it.view.copy(bands = (v / 32).roundToInt() * 32)) } }
+                    ValueSlider(S.dbRange(), s.view.minDb, -140f..-40f, "dB", default = dV.minDb) { v -> app.update { it.copy(view = it.view.copy(minDb = v.roundToInt().toFloat())) } }
+                    ValueSlider(S.dbTop(), s.view.maxDb, -40f..10f, "dB", default = dV.maxDb) { v -> app.update { it.copy(view = it.view.copy(maxDb = v.roundToInt().toFloat())) } }
+                    ValueSlider(S.maxFrequency(), s.view.maxFreq, 1000f..24000f, S.hzShort(), default = dV.maxFreq) { v -> app.update { it.copy(view = it.view.copy(maxFreq = v.roundToInt().toFloat())) } }
                 }
-                ValueSlider(S.windowMs(), s.view.windowMs, 5f..80f, S.msUnit(), default = dV.windowMs) { v -> app.update { it.copy(view = it.view.copy(windowMs = v.roundToInt().toFloat())) } }
-                ValueSlider(S.hopMs(), s.view.hopMs, 0f..20f, S.msUnit(), decimals = 1, default = dV.hopMs) { v -> app.update { it.copy(view = it.view.copy(hopMs = (v * 2).roundToInt() / 2f)) } }
-                ValueSlider(S.bands(), s.view.bands.toFloat(), 64f..384f, default = dV.bands.toFloat()) { v -> app.update { it.copy(view = it.view.copy(bands = (v / 32).roundToInt() * 32)) } }
-                ValueSlider(S.dbRange(), s.view.minDb, -140f..-40f, "dB", default = dV.minDb) { v -> app.update { it.copy(view = it.view.copy(minDb = v.roundToInt().toFloat())) } }
-                ValueSlider(S.dbTop(), s.view.maxDb, -40f..10f, "dB", default = dV.maxDb) { v -> app.update { it.copy(view = it.view.copy(maxDb = v.roundToInt().toFloat())) } }
-                ValueSlider(S.maxFrequency(), s.view.maxFreq, 1000f..24000f, S.hzShort(), default = dV.maxFreq) { v -> app.update { it.copy(view = it.view.copy(maxFreq = v.roundToInt().toFloat())) } }
             }
             Section.Editing -> {
-                SectionTitle(S.editing())
-                ValueSlider(S.nudgeStep(), s.edit.nudgeMs, 1f..50f, S.msUnit(), default = dE.nudgeMs) { v -> app.update { it.copy(edit = it.edit.copy(nudgeMs = v.roundToInt().toFloat())) } }
-                ValueSlider(S.minInterval(), s.edit.minIntervalMs, 0f..20f, S.msUnit(), default = dE.minIntervalMs) { v -> app.update { it.copy(edit = it.edit.copy(minIntervalMs = v.roundToInt().toFloat())) } }
-                SwitchRow(S.ripple() + " — " + S.rippleHint(), s.edit.ripple) { v -> app.update { it.copy(edit = it.edit.copy(ripple = v)) } }
-                SwitchRow(S.linked() + " — " + S.linkedHint(), s.edit.linked) { v -> app.update { it.copy(edit = it.edit.copy(linked = v)) } }
-                SwitchRow(S.loop(), s.edit.loop) { v -> app.update { it.copy(edit = it.edit.copy(loop = v)) } }
-                SwitchRow(snapZeroT(), s.edit.snapToZero) { v -> app.update { it.copy(edit = it.edit.copy(snapToZero = v)) } }
-                SectionTitle(PlayTitles.playback())
-                ValueSlider(PlayTitles.volume(), s.edit.volume, 0f..1f, "%", factor = 100f, default = dE.volume) { v -> app.update { it.copy(edit = it.edit.copy(volume = v)) } }
-                Text(PlayTitles.follow(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
-                FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Chip(PlayTitles.followOff(), s.edit.follow == "off") { app.update { it.copy(edit = it.edit.copy(follow = "off")) } }
-                    Chip(PlayTitles.followPage(), s.edit.follow == "page") { app.update { it.copy(edit = it.edit.copy(follow = "page")) } }
-                    Chip(PlayTitles.followKeep(), s.edit.follow == "keep") { app.update { it.copy(edit = it.edit.copy(follow = "keep")) } }
+                Fold(S.editing()) {
+                    ValueSlider(S.nudgeStep(), s.edit.nudgeMs, 1f..50f, S.msUnit(), default = dE.nudgeMs) { v -> app.update { it.copy(edit = it.edit.copy(nudgeMs = v.roundToInt().toFloat())) } }
+                    ValueSlider(S.minInterval(), s.edit.minIntervalMs, 0f..20f, S.msUnit(), default = dE.minIntervalMs) { v -> app.update { it.copy(edit = it.edit.copy(minIntervalMs = v.roundToInt().toFloat())) } }
+                    SwitchRow(S.ripple() + " — " + S.rippleHint(), s.edit.ripple) { v -> app.update { it.copy(edit = it.edit.copy(ripple = v)) } }
+                    SwitchRow(S.linked() + " — " + S.linkedHint(), s.edit.linked) { v -> app.update { it.copy(edit = it.edit.copy(linked = v)) } }
+                    SwitchRow(S.loop(), s.edit.loop) { v -> app.update { it.copy(edit = it.edit.copy(loop = v)) } }
+                    SwitchRow(snapZeroT(), s.edit.snapToZero) { v -> app.update { it.copy(edit = it.edit.copy(snapToZero = v)) } }
                 }
-                if (s.edit.follow == "keep") ValueSlider(PlayTitles.followAt(), s.edit.followAt, 0f..1f, "%", factor = 100f, default = dE.followAt) { v -> app.update { it.copy(edit = it.edit.copy(followAt = v)) } }
-                ValueSlider(S.speedSetting(), s.edit.speed, 0.1f..1f, "×", decimals = 2, default = dE.speed) { v -> app.update { it.copy(edit = it.edit.copy(speed = (v * 100).roundToInt() / 100f)) } }
-                SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
-                SwitchRow(S.otoLocked(), s.edit.otoLockedDrag) { v -> app.update { it.copy(edit = it.edit.copy(otoLockedDrag = v)) } }
-                SwitchRow(MouseTitles.spaceRestarts(), s.edit.spaceRestarts) { v -> app.update { it.copy(edit = it.edit.copy(spaceRestarts = v)) } }
-                Text(MouseTitles.owner(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
-                Text(MouseTitles.ownerHint(), color = c.muted, fontSize = 12.sp)
-                FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Chip(MouseTitles.ownerEnd(), s.edit.boundaryOwner == "end") { app.update { it.copy(edit = it.edit.copy(boundaryOwner = "end")) } }
-                    Chip(MouseTitles.ownerStart(), s.edit.boundaryOwner != "end") { app.update { it.copy(edit = it.edit.copy(boundaryOwner = "start")) } }
+                Fold(PlayTitles.playback()) {
+                    ValueSlider(PlayTitles.volume(), s.edit.volume, 0f..1f, "%", factor = 100f, default = dE.volume) { v -> app.update { it.copy(edit = it.edit.copy(volume = v)) } }
+                    Text(PlayTitles.follow(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
+                    FlowRow(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Chip(PlayTitles.followOff(), s.edit.follow == "off") { app.update { it.copy(edit = it.edit.copy(follow = "off")) } }
+                        Chip(PlayTitles.followPage(), s.edit.follow == "page") { app.update { it.copy(edit = it.edit.copy(follow = "page")) } }
+                        Chip(PlayTitles.followKeep(), s.edit.follow == "keep") { app.update { it.copy(edit = it.edit.copy(follow = "keep")) } }
+                    }
+                    if (s.edit.follow == "keep") ValueSlider(PlayTitles.followAt(), s.edit.followAt, 0f..1f, "%", factor = 100f, default = dE.followAt) { v -> app.update { it.copy(edit = it.edit.copy(followAt = v)) } }
+                    ValueSlider(S.speedSetting(), s.edit.speed, 0.1f..1f, "×", decimals = 2, default = dE.speed) { v -> app.update { it.copy(edit = it.edit.copy(speed = (v * 100).roundToInt() / 100f)) } }
+                    SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
+                    SwitchRow(S.otoLocked(), s.edit.otoLockedDrag) { v -> app.update { it.copy(edit = it.edit.copy(otoLockedDrag = v)) } }
+                    SwitchRow(MouseTitles.spaceRestarts(), s.edit.spaceRestarts) { v -> app.update { it.copy(edit = it.edit.copy(spaceRestarts = v)) } }
+                    Text(MouseTitles.owner(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
+                    Text(MouseTitles.ownerHint(), color = c.muted, fontSize = 12.sp)
+                    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Chip(MouseTitles.ownerEnd(), s.edit.boundaryOwner == "end") { app.update { it.copy(edit = it.edit.copy(boundaryOwner = "end")) } }
+                        Chip(MouseTitles.ownerStart(), s.edit.boundaryOwner != "end") { app.update { it.copy(edit = it.edit.copy(boundaryOwner = "start")) } }
+                    }
                 }
             }
             Section.Mouse -> MousePage(app)
             Section.Checks -> {
-                SectionTitle(S.checks())
-                ValueSlider(S.shortThreshold(), s.checks.minDurationMs.toFloat(), 0f..150f, S.msUnit(), default = dC.minDurationMs.toFloat()) { v ->
-                    app.update { it.copy(checks = it.checks.copy(minDurationMs = v.roundToInt().toDouble())) }
-                }
-                var phonemes by remember { mutableStateOf(s.checks.phonemeSet.joinToString(" ")) }
-                Text(S.phonemeSet(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-                Field(phonemes, { v ->
-                    phonemes = v
-                    app.update { it.copy(checks = it.checks.copy(phonemeSet = v.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }.toSet())) }
-                }, Modifier.fillMaxWidth())
-                Text(CheckTitles.fromDict(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
-                fun setOf(d: mlabeler.core.ds.PhonemeDict) = (d.rests + d.vowels + d.semivowels + d.special + d.consonants).toSet()
-                val chosen = remember(s.checks.phonemeSet) { mlabeler.app.state.Dictionaries.all().firstOrNull { it.vowels.isNotEmpty() && setOf(it) == s.checks.phonemeSet }?.name ?: "" }
-                DictionaryChips(chosen, autoTitle = CheckTitles.anyPhoneme()) { name ->
-                    val set = if (name.isEmpty()) emptySet() else setOf(mlabeler.app.state.Dictionaries.byName(name))
-                    phonemes = set.joinToString(" ")
-                    app.update { it.copy(checks = it.checks.copy(phonemeSet = set)) }
-                }
-                ValueSlider(CheckTitles.maxLen(), s.checks.maxDurationMs.toFloat(), 0f..3000f, S.msUnit(), default = 0f) { v ->
-                    app.update { it.copy(checks = it.checks.copy(maxDurationMs = ((v / 10).roundToInt() * 10).toDouble())) }
-                }
-                ValueSlider(CheckTitles.maxPause(), s.checks.maxPauseSeconds.toFloat(), 0f..30f, S.secondsShort(), decimals = 1, default = 0f) { v ->
-                    app.update { it.copy(checks = it.checks.copy(maxPauseSeconds = (v * 10).roundToInt() / 10.0)) }
-                }
-                ValueSlider(CheckTitles.maxPhrase(), s.checks.maxPhraseSeconds.toFloat(), 0f..60f, S.secondsShort(), decimals = 1, default = 0f) { v ->
-                    app.update { it.copy(checks = it.checks.copy(maxPhraseSeconds = (v * 10).roundToInt() / 10.0)) }
-                }
-                if (s.checks.maxPhraseSeconds > 0) ValueSlider(CheckTitles.phrasePause(), s.checks.phrasePauseMs.toFloat(), 50f..1000f, S.msUnit(), default = 200f) { v ->
-                    app.update { it.copy(checks = it.checks.copy(phrasePauseMs = v.roundToInt().toDouble())) }
-                }
-                Text(CheckTitles.zeroOff(), color = c.muted, fontSize = 12.sp)
-                SwitchRow(CheckTitles.diffsinger(), s.checks.diffsinger) { v -> app.update { it.copy(checks = it.checks.copy(diffsinger = v)) } }
-                SwitchRow(CheckTitles.edges(), s.checks.pauseAtEdges) { v -> app.update { it.copy(checks = it.checks.copy(pauseAtEdges = v)) } }
-                if (s.checks.pauseAtEdges) {
-                    var edge by remember { mutableStateOf(s.checks.edgePause) }
-                    Text(CheckTitles.edgeWhich(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
-                    Field(edge, { v -> edge = v; app.update { it.copy(checks = it.checks.copy(edgePause = v.trim())) } }, Modifier.width(160.dp))
-                }
-                SectionTitle(CheckTitles.scripts())
-                Text(CheckTitles.scriptsHint.format(mlabeler.app.plugins.CheckScripts.appDir(), ".mlabeler/checks"), color = c.muted, fontSize = 12.sp)
-                SwitchRow(CheckTitles.runScripts(), s.checks.scripts) { v -> app.update { it.copy(checks = it.checks.copy(scripts = v)) }; app.editor?.reloadCheckScripts() }
-                val ed = app.editor
-                if (ed != null) {
-                    Text(if (ed.checkScripts.isEmpty()) CheckTitles.none() else ed.checkScripts.joinToString(", ") { it.name }, color = c.text, fontSize = 13.sp, modifier = Modifier.padding(vertical = 6.dp))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Btn(CheckTitles.example()) {
-                        val p = runCatching { mlabeler.app.plugins.CheckScripts.writeExample() }.getOrNull()
-                        app.editor?.reloadCheckScripts()
-                        if (p != null) { app.message(CheckTitles.written.format(p)); if (!mlabeler.app.Platform.isMobile) mlabeler.app.Platform.openInFileManager(mlabeler.app.plugins.CheckScripts.appDir()) }
+                Fold(S.checks()) {
+                    ValueSlider(S.shortThreshold(), s.checks.minDurationMs.toFloat(), 0f..150f, S.msUnit(), default = dC.minDurationMs.toFloat()) { v ->
+                        app.update { it.copy(checks = it.checks.copy(minDurationMs = v.roundToInt().toDouble())) }
                     }
-                    Btn(CheckTitles.reload()) { app.editor?.reloadCheckScripts() }
+                    var phonemes by remember { mutableStateOf(s.checks.phonemeSet.joinToString(" ")) }
+                    Text(S.phonemeSet(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                    Field(phonemes, { v ->
+                        phonemes = v
+                        app.update { it.copy(checks = it.checks.copy(phonemeSet = v.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }.toSet())) }
+                    }, Modifier.fillMaxWidth())
+                    Text(CheckTitles.fromDict(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+                    fun setOf(d: mlabeler.core.ds.PhonemeDict) = (d.rests + d.vowels + d.semivowels + d.special + d.consonants).toSet()
+                    val chosen = remember(s.checks.phonemeSet) { mlabeler.app.state.Dictionaries.all().firstOrNull { it.vowels.isNotEmpty() && setOf(it) == s.checks.phonemeSet }?.name ?: "" }
+                    DictionaryChips(chosen, autoTitle = CheckTitles.anyPhoneme()) { name ->
+                        val set = if (name.isEmpty()) emptySet() else setOf(mlabeler.app.state.Dictionaries.byName(name))
+                        phonemes = set.joinToString(" ")
+                        app.update { it.copy(checks = it.checks.copy(phonemeSet = set)) }
+                    }
+                    ValueSlider(CheckTitles.maxLen(), s.checks.maxDurationMs.toFloat(), 0f..3000f, S.msUnit(), default = 0f) { v ->
+                        app.update { it.copy(checks = it.checks.copy(maxDurationMs = ((v / 10).roundToInt() * 10).toDouble())) }
+                    }
+                    ValueSlider(CheckTitles.maxPause(), s.checks.maxPauseSeconds.toFloat(), 0f..30f, S.secondsShort(), decimals = 1, default = 0f) { v ->
+                        app.update { it.copy(checks = it.checks.copy(maxPauseSeconds = (v * 10).roundToInt() / 10.0)) }
+                    }
+                    ValueSlider(CheckTitles.maxPhrase(), s.checks.maxPhraseSeconds.toFloat(), 0f..60f, S.secondsShort(), decimals = 1, default = 0f) { v ->
+                        app.update { it.copy(checks = it.checks.copy(maxPhraseSeconds = (v * 10).roundToInt() / 10.0)) }
+                    }
+                    if (s.checks.maxPhraseSeconds > 0) ValueSlider(CheckTitles.phrasePause(), s.checks.phrasePauseMs.toFloat(), 50f..1000f, S.msUnit(), default = 200f) { v ->
+                        app.update { it.copy(checks = it.checks.copy(phrasePauseMs = v.roundToInt().toDouble())) }
+                    }
+                    Text(CheckTitles.zeroOff(), color = c.muted, fontSize = 12.sp)
+                    SwitchRow(CheckTitles.diffsinger(), s.checks.diffsinger) { v -> app.update { it.copy(checks = it.checks.copy(diffsinger = v)) } }
+                    SwitchRow(CheckTitles.edges(), s.checks.pauseAtEdges) { v -> app.update { it.copy(checks = it.checks.copy(pauseAtEdges = v)) } }
+                    if (s.checks.pauseAtEdges) {
+                        var edge by remember { mutableStateOf(s.checks.edgePause) }
+                        Text(CheckTitles.edgeWhich(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+                        Field(edge, { v -> edge = v; app.update { it.copy(checks = it.checks.copy(edgePause = v.trim())) } }, Modifier.width(160.dp))
+                    }
+                }
+                Fold(CheckTitles.scripts()) {
+                    Text(CheckTitles.scriptsHint.format(mlabeler.app.plugins.CheckScripts.appDir(), ".mlabeler/checks"), color = c.muted, fontSize = 12.sp)
+                    SwitchRow(CheckTitles.runScripts(), s.checks.scripts) { v -> app.update { it.copy(checks = it.checks.copy(scripts = v)) }; app.editor?.reloadCheckScripts() }
+                    val ed = app.editor
+                    if (ed != null) {
+                        Text(if (ed.checkScripts.isEmpty()) CheckTitles.none() else ed.checkScripts.joinToString(", ") { it.name }, color = c.text, fontSize = 13.sp, modifier = Modifier.padding(vertical = 6.dp))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Btn(CheckTitles.example()) {
+                            val p = runCatching { mlabeler.app.plugins.CheckScripts.writeExample() }.getOrNull()
+                            app.editor?.reloadCheckScripts()
+                            if (p != null) { app.message(CheckTitles.written.format(p)); if (!mlabeler.app.Platform.isMobile) mlabeler.app.Platform.openInFileManager(mlabeler.app.plugins.CheckScripts.appDir()) }
+                        }
+                        Btn(CheckTitles.reload()) { app.editor?.reloadCheckScripts() }
+                    }
                 }
             }
             Section.Toolkit -> ToolkitPage(app)
@@ -710,55 +722,57 @@ private fun ToolkitPage(app: AppState) {
     val c = T.c
     val s = app.settings
     val tk = app.toolkit
-    SectionTitle(S.toolkit())
-    Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
-    mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
-    if (mlabeler.app.Platform.legacyWindows) LegacyNote()
-    ToolkitStatus(app, reinstall = true)
-    if (tk.canRunHere) Row(Modifier.padding(top = 6.dp)) {
-        Btn(ErrorTitles.updateToolkit(), enabled = !tk.updatingNow) { tk.updateNow() }
+    Fold(S.toolkit()) {
+        Text(S.toolkitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+        mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
+        if (mlabeler.app.Platform.legacyWindows) LegacyNote()
+        ToolkitStatus(app, reinstall = true)
+        if (tk.canRunHere) Row(Modifier.padding(top = 6.dp)) {
+            Btn(ErrorTitles.updateToolkit(), enabled = !tk.updatingNow) { tk.updateNow() }
+        }
     }
     OwnModelsSection(app)
-    SectionTitle(S.toolkitUrl())
-    var url by remember { mutableStateOf(s.toolkit.url) }
-    var token by remember { mutableStateOf(s.toolkit.token) }
-    Field(url, { url = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(url = it.trim())) } }, Modifier.fillMaxWidth())
-    Text(S.toolkitToken(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-    Field(token, { token = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(token = it.trim())) } }, Modifier.fillMaxWidth())
-    if (mlabeler.app.toolkit.LocalToolkit.supported) {
-        SwitchRow(S.toolkitAutoStart(), s.toolkit.autoStart) { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoStart = v)) } }
-        SwitchRow(S.toolkitShare(), s.toolkit.shareOnNetwork) { v ->
-            app.update { it.copy(toolkit = it.toolkit.copy(shareOnNetwork = v)) }
-            if (tk.ownProcess || (v && tk.status != mlabeler.app.toolkit.ToolkitManager.Status.Ready)) tk.restart()
-        }
-        if (s.toolkit.shareOnNetwork) {
-            val ips = remember { mlabeler.app.toolkit.LocalToolkit.lanAddresses() }
-            Column(Modifier.fillMaxWidth().padding(top = 4.dp).background(c.panelAlt).padding(10.dp)) {
-                Text(S.toolkitShareHint(), color = c.muted, fontSize = 12.sp)
-                for (ip in ips.ifEmpty { listOf("?") }) {
-                    androidx.compose.foundation.text.selection.SelectionContainer {
-                        Text("http://$ip:${tk.port}", color = c.text, fontSize = 15.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                    }
-                }
-                androidx.compose.foundation.text.selection.SelectionContainer {
-                    Text(S.toolkitToken() + ": " + tk.networkToken.ifEmpty { "…" }, color = c.text, fontSize = 13.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, modifier = Modifier.padding(top = 4.dp))
-                }
-                if (!tk.ownProcess) Text(S.toolkitShareOwn(), color = c.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+    Fold(S.toolkitUrl()) {
+        var url by remember { mutableStateOf(s.toolkit.url) }
+        var token by remember { mutableStateOf(s.toolkit.token) }
+        Field(url, { url = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(url = it.trim())) } }, Modifier.fillMaxWidth())
+        Text(S.toolkitToken(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+        Field(token, { token = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(token = it.trim())) } }, Modifier.fillMaxWidth())
+        if (mlabeler.app.toolkit.LocalToolkit.supported) {
+            SwitchRow(S.toolkitAutoStart(), s.toolkit.autoStart) { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoStart = v)) } }
+            SwitchRow(S.toolkitShare(), s.toolkit.shareOnNetwork) { v ->
+                app.update { it.copy(toolkit = it.toolkit.copy(shareOnNetwork = v)) }
+                if (tk.ownProcess || (v && tk.status != mlabeler.app.toolkit.ToolkitManager.Status.Ready)) tk.restart()
             }
-        }
-        var more by remember { mutableStateOf(false) }
-        Row(Modifier.padding(top = 10.dp)) { Chip(S.more(), more) { more = !more } }
-        if (more) {
-            var mvt by remember { mutableStateOf(s.toolkit.mvtPath) }
-            var src by remember { mutableStateOf(s.toolkit.installSource) }
-            Text(S.toolkitMvtPath(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-            Field(mvt, { mvt = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(mvtPath = it.trim())) } }, Modifier.fillMaxWidth(),
-                placeholder = mlabeler.app.toolkit.LocalToolkit.findMvt("") ?: "mvt")
-            Text(S.toolkitSource(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-            Field(src, { src = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(installSource = it.trim())) } }, Modifier.fillMaxWidth())
-            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn(S.toolkitReinstall(), enabled = !tk.installing) { tk.stop(); tk.install() }
+            if (s.toolkit.shareOnNetwork) {
+                val ips = remember { mlabeler.app.toolkit.LocalToolkit.lanAddresses() }
+                Column(Modifier.fillMaxWidth().padding(top = 4.dp).background(c.panelAlt).padding(10.dp)) {
+                    Text(S.toolkitShareHint(), color = c.muted, fontSize = 12.sp)
+                    for (ip in ips.ifEmpty { listOf("?") }) {
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text("http://$ip:${tk.port}", color = c.text, fontSize = 15.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                        }
+                    }
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(S.toolkitToken() + ": " + tk.networkToken.ifEmpty { "…" }, color = c.text, fontSize = 13.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace, modifier = Modifier.padding(top = 4.dp))
+                    }
+                    if (!tk.ownProcess) Text(S.toolkitShareOwn(), color = c.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+            var more by remember { mutableStateOf(false) }
+            Row(Modifier.padding(top = 10.dp)) { Chip(S.more(), more) { more = !more } }
+            if (more) {
+                var mvt by remember { mutableStateOf(s.toolkit.mvtPath) }
+                var src by remember { mutableStateOf(s.toolkit.installSource) }
+                Text(S.toolkitMvtPath(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                Field(mvt, { mvt = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(mvtPath = it.trim())) } }, Modifier.fillMaxWidth(),
+                    placeholder = mlabeler.app.toolkit.LocalToolkit.findMvt("") ?: "mvt")
+                Text(S.toolkitSource(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                Field(src, { src = it; app.update { st -> st.copy(toolkit = st.toolkit.copy(installSource = it.trim())) } }, Modifier.fillMaxWidth())
+                Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Btn(S.toolkitReinstall(), enabled = !tk.installing) { tk.stop(); tk.install() }
+                }
             }
         }
     }
@@ -768,41 +782,42 @@ private fun ToolkitPage(app: AppState) {
 private fun InterfacePage(app: AppState) {
     val c = T.c
     val s = app.settings
-    SectionTitle(S.environments())
-    EnvironmentsSection(app)
-    SectionTitle(MenuTitles.panels())
-    if (!mlabeler.app.Platform.isMobile) SwitchRow(MenuTitles.menuBar(), s.menuBar) { v -> app.update { it.copy(menuBar = v) } }
-    if (!mlabeler.app.Platform.isMobile) SwitchRow(titleBarMenuT(), s.titleBarMenu) { v -> app.update { it.copy(titleBarMenu = v) }; app.message(restartT()) }
-    SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }
-    SwitchRow(tipsAtStartT(), s.tipsAtStart) { v -> app.update { it.copy(tipsAtStart = v) } }
-    SwitchRow(minimapT(), s.layout.minimap) { v -> app.update { it.copy(layout = it.layout.copy(minimap = v)) } }
-    SwitchRow(phonemeColorsT(), s.layout.phonemeColors) { v -> app.update { it.copy(layout = it.layout.copy(phonemeColors = v)) } }
-    SectionTitle(animationsT())
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        for ((v, t) in listOf("normal" to animNormalT(), "reduced" to animReducedT(), "off" to animOffT())) Chip(t, s.animations == v) { app.update { it.copy(animations = v) } }
+    Fold(S.environments()) { EnvironmentsSection(app) }
+    Fold(MenuTitles.panels()) {
+        if (!mlabeler.app.Platform.isMobile) SwitchRow(MenuTitles.menuBar(), s.menuBar) { v -> app.update { it.copy(menuBar = v) } }
+        if (!mlabeler.app.Platform.isMobile) SwitchRow(titleBarMenuT(), s.titleBarMenu) { v -> app.update { it.copy(titleBarMenu = v) }; app.message(restartT()) }
+        SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }
+        SwitchRow(MenuTitles.filesPanel(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
+        SwitchRow(MenuTitles.detailsPanel(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
+        SwitchRow(tipsAtStartT(), s.tipsAtStart) { v -> app.update { it.copy(tipsAtStart = v) } }
+        SwitchRow(minimapT(), s.layout.minimap) { v -> app.update { it.copy(layout = it.layout.copy(minimap = v)) } }
+        SwitchRow(phonemeColorsT(), s.layout.phonemeColors) { v -> app.update { it.copy(layout = it.layout.copy(phonemeColors = v)) } }
     }
-    Text(animationsHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-    SwitchRow(MenuTitles.filesPanel(), s.layout.showFiles) { v -> app.update { it.copy(layout = it.layout.copy(showFiles = v)) } }
-    SwitchRow(MenuTitles.detailsPanel(), s.layout.showInspector) { v -> app.update { it.copy(layout = it.layout.copy(showInspector = v)) } }
-    if (s.statusBar) {
-        SectionTitle(MenuTitles.statusBar())
+    Fold(animationsT()) {
+        FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((v, t) in listOf("normal" to animNormalT(), "reduced" to animReducedT(), "off" to animOffT())) Chip(t, s.animations == v) { app.update { it.copy(animations = v) } }
+        }
+        Text(animationsHint(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+    }
+    if (s.statusBar) Fold(MenuTitles.statusBar()) {
         StatusBarSettings(app) { t, v, f -> SwitchRow(t, v, f) }
     }
-    SectionTitle(MenuTitles.toolbar())
-    SwitchRow(MenuTitles.buttonLabels(), s.toolbar.labels) { v -> app.update { it.copy(toolbar = it.toolbar.copy(labels = v)) } }
-    SwitchRow(MenuTitles.bigButtons(), s.toolbar.big) { v -> app.update { it.copy(toolbar = it.toolbar.copy(big = v)) } }
-    Text(S.toolbarHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
-    // a fixed list: ticking a group on or off doesn't move it
-    val order = s.toolbar.fullOrder()
-    for ((i, g) in order.withIndex()) {
-        val on = g in s.toolbar.groups
-        Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (c.checkboxes) Toggle(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } }, Modifier.padding(horizontal = 12.dp, vertical = 12.dp))
-            else androidx.compose.material3.Checkbox(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } },
-                colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.muted, checkmarkColor = c.onAccent))
-            Text(ToolLabels.group(g)(), color = if (on) c.text else c.muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            IconBtn(Icons.up, S.moveUp(), enabled = i > 0, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, -1)) } }
-            IconBtn(Icons.down, S.moveDown(), enabled = i < order.size - 1, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, 1)) } }
+    Fold(MenuTitles.toolbar()) {
+        SwitchRow(MenuTitles.buttonLabels(), s.toolbar.labels) { v -> app.update { it.copy(toolbar = it.toolbar.copy(labels = v)) } }
+        SwitchRow(MenuTitles.bigButtons(), s.toolbar.big) { v -> app.update { it.copy(toolbar = it.toolbar.copy(big = v)) } }
+        Text(S.toolbarHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+        // a fixed list: ticking a group on or off doesn't move it
+        val order = s.toolbar.fullOrder()
+        for ((i, g) in order.withIndex()) {
+            val on = g in s.toolbar.groups
+            Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (c.checkboxes) Toggle(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } }, Modifier.padding(horizontal = 12.dp, vertical = 12.dp))
+                else androidx.compose.material3.Checkbox(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } },
+                    colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.muted, checkmarkColor = c.onAccent))
+                Text(ToolLabels.group(g)(), color = if (on) c.text else c.muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                IconBtn(Icons.up, S.moveUp(), enabled = i > 0, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, -1)) } }
+                IconBtn(Icons.down, S.moveDown(), enabled = i < order.size - 1, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, 1)) } }
+            }
         }
     }
 }
@@ -873,33 +888,37 @@ object MouseTitles {
 private fun MousePage(app: AppState) {
     val c = T.c
     val s = app.settings
-    SectionTitle(MouseTitles.tool())
-    SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
-    SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
-    SwitchRow(MouseTitles.selectAfterDrag(), s.edit.selectAfterDrag) { v -> app.update { it.copy(edit = it.edit.copy(selectAfterDrag = v)) } }
-    SwitchRow(MouseTitles.audioDeselects(), s.edit.audioClickDeselects) { v -> app.update { it.copy(edit = it.edit.copy(audioClickDeselects = v)) } }
     val m = s.mouse
     fun set(f: (mlabeler.app.state.MouseSettings) -> mlabeler.app.state.MouseSettings) = app.update { it.copy(mouse = f(it.mouse)) }
-    SectionTitle(MouseTitles.wheel())
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Chip(MouseTitles.wheelScroll(), m.wheel != "phonemes") { set { it.copy(wheel = "scroll") } }
-        Chip(MouseTitles.wheelPhonemes(), m.wheel == "phonemes") { set { it.copy(wheel = "phonemes") } }
+    Fold(MouseTitles.tool()) {
+        SwitchRow(MouseTitles.playIt(), s.edit.cutPlay) { v -> app.update { it.copy(edit = it.edit.copy(cutPlay = v)) } }
+        SwitchRow(S.playOnDrag(), s.edit.playOnDrag) { v -> app.update { it.copy(edit = it.edit.copy(playOnDrag = v)) } }
+        SwitchRow(MouseTitles.selectAfterDrag(), s.edit.selectAfterDrag) { v -> app.update { it.copy(edit = it.edit.copy(selectAfterDrag = v)) } }
+        SwitchRow(MouseTitles.audioDeselects(), s.edit.audioClickDeselects) { v -> app.update { it.copy(edit = it.edit.copy(audioClickDeselects = v)) } }
     }
-    Text(MouseTitles.leftHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
-    SectionTitle(MouseTitles.onLabels())
-    ActionRow(MouseTitles.click(), m.tierClick) { v -> set { it.copy(tierClick = v) } }
-    ActionRow(MouseTitles.double(), m.tierDouble) { v -> set { it.copy(tierDouble = v) } }
-    ActionRow(MouseTitles.right(), m.tierRight) { v -> set { it.copy(tierRight = v) } }
-    ActionRow(MouseTitles.middle(), m.tierMiddle) { v -> set { it.copy(tierMiddle = v) } }
-    ActionRow(MouseTitles.ctrl(), m.tierCtrl) { v -> set { it.copy(tierCtrl = v) } }
-    ActionRow(MouseTitles.alt(), m.tierAlt) { v -> set { it.copy(tierAlt = v) } }
-    SectionTitle(MouseTitles.onAudio())
-    ActionRow(MouseTitles.click(), m.audioClick) { v -> set { it.copy(audioClick = v) } }
-    ActionRow(MouseTitles.double(), m.audioDouble) { v -> set { it.copy(audioDouble = v) } }
-    ActionRow(MouseTitles.right(), m.audioRight) { v -> set { it.copy(audioRight = v) } }
-    ActionRow(MouseTitles.middle(), m.audioMiddle) { v -> set { it.copy(audioMiddle = v) } }
-    ActionRow(MouseTitles.ctrl(), m.audioCtrl) { v -> set { it.copy(audioCtrl = v) } }
-    ActionRow(MouseTitles.alt(), m.audioAlt) { v -> set { it.copy(audioAlt = v) } }
+    Fold(MouseTitles.wheel()) {
+        FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Chip(MouseTitles.wheelScroll(), m.wheel != "phonemes") { set { it.copy(wheel = "scroll") } }
+            Chip(MouseTitles.wheelPhonemes(), m.wheel == "phonemes") { set { it.copy(wheel = "phonemes") } }
+        }
+    }
+    Fold(MouseTitles.onLabels()) {
+        Text(MouseTitles.leftHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+        ActionRow(MouseTitles.click(), m.tierClick) { v -> set { it.copy(tierClick = v) } }
+        ActionRow(MouseTitles.double(), m.tierDouble) { v -> set { it.copy(tierDouble = v) } }
+        ActionRow(MouseTitles.right(), m.tierRight) { v -> set { it.copy(tierRight = v) } }
+        ActionRow(MouseTitles.middle(), m.tierMiddle) { v -> set { it.copy(tierMiddle = v) } }
+        ActionRow(MouseTitles.ctrl(), m.tierCtrl) { v -> set { it.copy(tierCtrl = v) } }
+        ActionRow(MouseTitles.alt(), m.tierAlt) { v -> set { it.copy(tierAlt = v) } }
+    }
+    Fold(MouseTitles.onAudio()) {
+        ActionRow(MouseTitles.click(), m.audioClick) { v -> set { it.copy(audioClick = v) } }
+        ActionRow(MouseTitles.double(), m.audioDouble) { v -> set { it.copy(audioDouble = v) } }
+        ActionRow(MouseTitles.right(), m.audioRight) { v -> set { it.copy(audioRight = v) } }
+        ActionRow(MouseTitles.middle(), m.audioMiddle) { v -> set { it.copy(audioMiddle = v) } }
+        ActionRow(MouseTitles.ctrl(), m.audioCtrl) { v -> set { it.copy(audioCtrl = v) } }
+        ActionRow(MouseTitles.alt(), m.audioAlt) { v -> set { it.copy(audioAlt = v) } }
+    }
 }
 
 @Composable
@@ -974,22 +993,25 @@ private fun AboutPage(app: AppState) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) { for ((t, u) in links) link(t, u) }
         }
     }
-    SectionTitle(S.about())
-    Text("mLabeler ${mlabeler.app.AppInfo.VERSION}", color = c.text, fontSize = 15.sp)
-    Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
-    mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
-    if (mlabeler.app.Platform.legacyWindows) LegacyNote()
+    Fold(S.about()) {
+        Text("mLabeler ${mlabeler.app.AppInfo.VERSION}", color = c.text, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+        Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+        mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
+        if (mlabeler.app.Platform.legacyWindows) LegacyNote()
+    }
     UpdateSection(app) { t, v, f -> SwitchRow(t, v, f) }
-    SectionTitle(AboutTitles.author())
-    person("m", listOf(
-        "GitHub" to "https://github.com/Megageorgio",
-        "Telegram" to "https://t.me/m_repository",
-        "Discord" to "https://discord.gg/y5YsY9UfBG",
-    ))
-    SectionTitle(AboutTitles.thanks())
-    person("HHS_kt", listOf("YouTube" to "https://www.youtube.com/@HHS_kt", "Telegram" to "https://t.me/hhs_kt_666"))
-    person("Gitreti", emptyList())
-    person("XHR0ME", listOf("X" to "https://x.com/ExChroma", "Telegram" to "https://t.me/xhr0m1", "YouTube" to "https://www.youtube.com/@chr0ma313"))
+    Fold(AboutTitles.author()) {
+        person("m", listOf(
+            "GitHub" to "https://github.com/Megageorgio",
+            "Telegram" to "https://t.me/m_repository",
+            "Discord" to "https://discord.gg/y5YsY9UfBG",
+        ))
+    }
+    Fold(AboutTitles.thanks()) {
+        person("HHS_kt", listOf("YouTube" to "https://www.youtube.com/@HHS_kt", "Telegram" to "https://t.me/hhs_kt_666"))
+        person("Gitreti", emptyList())
+        person("XHR0ME", listOf("X" to "https://x.com/ExChroma", "Telegram" to "https://t.me/xhr0m1", "YouTube" to "https://www.youtube.com/@chr0ma313"))
+    }
 }
 
 private object DangerTitles {
@@ -1191,8 +1213,52 @@ internal fun Modifier.settingFocus(title: String): Modifier {
     val hit = focus != null && (focus == title || title.startsWith("$focus — "))
     if (!hit) return this
     val requester = remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
-    androidx.compose.runtime.LaunchedEffect(focus) { kotlinx.coroutines.delay(150); requester.bringIntoView() }
+    val open = LocalFoldOpen.current
+    androidx.compose.runtime.LaunchedEffect(focus) { open?.invoke(); kotlinx.coroutines.delay(150); requester.bringIntoView() }
     return this.bringIntoViewRequester(requester).background(T.c.accent.copy(alpha = 0.18f))
+}
+
+/** Which blocks of the settings are open, by title; kept while the settings window is open. */
+internal val LocalFolds = androidx.compose.runtime.compositionLocalOf<MutableMap<String, Boolean>?> { null }
+
+/** Opens the block around a setting the search jumped to. */
+private val LocalFoldOpen = androidx.compose.runtime.compositionLocalOf<(() -> Unit)?> { null }
+
+/** A block of settings under a title that opens and closes with a click; closed at first. */
+@Composable
+internal fun Fold(title: String, content: @Composable () -> Unit) {
+    val c = T.c
+    val shape = RoundedCornerShape(c.radius)
+    val folds = LocalFolds.current
+    var own by remember { mutableStateOf(false) }
+    val open = folds?.get(title) ?: own
+    fun set(v: Boolean) { if (folds != null) folds[title] = v else own = v }
+    val focus = LocalSettingFocus.current
+    // after a jump from the search the closed blocks are composed once out of sight: the one with the setting opens
+    var looked by remember(focus) { mutableStateOf(focus == null) }
+    androidx.compose.runtime.LaunchedEffect(focus) { if (focus != null) { androidx.compose.runtime.withFrameNanos { }; looked = true } }
+    val opener: () -> Unit = { set(true) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalFoldOpen provides opener) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp).clip(shape).border(c.borderWidth, c.border, shape)) {
+        Row(
+            Modifier.fillMaxWidth().background(c.panelAlt).settingFocus(title).clickable { set(!open) }.padding(horizontal = 10.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            androidx.compose.material3.Icon(if (open) Icons.down else Icons.right, null, tint = c.muted, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = c.text, fontSize = 14.sp, modifier = Modifier.weight(1f, fill = false))
+                SettingHelpMark(title)
+            }
+        }
+        if (open) {
+            Divider()
+            Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 10.dp)) { content() }
+        } else if (!looked) {
+            androidx.compose.ui.layout.Layout({ Column { content() } }) { _, _ -> layout(0, 0) {} }
+        }
+    }
+    }
 }
 
 /** The notice on old Windows: no toolkit of its own. */
