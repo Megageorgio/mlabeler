@@ -726,6 +726,27 @@ class EditorState(
         }
     }
 
+    /**
+     * Adds to the units of the transcription (.trans) the unit of [size] phonemes starting at the selected phoneme,
+     * or takes it away when it is there; the units are a tier of their own ([mlabeler.core.format.SegUnits.TIER]).
+     */
+    fun toggleUnit(size: Int) {
+        val d = doc ?: return
+        val k = d.phonemeTierIndex()
+        val ph = d.tiers.getOrNull(k) as? IntervalTier ?: return
+        val ref = selectedInterval()
+        val i = when {
+            ref == null -> ph.indexAt(cursor ?: return)
+            ref.tier == k -> ref.index
+            else -> (d.tiers.getOrNull(ref.tier) as? IntervalTier)?.let { t -> ph.indexAt(t.startOf(ref.index) + 1e-6) } ?: -1
+        }
+        if (i < 0 || i + size > ph.size) return
+        val u = d.tierIndex(mlabeler.core.format.SegUnits.TIER)
+        val old = (if (u >= 0) d.tiers[u] else null) as? IntervalTier
+        val t = mlabeler.core.format.SegUnits.toggle(old, ph, i, size)
+        updateDoc { x -> if (u >= 0) x.replace(u, t) else x.copy(tiers = x.tiers + t) }
+    }
+
     /** The refinement done after autolabelling, when it's on in the settings. */
     private fun refineAfter(): RefineSettings? = settings.toolkit.refine.takeIf { it.enabled && it.model.isNotBlank() }
 

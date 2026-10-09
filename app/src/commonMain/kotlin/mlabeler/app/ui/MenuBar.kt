@@ -72,6 +72,7 @@ object MenuTitles {
     val view = L("View", "Вид")
     val go = L("Go", "Переход")
     val tools = L("Tools", "Инструменты")
+    val units = L("Units of the transcription (.trans)", "Единицы транскрипции (.trans)")
     val help = L("Help", "Справка")
     val closeFolder = L("Close folder", "Закрыть папку")
     val openFolder = L("Open folder…", "Открыть папку…")
@@ -168,6 +169,8 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
                 item(Commands.ripple, ed, app, checked = s.edit.ripple), item(Commands.linked, ed, app, checked = s.edit.linked),
                 item(Commands.playOnDrag, ed, app, checked = s.edit.playOnDrag),
             )))
+            if (ed.item?.labelFormat == mlabeler.core.format.LabelFormat.Seg || ed.doc?.tierIndex(mlabeler.core.format.SegUnits.TIER)?.let { it >= 0 } == true)
+                add(MSub(MenuTitles.units(), listOf(item(Commands.unitPair, ed, app), item(Commands.unitSingle, ed, app))))
             add(MSep)
             add(MSub(MenuTitles.notes(), listOf(
                 item(Commands.groupPhonemes, ed, app), item(Commands.notesFromGroups, ed, app), MSep,

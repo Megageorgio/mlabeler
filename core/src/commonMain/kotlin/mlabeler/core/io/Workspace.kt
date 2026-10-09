@@ -206,11 +206,43 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.Audacity -> AudacityLabels.read(text, "phones", duration)
             LabelFormat.Ds -> mlabeler.core.format.DsFile.read(text, duration)
             LabelFormat.DsCsv -> csvRows[path]?.firstOrNull { it.name == item.name }?.doc ?: LabelDoc.empty(duration)
-            LabelFormat.Seg -> mlabeler.core.format.SegFile.read(text, duration)
+            LabelFormat.Seg -> segWithUnits(path, mlabeler.core.format.SegFile.read(text, duration))
             null -> throw FormatException("Unknown label format")
         }
         return Edits.fitToDuration(doc, duration)
     }
+
+    /**
+     * A .seg's labels with the units of its .trans as a tier ([mlabeler.core.format.SegUnits.TIER]), placed where its
+     * .as0 has them when there is one.
+     */
+    private fun segWithUnits(segPath: String, doc: LabelDoc): LabelDoc {
+        val ph = doc.tiers.getOrNull(doc.phonemeTierIndex()) as? mlabeler.core.model.IntervalTier ?: return doc
+        val transPath = Paths.withExt(segPath, "trans")
+        val trans = if (fs.exists(transPath)) runCatching { decodeGuess(fs.read(transPath), "UTF-8").first }.getOrNull() else null
+        val units = trans?.let { mlabeler.core.format.TransFile.units(it) } ?: return doc
+        val as0 = Paths.withExt(segPath, "as0")
+        val near = runCatching {
+            val blocks = mlabeler.core.format.ArticulationFile.read(decodeGuess(fs.read(as0), "UTF-8").first)
+            val rate = wavRate(Paths.withExt(segPath, "wav")) ?: 44100
+            units.map { u -> blocks.firstOrNull { it.phonemes == u }?.times(rate)?.let { t -> t[t.size / 2] } }
+        }.getOrDefault(emptyList())
+        return doc.copy(tiers = doc.tiers + mlabeler.core.format.SegUnits.tier(ph, units, near))
+    }
+
+    /** The sample rate in a WAV header, or null. */
+    private fun wavRate(path: String): Int? = runCatching {
+        val b = fs.read(path)
+        if (b.size < 28 || b.decodeToString(0, 4) != "RIFF") return null
+        var p = 12
+        while (p + 8 <= b.size) {
+            val id = b.decodeToString(p, p + 4)
+            val len = (b[p + 4].toInt() and 0xFF) or ((b[p + 5].toInt() and 0xFF) shl 8) or ((b[p + 6].toInt() and 0xFF) shl 16) or ((b[p + 7].toInt() and 0xFF) shl 24)
+            if (id == "fmt ") return (b[p + 12].toInt() and 0xFF) or ((b[p + 13].toInt() and 0xFF) shl 8) or ((b[p + 14].toInt() and 0xFF) shl 16) or ((b[p + 15].toInt() and 0xFF) shl 24)
+            p += 8 + len + (len and 1)
+        }
+        null
+    }.getOrNull()
 
     /** Labels for [stem] in [dir] (TextGrid, lab or Audacity txt), or null. */
     fun readLabelsIn(dir: String, stem: String, duration: Double): LabelDoc? {
@@ -254,14 +286,13 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                 // the transcription next to it follows the phonemes (left as it was while they are the same)
                 val transPath = Paths.withExt(path, "trans")
                 val oldTrans = if (fs.exists(transPath)) runCatching { fs.read(transPath).decodeToString() }.getOrNull() else null
-                val trans = mlabeler.core.format.TransFile.write(mlabeler.core.format.SegFile.phonemes(doc), oldTrans)
-                if (trans != oldTrans) {
-                    if (oldTrans != null && transPath !in backedUp) runCatching {
-                        fs.copy(transPath, Paths.join(Paths.join(metaDir, "backup"), Paths.stem(transPath) + ".${timestamp()}.trans"))
-                        backedUp += transPath
-                    }
-                    fs.write(transPath, trans.encodeToByteArray())
-                }
+                val unitsTier = doc.tiers.filterIsInstance<mlabeler.core.model.IntervalTier>().firstOrNull { t -> t.name == mlabeler.core.format.SegUnits.TIER }
+                val ph = doc.tiers.getOrNull(doc.phonemeTierIndex()) as? mlabeler.core.model.IntervalTier
+                val trans = mlabeler.core.format.TransFile.write(mlabeler.core.format.SegFile.phonemes(doc), oldTrans,
+                    units = unitsTier?.let { mlabeler.core.format.SegUnits.units(it) })
+                writeBeside(transPath, oldTrans, trans)
+                // the articulation segmentation follows the units and the phonemes (made from them where they changed)
+                if (unitsTier != null && ph != null) runCatching { writeArticulation(item, path, old, unitsTier, ph) }
                 mlabeler.core.format.SegFile.write(doc, old)
             }
             LabelFormat.Lab -> HtkLab.write(doc)
@@ -283,6 +314,38 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
         val updated = item.copy(labelPath = path, labelFormat = fmt)
         items = items.map { if (it.id == item.id) updated else it }
         return updated
+    }
+
+    /** Writes [text] to [path] when it differs from [old], copying the old file to the backup folder first. */
+    private fun writeBeside(path: String, old: String?, text: String) {
+        if (text == old) return
+        if (old != null && path !in backedUp) runCatching {
+            fs.copy(path, Paths.join(Paths.join(metaDir, "backup"), Paths.stem(path) + ".${timestamp()}." + Paths.ext(path)))
+            backedUp += path
+        }
+        fs.write(path, text.encodeToByteArray())
+    }
+
+    /** Settings of the articulation files made from the labels. */
+    var articulationWidths = mlabeler.core.format.SegUnits.Widths()
+
+    private fun writeArticulation(item: Item, segPath: String, oldSeg: String?, units: mlabeler.core.model.IntervalTier, ph: mlabeler.core.model.IntervalTier) {
+        val path = Paths.withExt(segPath, "as0")
+        val oldText = if (fs.exists(path)) runCatching { decodeGuess(fs.read(path), "UTF-8").first }.getOrNull() else null
+        val oldBlocks = oldText?.let { runCatching { mlabeler.core.format.ArticulationFile.read(it) }.getOrNull() } ?: emptyList()
+        if (oldText == null && mlabeler.core.format.SegUnits.units(units).none { it.size >= 2 }) return
+        val audio = mlabeler.core.audio.Wav.decode(fs.read(item.audioPath))
+        val oldPh = oldSeg?.let { runCatching { mlabeler.core.format.SegFile.read(it).tiers.firstOrNull() as? mlabeler.core.model.IntervalTier }.getOrNull() }
+        val pitch by lazy { mlabeler.core.dsp.Pitch.yin(audio.samples, audio.sampleRate, 0.005) }
+        fun voiced(a: Double, b: Double): Boolean {
+            val v = pitch.values
+            val i0 = (a / 0.005).toInt().coerceIn(0, v.size); val i1 = maxOf(i0 + 1, (b / 0.005).toInt()).coerceIn(i0, v.size)
+            if (i1 <= i0) return false
+            return (i0 until i1).count { v[it] > 0f } * 2 >= (i1 - i0)
+        }
+        val blocks = mlabeler.core.format.SegUnits.blocksFor(oldBlocks, units, ph, oldPh, audio.sampleRate, audio.samples.size, ::voiced, articulationWidths)
+        if (blocks == oldBlocks && oldText != null) return
+        writeBeside(path, oldText, mlabeler.core.format.ArticulationFile.write(blocks))
     }
 
     /**

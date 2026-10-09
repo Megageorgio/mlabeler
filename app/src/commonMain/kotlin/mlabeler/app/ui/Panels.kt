@@ -191,8 +191,11 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
         Divider()
         val done = ed.items.count { ed.marks(it).done }
         Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Text(S.doneCount.format(done, ed.items.size), color = c.muted, fontSize = 12.sp)
-            if (ed.items.isNotEmpty()) Box(Modifier.padding(top = 5.dp).fillMaxWidth().height(4.dp).clip(mlabeler.app.theme.RoundedCornerShape(2.dp)).background(c.panelAlt)) {
+            // the count is already in the status bar when it shows it: here only the bar then
+            val st = ed.app.settings
+            val inStatus = st.statusBar && "done" in st.status.left + st.status.right
+            if (!inStatus) Text(S.doneCount.format(done, ed.items.size), color = c.muted, fontSize = 12.sp)
+            if (ed.items.isNotEmpty()) Box(Modifier.padding(top = if (inStatus) 0.dp else 5.dp).fillMaxWidth().height(4.dp).clip(mlabeler.app.theme.RoundedCornerShape(2.dp)).background(c.panelAlt)) {
                 Box(Modifier.fillMaxWidth(done.toFloat() / ed.items.size).height(4.dp).background(c.ok))
             }
         }
