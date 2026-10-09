@@ -479,7 +479,13 @@ class EditorState(
 
     // ---------- autolabel through the toolkit ----------
 
-    var toolkitBusy by mutableStateOf<String?>(null)
+    private var busyText by mutableStateOf<String?>(null)
+    /** What the toolkit is doing for this folder, in words; null when nothing. */
+    var toolkitBusy: String?
+        get() = busyText
+        set(v) { busyText = v; if (v == null) toolkitDetail = null }
+    /** The toolkit job being waited for: its step and numbers (a download's megabytes, files done). */
+    var toolkitDetail by mutableStateOf<mlabeler.app.toolkit.JobProgress?>(null)
     /** When the current toolkit work began (ms) and its earlier steps, for the busy panel. */
     var toolkitBusySince = 0L
         private set
@@ -488,6 +494,7 @@ class EditorState(
     fun beginToolkitWork(what: String) {
         toolkitBusySince = now()
         toolkitSteps.clear()
+        toolkitDetail = null
         toolkitProgress = null
         toolkitBusy = what
     }
@@ -531,7 +538,7 @@ class EditorState(
                 val fileId = client.upload((item?.name ?: "part") + "_resynth.wav", wav)
                 val job = client.resynth(fileId, f0, curve.hop, method)
                 serverJob = job
-                val result = client.await(job) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
+                val result = client.await(job, { toolkitDetail = it }) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
                 val path = (result["file"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: throw mlabeler.app.toolkit.ToolkitException("no file in the result")
                 val bytes = client.download(path)
                 val out = withContext(Dispatchers.Default) { Wav.decode(bytes) }
@@ -563,6 +570,7 @@ class EditorState(
             try {
                 toolkitBusySince = now()
                 toolkitSteps.clear()
+                toolkitDetail = null
                 toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
                 if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
                 toolkitBusy = S.uploading()
@@ -574,7 +582,7 @@ class EditorState(
                     client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter())
                 } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages)
                 serverJob = job
-                val result = client.await(job) { p, stage ->
+                val result = client.await(job, { toolkitDetail = it }) { p, stage ->
                     toolkitProgress = p
                     val st = stage.ifEmpty { S.toolkit() }
                     // a new step (not the same one with new numbers) goes to the list of steps
@@ -644,11 +652,13 @@ class EditorState(
             try {
                 toolkitBusySince = now()
                 toolkitSteps.clear()
+                toolkitDetail = null
                 toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
                 if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
                 for ((n, f) in files.withIndex()) {
                     val head = batchFile.format(n + 1, files.size, f.name)
                     toolkitBusy = head
+                    toolkitDetail = null
                     toolkitProgress = n.toDouble() / files.size
                     try {
                         val bytes = withContext(Dispatchers.Default) { workspace.fs.read(f.audioPath) }
@@ -678,7 +688,7 @@ class EditorState(
                             client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter(), extraLanguages)
                         }
                         serverJob = job
-                        val result = client.await(job) { p, stage ->
+                        val result = client.await(job, { toolkitDetail = it }) { p, stage ->
                             toolkitProgress = (n + p) / files.size
                             toolkitBusy = head + " · " + stage.ifEmpty { S.toolkit() }
                         }
@@ -776,7 +786,7 @@ class EditorState(
         val offset = s0.toDouble() / a.sampleRate
         val segments = range.map { i -> Triple(tier.startOf(i) - offset, tier.endOf(i) - offset, tier.texts[i]) }
         val job = client.refine(fileId, segments, r.model, r.mode)
-        val result = try { client.await(job, progress) } catch (e: kotlinx.coroutines.CancellationException) {
+        val result = try { client.await(job, { toolkitDetail = it }, progress) } catch (e: kotlinx.coroutines.CancellationException) {
             withContext(kotlinx.coroutines.NonCancellable) { client.cancel(job) }
             throw e
         }
@@ -801,6 +811,7 @@ class EditorState(
             try {
                 toolkitBusySince = now()
                 toolkitSteps.clear()
+                toolkitDetail = null
                 toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
                 if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
                 toolkitBusy = S.uploading()
@@ -830,11 +841,13 @@ class EditorState(
             try {
                 toolkitBusySince = now()
                 toolkitSteps.clear()
+                toolkitDetail = null
                 toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
                 if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
                 for ((n, f) in files.withIndex()) {
                     val head = batchFile.format(n + 1, files.size, f.name)
                     toolkitBusy = head
+                    toolkitDetail = null
                     toolkitProgress = n.toDouble() / files.size
                     try {
                         val bytes = withContext(Dispatchers.Default) { workspace.fs.read(f.audioPath) }

@@ -328,7 +328,7 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                         ids += client.upload(smp.name, bytes) to mlabeler.core.oto.AutoOto.phonemesFor(smp.syl)
                     }
                     val job = client.alignPhonemes(ids, aligner, language)
-                    val res = client.await(job) { p, stage ->
+                    val res = client.await(job, { ed.toolkitDetail = it }) { p, stage ->
                         ed.toolkitProgress = 0.3 + 0.7 * p
                         // the toolkit's own words: loading the model, aligning a file…
                         if (stage.isNotEmpty() && stage != ed.toolkitBusy) {

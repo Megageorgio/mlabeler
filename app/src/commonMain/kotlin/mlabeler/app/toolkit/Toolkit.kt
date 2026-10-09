@@ -122,6 +122,36 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
 
     suspend fun removeModel(id: String) { call("DELETE", "/models/$id") }
 
+    /** Removes an engine's environment (it is installed again when a job needs it). */
+    suspend fun removeEngine(name: String) { call("DELETE", "/engines/$name", timeoutMs = 300_000) }
+
+    /** Disk space of the toolkit's folder, in bytes; null from toolkits that don't tell. */
+    data class Storage(
+        val home: String, val total: Long, val models: List<Pair<String, Long>>, val engines: List<Pair<String, Long>>,
+        val leftovers: Long, val engineDownloads: Long, val keepDays: Int?,
+    )
+
+    suspend fun storage(): Storage? {
+        val o = runCatching { call("GET", "/storage", timeoutMs = 120_000).jsonObject }.getOrElse { e ->
+            // an older toolkit has no such call
+            if (e is ToolkitException && (e.message == "Not Found" || e.message == "HTTP 404")) return null
+            throw e
+        }
+        fun list(k: String) = (o[k] as? JsonArray).orEmpty().map { it.jsonObject }.map {
+            it["id"]!!.jsonPrimitive.content to (it["bytes"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L)
+        }.sortedByDescending { it.second }
+        fun long(e: JsonElement?) = (e as? JsonPrimitive)?.content?.toDoubleOrNull()?.toLong() ?: 0L
+        return Storage(
+            (o["home"] as? JsonPrimitive)?.content ?: "", long(o["total"]), list("models"), list("engines"),
+            (o["temporary"] as? JsonObject)?.values?.sumOf { long(it) } ?: 0L, long(o["engine_downloads"]),
+            (o["keep_files_days"] as? JsonPrimitive)?.intOrNull,
+        )
+    }
+
+    /** Removes the leftovers of jobs (uploads, results, history, unfinished downloads); returns the bytes freed. */
+    suspend fun cleanupStorage(): Long =
+        call("POST", "/storage/cleanup", buildJsonObject { }, timeoutMs = 300_000).jsonObject["freed"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L
+
     /** Uploads a file, returns its id for input items. */
     suspend fun upload(name: String, bytes: ByteArray): String {
         val boundary = "----mlabeler" + bytes.size + name.hashCode()
@@ -294,12 +324,23 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return r.body
     }
 
-    /** Waits for a job; [onProgress] gets 0..1 and the stage. Returns the result object. */
-    suspend fun await(jobId: String, onProgress: (Double, String) -> Unit): JsonObject {
+    /**
+     * Waits for a job; [onProgress] gets 0..1 and the step in words, [onJob] all there is to show of it (the
+     * numbers of a download, files done). Returns the result object.
+     */
+    suspend fun await(jobId: String, onJob: ((JobProgress) -> Unit)? = null, onProgress: (Double, String) -> Unit): JsonObject {
         while (true) {
-            val info = call("GET", "/jobs/$jobId?wait=5").jsonObject
+            // a short wait: the numbers of a download change every second
+            val info = call("GET", "/jobs/$jobId?wait=1").jsonObject
             val status = info["status"]!!.jsonPrimitive.content
-            onProgress(info["progress"]?.jsonPrimitive?.doubleOrNull ?: 0.0, (info["stage"] as? JsonPrimitive)?.content ?: "")
+            val p = JobProgress(
+                info["progress"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+                (info["stage"] as? JsonPrimitive)?.content ?: "",
+                (info["message"] as? JsonPrimitive)?.content ?: "",
+                info["detail"] as? JsonObject,
+            )
+            onJob?.invoke(p)
+            onProgress(p.fraction, p.stageName())
             when (status) {
                 "done" -> return info["result"]!!.jsonObject
                 "failed" -> throw ToolkitException((info["error"] as? JsonPrimitive)?.content ?: "failed")
