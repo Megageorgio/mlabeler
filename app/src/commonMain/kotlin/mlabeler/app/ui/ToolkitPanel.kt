@@ -50,8 +50,8 @@ private val phoneHint = L(
     "На телефоне или планшете тулкит работает на компьютере. На компьютере: mLabeler → Настройки → Авторазметка → включите «Разрешить подключение с телефона» и введите сюда показанные там адрес и токен.",
 )
 private val legacyHint = L(
-    "On Windows older than 10 the toolkit doesn't run. Autolabel can use the toolkit of another computer in the network: there open mLabeler, Settings → Autolabel, turn on \"Let phones connect\", then type the address and token shown there into the fields below.",
-    "На Windows старше 10 тулкит не работает. Авторазметка может пользоваться тулкитом другого компьютера в сети: на нём mLabeler → Настройки → Авторазметка → включите «Разрешить подключение с телефона» и введите сюда показанные там адрес и токен.",
+    "On Windows 7 and 8.1 the toolkit doesn't run. Autolabel can use the toolkit of another computer in the network: there open mLabeler, Settings → Autolabel, turn on \"Let phones connect\", then type the address and token shown there into the fields below.",
+    "На Windows 7 и 8.1 тулкит не работает. Авторазметка может пользоваться тулкитом другого компьютера в сети: на нём mLabeler → Настройки → Авторазметка → включите «Разрешить подключение с телефона» и введите сюда показанные там адрес и токен.",
 )
 private val showLog = L("Log…", "Журнал…")
 private val reinstallBtn = L("Reinstall", "Переустановить")

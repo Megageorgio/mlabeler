@@ -114,6 +114,8 @@ private object CheckTitles {
 }
 
 private val tipsAtStartT = mlabeler.app.i18n.L("Tip of the day at start", "Совет дня при запуске")
+private val titleBarMenuT = mlabeler.app.i18n.L("Menus in the window title", "Меню в заголовке окна")
+private val restartT = mlabeler.app.i18n.L("Takes effect after restarting mLabeler", "Сработает после перезапуска mLabeler")
 private val minimapT = mlabeler.app.i18n.L("Map of the whole recording over the scroll bar", "Карта всей записи над полосой прокрутки")
 private val phonemeColorsT = mlabeler.app.i18n.L("Phonemes tinted by kind (vowels, consonants, pauses)", "Подсветка фонем по типу (гласные, согласные, паузы)")
 private val animationsT = mlabeler.app.i18n.L("Animations", "Анимации")
@@ -770,6 +772,7 @@ private fun InterfacePage(app: AppState) {
     EnvironmentsSection(app)
     SectionTitle(MenuTitles.panels())
     if (!mlabeler.app.Platform.isMobile) SwitchRow(MenuTitles.menuBar(), s.menuBar) { v -> app.update { it.copy(menuBar = v) } }
+    if (!mlabeler.app.Platform.isMobile) SwitchRow(titleBarMenuT(), s.titleBarMenu) { v -> app.update { it.copy(titleBarMenu = v) }; app.message(restartT()) }
     SwitchRow(MenuTitles.statusBar(), s.statusBar) { v -> app.update { it.copy(statusBar = v) } }
     SwitchRow(tipsAtStartT(), s.tipsAtStart) { v -> app.update { it.copy(tipsAtStart = v) } }
     SwitchRow(minimapT(), s.layout.minimap) { v -> app.update { it.copy(layout = it.layout.copy(minimap = v)) } }
@@ -1039,6 +1042,8 @@ internal object SettingsHelp {
             h("General", S.avoidCutout, "Phones: nothing is drawn under the camera cutout.", "Телефоны: ничего не рисуется под вырезом камеры."),
 
             h("Interface", MenuTitles.menuBar, "File, Edit, View… menus at the top of the window.", "Меню «Файл», «Правка», «Вид»… вверху окна."),
+            h("Interface", titleBarMenuT, "The program draws the window title itself and puts the menus in it, saving a row. Window buttons, dragging, double click and resizing at the edges keep working; on macOS the system's round buttons stay. Some window-manager features (snapping to screen halves, the frame shadow) may not work. Takes effect after a restart.",
+                "Программа сама рисует заголовок окна и ставит в него меню — на одну строку меньше. Кнопки окна, перетаскивание, двойной щелчок и изменение размера за края работают; на macOS остаются системные круглые кнопки. Некоторые возможности оконной системы (прилипание к половине экрана, тень рамки) могут не работать. Действует после перезапуска."),
             h("Interface", minimapT, "A thin strip with the whole recording: its loudness, the labelled parts and the part on screen; a click or a drag there moves the view.",
                 "Тонкая полоса со всей записью: громкость, размеченные места и видимая часть; щелчок или перетаскивание по ней двигает вид."),
             h("Interface", phonemeColorsT, "Vowels, consonants and pauses get a light tint of the theme's colours on the phoneme lane.",
@@ -1201,7 +1206,7 @@ internal fun LegacyNote() {
     }
 }
 
-private val legacyTitleT = mlabeler.app.i18n.L("Old Windows: without mVocalToolkit", "Старая Windows: без mVocalToolkit")
+private val legacyTitleT = mlabeler.app.i18n.L("Windows 7 or 8.1: without mVocalToolkit", "Windows 7 или 8.1: без mVocalToolkit")
 private val legacyNoteT = mlabeler.app.i18n.L(
     "On Windows 7 and 8.1 the toolkit can't be installed (it doesn't run there); autolabel works through the toolkit of another computer in the network. Everything else works as usual.",
     "На Windows 7 и 8.1 тулкит не устанавливается (он там не работает); авторазметка работает через тулкит другого компьютера в сети. Всё остальное работает как обычно.",

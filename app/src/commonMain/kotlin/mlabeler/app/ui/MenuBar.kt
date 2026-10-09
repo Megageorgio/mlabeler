@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.key
@@ -412,7 +413,7 @@ fun MenuCatcher(onDismiss: () -> Unit, onMove: (androidx.compose.ui.geometry.Off
 
 /** File / Edit / View … across the top, for computers. Moving the mouse along it switches open menus. */
 @Composable
-fun MenuBar(app: AppState, ed: EditorState) {
+fun MenuBar(app: AppState, ed: EditorState, inTitle: Boolean = false) {
     val c = mlabeler.app.theme.T.c
     var open by remember { mutableStateOf<Int?>(null) }
     val tree = menus(app, ed)
@@ -426,7 +427,7 @@ fun MenuBar(app: AppState, ed: EditorState) {
         )
     }
     Row(
-        Modifier.fillMaxWidth().height(24.dp).background(c.panel).padding(horizontal = 4.dp),
+        (if (inTitle) Modifier.fillMaxHeight() else Modifier.fillMaxWidth().height(24.dp).background(c.panel)).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         for ((k, pair) in tree.withIndex()) {

@@ -42,7 +42,9 @@ fun App(app: AppState = rememberAppState()) {
         val font = androidx.compose.runtime.remember(st.font) { systemFontFamily(st.font) }
         AppTheme(Themes.byId(app.settings.theme), font, crisp = app.settings.crisp) {
             StorageAccess {
-                Box(Modifier.fillMaxSize()) {
+              androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+                mlabeler.app.ui.LocalWindowFrame.current?.let { mlabeler.app.ui.TitleBar(app, it) }
+                Box(Modifier.weight(1f).fillMaxSize()) {
                     val ed = app.editor
                     val rec = app.recorder
                     val kar = app.karaoke
@@ -86,6 +88,7 @@ fun App(app: AppState = rememberAppState()) {
                         )
                     }
                 }
+              }
             }
         }
     }

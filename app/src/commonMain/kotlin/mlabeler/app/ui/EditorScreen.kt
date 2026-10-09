@@ -143,7 +143,7 @@ private fun WideEditor(app: AppState, ed: EditorState, wc: WidthClass) {
     val l = s.layout
     var overlayDetails by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
-        if (s.menuBar && !Platform.isMobile) MenuBar(app, ed)
+        if (s.menuBar && !Platform.isMobile && LocalWindowFrame.current == null) MenuBar(app, ed)
         TopBar(app, ed, wc, overlayDetails) { overlayDetails = !overlayDetails }
         Divider()
         Box(Modifier.weight(1f).fillMaxWidth()) {

@@ -310,6 +310,8 @@ data class AppSettings(
     val pluginSlots: List<String> = emptyList(),
     /** File / Edit / View … menus at the top (computers). */
     val menuBar: Boolean = !Platform.isMobile,
+    /** Computers: the program draws the window title itself, with the menus in it. */
+    val titleBarMenu: Boolean = false,
     val statusBar: Boolean = true,
     val toolbar: ToolbarSettings = ToolbarSettings(),
     /** The first-start choice (simple or everything) was made. */
