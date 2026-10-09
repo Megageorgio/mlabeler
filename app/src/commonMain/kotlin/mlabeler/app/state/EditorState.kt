@@ -1078,6 +1078,80 @@ class EditorState(
         }
     }
 
+    // ---------- units of the transcriptions over the whole folder ----------
+
+    /** A place where a unit is or could be: the file, its first phoneme, how many, the times, whether it is chosen. */
+    data class UnitPlace(val itemId: String, val unit: String, val index: Int, val size: Int, val start: Double, val end: Double, val chosen: Boolean)
+
+    /** The .seg/.trans recordings of the folder: every chosen unit and every change between two phonemes. */
+    suspend fun unitPlaces(progress: (Int, Int) -> Unit): List<UnitPlace> = withContext(Dispatchers.Default) {
+        val segs = items.filter { it.labelFormat == mlabeler.core.format.LabelFormat.Seg }
+        val out = mutableListOf<UnitPlace>()
+        for ((n, it) in segs.withIndex()) {
+            progress(n, segs.size)
+            val d = (if (it.id == item?.id) committed else null) ?: runCatching {
+                workspace.readLabels(it, Wav.decode(workspace.fs.read(it.audioPath)).duration)
+            }.getOrNull() ?: continue
+            val ph = d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier ?: continue
+            val names = mlabeler.core.format.SegUnits.phonemeNames(ph)
+            val unitsTier = d.tiers.filterIsInstance<IntervalTier>().firstOrNull { t -> t.name == mlabeler.core.format.SegUnits.TIER }
+            val chosen = unitsTier?.let { u -> mlabeler.core.format.SegUnits.placesOf(u, ph) }.orEmpty().toSet()
+            val places = (chosen + (0 until names.size - 1).map { i -> i to 2 }).distinct()
+            for ((i, size) in places) {
+                // the unlabelled rest after the labels (they may end before the sound) is not a phoneme
+                if (i + size - 1 == ph.size - 1 && ph.texts.last().isEmpty()) continue
+                out += UnitPlace(it.id, names.subList(i, i + size).joinToString(" "), i, size, ph.startOf(i), ph.endOf(i + size - 1), (i to size) in chosen)
+            }
+        }
+        progress(segs.size, segs.size)
+        out
+    }
+
+    /** Plays the phonemes of [p] from its recording. */
+    fun playPlace(p: UnitPlace) {
+        val it = items.firstOrNull { x -> x.id == p.itemId } ?: return
+        scope.launch {
+            val a = withContext(Dispatchers.Default) { runCatching { Wav.decode(workspace.fs.read(it.audioPath)) }.getOrNull() } ?: return@launch
+            val s0 = (p.start * a.sampleRate).toInt().coerceIn(0, a.samples.size)
+            val s1 = (p.end * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
+            playBuffer(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1)))
+        }
+    }
+
+    /** Saves the chosen units of the recordings in [changed] (file id → its places); returns the files written. */
+    suspend fun applyUnits(changed: Map<String, List<Pair<Int, Int>>>): Int {
+        var n = 0
+        for ((id, places) in changed) {
+            val it = items.firstOrNull { x -> x.id == id } ?: continue
+            if (id == item?.id) {
+                val d = committed ?: continue
+                val ph = d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier ?: continue
+                val t = mlabeler.core.format.SegUnits.tierAt(ph, places)
+                val u = d.tierIndex(mlabeler.core.format.SegUnits.TIER)
+                updateDoc { x -> if (u >= 0) x.replace(u, t) else x.copy(tiers = x.tiers + t) }
+                saveLabels(quiet = true)
+                n++
+                continue
+            }
+            val ok = withContext(Dispatchers.Default) {
+                runCatching {
+                    val a = Wav.decode(workspace.fs.read(it.audioPath))
+                    val d = workspace.readLabels(it, a.duration)
+                    val ph = d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier ?: return@runCatching false
+                    val t = mlabeler.core.format.SegUnits.tierAt(ph, places)
+                    val u = d.tierIndex(mlabeler.core.format.SegUnits.TIER)
+                    workspace.writeLabels(it, if (u >= 0) d.replace(u, t) else d.copy(tiers = d.tiers + t), a.duration)
+                    histories.remove(it.id)
+                    true
+                }.getOrDefault(false)
+            }
+            if (ok) n++
+        }
+        items = workspace.items
+        readLabelTimes()
+        return n
+    }
+
     // ---------- several files at once ----------
 
     /** Files picked in the list (by id) for doing something with all of them; the open file is apart from this. */

@@ -314,6 +314,25 @@ object SegUnits {
         return nonOverlapping(TIER, items, ph.start, ph.end)
     }
 
+    /** The units tier for the units at these places of [ph]: (first phoneme, number of phonemes), in any order. */
+    fun tierAt(ph: IntervalTier, places: List<Pair<Int, Int>>): IntervalTier {
+        val names = names(ph)
+        val items = places.filter { (i, n) -> i >= 0 && n >= 1 && i + n <= names.size }.distinct().map { (i, n) ->
+            val (s, e) = span(ph, i, n)
+            Triple(s, e, names.subList(i, i + n).joinToString(" "))
+        }
+        return nonOverlapping(TIER, items, ph.start, ph.end)
+    }
+
+    /** The places (first phoneme, number of phonemes) of the named units of [units] on [ph]. */
+    fun placesOf(units: IntervalTier, ph: IntervalTier): List<Pair<Int, Int>> {
+        val names = names(ph)
+        return places(units, ph).mapNotNull { (u, i) -> if (i >= 0 && i + u.size <= names.size && names.subList(i, i + u.size) == u) i to u.size else null }
+    }
+
+    /** The phoneme names of [ph] as the .seg writes them (an unnamed interval is a silence). */
+    fun phonemeNames(ph: IntervalTier): List<String> = names(ph)
+
     /** An interval tier from [items] that may overlap: a later start is moved to the end of the one before. */
     private fun nonOverlapping(name: String, items: List<Triple<Double, Double, String>>, start: Double, end: Double): IntervalTier {
         val sorted = items.sortedBy { it.first }

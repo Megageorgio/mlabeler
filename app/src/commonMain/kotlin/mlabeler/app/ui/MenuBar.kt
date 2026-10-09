@@ -170,7 +170,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
                 item(Commands.playOnDrag, ed, app, checked = s.edit.playOnDrag),
             )))
             if (ed.item?.labelFormat == mlabeler.core.format.LabelFormat.Seg || ed.doc?.tierIndex(mlabeler.core.format.SegUnits.TIER)?.let { it >= 0 } == true)
-                add(MSub(MenuTitles.units(), listOf(item(Commands.unitPair, ed, app), item(Commands.unitSingle, ed, app))))
+                add(MSub(MenuTitles.units(), listOf(item(Commands.unitPair, ed, app), item(Commands.unitSingle, ed, app), MSep, item(Commands.unitsOverview, ed, app))))
             add(MSep)
             add(MSub(MenuTitles.notes(), listOf(
                 item(Commands.groupPhonemes, ed, app), item(Commands.notesFromGroups, ed, app), MSep,
@@ -286,6 +286,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.soundCheck, ed, app))
             if (!oto) add(item(Commands.summary, ed, app))
             if (!oto) add(item(Commands.phonemeCuts, ed, app))
+            if (!oto && ed.items.any { it.labelFormat == mlabeler.core.format.LabelFormat.Seg }) add(item(Commands.unitsOverview, ed, app))
         }))
         val slots = listOf(Commands.slot1, Commands.slot2, Commands.slot3, Commands.slot4)
         val named = slots.withIndex().mapNotNull { (k, c) -> s.pluginSlots.getOrNull(k)?.takeIf { it.isNotEmpty() }?.let { item(c, ed, app, title = it) } }
