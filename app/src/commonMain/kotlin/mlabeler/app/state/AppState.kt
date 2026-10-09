@@ -103,6 +103,22 @@ class AppState(private val scope: CoroutineScope) {
             }
         }
     }
+    /** A labels plugin tried on many files, waiting to be applied (shown in the plugins dialog). */
+    var pluginBatch by mutableStateOf<PluginBatch?>(null)
+
+    /** Tries a labels plugin on [files] and shows what it would change; nothing is written yet. */
+    fun checkPluginOnFiles(p: mlabeler.app.plugins.Plugin, params: Map<String, kotlinx.serialization.json.JsonElement>, files: List<mlabeler.core.io.Item>) {
+        val ed = editor ?: return
+        update { it.copy(pluginParams = it.pluginParams + (p.info.name to kotlinx.serialization.json.JsonObject(params).toString())) }
+        pluginBatch?.cancel()
+        pluginBatch = PluginBatch(p, params, files).also { it.check(ed, scope) }
+    }
+
+    fun closePluginBatch() {
+        pluginBatch?.cancel()
+        pluginBatch = null
+    }
+
     var recorder by mutableStateOf<mlabeler.app.recorder.RecorderState?>(null)
         private set
 

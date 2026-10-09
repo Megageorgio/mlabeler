@@ -621,6 +621,25 @@ class EditorState(
         }
     }
 
+    /**
+     * Writes the labels of [f], a file other than the open one, for work over many files (autolabel, refinement, a
+     * plugin): its undo history goes, the list of files and the change times follow.
+     */
+    fun writeOtherLabels(f: Item, doc: LabelDoc, duration: Double, format: mlabeler.core.format.LabelFormat? = null) {
+        val updated = workspace.writeLabels(f, doc, duration, format)
+        histories.remove(f.id)
+        items = items.map { x -> if (x.id == f.id) updated else x }
+        updated.labelPath?.let { p -> labelTimes = labelTimes + (updated.id to (runCatching { workspace.fs.lastModified(p) }.getOrNull() ?: 0L)) }
+        labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
+    }
+
+    /** The labels of [f] as they are now: the open one's, unsaved changes of another, else its file; null without any. */
+    fun currentLabels(f: Item): LabelDoc? =
+        if (f.id == item?.id) doc else histories[f.id]?.current ?: f.labelPath?.let { runCatching { workspace.readLabels(f, 0.0) }.getOrNull() }
+
+    /** After labels of many files changed at once: the search over all labels reads them again. */
+    fun labelsChangedOnDisk() { labelIndex = null; docVersion++ }
+
     /** Where each file's text comes from when many files are aligned at once. */
     enum class BatchText { TxtNextToIt, Labels, None }
 
@@ -708,12 +727,8 @@ class EditorState(
                             updateDoc { d -> merged(d) }
                             saveLabels(quiet = true)
                         } else {
-                            val updated = workspace.writeLabels(f, merged(current ?: LabelDoc.empty(a.duration)), a.duration,
+                            writeOtherLabels(f, merged(current ?: LabelDoc.empty(a.duration)), a.duration,
                                 if (f.labelFormat == null) workspace.state.defaultFormat else null)
-                            histories.remove(f.id)
-                            items = items.map { x -> if (x.id == f.id) updated else x }
-                            updated.labelPath?.let { p -> labelTimes = labelTimes + (updated.id to (runCatching { workspace.fs.lastModified(p) }.getOrNull() ?: 0L)) }
-                            labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
                         }
                         done++
                     } catch (e: kotlinx.coroutines.CancellationException) {
@@ -864,12 +879,7 @@ class EditorState(
                             if (f.id == item?.id) {
                                 updateDoc { out }
                                 saveLabels(quiet = true)
-                            } else {
-                                val updated = workspace.writeLabels(f, out, a.duration, null)
-                                histories.remove(f.id)
-                                items = items.map { x -> if (x.id == f.id) updated else x }
-                                labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
-                            }
+                            } else writeOtherLabels(f, out, a.duration)
                         }
                         done++
                     } catch (e: kotlinx.coroutines.CancellationException) {
