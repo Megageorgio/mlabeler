@@ -135,7 +135,7 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             for (n in listOf("lab", "labs", "label", "labels", "TextGrid", "textgrid", "textgrids")) dirs += Paths.join(parent, n)
         }
         for (f in state.labelFolders) dirs += Paths.join(root, f)
-        return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "ds", "seg", "txt").map { Paths.join(d, "$stem.$it") } }
+        return dirs.flatMap { d -> listOf("TextGrid", "textgrid", "lab", "ds", "seg", "inf", "txt").map { Paths.join(d, "$stem.$it") } }
     }
 
     /** transcriptions.csv files of the folder (root and three levels down), parsed. */
@@ -190,6 +190,10 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                     val text = try { decodeGuess(fs.read(c), "UTF-8").first } catch (_: Exception) { "" }
                     if (mlabeler.core.format.SegFile.looksLike(text)) return c to LabelFormat.Seg
                 }
+                "inf" -> {
+                    val text = try { decodeGuess(fs.read(c), "UTF-8").first } catch (_: Exception) { "" }
+                    if (mlabeler.core.format.NiaoNiao.looksLike(text)) return c to LabelFormat.Inf
+                }
             }
         }
         csvFor(audioPath, Paths.stem(audioPath))?.let { return it to LabelFormat.DsCsv }
@@ -207,6 +211,8 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
             LabelFormat.Ds -> mlabeler.core.format.DsFile.read(text, duration)
             LabelFormat.DsCsv -> csvRows[path]?.firstOrNull { it.name == item.name }?.doc ?: LabelDoc.empty(duration)
             LabelFormat.Seg -> segWithUnits(path, mlabeler.core.format.SegFile.read(text, duration))
+            LabelFormat.Inf -> mlabeler.core.format.NiaoNiao.toDoc(mlabeler.core.format.NiaoNiao.read(text), wavRate(item.audioPath) ?: mlabeler.core.format.NiaoNiao.SAMPLE_RATE,
+                duration.takeIf { it > 0 })
             null -> throw FormatException("Unknown label format")
         }
         return Edits.fitToDuration(doc, duration)
@@ -306,6 +312,13 @@ class Workspace(val root: String, val fs: FileSystem = PlatformFs) {
                 mlabeler.core.format.SegFile.write(doc, old)
             }
             LabelFormat.Lab -> HtkLab.write(doc)
+            LabelFormat.Inf -> {
+                // the pitch and the levels stay as they were until they are measured again
+                val previous = old?.takeIf { mlabeler.core.format.NiaoNiao.looksLike(it) }?.let { mlabeler.core.format.NiaoNiao.read(it) }
+                val inf = mlabeler.core.format.NiaoNiao.fromDoc(doc, wavRate(item.audioPath) ?: mlabeler.core.format.NiaoNiao.SAMPLE_RATE, previous)
+                    ?: throw FormatException("No sound marked for the .inf")
+                inf.write()
+            }
             LabelFormat.TextGrid -> TextGridFormat.write(doc, duration)
             LabelFormat.Audacity -> AudacityLabels.write(doc)
             LabelFormat.Ds -> mlabeler.core.format.DsFile.write(doc, if (fs.exists(path)) runCatching { fs.read(path).decodeToString() }.getOrNull() else null, f0)

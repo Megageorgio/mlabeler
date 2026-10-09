@@ -473,6 +473,18 @@ class EditorState(
             app.message(S.changedOutside(), error = true)
         }
     }
+    /** Reads the open file's labels again after they were written on disk (an undo step when they changed). */
+    internal fun reloadOpenLabels() {
+        val it = item ?: return
+        val path = it.labelPath ?: return
+        val d = runCatching { workspace.readLabels(it, duration) }.getOrNull() ?: return
+        labelMtime[it.id] = runCatching { workspace.fs.lastModified(path) }.getOrDefault(0L)
+        if (d != committed) {
+            commit(d)
+            history?.markSaved()
+            docVersion++
+        }
+    }
     private var loadJob: Job? = null
     private var playJob: Job? = null
 

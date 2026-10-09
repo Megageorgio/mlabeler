@@ -77,6 +77,7 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showSummary && ed != null) mlabeler.app.ui.DatasetSummaryDialog(app, ed)
                     if (app.showPhonemeCuts && ed != null) mlabeler.app.ui.PhonemeCutsDialog(app, ed)
                     if (app.showRefine && ed != null) mlabeler.app.ui.RefineDialog(app, ed)
+                    if (app.showNiao && ed != null) mlabeler.app.ui.NiaoNiaoDialog(app, ed)
                     if (app.showNfc && ed != null) mlabeler.app.ui.NfcDialog(app, ed)
                     if (app.showUst && ed != null) mlabeler.app.ui.UstDialog(app, ed)
                     if (app.showResynth && ed != null) mlabeler.app.ui.ResynthDialog(app, ed)

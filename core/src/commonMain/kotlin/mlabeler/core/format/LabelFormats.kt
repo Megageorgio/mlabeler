@@ -19,6 +19,8 @@ enum class LabelFormat(val extension: String, val title: String) {
     DsCsv("csv", "DiffSinger transcriptions.csv"),
     /** Phoneme segmentation (.seg) with its transcription (.trans) next to it. */
     Seg("seg", ".seg/.trans"),
+    /** NiaoNiao voicebank source: one .inf with the marks of each recording. */
+    Inf("inf", "NiaoNiao .inf"),
     ;
 
     /** Formats one file can be saved in on its own. */

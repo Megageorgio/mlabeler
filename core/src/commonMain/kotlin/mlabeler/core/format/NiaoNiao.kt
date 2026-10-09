@@ -1,0 +1,190 @@
+package mlabeler.core.format
+
+import mlabeler.core.model.IntervalTier
+import mlabeler.core.model.LabelDoc
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+/**
+ * NiaoNiao (袅袅虚拟歌手) voicebanks.
+ *
+ * Source: a folder of `<sound>.wav` (44.1 kHz, 16-bit, mono) each with `<sound>.inf`: one line
+ * `start end consonant decay pitch consonantLevel level` — the sound starts and ends at `start` and `end`, its
+ * consonant ends at `consonant` and it fades from `decay` (samples of the wav); `pitch` is in Hz; the levels are the
+ * mean absolute sample values of start..consonant and of start..end.
+ *
+ * Built bank: `voice.d`, the samples start..end of every sound one after another, and `inf.d`, lines in base64:
+ * `v1`, `<count> 0 0 0 0 0 0 0 0 0`, then per sound (by name) `name offset length consonant decay pitch
+ * consonantLevel level` with offset and length in bytes of voice.d and the marks counted from the sound's start.
+ */
+object NiaoNiao {
+    const val SAMPLE_RATE = 44100
+    const val TIER = "niaoniao"
+    const val CONSONANT = "consonant"
+    const val VOWEL = "vowel"
+    const val DECAY = "decay"
+
+    data class Inf(
+        val start: Int, val end: Int, val consonant: Int, val decay: Int,
+        val pitch: Double = 0.0, val consonantLevel: Int = 0, val level: Int = 0,
+    ) {
+        fun write(): String = "$start $end $consonant $decay ${formatPitch(pitch)} $consonantLevel $level"
+    }
+
+    fun formatPitch(hz: Double): String = formatNumber(hz, 1).let { if ('.' in it) it else "$it.0" }
+
+    /** True for the one line of seven numbers of an .inf. */
+    fun looksLike(text: String): Boolean {
+        val p = text.trim().split(Regex("\\s+"))
+        return p.size == 7 && p.all { it.toDoubleOrNull() != null }
+    }
+
+    fun read(text: String): Inf {
+        val p = text.trim().split(Regex("\\s+"))
+        require(p.size >= 4) { "Not a NiaoNiao .inf" }
+        fun i(k: Int) = p.getOrNull(k)?.toDoubleOrNull()?.roundToInt() ?: 0
+        return Inf(i(0), i(1), i(2), i(3), p.getOrNull(4)?.toDoubleOrNull() ?: 0.0, i(5), i(6))
+    }
+
+    /** The marks as a tier: consonant, vowel and decay between the start and the end. */
+    fun toDoc(inf: Inf, sampleRate: Int, duration: Double?): LabelDoc {
+        fun t(s: Int) = (s.toDouble() / sampleRate).coerceIn(0.0, duration ?: Double.MAX_VALUE)
+        val a = t(inf.start)
+        val e = t(inf.end).coerceAtLeast(a)
+        val c = t(inf.consonant).coerceIn(a, e)
+        val d = t(inf.decay).coerceIn(c, e)
+        val items = listOf(Triple(a, c, CONSONANT), Triple(c, d, VOWEL), Triple(d, e, DECAY)).filter { it.second > it.first }
+        return LabelDoc(listOf(IntervalTier.fromIntervals(TIER, items, duration)))
+    }
+
+    /**
+     * The marks of [doc] (its NiaoNiao tier, else its phoneme tier): the start of the first part to the end of the
+     * last; the consonant ends where the vowel starts and the decay starts at the part named so. [old] gives the
+     * pitch and levels, which only [measure] works out.
+     */
+    fun fromDoc(doc: LabelDoc, sampleRate: Int, old: Inf?): Inf? {
+        val tier = (doc.tiers.firstOrNull { it is IntervalTier && it.name == TIER } ?: doc.tiers.getOrNull(doc.phonemeTierIndex())) as? IntervalTier
+            ?: return null
+        val parts = (0 until tier.size).filter { tier.texts[it].isNotBlank() }
+        if (parts.isEmpty()) return null
+        fun s(t: Double) = (t * sampleRate).roundToInt()
+        val start = tier.startOf(parts.first())
+        val end = tier.endOf(parts.last())
+        // parts named so, else the second and the third part
+        val c = (parts.firstOrNull { tier.texts[it] == VOWEL } ?: parts.getOrNull(1))?.let { tier.startOf(it) } ?: start
+        val d = (parts.firstOrNull { tier.texts[it] == DECAY } ?: parts.getOrNull(2))?.let { tier.startOf(it) } ?: end
+        return Inf(s(start), s(end), s(c), s(maxOf(c, d)), old?.pitch ?: 0.0, old?.consonantLevel ?: 0, old?.level ?: 0)
+    }
+
+    /** 16-bit values of [samples] (-1..1), as WAV decoding gives them back exactly. */
+    fun toInt16(samples: FloatArray, from: Int = 0, to: Int = samples.size): ShortArray =
+        ShortArray((to - from).coerceAtLeast(0)) { k -> (samples[from + k] * 32768f).roundToInt().coerceIn(-32768, 32767).toShort() }
+
+    /**
+     * The levels and the pitch of [inf] measured on [samples]: mean absolute 16-bit values of start..consonant and
+     * start..end, and the pitch of the vowel as the NiaoNiao tool gives it (a whole number of samples per period).
+     */
+    fun measure(inf: Inf, samples: FloatArray, sampleRate: Int, f0: mlabeler.core.dsp.Curve? = null): Inf {
+        val s = inf.start.coerceIn(0, samples.size)
+        val e = inf.end.coerceIn(s, samples.size)
+        val c = inf.consonant.coerceIn(s, e)
+        fun mean(a: Int, b: Int): Int {
+            if (b <= a) return 0
+            var sum = 0.0
+            for (i in a until b) sum += abs((samples[i] * 32768f).roundToInt().coerceIn(-32768, 32767))
+            return (sum / (b - a)).toInt()
+        }
+        val curve = f0 ?: mlabeler.core.dsp.Pitch.yin(samples, sampleRate)
+        val d = inf.decay.coerceIn(c, e)
+        val vals = (((c.toDouble() / sampleRate) / curve.hop).toInt() until ((d.toDouble() / sampleRate) / curve.hop).toInt())
+            .mapNotNull { curve.values.getOrNull(it)?.takeIf { v -> v > 0f && !v.isNaN() } }.sorted()
+        val pitch = if (vals.isEmpty()) inf.pitch else {
+            val hz = vals[vals.size / 2].toDouble()
+            val period = (SAMPLE_RATE / hz).roundToInt().coerceAtLeast(1)
+            (SAMPLE_RATE.toDouble() / period * 10).roundToInt() / 10.0
+        }
+        return inf.copy(pitch = pitch, consonantLevel = mean(s, c), level = mean(s, e))
+    }
+
+    /**
+     * Marks found from the loudness: the sound is where it is louder than [thresholdDb] below its loudest part; the
+     * consonant ends where the loudness first reaches half of the loudest, the decay starts where it last does.
+     */
+    fun auto(samples: FloatArray, sampleRate: Int, thresholdDb: Double = -30.0): Inf? {
+        val hop = (sampleRate / 200).coerceAtLeast(1)
+        val n = samples.size / hop
+        if (n < 3) return null
+        val level = DoubleArray(n) { k ->
+            var sum = 0.0
+            for (i in k * hop until minOf(samples.size, (k + 2) * hop)) sum += samples[i].toDouble() * samples[i]
+            kotlin.math.sqrt(sum / (2 * hop))
+        }
+        val top = level.maxOrNull() ?: return null
+        if (top <= 1e-6) return null
+        val floor = top * kotlin.math.exp(thresholdDb / 20 * kotlin.math.ln(10.0))
+        val first = level.indexOfFirst { it >= floor }
+        val last = level.indexOfLast { it >= floor }
+        if (first < 0 || last <= first) return null
+        val half = top * 0.5
+        val rise = (first..last).firstOrNull { level[it] >= half } ?: first
+        val fall = (first..last).lastOrNull { level[it] >= half } ?: last
+        val start = first * hop
+        val end = minOf(samples.size, (last + 2) * hop)
+        val consonant = (rise * hop).coerceIn(start, end)
+        val decay = (fall * hop).coerceIn(consonant, end)
+        return Inf(start, end, consonant, decay)
+    }
+
+    /** One sound of a bank: its name, its marks and its 16-bit samples from start to end. */
+    class Sound(val name: String, val inf: Inf, val samples: ShortArray)
+
+    /** voice.d and inf.d (the text with its lines) of [sounds], in the order of their names. */
+    @OptIn(ExperimentalEncodingApi::class)
+    fun pack(sounds: List<Sound>, version: Int = 1): Pair<ByteArray, String> {
+        val sorted = sounds.sortedWith(compareBy { it.name })
+        val total = sorted.sumOf { it.samples.size }
+        val voice = ByteArray(total * 2)
+        var pos = 0
+        val lines = mutableListOf("v$version", "${sorted.size} 0 0 0 0 0 0 0 0 0")
+        for (s in sorted) {
+            val offset = pos * 2
+            for (v in s.samples) { voice[pos * 2] = v.toByte(); voice[pos * 2 + 1] = (v.toInt() shr 8).toByte(); pos++ }
+            val i = s.inf
+            lines += "${s.name} $offset ${s.samples.size * 2} ${i.consonant - i.start} ${i.decay - i.start} ${formatPitch(i.pitch)} ${i.consonantLevel} ${i.level}\n"
+        }
+        return voice to lines.joinToString("") { Base64.encode(it.encodeToByteArray()) + "\n" }
+    }
+
+    /** The sounds of a built bank: inf.d text and voice.d bytes; each sound's marks start at 0. */
+    @OptIn(ExperimentalEncodingApi::class)
+    fun unpack(infD: String, voice: ByteArray): List<Sound> {
+        val lines = infD.lines().map { it.trim() }.filter { it.isNotEmpty() }.map { Base64.decode(it).decodeToString().trim() }
+        require(lines.size >= 2 && lines[0].startsWith("v")) { "Not a NiaoNiao inf.d" }
+        return lines.drop(2).mapNotNull { line ->
+            val p = line.split(Regex("\\s+"))
+            if (p.size < 8) return@mapNotNull null
+            val offset = p[1].toInt()
+            val len = p[2].toInt().coerceAtMost(voice.size - offset).coerceAtLeast(0)
+            val samples = ShortArray(len / 2) { k -> ((voice[offset + 2 * k].toInt() and 0xFF) or (voice[offset + 2 * k + 1].toInt() shl 8)).toShort() }
+            Sound(p[0], Inf(0, samples.size, p[3].toInt(), p[4].toInt(), p[5].toDouble(), p[6].toInt(), p[7].toInt()), samples)
+        }
+    }
+
+    /** A 16-bit mono WAV of [samples]. */
+    fun wav(samples: ShortArray, sampleRate: Int = SAMPLE_RATE): ByteArray {
+        val n = samples.size
+        val out = ByteArray(44 + n * 2)
+        fun put32(i: Int, v: Int) { out[i] = v.toByte(); out[i + 1] = (v shr 8).toByte(); out[i + 2] = (v shr 16).toByte(); out[i + 3] = (v shr 24).toByte() }
+        fun put16(i: Int, v: Int) { out[i] = v.toByte(); out[i + 1] = (v shr 8).toByte() }
+        "RIFF".encodeToByteArray().copyInto(out, 0)
+        put32(4, 36 + n * 2)
+        "WAVEfmt ".encodeToByteArray().copyInto(out, 8)
+        put32(16, 16); put16(20, 1); put16(22, 1); put32(24, sampleRate); put32(28, sampleRate * 2); put16(32, 2); put16(34, 16)
+        "data".encodeToByteArray().copyInto(out, 36)
+        put32(40, n * 2)
+        for (i in 0 until n) put16(44 + i * 2, samples[i].toInt())
+        return out
+    }
+}
