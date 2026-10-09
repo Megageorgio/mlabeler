@@ -471,6 +471,34 @@ class EditorState(
         } + modelResults[it.id].orEmpty()
     }
 
+    /** The place [goToDifference] went to last. */
+    private var lastDifference: Double? = null
+
+    /**
+     * Selects the next (or the previous) place where [r] differs from the labels: a boundary 30 ms or more away, or
+     * another text. Returns how many such places there are (0: none).
+     */
+    fun goToDifference(r: Reference, forward: Boolean): Int {
+        val d = doc ?: return 0
+        // (time, tier of the labels it belongs to)
+        val spots = r.doc.tiers.filterIsInstance<IntervalTier>().flatMap { t ->
+            val main = mlabeler.core.check.Compare.counterpart(d, t) ?: return@flatMap emptyList()
+            val k = d.tiers.indexOf(main)
+            mlabeler.core.check.Compare.differences(main, t).map { it to k }
+        }.sortedBy { it.first }
+        if (spots.isEmpty()) return 0
+        val span = selectedSpan()
+        val last = lastDifference
+        val here = if (last != null && span != null && last >= span.first - 1e-6 && last <= span.second + 1e-6) last
+            else span?.let { (a, b) -> (a + b) / 2 } ?: cursor ?: viewStart
+        val (t, k) = if (forward) spots.firstOrNull { it.first > here + 0.003 } ?: spots.first()
+            else spots.lastOrNull { it.first < here - 0.003 } ?: spots.last()
+        lastDifference = t
+        val i = (d.tiers.getOrNull(k) as? IntervalTier)?.indexAt(t) ?: -1
+        if (i >= 0) selectInterval(IntervalRef(k, i)) else reveal(t - 0.2, t + 0.2)
+        return spots.size
+    }
+
     fun dropModelResult(r: Reference) {
         val id = item?.id ?: return
         modelResults[id] = modelResults[id].orEmpty() - r
