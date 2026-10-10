@@ -59,6 +59,11 @@ private val whisperDirectT = L("Recognise the words with Whisper and place them 
 private val directNoteT = L("Whisper hears the words when autolabelling starts. To check or correct them first, press Recognise: the text appears here.",
     "Whisper распознает слова, когда начнётся авторазметка. Чтобы сначала проверить или поправить их, нажмите «Распознать»: текст появится здесь.")
 private val recogniseBtnT = L("Recognise", "Распознать")
+private val breathsT = L("Breaths (AP) where they can be heard", "Вдохи (AP) там, где они слышны")
+private val splitT = L("Align long recordings again in pieces between pauses", "Длинные записи выравнивать ещё раз по кускам между паузами")
+private val splitLenT = L("Longest piece", "Самый длинный кусок")
+private val splitNoteT = L("The aligner is most accurate on phrases. The recording is cut only at clear pauses and breaths, never inside a word.",
+    "На фразах выравниватель точнее всего. Запись режется только на явных паузах и вдохах, слово не разрывается.")
 private val recognisingT = L("Recognising…", "Распознаю…")
 private val whisperBatchT = L("Files without text: recognise the words with Whisper", "Файлы без текста: распознать слова через Whisper")
 private val allFiles = L("All files of the folder", "Все файлы папки")
@@ -271,6 +276,25 @@ fun AutolabelDialog(app: AppState) {
                     }
                 }
                 Text(otherLangsNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+            }
+            if (!recognizeMode && modelEngine in setOf("sofa", "tifa", "hubertfa")) {
+                val tk = app.settings.toolkit
+                fun set(f: (mlabeler.app.state.ToolkitSettings) -> mlabeler.app.state.ToolkitSettings) = app.update { it.copy(toolkit = f(it.toolkit)) }
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp).clickable { set { it.copy(breaths = !it.breaths) } }, verticalAlignment = Alignment.CenterVertically) {
+                    Text(breathsT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Toggle(tk.breaths, { v -> set { it.copy(breaths = v) } })
+                }
+                // HubertFA has no second pass in pieces
+                if (modelEngine != "hubertfa") {
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp).clickable { set { it.copy(splitLong = !it.splitLong) } }, verticalAlignment = Alignment.CenterVertically) {
+                        Text(splitT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Toggle(tk.splitLong, { v -> set { it.copy(splitLong = v) } })
+                    }
+                    if (tk.splitLong) {
+                        ValueSlider(splitLenT(), tk.splitSeconds, 5f..60f, " s", default = 25f) { v -> set { it.copy(splitSeconds = kotlin.math.round(v)) } }
+                        Text(splitNoteT(), color = c.muted, fontSize = 11.sp)
+                    }
+                }
             }
             Text(ownModelLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
                 .clickable { app.settingsPage = "Toolkit"; app.showAutolabel = false; app.showSettings = true })

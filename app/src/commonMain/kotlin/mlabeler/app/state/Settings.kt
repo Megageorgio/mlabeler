@@ -215,6 +215,11 @@ data class ToolkitSettings(
     val whisperDirect: Boolean = true,
     /** Words no dictionary or G2P can spell are left out instead of failing the file. */
     val skipUnknownWords: Boolean = false,
+    /** Breaths (AP) are placed where the aligner hears them (SOFA, HubertFA detect them; TIFA may place one at pauses). */
+    val breaths: Boolean = true,
+    /** Long recordings are aligned again in pieces cut at pauses, of up to [splitSeconds] (SOFA, TIFA). */
+    val splitLong: Boolean = true,
+    val splitSeconds: Float = 25f,
     /** Phoneme recognition (WFL-ASR): see [mlabeler.app.toolkit.SegmentOptions]. */
     val wfl: WflSettings = WflSettings(),
     /** Refinement of the phoneme boundaries after autolabelling (off by default). */

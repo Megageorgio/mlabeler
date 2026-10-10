@@ -231,7 +231,8 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
      */
     suspend fun align(fileId: String, model: String, language: String?, text: String, phonemes: Boolean, whisper: Boolean = false,
                       refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList(),
-                      whisperModel: String? = null, skipUnknown: Boolean = false): String {
+                      whisperModel: String? = null, skipUnknown: Boolean = false, breaths: Boolean = true,
+                      splitSeconds: Float? = null): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -248,6 +249,16 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             if (!whisper) put("transcribe", kotlinx.serialization.json.JsonNull)
             else if (!whisperModel.isNullOrBlank()) putJsonObject("transcribe") { put("model", whisperModel) }
             if (skipUnknown) put("skip_unknown_words", true)
+            // breaths: each engine takes its own option, the others ignore it
+            put("optional_breaths", breaths)
+            if (!breaths) {
+                put("ap_detector", "none")
+                put("non_lexical_phonemes", JsonArray(emptyList()))
+            }
+            if (splitSeconds != null) {
+                put("split_silence", true)
+                put("split_max_length", splitSeconds.toDouble())
+            }
             putRefine(refine)
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))

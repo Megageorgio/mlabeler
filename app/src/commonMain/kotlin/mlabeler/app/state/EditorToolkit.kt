@@ -163,7 +163,8 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             val fileId = client.upload(it.name + "_part.wav", wav)
             val job = if (recognize) {
                 client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter())
-            } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords)
+            } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
+                settings.toolkit.breaths, settings.toolkit.splitSeconds.takeIf { settings.toolkit.splitLong })
             serverJob = job
             val result = client.await(job, { toolkitDetail = it }) { p, stage ->
                 toolkitProgress = p
@@ -256,7 +257,8 @@ fun EditorState.autolabelFiles(
                             else -> ""
                         }
                         if (text.isBlank() && !whisper) error(noText())
-                        client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords)
+                        client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
+                            settings.toolkit.breaths, settings.toolkit.splitSeconds.takeIf { settings.toolkit.splitLong })
                     }
                     serverJob = job
                     val result = client.await(job, { toolkitDetail = it }) { p, stage ->
