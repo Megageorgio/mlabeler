@@ -60,6 +60,8 @@ private val whisperDirectT = L("Recognise the words with Whisper and place them 
 private val directNoteT = L("Whisper hears the words when autolabelling starts. To check or correct them first, press Recognise: the text appears here.",
     "Whisper распознает слова, когда начнётся авторазметка. Чтобы сначала проверить или поправить их, нажмите «Распознать»: текст появится здесь.")
 private val recogniseBtnT = L("Recognise", "Распознать")
+private val recogniseFailedT = L("Whisper: {0}", "Whisper: {0}")
+private val nothingHeardT = L("no words were heard in this part", "в этом фрагменте слов не услышано")
 private val breathsT = L("Breaths (AP) where they can be heard", "Вдохи (AP) там, где они слышны")
 private val splitT = L("Align long recordings again by segments between pauses", "Повторно выравнивать длинные записи по сегментам между паузами")
 private val splitLenT = L("Maximum segment length", "Максимальная длина сегмента")
@@ -154,6 +156,7 @@ fun AutolabelDialog(app: AppState) {
     var direct by remember { mutableStateOf(settings.whisperDirect) }
     var recognising by remember { mutableStateOf(false) }
     var recogniseJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var recogniseError by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val range = if (whole || selected == null) 0.0 to ed.duration else selected
     var recognizeMode by remember { mutableStateOf(false) }
@@ -336,16 +339,23 @@ fun AutolabelDialog(app: AppState) {
                     Row(Modifier.padding(top = 6.dp)) {
                         Btn(if (recognising) recognisingT() else recogniseBtnT(), enabled = !recognising) {
                             recognising = true
+                            recogniseError = null
                             recogniseJob = scope.launch {
                                 try {
                                     val heard = ed.transcribePart(range.first, range.second, lang.takeIf { it.isNotEmpty() && it != "*" })
-                                    text = heard
-                                    phonemes = false
-                                    direct = false
+                                    if (heard.isBlank()) recogniseError = nothingHeardT()
+                                    else {
+                                        text = heard
+                                        phonemes = false
+                                        direct = false
+                                    }
                                 } catch (e: kotlinx.coroutines.CancellationException) {
                                     throw e
                                 } catch (e: Exception) {
-                                    app.message(e.message ?: e.toString(), error = true)
+                                    // the message bar is under the dialog: the error is shown here too
+                                    val m = e.message?.takeIf { it.isNotBlank() } ?: e.toString()
+                                    recogniseError = m.lineSequence().firstOrNull { it.isNotBlank() } ?: m
+                                    app.message(m, error = true)
                                 } finally {
                                     recognising = false
                                     recogniseJob = null
@@ -353,6 +363,7 @@ fun AutolabelDialog(app: AppState) {
                             }
                         }
                     }
+                    recogniseError?.let { Text(recogniseFailedT.format(it), color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) }
                     if (direct) Text(directNoteT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                     else {
                         // the text and where it can come from in one row; what the text is (a choice) below it
