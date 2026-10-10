@@ -32,6 +32,7 @@ import mlabeler.app.theme.T
 import mlabeler.core.model.IntervalTier
 import mlabeler.app.state.autolabel
 import mlabeler.app.state.autolabelFiles
+import mlabeler.app.state.transcribePart
 
 private val title = L("Autolabel", "Авторазметка")
 private val partLine = L("{0} – {1} ({2})", "{0} – {1} ({2})")
@@ -53,9 +54,13 @@ private val phonemesHint = L("e.g. SP t w i ng k ax l SP", "например: SP
 private val fromFile = L("From a file…", "Из файла…")
 private val fromFileNote = L("Lyrics, subtitles (.lrc, .srt) or a .lab: timings, tags and punctuation are removed.",
     "Текст песни, субтитры (.lrc, .srt) или .lab: тайминги, теги и знаки препинания убираются.")
-private val whisperT = L("No text: recognise the words with Whisper first (a large model, downloaded on first use)",
-    "Нет текста — сначала распознать слова через Whisper (большая модель, загружается при первом использовании)")
-private val needText = L("Enter the text, load it from a file or turn on Whisper", "Впишите текст, загрузите его из файла или включите Whisper")
+private val needText = L("Enter the text, load it from a file or recognise it with Whisper", "Впишите текст, загрузите его из файла или распознайте его через Whisper")
+private val whisperDirectT = L("Recognise the words with Whisper and place them straight away", "Распознать слова через Whisper и сразу их расставить")
+private val directNoteT = L("Whisper hears the words when autolabelling starts. To check or correct them first, press Recognise: the text appears here.",
+    "Whisper распознает слова, когда начнётся авторазметка. Чтобы сначала проверить или поправить их, нажмите «Распознать»: текст появится здесь.")
+private val recogniseBtnT = L("Recognise", "Распознать")
+private val recognisingT = L("Recognising…", "Распознаю…")
+private val whisperBatchT = L("Files without text: recognise the words with Whisper", "Файлы без текста: распознать слова через Whisper")
 private val allFiles = L("All files of the folder", "Все файлы папки")
 private val whichFiles = L("Which files", "Какие файлы")
 private val filesNoLabels = L("Without labels ({0})", "Без разметки ({0})")
@@ -138,6 +143,9 @@ fun AutolabelDialog(app: AppState) {
     var which by remember { mutableStateOf(mlabeler.app.state.FileFilter.NoLabels) }
     var batchSource by remember { mutableStateOf(mlabeler.app.state.EditorState.BatchText.TxtNextToIt) }
     var whisper by remember { mutableStateOf(settings.whisper) }
+    var direct by remember { mutableStateOf(settings.whisperDirect) }
+    var recognising by remember { mutableStateOf(false) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val range = if (whole || selected == null) 0.0 to ed.duration else selected
     var recognizeMode by remember { mutableStateOf(false) }
     val task = if (recognizeMode) "segment" else "align"
@@ -172,7 +180,7 @@ fun AutolabelDialog(app: AppState) {
     var text by remember(whole) { mutableStateOf(if (wordTier != null) textsIn(wordTier, range) else textsIn(phoneTier, range)) }
     // the whole file goes into the labels by default; a part is compared first
     var replace by remember(whole) { mutableStateOf(whole && (doc == null || doc.tiers.all { t -> (t as? IntervalTier)?.texts?.all { it.isEmpty() } ?: true })) }
-    val textMissing = !recognizeMode && !batch && text.isBlank() && !whisper
+    val textMissing = !recognizeMode && !batch && text.isBlank() && !direct
     var reviewTexts by remember { mutableStateOf(false) }
     if (reviewTexts) TextsDialog(ed, ed.batchFiles(which), lang.takeIf { it.isNotEmpty() && it != "*" }) { reviewTexts = false }
     Overlay({ close() }, 640) {
@@ -183,7 +191,7 @@ fun AutolabelDialog(app: AppState) {
             Btn(run(), primary = true, enabled = modelOk && error == null && !textMissing && (!batch || files.isNotEmpty())) {
                 app.update {
                     val t = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang)
-                    else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper,
+                    else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper, whisperDirect = if (batch) it.toolkit.whisperDirect else direct,
                         extraLanguages = if (otherLangCodes.isEmpty()) it.toolkit.extraLanguages else extra)
                     it.copy(toolkit = t)
                 }
@@ -191,8 +199,12 @@ fun AutolabelDialog(app: AppState) {
                 if (batch) {
                     val src = if (recognizeMode && batchSource == mlabeler.app.state.EditorState.BatchText.TxtNextToIt) mlabeler.app.state.EditorState.BatchText.None else batchSource
                     ed.autolabelFiles(files, model, language, recognizeMode, src, phonemes, whisper && !recognizeMode, extra)
-                } else ed.autolabel(range.first, range.second, model, language, if (recognizeMode) forced else text,
-                    phonemes && text.isNotBlank(), replace, recognize = recognizeMode, whisper = whisper && !recognizeMode, extraLanguages = extra)
+                } else {
+                    // Whisper's words straight away: no text goes with the request
+                    val sung = if (recognizeMode) forced else if (direct) "" else text
+                    ed.autolabel(range.first, range.second, model, language, sung, phonemes && !direct && text.isNotBlank(), replace,
+                        recognize = recognizeMode, whisper = direct && !recognizeMode, extraLanguages = extra)
+                }
                 close()
             }
         }) {
@@ -281,6 +293,15 @@ fun AutolabelDialog(app: AppState) {
             if (!recognizeMode) {
                 if (batch) {
                     SectionTitle(textFrom())
+                    if (batchSource != mlabeler.app.state.EditorState.BatchText.Labels) {
+                        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp).clickable { whisper = !whisper }, verticalAlignment = Alignment.CenterVertically) {
+                            Text(whisperBatchT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Toggle(whisper, { whisper = it })
+                        }
+                        if (whisper) Column(Modifier.padding(bottom = 6.dp)) {
+                            WhisperModelChoice(settings.whisperModel) { id -> app.update { it.copy(toolkit = it.toolkit.copy(whisperModel = id)) } }
+                        }
+                    }
                     androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Chip(fromTxt(), batchSource != mlabeler.app.state.EditorState.BatchText.Labels) { batchSource = mlabeler.app.state.EditorState.BatchText.TxtNextToIt }
                         Chip(fromLabels(), batchSource == mlabeler.app.state.EditorState.BatchText.Labels) { batchSource = mlabeler.app.state.EditorState.BatchText.Labels }
@@ -295,31 +316,52 @@ fun AutolabelDialog(app: AppState) {
                     }
                 } else {
                     SectionTitle(textTitle())
-                    // the text and where it can come from in one row; what the text is (a choice) below it
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Field(text, { text = it }, Modifier.weight(1f), placeholder = if (phonemes) phonemesHint() else wordsHint())
-                        TextFromFile(ed.workspace.root) { raw ->
-                            val asPh = phonemes || mlabeler.core.format.TextImport.looksLikeLab(raw)
-                            phonemes = asPh
-                            text = mlabeler.core.format.TextImport.clean(raw, asPh)
+                    // Whisper first: its words are placed as they are, or put into the field to be checked
+                    Row(Modifier.fillMaxWidth().clickable { direct = !direct }, verticalAlignment = Alignment.CenterVertically) {
+                        Text(whisperDirectT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Toggle(direct, { direct = it })
+                    }
+                    Column(Modifier.padding(top = 6.dp)) {
+                        WhisperModelChoice(settings.whisperModel) { id -> app.update { it.copy(toolkit = it.toolkit.copy(whisperModel = id)) } }
+                    }
+                    Row(Modifier.padding(top = 6.dp)) {
+                        Btn(if (recognising) recognisingT() else recogniseBtnT(), enabled = !recognising) {
+                            recognising = true
+                            scope.launch {
+                                try {
+                                    val heard = ed.transcribePart(range.first, range.second, lang.takeIf { it.isNotEmpty() && it != "*" })
+                                    text = heard
+                                    phonemes = false
+                                    direct = false
+                                } catch (e: kotlinx.coroutines.CancellationException) {
+                                    throw e
+                                } catch (e: Exception) {
+                                    app.message(e.message ?: e.toString(), error = true)
+                                } finally {
+                                    recognising = false
+                                }
+                            }
                         }
                     }
-                    Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Chip(asText(), !phonemes) { phonemes = false }
-                        Chip(asPhonemes(), phonemes) { phonemes = true }
-                    }
-                }
-                if (!(batch && batchSource == mlabeler.app.state.EditorState.BatchText.Labels)) {
-                    Row(Modifier.fillMaxWidth().padding(top = 8.dp).clickable { whisper = !whisper }, verticalAlignment = Alignment.CenterVertically) {
-                        Text(whisperT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                        Toggle(whisper, { whisper = it })
-                    }
-                    if (whisper) Column(Modifier.padding(top = 6.dp)) {
-                        WhisperModelChoice(settings.whisperModel) { id -> app.update { it.copy(toolkit = it.toolkit.copy(whisperModel = id)) } }
+                    if (direct) Text(directNoteT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                    else {
+                        // the text and where it can come from in one row; what the text is (a choice) below it
+                        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Field(text, { text = it }, Modifier.weight(1f), placeholder = if (phonemes) phonemesHint() else wordsHint())
+                            TextFromFile(ed.workspace.root) { raw ->
+                                val asPh = phonemes || mlabeler.core.format.TextImport.looksLikeLab(raw)
+                                phonemes = asPh
+                                text = mlabeler.core.format.TextImport.clean(raw, asPh)
+                            }
+                        }
+                        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Chip(asText(), !phonemes) { phonemes = false }
+                            Chip(asPhonemes(), phonemes) { phonemes = true }
+                        }
                     }
                 }
             }
-            if (!recognizeMode && !(batch && batchSource == mlabeler.app.state.EditorState.BatchText.Labels) && !(phonemes && !batch)
+            if (!recognizeMode && !(batch && batchSource == mlabeler.app.state.EditorState.BatchText.Labels) && !(phonemes && !batch) && !(direct && !batch)
                 && langs?.any { g -> g.models.any { it.id == model } } == true) {
                 Text(checkWordsLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp).clickable {
                     val language = lang.takeIf { it.isNotEmpty() && it != "*" }

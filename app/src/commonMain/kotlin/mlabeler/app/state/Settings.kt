@@ -211,6 +211,8 @@ data class ToolkitSettings(
     val whisper: Boolean = false,
     /** The Whisper model that recognises the words for autolabelling. */
     val whisperModel: String = "whisper-large-v3-turbo",
+    /** Autolabelling one recording places Whisper's words straight away, not the text of the field. */
+    val whisperDirect: Boolean = true,
     /** Words no dictionary or G2P can spell are left out instead of failing the file. */
     val skipUnknownWords: Boolean = false,
     /** Phoneme recognition (WFL-ASR): see [mlabeler.app.toolkit.SegmentOptions]. */

@@ -523,3 +523,25 @@ private fun selfCheckShort(d: mlabeler.app.toolkit.ToolkitClient.Diagnosis): Str
 private val batchDoneWithErrors = L("Labelled {0} files, {1} with errors:", "Размечено файлов: {0}, с ошибками: {1}:")
 private val batchStopped = L("Stopped: {0} of {1} files labelled and saved", "Остановлено: размечено и сохранено {0} из {1}")
 private val noText = L("no text (a .txt with the same name, or Whisper)", "нет текста (.txt с тем же именем или Whisper)")
+
+/** The words Whisper hears in [from]..[to] of the open recording (the Whisper model of the settings). */
+suspend fun EditorState.transcribePart(from: Double, to: Double, language: String?): String {
+    val a = audio ?: return ""
+    val client = app.toolkit.client()
+    if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+    val s0 = (from * a.sampleRate).toInt().coerceIn(0, a.samples.size)
+    val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
+    val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
+    val id = client.upload((item?.name ?: "part") + "_part.wav", wav)
+    val job = client.transcribe(id, language, null, settings.toolkit.whisperModel)
+    try {
+        val res = client.await(job) { _, _ -> }
+        val first = (res["items"] as? kotlinx.serialization.json.JsonArray)?.firstOrNull() as? kotlinx.serialization.json.JsonObject
+        if ((first?.get("ok") as? kotlinx.serialization.json.JsonPrimitive)?.content == "false")
+            throw mlabeler.app.toolkit.ToolkitException((first["error"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: "failed")
+        return (first?.get("text") as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim().orEmpty()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        withContext(kotlinx.coroutines.NonCancellable) { client.cancel(job) }
+        throw e
+    }
+}
