@@ -13,6 +13,8 @@ import mlabeler.core.format.NiaoNiao
 import mlabeler.core.io.Item
 import mlabeler.core.io.Paths
 import mlabeler.core.io.PlatformFs
+import mlabeler.core.format.OtoEntry
+import mlabeler.core.oto.OtoPhonemes
 
 // NiaoNiao voicebanks: the marks of each recording in its .inf, measuring, packing into voice.d and inf.d, oto.ini.
 
@@ -236,24 +238,32 @@ private fun EditorState.saveAll() {
 }
 
 /**
- * Makes the .inf of [files] from the folder's oto.ini (the entry named as the file, else its first one); with [keep]
- * the files that have an .inf keep it.
+ * Makes NiaoNiao sounds from the folder's oto.ini. When each recording holds one syllable named as the file, its .inf
+ * is written next to it (with [keep] an existing .inf stays). Otherwise (takes of several syllables, VCV, kana names)
+ * each syllable an alias ends on becomes its own recording in a new folder beside this one, named by the syllable and
+ * cut with a margin; CV entries ("ka", "- ka") are taken before VCV ones, a syllable found again is left out.
  */
 fun EditorState.niaoFromOto(files: List<Item>, keep: Boolean) {
     saveAll()
-    workspace.updateState { it.copy(defaultFormat = LabelFormat.Inf) }
     runNiao(fromOtoT()) {
         val entries = readOto(files)?.first ?: error(noOtoT())
         val bySample = entries.groupBy { it.sample.lowercase() }
+        fun entriesOf(f: Item) = bySample[Paths.name(f.audioPath).lowercase()].orEmpty()
+        val split = files.any { f ->
+            val names = entriesOf(f).mapNotNull { OtoPhonemes.syllable(it.alias)?.text }.distinct()
+            names.size > 1 || names.size == 1 && names[0] != Paths.stem(f.audioPath).lowercase()
+        }
+        if (split) return@runNiao splitFromOto(files, ::entriesOf, keep)
+        workspace.updateState { it.copy(defaultFormat = LabelFormat.Inf) }
         var done = 0
         val failed = mutableListOf<String>()
         for ((k, f) in files.withIndex()) {
             toolkitBusy = progressT.format(k + 1, files.size, f.name)
             toolkitProgress = k.toDouble() / files.size
             if (keep && workspace.fs.exists(infPath(f))) continue
-            val list = bySample[Paths.name(f.audioPath).lowercase()]
-            if (list.isNullOrEmpty()) { failed += f.name + ": " + noEntryT(); continue }
-            val e = list.firstOrNull { it.alias == Paths.stem(f.audioPath) } ?: list.first()
+            val list = entriesOf(f)
+            if (list.isEmpty()) { failed += f.name + ": " + noEntryT(); continue }
+            val e = list.firstOrNull { OtoPhonemes.syllable(it.alias) != null } ?: list.first()
             try {
                 val a = readAudio(f)
                 val inf = withContext(Dispatchers.Default) { NiaoNiao.measure(NiaoNiao.fromOto(e, a.samples, a.sampleRate), a.samples, a.sampleRate) }
@@ -267,6 +277,62 @@ fun EditorState.niaoFromOto(files: List<Item>, keep: Boolean) {
             }
         }
         fromOtoDoneT.format(done) + if (failed.isEmpty()) "" else "\n" + failed.joinToString("\n")
+    }
+}
+
+/** The splitting half of [niaoFromOto]: one recording and .inf per syllable in <folder>_niaoniao. */
+private suspend fun EditorState.splitFromOto(files: List<Item>, entriesOf: (Item) -> List<OtoEntry>, keep: Boolean): String {
+    val fs = workspace.fs
+    val dir = Paths.parent(files.first().audioPath)
+    val out = Paths.join(Paths.parent(dir), Paths.name(dir) + "_niaoniao")
+    fs.mkdirs(out)
+    // which entry gives each syllable: CV before VCV, then in the order of the files
+    val chosen = LinkedHashMap<String, Pair<Item, OtoEntry>>()
+    var again = 0
+    var noVowel = 0
+    for (vcv in listOf(false, true)) for (f in files) for (e in entriesOf(f)) {
+        val head = e.alias.trim().let { ' ' !in it || it.startsWith("-") }
+        if (head == vcv) continue
+        val s = OtoPhonemes.syllable(e.alias)
+        if (s == null) { noVowel++; continue }
+        if (s.text in chosen) again++ else chosen[s.text] = f to e
+    }
+    var done = 0
+    val failed = mutableListOf<String>()
+    val byFile = chosen.entries.groupBy({ it.value.first }, { it.key to it.value.second })
+    for ((k, f) in files.withIndex()) {
+        val list = byFile[f] ?: continue
+        toolkitBusy = progressT.format(k + 1, files.size, f.name)
+        toolkitProgress = k.toDouble() / files.size
+        try {
+            val a = readAudio(f)
+            for ((name, e) in list) {
+                val wav = Paths.join(out, "$name.wav")
+                if (keep && fs.exists(wav)) continue
+                val (part, inf) = withContext(Dispatchers.Default) {
+                    val m = NiaoNiao.fromOto(e, a.samples, a.sampleRate)
+                    val pad = a.sampleRate / 10
+                    val from = (m.start - pad).coerceAtLeast(0)
+                    val to = (m.end + pad).coerceAtMost(a.samples.size)
+                    val part = a.samples.copyOfRange(from, to)
+                    val inf = m.copy(start = m.start - from, end = m.end - from, consonant = m.consonant - from, decay = m.decay - from)
+                    part to NiaoNiao.measure(inf, part, a.sampleRate)
+                }
+                fs.write(wav, Wav.encode16(Audio(a.sampleRate, part)))
+                fs.write(Paths.join(out, "$name.inf"), inf.write().encodeToByteArray())
+                done++
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            failed += f.name + ": " + (e.message ?: e.toString())
+        }
+    }
+    return buildString {
+        append(splitDoneT.format(done, out))
+        if (again > 0) append("\n").append(againT.format(again))
+        if (noVowel > 0) append("\n").append(noVowelT.format(noVowel))
+        if (failed.isNotEmpty()) append("\n").append(failed.joinToString("\n"))
     }
 }
 
@@ -295,6 +361,43 @@ fun EditorState.niaoToOto(files: List<Item>) {
         workspace.fs.write(path, mlabeler.core.io.encodeText(text, cs))
         oto.forget()
         toOtoDoneT.format(made.size)
+    }
+}
+
+/**
+ * Writes a .lab for every recording of [files] with entries in the folder's oto.ini: the consonant and the vowel of
+ * each alias's syllable in time (see [OtoPhonemes.intervals]). A recording's old label file is kept in
+ * .mlabeler/backup.
+ */
+fun EditorState.otoToLab(files: List<Item>) {
+    saveAll()
+    runNiao(toLabT()) {
+        val bySample = (readOto(files)?.first ?: error(noOtoT())).groupBy { it.sample.lowercase() }
+        val folder = "oto-lab-" + workspace.stamp()
+        var done = 0
+        val failed = mutableListOf<String>()
+        for ((k, f) in files.withIndex()) {
+            val list = bySample[Paths.name(f.audioPath).lowercase()] ?: continue
+            toolkitBusy = progressT.format(k + 1, files.size, f.name)
+            toolkitProgress = k.toDouble() / files.size
+            try {
+                val a = readAudio(f)
+                val iv = OtoPhonemes.intervals(list, a.durationMs)
+                if (iv.isEmpty()) { failed += f.name + ": " + noSyllablesT(); continue }
+                val doc = mlabeler.core.model.LabelDoc(listOf(mlabeler.core.model.IntervalTier.fromIntervals("phones", iv, a.duration)))
+                val old = f.labelPath?.takeIf { workspace.fs.exists(it) }
+                if (old != null) workspace.backupCopy(old)
+                val updated = workspace.writeLabels(f.copy(labelPath = null, labelFormat = null), doc, a.duration, LabelFormat.Lab)
+                if (old != null && old != updated.labelPath) workspace.moveToBackup(old, folder)
+                histories.remove(f.id)
+                done++
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                failed += f.name + ": " + (e.message ?: e.toString())
+            }
+        }
+        toLabDoneT.format(done) + if (failed.isEmpty()) "" else "\n" + failed.joinToString("\n")
     }
 }
 
@@ -327,3 +430,9 @@ private val noEntryT = L("no entry in oto.ini", "нет строки в oto.ini"
 private val fromOtoDoneT = L("Marks taken from oto.ini for {0} recordings", "Метки из oto.ini перенесены в записи: {0}")
 private val toOtoT = L("Writing oto.ini", "Запись oto.ini")
 private val toOtoDoneT = L("{0} entries written to oto.ini; the old file is in .mlabeler/backup", "В oto.ini записано строк: {0}; старый файл лежит в .mlabeler/backup")
+private val splitDoneT = L("{0} sounds cut out, one syllable each, into {1}", "Вырезано звуков, по слогу в каждом: {0}, они лежат в {1}")
+private val againT = L("Syllables met again and left out: {0}", "Повторные слоги пропущены: {0}")
+private val noVowelT = L("Entries that don't end on a vowel left out: {0}", "Пропущены строки, которые кончаются не на гласную: {0}")
+private val toLabT = L("Labels from oto.ini", "Разметка из oto.ini")
+private val noSyllablesT = L("no alias ends on a syllable", "ни один псевдоним не кончается слогом")
+private val toLabDoneT = L("{0} .lab files made from oto.ini; old label files are in .mlabeler/backup", "Сделано .lab из oto.ini: {0}; старая разметка лежит в .mlabeler/backup")

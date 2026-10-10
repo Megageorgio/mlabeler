@@ -28,6 +28,7 @@ import mlabeler.app.state.niaoFiles
 import mlabeler.app.state.niaoFromOto
 import mlabeler.app.state.niaoHasOto
 import mlabeler.app.state.niaoToOto
+import mlabeler.app.state.otoToLab
 import mlabeler.app.theme.T
 
 private val titleT = L("Convert label files", "Перевод файлов разметки в другой формат")
@@ -40,12 +41,15 @@ private val aboutT = L(
 )
 private val defaultT = L("Use this format for new labels of the folder too", "Использовать этот формат и для новой разметки папки")
 private val runT = L("Convert", "Перевести")
-private val otoTitleT = L("oto.ini and NiaoNiao marks (.inf)", "oto.ini и метки NiaoNiao (.inf)")
+private val otoTitleT = L("oto.ini", "oto.ini")
 private val fromOtoMissingT = L("oto.ini → .inf where there are none", "oto.ini → .inf там, где их нет")
 private val fromOtoAllT = L("oto.ini → .inf for all", "oto.ini → .inf для всех")
 private val toOtoT = L(".inf → oto.ini", ".inf → oto.ini")
-private val otoHintT = L("CV entries: the offset is the start, the preutterance and the fixed part end where the vowel starts, the cutoff is the end. oto.ini has no decay, it is placed from the loudness.",
-    "Строки CV: смещение — начало, преутерация и фиксированная часть кончаются там, где начинается гласная, отсечка — конец. Затухания в oto.ini нет, оно ставится по громкости.")
+private val otoHintT = L("NiaoNiao: the offset is the start, the preutterance and the fixed part end where the vowel starts, the cutoff is the end; the decay, which oto.ini lacks, is placed from the loudness. Recordings of several syllables (VCV, long takes) or named in kana are cut into one recording per syllable in a new folder <folder>_niaoniao.",
+    "NiaoNiao: смещение — начало, преутерация и фиксированная часть кончаются там, где начинается гласная, отсечка — конец; затухание, которого в oto.ini нет, ставится по громкости. Записи из нескольких слогов (VCV, длинные дубли) или с именами каной режутся на отдельные записи по слогу в новой папке <папка>_niaoniao.")
+private val toLabT = L("oto.ini → .lab", "oto.ini → .lab")
+private val labHintT = L(".lab: the consonant of each syllable from the overlap to the preutterance, the vowel up to the cutoff or the next consonant, SP between them. The old label files go to .mlabeler/backup.",
+    ".lab: согласная каждого слога от перекрытия до преутерации, гласная до отсечки или до следующей согласной, между ними SP. Старая разметка уходит в .mlabeler/backup.")
 
 @Composable
 fun ConvertDialog(app: AppState, ed: EditorState) {
@@ -88,8 +92,10 @@ fun ConvertDialog(app: AppState, ed: EditorState) {
                     if (hasOto) Btn(fromOtoMissingT(), enabled = infs < wavs.size) { ed.niaoFromOto(wavs, keep = true); close() }
                     if (hasOto) Btn(fromOtoAllT()) { ed.niaoFromOto(wavs, keep = false); close() }
                     if (infs > 0) Btn(toOtoT()) { ed.niaoToOto(wavs); close() }
+                    if (hasOto) Btn(toLabT()) { ed.otoToLab(wavs); close() }
                 }
                 Text(otoHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                if (hasOto) Text(labHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
