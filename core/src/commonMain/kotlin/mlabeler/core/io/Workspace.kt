@@ -28,6 +28,8 @@ data class ItemState(
     /** Last view start and zoom. */
     val viewStart: Double = 0.0,
     val pixelsPerSecond: Double = 0.0,
+    /** Time spent labelling this recording, ms: only while the user was doing something (see the app's WorkTimer). */
+    val workMs: Long = 0,
 )
 
 @Serializable
@@ -49,6 +51,8 @@ data class WorkspaceState(
     /** The file list grouped by subfolder (otherwise one flat list), and the folded subfolders. */
     val tree: Boolean = false,
     val folded: Set<String> = emptySet(),
+    /** Time spent labelling in this folder, ms (all its recordings, those since removed included). */
+    val workMs: Long = 0,
 )
 
 /** One audio file and where its labels are. [id] is the audio path relative to the workspace root. */

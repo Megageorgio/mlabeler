@@ -76,6 +76,8 @@ class AppState(private val scope: CoroutineScope) {
     var showSoundCheck by mutableStateOf(false)
     val toolkit = mlabeler.app.toolkit.ToolkitManager(this, scope)
     val updater = Updater(this, scope)
+    /** The time spent labelling, per folder and recording. */
+    val workTimer = WorkTimer(this, scope)
     var plugins by mutableStateOf<List<mlabeler.app.plugins.Plugin>>(emptyList())
         private set
 
@@ -192,6 +194,7 @@ class AppState(private val scope: CoroutineScope) {
     fun openRecorder(folder: String) {
         if (!PlatformFs.isDirectory(folder)) return
         editor?.let { if (it.dirty) it.save(quiet = true) }
+        workTimer.flush()
         recorder = mlabeler.app.recorder.RecorderState(folder, this, scope)
     }
 
@@ -202,6 +205,7 @@ class AppState(private val scope: CoroutineScope) {
     fun openKaraoke(folder: String) {
         if (!PlatformFs.isDirectory(folder)) return
         editor?.let { if (it.dirty) it.save(quiet = true) }
+        workTimer.flush()
         recorder?.close(); recorder = null
         karaoke = mlabeler.app.recorder.KaraokeState(folder, this, scope)
     }
@@ -243,6 +247,7 @@ class AppState(private val scope: CoroutineScope) {
         applyAudioFormats(settings)
         Lang.current = settings.language.ifEmpty { Platform.systemLanguage }.let { l -> if (Lang.available.any { it.first == l }) l else "en" }
         if (settings.setupDone) updater.checkAtStart()
+        followPresence(scope)
     }
 
     /** Shows the report of a crash of the previous run (once). */
@@ -358,6 +363,7 @@ class AppState(private val scope: CoroutineScope) {
     }
 
     fun closeFolder() {
+        workTimer.flush()
         editor?.saveAllOnClose()
         editor = null
     }
@@ -398,6 +404,7 @@ class AppState(private val scope: CoroutineScope) {
      * (telling the toolkit can take a few seconds when it is busy or gone).
      */
     fun close(stopToolkit: Boolean = true) {
+        workTimer.flush()
         editor?.saveAllOnClose()
         if (stopToolkit) toolkit.close()
         updater.onExit()

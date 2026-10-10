@@ -44,6 +44,8 @@ private val filesT = L("Recordings", "Записи")
 private val filesLine = L("{0} in the folder · {1} labelled · {2} done", "{0} в папке · {1} размечено · {2} готово")
 private val lengthT = L("Length", "Длительность")
 private val lengthLine = L("{0} labelled · {1} without pauses", "{0} размечено · {1} без пауз")
+private val workT = L("Labelling time", "Время разметки")
+private val workLine = L("{0} in all · {1} per recording worked on, on average", "{0} всего · в среднем {1} на запись, с которой работали")
 private val phonemesT = L("Phonemes", "Фонемы")
 private val phonemesLine = L("{0} different, {1} in all", "{0} разных, всего {1}")
 private val rareT = L("Rare phonemes", "Редкие фонемы")
@@ -101,6 +103,11 @@ fun DatasetSummaryDialog(app: AppState, ed: EditorState) {
             val done = ed.items.count { ed.marks(it).done }
             Fact(filesT(), filesLine.format(ed.items.size, labelled.size, done))
             Fact(lengthT(), lengthLine.format(formatTime(stats.seconds, precise = false), formatTime(stats.singingSeconds, precise = false)))
+            if (app.settings.workTime.enabled) {
+                val worked = ed.items.map { ed.workspace.itemState(it.id).workMs }.filter { it > 0 }
+                val total = app.workTimer.folderMs
+                Fact(workT(), workLine.format(mlabeler.app.state.WorkTimer.format(total), mlabeler.app.state.WorkTimer.format(if (worked.isEmpty()) 0 else worked.sum() / worked.size)))
+            }
             Fact(phonemesT(), phonemesLine.format(stats.phonemes.count { it.name !in pauses }, stats.phonemes.filter { it.name !in pauses }.sumOf { it.count }))
 
             SectionTitle(rareT())

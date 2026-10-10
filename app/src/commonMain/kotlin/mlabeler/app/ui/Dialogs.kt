@@ -862,6 +862,48 @@ private fun DoneSoundSection(app: AppState) {
     ValueSlider(doneSoundMinT(), d.minSeconds.toFloat(), 0f..600f, " s", default = 20f) { v -> set { it.copy(minSeconds = v.toInt()) } }
 }
 
+private val workTimeT = L("Labelling time", "Время разметки")
+private val workTimeOnT = L("Count the time spent labelling", "Считать время, потраченное на разметку")
+private val workIdleT = L("A break begins after this long without activity", "Перерыв начинается после бездействия в течение")
+private val workNowT = L("This folder: {0}, this recording: {1}", "Эта папка: {0}, эта запись: {1}")
+private val workResetT = L("Reset the time of this folder", "Сбросить время этой папки")
+private val workResetSureT = L("Reset: the time of the folder and of all its recordings is lost", "Сбросить: время папки и всех её записей будет потеряно")
+private val discordOnT = L("Show in Discord what is being labelled", "Показывать в Discord, что размечается")
+private val discordNamesT = L("Names of the folder and the recording", "Названия папки и записи")
+private val discordMissingT = L("This build has no Discord application, so nothing is shown.", "В этой сборке нет приложения Discord, поэтому ничего не показывается.")
+
+/** Counting the time spent labelling: on or off, when a break begins, the folder's time and its reset. */
+@Composable
+private fun WorkTimeSection(app: AppState) {
+    val c = T.c
+    val w = app.settings.workTime
+    fun set(f: (mlabeler.app.state.WorkTimeSettings) -> mlabeler.app.state.WorkTimeSettings) = app.update { it.copy(workTime = f(it.workTime)) }
+    SwitchRow(workTimeOnT(), w.enabled) { v -> set { it.copy(enabled = v) } }
+    if (!w.enabled) return
+    ValueSlider(workIdleT(), w.idleSeconds.toFloat(), 10f..600f, " s", default = 60f) { v -> set { it.copy(idleSeconds = v.roundToInt()) } }
+    if (app.editor == null) return
+    val t = app.workTimer
+    Text(workNowT.format(mlabeler.app.state.WorkTimer.format(t.folderMs), mlabeler.app.state.WorkTimer.format(t.itemMs)),
+        color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+    var sure by remember { mutableStateOf(false) }
+    Row(Modifier.padding(top = 8.dp)) {
+        Btn(if (sure) workResetSureT() else workResetT(), primary = sure) {
+            if (sure) { t.reset(); sure = false } else sure = true
+        }
+    }
+}
+
+/** Discord Rich Presence (computers): on or off, and whether the folder and recording are named. */
+@Composable
+private fun DiscordSection(app: AppState) {
+    val c = T.c
+    val d = app.settings.discord
+    fun set(f: (mlabeler.app.state.DiscordSettings) -> mlabeler.app.state.DiscordSettings) = app.update { it.copy(discord = f(it.discord)) }
+    SwitchRow(discordOnT(), d.enabled) { v -> set { it.copy(enabled = v) } }
+    if (d.enabled) SwitchRow(discordNamesT(), d.showNames) { v -> set { it.copy(showNames = v) } }
+    if (!mlabeler.app.RichPresence.supported) Text(discordMissingT(), color = c.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+}
+
 @Composable
 private fun InterfacePage(app: AppState) {
     val c = T.c
@@ -890,6 +932,8 @@ private fun InterfacePage(app: AppState) {
         if (!mlabeler.app.Platform.isMobile) SwitchRow(hoverBoundaryT(), s.hoverBoundary) { v -> app.update { it.copy(hoverBoundary = v) } }
     }
     Fold(doneSoundT()) { DoneSoundSection(app) }
+    Fold(workTimeT()) { WorkTimeSection(app) }
+    if (!mlabeler.app.Platform.isMobile) Fold("Discord") { DiscordSection(app) }
     if (s.statusBar) Fold(MenuTitles.statusBar()) {
         StatusBarSettings(app) { t, v, f -> SwitchRow(t, v, f) }
     }
@@ -1276,6 +1320,14 @@ internal object SettingsHelp {
                 "Когда заканчивается работа по многим файлам, которая шла достаточно долго, проигрывается выбранный звуковой файл: в это время можно заниматься другим. По умолчанию выключено."),
             h("Interface", doneSoundMinT, "Jobs shorter than this end without a sound. 0: the sound plays after every job. Default: 20 s.",
                 "Работа короче этого заканчивается без звука. 0: звук после любой работы. По умолчанию 20 с."),
+            h("Interface", workTimeOnT, "Counts the time spent on each folder and recording, as drawing programs do: only while you click, type, move the mouse over the window or listen. A break without any of these is left out. Shown in the status bar and the dataset summary. On by default.",
+                "Считает время работы над каждой папкой и записью, как это делают программы для рисования: только пока вы нажимаете, печатаете, двигаете мышь над окном или слушаете. Перерыв без этого не учитывается. Показывается в строке состояния и сводке по датасету. По умолчанию включено."),
+            h("Interface", workIdleT, "If nothing happens for this long, the time stops until the next action; the pause itself is not counted. Default: 60 s.",
+                "Если ничего не происходит столько времени, счёт останавливается до следующего действия; сама пауза не учитывается. По умолчанию 60 с."),
+            h("Interface", discordOnT, "Discord on this computer shows in your profile that mLabeler is open, what is labelled and for how long, as code editors do. Off: nothing is shown. On by default.",
+                "Discord на этом компьютере показывает в профиле, что открыт mLabeler, что размечается и как долго, как это делают редакторы кода. Выключено: ничего не показывается. По умолчанию включено."),
+            h("Interface", discordNamesT, "Off: Discord shows only that labelling goes on, without the names of the folder and the recording. On by default.",
+                "Выключено: Discord показывает только, что идёт разметка, без названий папки и записи. По умолчанию включено."),
             h("View", S.toggleFiles, "The panel with the list of files and the list of all labels (Ctrl+B).", "Панель со списком файлов и списком всех меток (Ctrl+B)."),
             h("View", S.toggleInspector, "The panel with details of the selection, checks and comparison (Ctrl+I).", "Панель со свойствами выбранного, проверками и сравнением (Ctrl+I)."),
             h("Spectrogram", detailT, "Ready combinations of window length, step and bands below. Higher detail is sharper but takes longer to build and more memory.",
@@ -1386,6 +1438,7 @@ internal object SettingsHelp {
             // MouseTitles.tool ("Clicks"), PlayTitles.playback, scaleT, whatToShow: containers of switches and sliders that have their own hints.
             // CheckTitles.scripts: container; its explanation is shown as text inside and "Run them" has a hint.
             // doneSoundT: container; doneSoundOnT and doneSoundMinT carry the hints.
+            // workTimeT, "Discord": containers; workTimeOnT, workIdleT, discordOnT and discordNamesT carry the hints.
             // niaoTitleT ("NiaoNiao"): container; niaoAlwaysT and niaoSpreadT carry the hints.
             // UpdateTitles.section ("Updates"): container; the channel explanation is shown as text inside.
             // StorageTitles.title ("Disk space"), OwnModels title ("Your own models"): containers with their own text inside.

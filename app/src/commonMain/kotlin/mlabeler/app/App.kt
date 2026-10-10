@@ -9,6 +9,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import mlabeler.app.state.AppState
@@ -44,7 +48,7 @@ fun App(app: AppState = rememberAppState()) {
         AppTheme(Themes.byId(app.settings.theme), font, crisp = app.settings.crisp) {
             StorageAccess {
               val frame = mlabeler.app.ui.LocalWindowFrame.current
-              androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().windowEdge(frame)) {
+              androidx.compose.foundation.layout.Column(Modifier.fillMaxSize().windowEdge(frame).countsWork(app)) {
                 frame?.let { mlabeler.app.ui.TitleBar(app, it) }
                 Box(Modifier.weight(1f).fillMaxSize()) {
                     val ed = app.editor
@@ -100,4 +104,24 @@ fun App(app: AppState = rememberAppState()) {
             }
         }
     }
+}
+
+/**
+ * Every input of the window tells the [mlabeler.app.state.WorkTimer] the user is working: keys, clicks, the wheel,
+ * and mouse moves while the window has the focus (a pointer passing over it on the way elsewhere is not work).
+ */
+@Composable
+private fun Modifier.countsWork(app: AppState): Modifier {
+    val focused = androidx.compose.runtime.rememberUpdatedState(androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused)
+    return this
+        .onPreviewKeyEvent { app.workTimer.activity(); false }
+        .pointerInput(app) {
+            awaitPointerEventScope {
+                while (true) {
+                    val e = awaitPointerEvent(PointerEventPass.Initial)
+                    val hover = e.type == PointerEventType.Move || e.type == PointerEventType.Enter || e.type == PointerEventType.Exit
+                    if (!hover || focused.value) app.workTimer.activity()
+                }
+            }
+        }
 }

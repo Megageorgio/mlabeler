@@ -356,6 +356,8 @@ data class AppSettings(
     val karaoke: KaraokeSettings = KaraokeSettings(),
     val doneSound: DoneSoundSettings = DoneSoundSettings(),
     val niao: NiaoSettings = NiaoSettings(),
+    val workTime: WorkTimeSettings = WorkTimeSettings(),
+    val discord: DiscordSettings = DiscordSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
@@ -378,7 +380,7 @@ data class AppSettings(
 /** Items of the status bar (ids of [mlabeler.app.ui.StatusItems]) on each side, in order; the others are hidden. */
 @Serializable
 data class StatusSettings(
-    val left: List<String> = listOf("entry", "done", "range"),
+    val left: List<String> = listOf("entry", "done", "worktime", "range"),
     val right: List<String> = listOf("work", "problems", "help", "zoom"),
     val percent: Boolean = true,
 ) {
@@ -518,4 +520,19 @@ data class NiaoSettings(
     val low: String = "",
     val high: String = "",
     val spread: Int = 2,
+)
+
+/** Counting the time spent labelling ([WorkTimer]): on, and how long without any activity stops the count. */
+@Serializable
+data class WorkTimeSettings(
+    val enabled: Boolean = true,
+    val idleSeconds: Int = 60,
+)
+
+/** Computers: what is labelled is shown in the Discord profile, as code editors do. */
+@Serializable
+data class DiscordSettings(
+    val enabled: Boolean = true,
+    /** The names of the folder and the recording are shown (off: only that labelling goes on). */
+    val showNames: Boolean = true,
 )
