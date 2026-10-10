@@ -526,24 +526,42 @@ private val batchDoneWithErrors = L("Labelled {0} files, {1} with errors:", "Р�
 private val batchStopped = L("Stopped: {0} of {1} files labelled and saved", "Остановлено: размечено и сохранено {0} из {1}")
 private val noText = L("no text (a .txt with the same name, or Whisper)", "нет текста (.txt с тем же именем или Whisper)")
 
-/** The words Whisper hears in [from]..[to] of the open recording (the Whisper model of the settings). */
+/**
+ * The words Whisper hears in [from]..[to] of the open recording (the Whisper model of the settings). The steps and
+ * the progress are shown as for autolabelling (toolkitBusy and the others), and cleared at the end.
+ */
 suspend fun EditorState.transcribePart(from: Double, to: Double, language: String?): String {
     val a = audio ?: return ""
     val client = app.toolkit.client()
-    if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
-    val s0 = (from * a.sampleRate).toInt().coerceIn(0, a.samples.size)
-    val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
-    val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
-    val id = client.upload((item?.name ?: "part") + "_part.wav", wav)
-    val job = client.transcribe(id, language, null, settings.toolkit.whisperModel)
+    toolkitBusySince = now()
+    toolkitSteps.clear()
+    toolkitDetail = null
+    toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
+    var job: String? = null
     try {
-        val res = client.await(job) { _, _ -> }
+        if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+        toolkitBusy = S.uploading()
+        val s0 = (from * a.sampleRate).toInt().coerceIn(0, a.samples.size)
+        val s1 = (to * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
+        val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
+        val id = client.upload((item?.name ?: "part") + "_part.wav", wav)
+        job = client.transcribe(id, language, null, settings.toolkit.whisperModel)
+        val res = client.await(job, { toolkitDetail = it }) { p, stage ->
+            toolkitProgress = p
+            val st = stage.ifEmpty { S.toolkit() }
+            if (st != toolkitBusy) { toolkitBusy?.let { toolkitSteps += it }; toolkitBusy = st }
+        }
         val first = (res["items"] as? kotlinx.serialization.json.JsonArray)?.firstOrNull() as? kotlinx.serialization.json.JsonObject
         if ((first?.get("ok") as? kotlinx.serialization.json.JsonPrimitive)?.content == "false")
             throw mlabeler.app.toolkit.ToolkitException((first["error"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: "failed")
         return (first?.get("text") as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim().orEmpty()
     } catch (e: kotlinx.coroutines.CancellationException) {
-        withContext(kotlinx.coroutines.NonCancellable) { client.cancel(job) }
+        job?.let { withContext(kotlinx.coroutines.NonCancellable) { client.cancel(it) } }
         throw e
+    } finally {
+        toolkitBusy = null
+        toolkitProgress = null
+        toolkitDetail = null
+        toolkitSteps.clear()
     }
 }

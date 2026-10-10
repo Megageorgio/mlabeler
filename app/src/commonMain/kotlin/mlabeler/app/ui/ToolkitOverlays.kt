@@ -47,20 +47,28 @@ private val discard = L("Remove", "Убрать")
 /** Covers the editor while the toolkit works on this file. */
 @Composable
 fun AutolabelBusy(ed: EditorState) {
-    val stage = ed.toolkitBusy ?: return
+    if (ed.toolkitBusy == null) return
     val c = T.c
     Box(
         Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.55f))
             .clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
-    ) {
+    ) { ToolkitBusyCard(ed, working(), waitHint()) { ed.cancelToolkit() } }
+}
+
+/** What the toolkit is doing for [ed]: the steps so far, the current one with its numbers, the time, a stop button. */
+@Composable
+fun ToolkitBusyCard(ed: EditorState, title: String, hint: String, onStop: () -> Unit) {
+    val stage = ed.toolkitBusy ?: return
+    val c = T.c
+    run {
         val shape = RoundedCornerShape(c.radius * 2)
         Column(
             Modifier.widthIn(max = 420.dp).padding(16.dp).clip(shape).background(c.panel).border(c.borderWidth, c.border, shape).padding(20.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(20.dp), color = c.accent, strokeWidth = 2.dp)
-                Text(working(), color = c.text, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp))
+                Text(title, color = c.text, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp))
             }
             // earlier steps, then the current one with its numbers
             for (s in ed.toolkitSteps) Text("✓ $s", color = c.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
@@ -81,9 +89,9 @@ fun AutolabelBusy(ed: EditorState) {
             val secs = ((now - ed.toolkitBusySince) / 1000).coerceAtLeast(0)
             val pct = if (p != null && p > 0) "${(p * 100).toInt()}%  ·  " else ""
             Text(pct + elapsed.format("${secs / 60}:${(secs % 60).toString().padStart(2, '0')}"), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
-            Text(waitHint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+            Text(hint, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
             Row(Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.End) {
-                Btn(stopT()) { ed.cancelToolkit() }
+                Btn(stopT()) { onStop() }
             }
         }
     }

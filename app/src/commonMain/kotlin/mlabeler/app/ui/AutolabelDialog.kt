@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -63,6 +64,9 @@ private val breathsT = L("Breaths (AP) where they can be heard", "Вдохи (AP
 private val splitT = L("Align long recordings again by segments between pauses", "Повторно выравнивать длинные записи по сегментам между паузами")
 private val splitLenT = L("Maximum segment length", "Максимальная длина сегмента")
 private val optionsT = L("Labelling options", "Параметры разметки")
+private val recognisingTitleT = L("Recognising the text", "Распознавание текста")
+private val recognisingHintT = L("Whisper listens to the selected part. The text appears in the field, where it can be checked before autolabelling.",
+    "Whisper распознаёт выбранный фрагмент. Текст появится в поле, где его можно проверить перед разметкой.")
 private val recognisingT = L("Recognising…", "Распознавание…")
 private val whisperBatchT = L("Files without text: recognise the words with Whisper", "Файлы без текста: распознать слова через Whisper")
 private val allFiles = L("All files of the folder", "Все файлы папки")
@@ -149,6 +153,7 @@ fun AutolabelDialog(app: AppState) {
     var whisper by remember { mutableStateOf(settings.whisper) }
     var direct by remember { mutableStateOf(settings.whisperDirect) }
     var recognising by remember { mutableStateOf(false) }
+    var recogniseJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val range = if (whole || selected == null) 0.0 to ed.duration else selected
     var recognizeMode by remember { mutableStateOf(false) }
@@ -192,7 +197,7 @@ fun AutolabelDialog(app: AppState) {
             Btn(S.cancel()) { close() }
             val modelOk = langs?.any { g -> g.models.any { it.id == model } } == true
             val files = if (batch) ed.batchFiles(which) else emptyList()
-            Btn(run(), primary = true, enabled = modelOk && error == null && !textMissing && (!batch || files.isNotEmpty())) {
+            Btn(run(), primary = true, enabled = modelOk && error == null && !textMissing && !recognising && (!batch || files.isNotEmpty())) {
                 app.update {
                     val t = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang)
                     else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper, whisperDirect = if (batch) it.toolkit.whisperDirect else direct,
@@ -331,7 +336,7 @@ fun AutolabelDialog(app: AppState) {
                     Row(Modifier.padding(top = 6.dp)) {
                         Btn(if (recognising) recognisingT() else recogniseBtnT(), enabled = !recognising) {
                             recognising = true
-                            scope.launch {
+                            recogniseJob = scope.launch {
                                 try {
                                     val heard = ed.transcribePart(range.first, range.second, lang.takeIf { it.isNotEmpty() && it != "*" })
                                     text = heard
@@ -343,6 +348,7 @@ fun AutolabelDialog(app: AppState) {
                                     app.message(e.message ?: e.toString(), error = true)
                                 } finally {
                                     recognising = false
+                                    recogniseJob = null
                                 }
                             }
                         }
@@ -391,6 +397,12 @@ fun AutolabelDialog(app: AppState) {
             if (textMissing) Text(needText(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
         }
     }
+    // the progress over the dialog; the dialog waits for the text
+    if (recognising) androidx.compose.foundation.layout.Box(
+        Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.55f))
+            .clickable(remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) { },
+        contentAlignment = Alignment.Center,
+    ) { ToolkitBusyCard(ed, recognisingTitleT(), recognisingHintT()) { recogniseJob?.cancel() } }
 }
 
 /** Big two-line option card. */
