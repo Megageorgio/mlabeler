@@ -24,6 +24,8 @@ private val numberOfT = L("Recording {0} of {1}", "Запись {0} из {1}")
 private fun AppState.presenceLines(): Pair<String, String>? {
     val d = settings.discord
     if (!d.enabled) return null
+    // read so that choosing another language in the settings rewrites the lines at once
+    settings.language
     val names = d.showNames
     karaoke?.let { return karaokeT() to "" }
     recorder?.let { r -> return (if (names) recordingInT.format(Paths.name(r.folder)) else recordingT()) to "" }
