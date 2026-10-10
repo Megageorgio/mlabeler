@@ -30,12 +30,26 @@ import mlabeler.app.theme.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.material3.Icon
-import androidx.compose.material3.PlainTooltip
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,22 +92,70 @@ object UiScale {
     var current by androidx.compose.runtime.mutableFloatStateOf(1f)
 }
 
+/**
+ * [text] in a small box by [content] while the pointer is over it, gone as soon as the pointer leaves; on a touch
+ * screen after a long press, until a moment after the finger is lifted. (Material's tooltip went by itself after a
+ * second and a half under a still pointer and always faded and grew, whatever the animations setting.) It appears
+ * as the animations setting says: a short fade and growth, a quicker fade, or at once.
+ */
 @Composable
 fun Tip(text: String, content: @Composable () -> Unit) {
     if (text.isEmpty()) return content()
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
-        tooltip = {
-            val c = T.c
-            PlainTooltip(
-                containerColor = c.popupAlt,
-                contentColor = c.text,
-                shape = RoundedCornerShape(if (c.square) 0.dp else c.radius),
-                modifier = Modifier.border(c.borderWidth, c.border, RoundedCornerShape(if (c.square) 0.dp else c.radius)),
-            ) { Text(text, fontSize = 12.sp, color = c.text) }
+    val shown = remember { MutableTransitionState(false) }
+    val longPress = androidx.compose.ui.platform.LocalViewConfiguration.current.longPressTimeoutMillis
+    Box(
+        Modifier.pointerInput(Unit) {
+            coroutineScope {
+                var touch: Job? = null
+                awaitPointerEventScope {
+                    while (true) {
+                        val ev = awaitPointerEvent(PointerEventPass.Initial)
+                        val byTouch = ev.changes.firstOrNull()?.type == PointerType.Touch
+                        when (ev.type) {
+                            PointerEventType.Enter -> if (!byTouch) shown.targetState = true
+                            PointerEventType.Exit -> if (!byTouch) shown.targetState = false
+                            PointerEventType.Press -> if (byTouch) {
+                                touch?.cancel()
+                                touch = this@coroutineScope.launch { delay(longPress); shown.targetState = true }
+                            }
+                            PointerEventType.Release -> if (byTouch) {
+                                touch?.cancel()
+                                if (shown.targetState) touch = this@coroutineScope.launch { delay(1500); shown.targetState = false }
+                            }
+                            else -> Unit
+                        }
+                    }
+                }
+            }
         },
-        state = rememberTooltipState(),
-    ) { content() }
+    ) {
+        content()
+        // inside the box, so the box is what the tooltip is placed by
+        if (shown.currentState || shown.targetState) {
+            val motion = Motion.Local.current
+            val ms = Motion.ms(150)
+            val enter = when (motion) {
+                "off" -> EnterTransition.None
+                "reduced" -> fadeIn(tween(ms))
+                else -> fadeIn(tween(ms)) + scaleIn(tween(ms), initialScale = 0.8f)
+            }
+            val exit = when (motion) {
+                "off" -> ExitTransition.None
+                "reduced" -> fadeOut(tween(ms / 2))
+                else -> fadeOut(tween(ms / 2)) + scaleOut(tween(ms / 2), targetScale = 0.8f)
+            }
+            Popup(popupPositionProvider = TooltipDefaults.rememberTooltipPositionProvider(), properties = PopupProperties(focusable = false)) {
+                AnimatedVisibility(shown, enter = enter, exit = exit) {
+                    val c = T.c
+                    val shape = RoundedCornerShape(if (c.square) 0.dp else c.radius)
+                    Box(
+                        Modifier.widthIn(max = TooltipDefaults.plainTooltipMaxWidth).clip(shape).background(c.popupAlt)
+                            .border(c.borderWidth, c.border, shape).padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) { Text(text, fontSize = 12.sp, color = c.text) }
+                }
+            }
+        }
+    }
 }
 
 /**
