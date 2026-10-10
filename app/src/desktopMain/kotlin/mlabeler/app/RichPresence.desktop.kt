@@ -24,9 +24,9 @@ import java.nio.channels.SocketChannel
 actual object RichPresence {
     /**
      * The Discord application "mLabeler" (discord.com/developers/applications): its name is what the profile says is
-     * being played, its art asset "logo" is the picture. MLABELER_DISCORD_ID replaces it (for trying another one).
+     * being played. MLABELER_DISCORD_ID replaces it (for trying another one).
      */
-    private const val APP_ID = ""
+    private const val APP_ID = "1558325691102007440"
     private val appId: String = System.getenv("MLABELER_DISCORD_ID")?.trim()?.takeIf { it.isNotEmpty() } ?: APP_ID
 
     actual val supported: Boolean get() = appId.isNotEmpty()
@@ -98,7 +98,8 @@ actual object RichPresence {
         if (p.state.isNotBlank()) put("state", line(p.state))
         putJsonObject("timestamps") { put("start", p.startEpochSec) }
         putJsonObject("assets") {
-            put("large_image", "logo")
+            // a picture from the web needs no art uploaded to the Discord application
+            put("large_image", "https://raw.githubusercontent.com/Megageorgio/mlabeler/main/art/icon-256.png")
             put("large_text", "mLabeler ${AppInfo.VERSION}")
         }
     }
