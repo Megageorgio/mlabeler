@@ -96,7 +96,7 @@ actual object RichPresence {
         fun line(s: String) = s.take(128).let { if (it.length < 2) it.padEnd(2, '​') else it }
         if (p.details.isNotBlank()) put("details", line(p.details))
         if (p.state.isNotBlank()) put("state", line(p.state))
-        putJsonObject("timestamps") { put("start", p.startEpochSec) }
+        p.startEpochSec?.let { s -> putJsonObject("timestamps") { put("start", s) } }
         putJsonObject("assets") {
             // a picture from the web needs no art uploaded to the Discord application
             put("large_image", "https://raw.githubusercontent.com/Megageorgio/mlabeler/main/art/icon-256.png")

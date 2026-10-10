@@ -49,6 +49,7 @@ import kotlin.math.min
  * f0 with what was drawn — through the toolkit: "world" (quick) or "nsf" (the vocoder of DiffSinger).
  */
 fun EditorState.playResynth(method: String) {
+    describeWork("Resynthesising", method)
     val a = audio ?: return
     val curve = pitchCurve ?: return app.message(S.pitchNotReady())
     val (from, to) = range ?: selectedSpan() ?: (viewStart to viewStart + visibleDuration)
@@ -92,6 +93,7 @@ fun EditorState.playResynth(method: String) {
  * goes since the sound has that pitch now) or as <name>_f0.wav next to it.
  */
 fun EditorState.saveResynth(method: String, asCopy: Boolean) {
+    describeWork("Resynthesising", method)
     val a = audio ?: return
     val it = item ?: return
     val curve = pitchCurve ?: return app.message(S.pitchNotReady())
@@ -144,6 +146,7 @@ private val resynthSavedCopy = L("Saved {0} next to the recording", "Сохра�
  */
 fun EditorState.autolabel(from: Double, to: Double, model: String, language: String?, text: String, phonemes: Boolean, replace: Boolean, recognize: Boolean = false, whisper: Boolean = false,
               extraLanguages: List<String> = emptyList()) {
+    describeWork(if (recognize && text.isBlank()) "Recognising the words" else "Autolabelling", model)
     val a = audio ?: return
     val it = item ?: return
     toolkitJob?.cancel()
@@ -214,6 +217,7 @@ fun EditorState.autolabelFiles(
     phonemes: Boolean, whisper: Boolean, extraLanguages: List<String> = emptyList(),
 ) {
     if (files.isEmpty()) return
+    describeWork("Autolabelling ${files.size} files", model)
     toolkitJob?.cancel()
     toolkitJob = scope.launch {
         val client = app.toolkit.client()
@@ -315,6 +319,7 @@ fun EditorState.autolabelFiles(
  * the dictionary of [model], its own words and G2P; each word's span is shared equally among its phonemes (undoable).
  */
 fun EditorState.phonemesFromWords(model: String, language: String?) {
+    describeWork("Spelling words as phonemes", model)
     val d = doc ?: return
     val wk = d.wordTierIndex()
     if (wk < 0) return app.message(noWordsTier())
@@ -414,6 +419,7 @@ internal suspend fun EditorState.refinedDoc(
 
 /** Refines the phoneme boundaries of the open file within [from]..[to] (undoable). */
 fun EditorState.refineBoundaries(from: Double, to: Double, r: RefineSettings) {
+    describeWork("Refining boundaries", r.model)
     val a = audio ?: return
     val it = item ?: return
     val d = doc ?: return
@@ -444,6 +450,7 @@ fun EditorState.refineBoundaries(from: Double, to: Double, r: RefineSettings) {
 /** Refines the phoneme boundaries of the labels of [files] and saves them (the open one through its history). */
 fun EditorState.refineFiles(files: List<Item>, r: RefineSettings) {
     if (files.isEmpty()) return
+    describeWork("Refining ${files.size} files", r.model)
     toolkitJob?.cancel()
     toolkitJob = scope.launch {
         val client = app.toolkit.client()

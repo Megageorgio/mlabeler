@@ -375,6 +375,7 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
             val made = mutableMapOf<String, List<OtoEntry>>()
             var failed = 0
             try {
+                ed.describeWork("Placing oto.ini markers for ${targets.size} samples")
                 ed.beginToolkitWork("oto 0/${targets.size}")
                 // read every sample first; with an aligner they all go to the toolkit as one job (a job per file
                 // spends most of its time starting and finishing, not aligning)

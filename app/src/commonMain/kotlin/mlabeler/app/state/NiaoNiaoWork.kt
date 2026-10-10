@@ -44,6 +44,7 @@ private fun EditorState.runNiao(title: String, block: suspend () -> String) {
     toolkitJob?.cancel()
     toolkitJob = scope.launch {
         try {
+            describeWork("Working on a NiaoNiao bank")
             beginToolkitWork(title)
             app.message(block())
         } catch (e: kotlinx.coroutines.CancellationException) {

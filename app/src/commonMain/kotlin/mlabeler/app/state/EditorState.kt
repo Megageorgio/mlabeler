@@ -662,6 +662,17 @@ class EditorState(
                 if (was && toolkitBusySince > 0) app.workFinished(toolkitBusySince)
             }
         }
+    /** The kind of long work going on, in English, and the model doing it ("" = none), for the Discord profile. */
+    var workKind by mutableStateOf<String?>(null)
+    var workModel by mutableStateOf<String?>(null)
+    /**
+     * Names the long work about to begin (shown in the Discord profile while [toolkitBusy] is set). Kept after the
+     * work ends: a cancelled job finishing late must not wipe the name of the one that replaced it.
+     */
+    fun describeWork(kind: String, model: String? = null) {
+        workKind = kind
+        workModel = model?.takeIf { it.isNotBlank() }
+    }
     /** The toolkit job being waited for: its step and numbers (a download's megabytes, files done). */
     var toolkitDetail by mutableStateOf<mlabeler.app.toolkit.JobProgress?>(null)
     /** When the current toolkit work began (ms) and its earlier steps, for the busy panel. */

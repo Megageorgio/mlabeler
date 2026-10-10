@@ -869,7 +869,21 @@ private val workNowT = L("Since the program started: {2}. This folder: {0}, this
 private val workResetT = L("Reset the time of this folder", "Сбросить время этой папки")
 private val workResetSureT = L("Reset: the time of the folder and of all its recordings is lost", "Сбросить: время папки и всех её записей будет потеряно")
 private val discordOnT = L("Show in Discord what is being labelled", "Показывать в Discord, что размечается")
-private val discordNamesT = L("Names of the folder and the recording", "Названия папки и записи")
+private val discordEnglishT = L("Discord shows it in English, so that friends who speak other languages can read it too.", "Discord показывает это по-английски, чтобы прочитать могли и друзья, говорящие на других языках.")
+private val discordFolderT = L("Folder name", "Название папки")
+private val discordFileT = L("File name", "Название файла")
+private val discordPhonemeT = L("Selected phoneme", "Выбранная фонема")
+private val discordPositionT = L("Place of the file in the folder (76 of 139)", "Номер файла в папке (76 из 139)")
+private val discordDoneT = L("Number of files marked done", "Число файлов, отмеченных готовыми")
+private val discordWorkT = L("Long work in progress (autolabelling, refining) and how far it is", "Идущая долгая работа (авторазметка, уточнение) и её ход")
+private val discordModelT = L("The model doing it", "Модель, которая её выполняет")
+private val discordModeT = L("Labels or oto.ini", "Разметка или oto.ini")
+private val discordTimeT = L("Time shown", "Показываемое время")
+private val discordTimeFolderT = L("In this folder", "В этой папке")
+private val discordTimeWorkT = L("Labelling time of the folder", "Время разметки папки")
+private val discordTimeStartT = L("Since the program started", "С запуска программы")
+private val discordTimeOffT = L("None", "Нет")
+private val discordPreviewT = L("Now shown:", "Сейчас показывается:")
 private val discordMissingT = L("This build has no Discord application, so nothing is shown.", "В этой сборке нет приложения Discord, поэтому ничего не показывается.")
 
 /** Counting the time spent labelling: on or off, when a break begins, the folder's time and its reset. */
@@ -900,7 +914,27 @@ private fun DiscordSection(app: AppState) {
     val d = app.settings.discord
     fun set(f: (mlabeler.app.state.DiscordSettings) -> mlabeler.app.state.DiscordSettings) = app.update { it.copy(discord = f(it.discord)) }
     SwitchRow(discordOnT(), d.enabled) { v -> set { it.copy(enabled = v) } }
-    if (d.enabled) SwitchRow(discordNamesT(), d.showNames) { v -> set { it.copy(showNames = v) } }
+    if (d.enabled) {
+        Text(discordEnglishT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+        SwitchRow(discordFolderT(), d.folder) { v -> set { it.copy(folder = v) } }
+        SwitchRow(discordFileT(), d.file) { v -> set { it.copy(file = v) } }
+        SwitchRow(discordPhonemeT(), d.phoneme) { v -> set { it.copy(phoneme = v) } }
+        SwitchRow(discordPositionT(), d.position) { v -> set { it.copy(position = v) } }
+        SwitchRow(discordDoneT(), d.done) { v -> set { it.copy(done = v) } }
+        SwitchRow(discordModeT(), d.mode) { v -> set { it.copy(mode = v) } }
+        SwitchRow(discordWorkT(), d.work) { v -> set { it.copy(work = v) } }
+        if (d.work) SwitchRow(discordModelT(), d.model) { v -> set { it.copy(model = v) } }
+        Text(discordTimeT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((v, t) in listOf("folder" to discordTimeFolderT, "work" to discordTimeWorkT, "start" to discordTimeStartT, "off" to discordTimeOffT))
+                Chip(t(), d.time == v) { set { it.copy(time = v) } }
+        }
+        mlabeler.app.state.presencePreview(app)?.let { (a, b) ->
+            Text(discordPreviewT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+            Text(a, color = c.text, fontSize = 13.sp)
+            if (b.isNotEmpty()) Text(b, color = c.text, fontSize = 13.sp)
+        }
+    }
     if (!mlabeler.app.RichPresence.supported) Text(discordMissingT(), color = c.warn, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
 }
 
@@ -1326,8 +1360,8 @@ internal object SettingsHelp {
                 "Если ничего не происходит столько времени, счёт останавливается до следующего действия; сама пауза не учитывается. По умолчанию 60 с."),
             h("Interface", discordOnT, "Discord on this computer shows in your profile that mLabeler is open, what is labelled and for how long, as code editors do. Off: nothing is shown. On by default.",
                 "Discord на этом компьютере показывает в профиле, что открыт mLabeler, что размечается и как долго, как это делают редакторы кода. Выключено: ничего не показывается. По умолчанию включено."),
-            h("Interface", discordNamesT, "Off: Discord shows only that labelling goes on, without the names of the folder and the recording. On by default.",
-                "Выключено: Discord показывает только, что идёт разметка, без названий папки и записи. По умолчанию включено."),
+            h("Interface", discordWorkT, "While autolabelling, refining or other long work runs, the second line shows it and its percent instead of the file. On by default.",
+                "Пока идёт авторазметка, уточнение или другая долгая работа, вторая строка показывает её и процент вместо файла. По умолчанию включено."),
             h("View", S.toggleFiles, "The panel with the list of files and the list of all labels (Ctrl+B).", "Панель со списком файлов и списком всех меток (Ctrl+B)."),
             h("View", S.toggleInspector, "The panel with details of the selection, checks and comparison (Ctrl+I).", "Панель со свойствами выбранного, проверками и сравнением (Ctrl+I)."),
             h("Spectrogram", detailT, "Ready combinations of window length, step and bands below. Higher detail is sharper but takes longer to build and more memory.",
@@ -1438,7 +1472,8 @@ internal object SettingsHelp {
             // MouseTitles.tool ("Clicks"), PlayTitles.playback, scaleT, whatToShow: containers of switches and sliders that have their own hints.
             // CheckTitles.scripts: container; its explanation is shown as text inside and "Run them" has a hint.
             // doneSoundT: container; doneSoundOnT and doneSoundMinT carry the hints.
-            // workTimeT, "Discord": containers; workTimeOnT, workIdleT, discordOnT and discordNamesT carry the hints.
+            // workTimeT, "Discord": containers; workTimeOnT, workIdleT, discordOnT and discordWorkT carry the hints. The other
+            // Discord switches name the part they show, and the "Now shown" lines below them show the result.
             // niaoTitleT ("NiaoNiao"): container; niaoAlwaysT and niaoSpreadT carry the hints.
             // UpdateTitles.section ("Updates"): container; the channel explanation is shown as text inside.
             // StorageTitles.title ("Disk space"), OwnModels title ("Your own models"): containers with their own text inside.

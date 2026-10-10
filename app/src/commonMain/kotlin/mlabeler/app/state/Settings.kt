@@ -529,10 +529,27 @@ data class WorkTimeSettings(
     val idleSeconds: Int = 60,
 )
 
-/** Computers: what is labelled is shown in the Discord profile, as code editors do. */
+/**
+ * Computers: what is labelled is shown in the Discord profile (in English, for friends of any language), as code
+ * editors do, with each part on or off.
+ */
 @Serializable
 data class DiscordSettings(
     val enabled: Boolean = true,
-    /** The names of the folder and the recording are shown (off: only that labelling goes on). */
-    val showNames: Boolean = true,
+    val folder: Boolean = true,
+    val file: Boolean = true,
+    /** The selected phoneme. */
+    val phoneme: Boolean = false,
+    /** "76 of 139": the recording's place in the folder. */
+    val position: Boolean = true,
+    /** How many recordings are marked done. */
+    val done: Boolean = false,
+    /** Long work going on (autolabelling, refining…) instead of the file, with its progress. */
+    val work: Boolean = true,
+    /** The model doing that work. */
+    val model: Boolean = true,
+    /** Labels or oto.ini. */
+    val mode: Boolean = true,
+    /** The clock: "folder" (since the folder was opened), "work" (labelling time of the folder), "start" (since the program started) or "off". */
+    val time: String = "folder",
 )
