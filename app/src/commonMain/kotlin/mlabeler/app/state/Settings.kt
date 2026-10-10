@@ -380,7 +380,7 @@ data class AppSettings(
 /** Items of the status bar (ids of [mlabeler.app.ui.StatusItems]) on each side, in order; the others are hidden. */
 @Serializable
 data class StatusSettings(
-    val left: List<String> = listOf("entry", "done", "worktime", "range"),
+    val left: List<String> = listOf("entry", "done", "session", "worktime", "range"),
     val right: List<String> = listOf("work", "problems", "help", "zoom"),
     val percent: Boolean = true,
 ) {

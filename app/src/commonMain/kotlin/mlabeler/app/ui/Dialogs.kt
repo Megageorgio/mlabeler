@@ -865,7 +865,7 @@ private fun DoneSoundSection(app: AppState) {
 private val workTimeT = L("Labelling time", "Время разметки")
 private val workTimeOnT = L("Count the time spent labelling", "Считать время, потраченное на разметку")
 private val workIdleT = L("A break begins after this long without activity", "Перерыв начинается после бездействия в течение")
-private val workNowT = L("This folder: {0}, this recording: {1}", "Эта папка: {0}, эта запись: {1}")
+private val workNowT = L("Since the program started: {2}. This folder: {0}, this recording: {1}", "С запуска программы: {2}. Эта папка: {0}, эта запись: {1}")
 private val workResetT = L("Reset the time of this folder", "Сбросить время этой папки")
 private val workResetSureT = L("Reset: the time of the folder and of all its recordings is lost", "Сбросить: время папки и всех её записей будет потеряно")
 private val discordOnT = L("Show in Discord what is being labelled", "Показывать в Discord, что размечается")
@@ -883,7 +883,7 @@ private fun WorkTimeSection(app: AppState) {
     ValueSlider(workIdleT(), w.idleSeconds.toFloat(), 10f..600f, " s", default = 60f) { v -> set { it.copy(idleSeconds = v.roundToInt()) } }
     if (app.editor == null) return
     val t = app.workTimer
-    Text(workNowT.format(mlabeler.app.state.WorkTimer.format(t.folderMs), mlabeler.app.state.WorkTimer.format(t.itemMs)),
+    Text(workNowT.format(mlabeler.app.state.WorkTimer.format(t.folderMs), mlabeler.app.state.WorkTimer.format(t.itemMs), mlabeler.app.state.WorkTimer.format(t.sessionMs)),
         color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
     var sure by remember { mutableStateOf(false) }
     Row(Modifier.padding(top = 8.dp)) {
@@ -1320,8 +1320,8 @@ internal object SettingsHelp {
                 "Когда заканчивается работа по многим файлам, которая шла достаточно долго, проигрывается выбранный звуковой файл: в это время можно заниматься другим. По умолчанию выключено."),
             h("Interface", doneSoundMinT, "Jobs shorter than this end without a sound. 0: the sound plays after every job. Default: 20 s.",
                 "Работа короче этого заканчивается без звука. 0: звук после любой работы. По умолчанию 20 с."),
-            h("Interface", workTimeOnT, "Counts the time spent on each folder and recording, as drawing programs do: only while you click, type, move the mouse over the window or listen. A break without any of these is left out. Shown in the status bar and the dataset summary. On by default.",
-                "Считает время работы над каждой папкой и записью, как это делают программы для рисования: только пока вы нажимаете, печатаете, двигаете мышь над окном или слушаете. Перерыв без этого не учитывается. Показывается в строке состояния и сводке по датасету. По умолчанию включено."),
+            h("Interface", workTimeOnT, "Counts the time spent on each folder and recording, as drawing programs do: only while you click, type, move the mouse over the window or listen. A break without any of these is left out. Shown in the status bar (since the program started, for the folder and for the file) and the dataset summary. On by default.",
+                "Считает время работы над каждой папкой и записью, как это делают программы для рисования: только пока вы нажимаете, печатаете, двигаете мышь над окном или слушаете. Перерыв без этого не учитывается. Показывается в строке состояния (с запуска программы, для папки и для файла) и сводке по датасету. По умолчанию включено."),
             h("Interface", workIdleT, "If nothing happens for this long, the time stops until the next action; the pause itself is not counted. Default: 60 s.",
                 "Если ничего не происходит столько времени, счёт останавливается до следующего действия; сама пауза не учитывается. По умолчанию 60 с."),
             h("Interface", discordOnT, "Discord on this computer shows in your profile that mLabeler is open, what is labelled and for how long, as code editors do. Off: nothing is shown. On by default.",

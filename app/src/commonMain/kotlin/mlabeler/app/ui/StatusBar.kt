@@ -34,6 +34,7 @@ object StatusItems {
         "entry" to L("Phoneme number (167 / 1040)", "Номер фонемы (167 / 1040)"),
         "file" to L("File number (3 / 12)", "Номер файла (3 / 12)"),
         "done" to L("Files marked done (7 / 12)", "Файлы, отмеченные готовыми (7 / 12)"),
+        "session" to L("Active labelling since the program started", "Активная разметка с запуска программы"),
         "worktime" to L("Time spent labelling: the folder and this file", "Время разметки: папка и этот файл"),
         "phoneme" to L("Selected phoneme and its length", "Выбранная фонема и её длина"),
         "cursor" to L("Time under the mouse", "Время под мышью"),
@@ -49,6 +50,7 @@ object StatusItems {
     val fileT = L("File", "Файл")
     val doneT = L("Done", "Готово")
     val timeT = L("Time", "Время")
+    val sessionT = L("Since start", "С запуска")
     val fileTimeT = L("file", "файл")
 }
 
@@ -116,6 +118,10 @@ private fun StatusItem(app: AppState, ed: EditorState, id: String, st: StatusSet
                 StatusText(S.toolkit() + ": " + b + numbers + pct, color = c.accent)
                 Text("×", color = c.muted, fontSize = 14.sp, modifier = Modifier.clickable { ed.cancelToolkit() })
             }
+        }
+        "session" -> if (app.settings.workTime.enabled) {
+            val t = app.workTimer
+            StatusText(StatusItems.sessionT() + " " + WorkTimer.format(t.sessionMs), color = if (t.running) c.text else c.muted)
         }
         "worktime" -> if (app.settings.workTime.enabled) {
             val t = app.workTimer

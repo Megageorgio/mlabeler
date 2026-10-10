@@ -28,6 +28,7 @@ class WorkTimer(private val app: AppState, scope: CoroutineScope) {
     private var folderPending = 0L
     private val itemPending = mutableMapOf<String, Long>()
     private var lastFlush = clock.markNow()
+    private var sessionRaw = 0L
 
     /** Time in the open folder and in its open recording, ms; refreshed about once a second. */
     var folderMs by mutableLongStateOf(0L)
@@ -37,7 +38,7 @@ class WorkTimer(private val app: AppState, scope: CoroutineScope) {
     /** The user did something within the idle limit (the time is running). */
     var running by mutableStateOf(false)
         private set
-    /** Time counted since the program started, ms. */
+    /** Active time since the program started (all folders), ms; refreshed about once a second. */
     var sessionMs by mutableLongStateOf(0L)
         private set
 
@@ -76,11 +77,12 @@ class WorkTimer(private val app: AppState, scope: CoroutineScope) {
         val gap = (now - prev).inWholeMilliseconds
         if (gap <= 0 || gap > idleMs) return
         folderPending += gap
-        sessionMs += gap
+        sessionRaw += gap
         ed.item?.id?.let { itemPending[it] = (itemPending[it] ?: 0L) + gap }
     }
 
     private fun refresh() {
+        sessionMs = sessionRaw
         val ed = app.editor
         if (ed == null) {
             folderMs = 0; itemMs = 0; running = false
