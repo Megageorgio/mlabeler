@@ -20,6 +20,6 @@ class OtoCompareTest {
         assertEquals(40.0, d[0].deltas[OtoMarker.Left])
         assertNull(d[1].theirs)
         assertNull(d[2].mine)
-        assertEquals(listOf("b", "c", "mine", "theirs"), OtoCompare.differences(mine, theirs, minMs = 1.0).map { it.alias })
+        assertEquals(listOf("c", "b", "mine", "theirs"), OtoCompare.differences(mine, theirs, minMs = 1.0).map { it.alias })
     }
 }

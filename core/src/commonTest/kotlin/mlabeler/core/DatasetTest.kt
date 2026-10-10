@@ -29,7 +29,7 @@ class DatasetTest {
         // pinyin: y and w are consonants of the next syllable, which join the group before (as add_ph_num.py does)
         assertEquals(listOf(2, 2, 1), Grouping.phNum(listOf("SP", "w", "o", "d", "e"), PhonemeDict.chinese))
         // Korean: the final consonant (NG) stays with its syllable's vowel; w before a vowel joins the group before
-        assertEquals(listOf(2, 3, 2), Grouping.phNum(listOf("SP", "g", "a", "NG", "w", "a"), PhonemeDict.korean))
+        assertEquals(listOf(2, 3, 1), Grouping.phNum(listOf("SP", "g", "a", "NG", "w", "a"), PhonemeDict.korean))
         // y before a vowel belongs to the group before it
         assertEquals(listOf(2, 1), Grouping.phNum(listOf("SP", "y", "a"), ja))
         // without a dictionary letters decide; multi-language prefixes are ignored
