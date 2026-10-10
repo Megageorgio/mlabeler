@@ -28,10 +28,6 @@ class NiaoNiaoTest {
         assertEquals(listOf(-1, -1, 0, 1), voice.take(4).map { it.toInt() })
         val lines = infD.trim().lines().map { Base64.decode(it).decodeToString() }
         assertEquals(listOf("v1", "2 0 0 0 0 0 0 0 0 0", "a 0 4 1 1 339.2 1 2\n", "ba 4 8 1 3 347.2 1134 2622\n"), lines)
-        val back = NiaoNiao.unpack(infD, voice)
-        assertEquals(listOf("a", "ba"), back.map { it.name })
-        assertEquals(listOf<Short>(1, 2, 3, 4), back[1].samples.toList())
-        assertEquals(NiaoNiao.Inf(0, 4, 1, 3, 347.2, 1134, 2622), back[1].inf)
     }
 
     @Test

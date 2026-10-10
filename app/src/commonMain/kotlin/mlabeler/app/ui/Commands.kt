@@ -241,10 +241,10 @@ object Commands {
     val unitSingle = Command("unit-single", L("This phoneme held: keep or take away", "Эта фонема протяжно: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
     val unitsOverview = Command("units-overview", L("Transitions of the folder (.trans)…", "Переходы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
     val refine = Command("refine-boundaries", L("Refine boundaries…", "Уточнить границы…"), emptyList()) { _, a -> a.showRefine = true }.only(Mode.Labels)
-    val niao = Command("niaoniao", L("NiaoNiao voicebank…", "Банк NiaoNiao…"), emptyList(), { it.niaoShown() }) { _, a -> a.showNiao = true }
+    val niao = Command("niaoniao", L("NiaoNiao voicebank…", "Банк NiaoNiao…"), emptyList(), { it.niaoShown() }) { _, a -> a.showNiao = true }.only(Mode.Labels)
     val nfc = Command("normalize-names", L("Normalise file names (files from a Mac)…", "Нормализовать имена файлов (файлы с Mac)…"), emptyList()) { _, a -> a.showNfc = true }
     val ust = Command("ust", L("UTAU sequence (.ust)…", "Партия UTAU (.ust)…"), emptyList()) { _, a -> a.showUst = true }
-    val convert = Command("convert-labels", L("Convert label files…", "Перевести файлы разметки в другой формат…"), emptyList()) { _, a -> a.showConvert = true }.only(Mode.Labels)
+    val convert = Command("convert-labels", L("Convert label files…", "Перевести файлы разметки в другой формат…"), emptyList()) { _, a -> a.showConvert = true }
     val g2p = Command("phonemes-from-words", L("Phonemes from the words (dictionary and G2P of the aligner model)", "Фонемы по словам (словарь и G2P модели выравнивания)"), emptyList()) { e, a ->
         val t = a.settings.toolkit
         if (t.lastModel.isBlank()) { a.message(L("Choose an aligner model in Autolabel first", "Сначала выберите модель выравнивания в авторазметке")()); a.showAutolabel = true }

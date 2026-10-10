@@ -232,34 +232,4 @@ object NiaoNiao {
         return voice to lines.joinToString("") { Base64.encode(it.encodeToByteArray()) + "\n" }
     }
 
-    /** The sounds of a built bank: inf.d text and voice.d bytes; each sound's marks start at 0. */
-    @OptIn(ExperimentalEncodingApi::class)
-    fun unpack(infD: String, voice: ByteArray): List<Sound> {
-        val lines = infD.lines().map { it.trim() }.filter { it.isNotEmpty() }.map { Base64.decode(it).decodeToString().trim() }
-        require(lines.size >= 2 && lines[0].startsWith("v")) { "Not a NiaoNiao inf.d" }
-        return lines.drop(2).mapNotNull { line ->
-            val p = line.split(Regex("\\s+"))
-            if (p.size < 8) return@mapNotNull null
-            val offset = p[1].toInt()
-            val len = p[2].toInt().coerceAtMost(voice.size - offset).coerceAtLeast(0)
-            val samples = ShortArray(len / 2) { k -> ((voice[offset + 2 * k].toInt() and 0xFF) or (voice[offset + 2 * k + 1].toInt() shl 8)).toShort() }
-            Sound(p[0], Inf(0, samples.size, p[3].toInt(), p[4].toInt(), p[5].toDouble(), p[6].toInt(), p[7].toInt()), samples)
-        }
-    }
-
-    /** A 16-bit mono WAV of [samples]. */
-    fun wav(samples: ShortArray, sampleRate: Int = SAMPLE_RATE): ByteArray {
-        val n = samples.size
-        val out = ByteArray(44 + n * 2)
-        fun put32(i: Int, v: Int) { out[i] = v.toByte(); out[i + 1] = (v shr 8).toByte(); out[i + 2] = (v shr 16).toByte(); out[i + 3] = (v shr 24).toByte() }
-        fun put16(i: Int, v: Int) { out[i] = v.toByte(); out[i + 1] = (v shr 8).toByte() }
-        "RIFF".encodeToByteArray().copyInto(out, 0)
-        put32(4, 36 + n * 2)
-        "WAVEfmt ".encodeToByteArray().copyInto(out, 8)
-        put32(16, 16); put16(20, 1); put16(22, 1); put32(24, sampleRate); put32(28, sampleRate * 2); put16(32, 2); put16(34, 16)
-        "data".encodeToByteArray().copyInto(out, 36)
-        put32(40, n * 2)
-        for (i in 0 until n) put16(44 + i * 2, samples[i].toInt())
-        return out
-    }
 }

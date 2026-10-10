@@ -13,29 +13,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 import mlabeler.app.i18n.L
 import mlabeler.app.i18n.S
 import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
-import mlabeler.app.state.Mode
 import mlabeler.app.state.niaoAutoMarks
 import mlabeler.app.state.niaoCheck
 import mlabeler.app.state.niaoFiles
 import mlabeler.app.state.niaoFlatten
-import mlabeler.app.state.niaoFromOto
-import mlabeler.app.state.niaoHasOto
 import mlabeler.app.state.niaoMeasure
 import mlabeler.app.state.niaoPack
 import mlabeler.app.state.niaoPitches
-import mlabeler.app.state.niaoToOto
-import mlabeler.app.state.unpackNiaoBank
 import mlabeler.app.theme.T
 import mlabeler.core.format.LabelFormat
 import mlabeler.core.format.NiaoNiao
@@ -61,12 +54,6 @@ private val measureT = L("Measure the pitch and levels while packing", "Изме
 private val packBtnT = L("Pack into voice.d and inf.d", "Упаковать в voice.d и inf.d")
 private val extrasT = L("readme.txt, charactor.txt (the first line is the name, colons are half-width) and head.png (100×100, becomes head.d) are taken from the folder of the recordings or the one above.",
     "readme.txt, charactor.txt (первая строка — имя, двоеточия полуширинные) и head.png (100×100, станет head.d) берутся из папки записей или папки выше.")
-private val unpackTitleT = L("Unpack a bank", "Распаковка банка")
-private val unpackHintT = L("A folder with voice.d and inf.d becomes a source folder: a .wav and an .inf per sound, opened here.",
-    "Папка с voice.d и inf.d превращается в исходники: .wav и .inf на каждый звук, они откроются здесь.")
-private val unpackBtnT = L("Choose the bank folder…", "Выбрать папку банка…")
-private val unpackedT = L("Unpacked {0} sounds into {1}", "Распаковано звуков: {0} в {1}")
-private val noBankT = L("No voice.d and inf.d in this folder", "В этой папке нет voice.d и inf.d")
 private val toneTitleT = L("One pitch", "Один тон")
 private val toneOwnT = L("Each sound on its own pitch", "Каждый звук на своей высоте")
 private val toneCommonT = L("All on one note", "Все на одну ноту")
@@ -82,17 +69,10 @@ private val rangeT = L("Out of {0}–{1} ({2}):", "Вне {0}–{1} ({2}):")
 private val noPitchT = L("No pitch measured ({0}):", "Высота не измерена ({0}):")
 private val allGoodT = L("Every syllable is there and every pitch is in {0}–{1}.", "Все слоги на месте, вся высота в пределах {0}–{1}.")
 private val moreT = L("and {0} more", "и ещё {0}")
-private val otoTitleT = L("oto.ini", "oto.ini")
-private val fromOtoMissingT = L("Marks from oto.ini where there are none", "Метки из oto.ini там, где их нет")
-private val fromOtoAllT = L("All marks from oto.ini", "Все метки из oto.ini")
-private val toOtoT = L("Write oto.ini from the marks", "Записать oto.ini по меткам")
-private val otoHintT = L("CV entries: the offset is the start, the preutterance and the fixed part end where the vowel starts, the cutoff is the end. oto.ini has no decay, it is placed from the loudness.",
-    "Строки CV: смещение — начало, преутерация и фиксированная часть кончаются там, где начинается гласная, отсечка — конец. Затухания в oto.ini нет, оно ставится по громкости.")
 
 @Composable
 fun NiaoNiaoDialog(app: AppState, ed: EditorState) {
     val c = T.c
-    val scope = rememberCoroutineScope()
     fun close() { app.showNiao = false; ed.requestFocus() }
     val files = remember(ed.items) { ed.niaoFiles() }
     val marked = files.count { it.labelFormat == LabelFormat.Inf }
@@ -100,8 +80,6 @@ fun NiaoNiaoDialog(app: AppState, ed: EditorState) {
     var out by remember { mutableStateOf(Paths.join(Paths.parent(dir), Paths.name(dir) + "_bank")) }
     var version by remember { mutableStateOf("1") }
     var measure by remember { mutableStateOf(true) }
-    val otoMode = ed.mode == Mode.Oto
-    val hasOto = remember(files) { ed.niaoHasOto(files) }
     var common by remember { mutableStateOf(false) }
     var note by remember(files) {
         val p = ed.niaoPitches(files).values.filter { it > 0 }.sorted()
@@ -114,7 +92,6 @@ fun NiaoNiaoDialog(app: AppState, ed: EditorState) {
             Text(aboutT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
             Text(filesT.format(files.size, marked), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
 
-            if (!otoMode) {
             SectionTitle(autoTitleT())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Btn(autoMissingT(), enabled = marked < files.size) { ed.niaoAutoMarks(files, keep = true); close() }
@@ -141,19 +118,7 @@ fun NiaoNiaoDialog(app: AppState, ed: EditorState) {
             Btn(checkBtnT(), enabled = files.isNotEmpty()) { report = ed.niaoCheck(files) }
             report?.let { NiaoReport(ed, files, it) { close() } }
             Text(checkHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-            }
 
-            if (hasOto || marked > 0) {
-                SectionTitle(otoTitleT())
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (hasOto) Btn(fromOtoMissingT(), enabled = marked < files.size) { ed.niaoFromOto(files, keep = true); close() }
-                    if (hasOto) Btn(fromOtoAllT()) { ed.niaoFromOto(files, keep = false); close() }
-                    if (marked > 0) Btn(toOtoT()) { ed.niaoToOto(files); close() }
-                }
-                Text(otoHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-            }
-
-            if (!otoMode) {
             SectionTitle(packTitleT())
             Text(outT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -172,32 +137,6 @@ fun NiaoNiaoDialog(app: AppState, ed: EditorState) {
             Row(Modifier.padding(top = 8.dp)) {
                 Btn(packBtnT(), primary = true, enabled = marked > 0 && out.isNotBlank()) {
                     ed.niaoPack(files, out.trim(), measure, version.toIntOrNull() ?: 1); close()
-                }
-            }
-            }
-
-            SectionTitle(unpackTitleT())
-            Text(unpackHintT(), color = c.muted, fontSize = 11.sp)
-            Row(Modifier.padding(top = 6.dp)) {
-                Btn(unpackBtnT()) {
-                    app.pickFolder(unpackTitleT()) { bank ->
-                        if (!mlabeler.core.io.PlatformFs.exists(Paths.join(bank, "voice.d")) || !mlabeler.core.io.PlatformFs.exists(Paths.join(bank, "inf.d"))) {
-                            app.message(noBankT(), error = true); return@pickFolder
-                        }
-                        val target = Paths.join(Paths.parent(bank), Paths.name(bank) + "_src")
-                        scope.launch {
-                            try {
-                                val n = unpackNiaoBank(bank, target)
-                                app.message(unpackedT.format(n, target))
-                                close()
-                                app.openFolder(target)
-                            } catch (e: kotlinx.coroutines.CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                app.message(e.message ?: e.toString(), error = true)
-                            }
-                        }
-                    }
                 }
             }
         }

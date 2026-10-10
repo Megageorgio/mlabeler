@@ -14,7 +14,7 @@ import mlabeler.core.io.Item
 import mlabeler.core.io.Paths
 import mlabeler.core.io.PlatformFs
 
-// NiaoNiao voicebanks: the marks of each recording in its .inf, measuring, packing into voice.d and inf.d, unpacking.
+// NiaoNiao voicebanks: the marks of each recording in its .inf, measuring, packing into voice.d and inf.d, oto.ini.
 
 private suspend fun EditorState.readAudio(f: Item): Audio = withContext(Dispatchers.Default) {
     val bytes = workspace.fs.read(f.audioPath)
@@ -300,21 +300,6 @@ fun EditorState.niaoToOto(files: List<Item>) {
 
 /** The NiaoNiao tools are offered: the folder has .inf marks, or the settings show them everywhere. */
 fun EditorState.niaoShown(): Boolean = app.settings.niao.always || isNiaoFolder()
-
-/** Unpacks the bank in [bank] (voice.d and inf.d) into [out]: a .wav and an .inf per sound. Returns how many. */
-suspend fun unpackNiaoBank(bank: String, out: String): Int = withContext(Dispatchers.Default) {
-    val sounds = NiaoNiao.unpack(PlatformFs.read(Paths.join(bank, "inf.d")).decodeToString(), PlatformFs.read(Paths.join(bank, "voice.d")))
-    PlatformFs.mkdirs(out)
-    for (s in sounds) {
-        PlatformFs.write(Paths.join(out, s.name + ".wav"), NiaoNiao.wav(s.samples))
-        PlatformFs.write(Paths.join(out, s.name + ".inf"), s.inf.write().encodeToByteArray())
-    }
-    for ((from, to) in listOf("readme.txt" to "readme.txt", "charactor.txt" to "charactor.txt", "head.d" to "head.png")) {
-        val src = Paths.join(bank, from)
-        if (PlatformFs.exists(src)) runCatching { PlatformFs.copy(src, Paths.join(out, to)) }
-    }
-    sounds.size
-}
 
 /** A recording labelled in NiaoNiao marks: new labels of the folder are .inf too. */
 fun EditorState.isNiaoFolder(): Boolean = items.any { it.labelFormat == LabelFormat.Inf }

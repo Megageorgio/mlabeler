@@ -9,6 +9,9 @@ import mlabeler.core.io.Item
 /** Formats label files can be turned into. */
 val convertTargets = listOf(LabelFormat.Lab, LabelFormat.TextGrid, LabelFormat.Audacity, LabelFormat.Ds)
 
+/** In oto mode the conversion is only oto.ini into NiaoNiao marks, so it is offered when the folder has an oto.ini. */
+fun EditorState.otoConvertible(): Boolean = niaoHasOto(niaoFiles())
+
 /** Files with labels in a format other than [target] (rows of a transcriptions.csv stay where they are). */
 fun EditorState.filesToConvert(target: LabelFormat): List<Item> =
     items.filter { it.labelPath != null && it.labelFormat != null && it.labelFormat != target && it.labelFormat != LabelFormat.DsCsv }

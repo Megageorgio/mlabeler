@@ -788,8 +788,8 @@ private fun ToolkitPage(app: AppState) {
 
 private val niaoTitleT = L("NiaoNiao", "NiaoNiao")
 private val niaoAlwaysT = L("NiaoNiao tools in every folder", "Инструменты NiaoNiao в любой папке")
-private val niaoAlwaysHintT = L("Off: they appear only in a folder with .inf marks. On: also in other folders, to unpack a bank or make marks from oto.ini.",
-    "Выключено: они видны только в папке с метками .inf. Включено: и в других папках, чтобы распаковать банк или взять метки из oto.ini.")
+private val niaoAlwaysHintT = L("Off: they appear only in a folder with .inf marks. On: also in other folders, to place the first marks in new recordings.",
+    "Выключено: они видны только в папке с метками .inf. Включено: и в других папках, чтобы расставить первые метки в новых записях.")
 private val niaoSetT = L("Full set of syllables (text file; empty: Mandarin pinyin)", "Полный набор слогов (текстовый файл; пусто — пиньинь)")
 private val niaoRangeT = L("Pitch range, notes (empty: around the bank's middle pitch)", "Диапазон высоты, ноты (пусто — вокруг средней высоты банка)")
 private val niaoSpreadT = L("Allowed distance from the middle pitch", "Допустимое отклонение от средней высоты")

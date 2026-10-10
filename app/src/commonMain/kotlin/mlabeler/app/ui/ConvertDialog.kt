@@ -22,7 +22,12 @@ import mlabeler.app.state.AppState
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.convertLabels
 import mlabeler.app.state.convertTargets
+import mlabeler.app.state.Mode
 import mlabeler.app.state.filesToConvert
+import mlabeler.app.state.niaoFiles
+import mlabeler.app.state.niaoFromOto
+import mlabeler.app.state.niaoHasOto
+import mlabeler.app.state.niaoToOto
 import mlabeler.app.theme.T
 
 private val titleT = L("Convert label files", "Перевод файлов разметки в другой формат")
@@ -35,6 +40,12 @@ private val aboutT = L(
 )
 private val defaultT = L("Use this format for new labels of the folder too", "Использовать этот формат и для новой разметки папки")
 private val runT = L("Convert", "Перевести")
+private val otoTitleT = L("oto.ini and NiaoNiao marks (.inf)", "oto.ini и метки NiaoNiao (.inf)")
+private val fromOtoMissingT = L("oto.ini → .inf where there are none", "oto.ini → .inf там, где их нет")
+private val fromOtoAllT = L("oto.ini → .inf for all", "oto.ini → .inf для всех")
+private val toOtoT = L(".inf → oto.ini", ".inf → oto.ini")
+private val otoHintT = L("CV entries: the offset is the start, the preutterance and the fixed part end where the vowel starts, the cutoff is the end. oto.ini has no decay, it is placed from the loudness.",
+    "Строки CV: смещение — начало, преутерация и фиксированная часть кончаются там, где начинается гласная, отсечка — конец. Затухания в oto.ini нет, оно ставится по громкости.")
 
 @Composable
 fun ConvertDialog(app: AppState, ed: EditorState) {
@@ -43,15 +54,21 @@ fun ConvertDialog(app: AppState, ed: EditorState) {
     var target by remember { mutableStateOf(ed.workspace.state.defaultFormat.takeIf { it in convertTargets } ?: mlabeler.core.format.LabelFormat.TextGrid) }
     var makeDefault by remember { mutableStateOf(true) }
     val files = remember(target, ed.items) { ed.filesToConvert(target) }
+    val otoMode = ed.mode == Mode.Oto
+    // a direction is offered only when there is something to convert from
+    val wavs = remember(ed.items) { ed.niaoFiles() }
+    val hasOto = remember(wavs) { ed.niaoHasOto(wavs) }
+    val infs = wavs.count { it.labelFormat == mlabeler.core.format.LabelFormat.Inf }
     Overlay({ close() }, 560) {
         DialogContent(footer = {
             Btn(S.cancel()) { close() }
-            Btn(runT(), primary = true, enabled = files.isNotEmpty()) {
+            if (!otoMode) Btn(runT(), primary = true, enabled = files.isNotEmpty()) {
                 ed.convertLabels(files, target, makeDefault)
                 close()
             }
         }) {
             Text(titleT(), color = c.text, fontSize = 17.sp)
+            if (!otoMode) {
             SectionTitle(toT())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (f in convertTargets) Chip(f.title, f == target) { target = f }
@@ -63,6 +80,16 @@ fun ConvertDialog(app: AppState, ed: EditorState) {
             Row(Modifier.fillMaxWidth().padding(top = 10.dp).clickable { makeDefault = !makeDefault }, verticalAlignment = Alignment.CenterVertically) {
                 Text(defaultT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
                 Toggle(makeDefault, { makeDefault = it })
+            }
+            }
+            if (hasOto || infs > 0) {
+                SectionTitle(otoTitleT())
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (hasOto) Btn(fromOtoMissingT(), enabled = infs < wavs.size) { ed.niaoFromOto(wavs, keep = true); close() }
+                    if (hasOto) Btn(fromOtoAllT()) { ed.niaoFromOto(wavs, keep = false); close() }
+                    if (infs > 0) Btn(toOtoT()) { ed.niaoToOto(wavs); close() }
+                }
+                Text(otoHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
