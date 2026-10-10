@@ -32,12 +32,12 @@ private val aboutT = L(
     "Все места, где в разметке папки стоят эти фонемы (или их сочетания), вырезаются из записей — чтобы прослушать их подряд и найти неправильные. Через запятую; сочетание через пробел: «h, s, k t, pau a».",
 )
 private val modeT = L("How to save", "Как сохранить")
-private val separateT = L("Each piece in its own file", "Каждый кусок отдельным файлом")
+private val separateT = L("Each segment in its own file", "Каждый сегмент в отдельный файл")
 private val byPhonemeT = L("One file per phoneme", "Один файл на фонему")
 private val byWavT = L("One file per phoneme and recording", "Один файл на фонему и запись")
 private val intoT = L("Into the folder", "В папку")
 private val runT = L("Cut", "Нарезать")
-private val doneT = L("Cut {0} pieces into {1}", "Нарезано кусков: {0}, в {1}")
+private val doneT = L("{0} segments cut into {1}", "Нарезано сегментов: {0}, папка {1}")
 private val noneT = L("These phonemes are not in the labels", "Этих фонем нет в разметке")
 private val workingT = L("Cutting… {0} of {1} files", "Нарезка… файлов: {0} из {1}")
 

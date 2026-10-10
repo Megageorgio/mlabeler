@@ -33,7 +33,7 @@ import mlabeler.app.toolkit.ToolkitClient
 private val title = L("Your own models", "Свои модели")
 private val hint = L(
     "A model you trained or downloaded, without publishing it anywhere. Pick its checkpoint (.pt, .ckpt): the config, phoneme list and language list next to it are taken too. A folder or an archive works as well. The file has to be on the computer where the toolkit runs.",
-    "Модель, которую вы обучили или скачали, — без публикации. Выберите её чекпоинт (.pt, .ckpt): конфиг, список фонем и список языков рядом с ним также будут добавлены. Поддерживаются также папка или архив. Файл должен находиться на компьютере, где работает тулкит.",
+    "Модель, которую вы обучили или скачали, — без публикации. Выберите её чекпоинт (.pt, .ckpt): файл конфигурации, список фонем и список языков рядом с ним также будут добавлены. Поддерживаются также папка или архив. Файл должен находиться на компьютере, где работает тулкит.",
 )
 private val pathT = L("Checkpoint, folder or archive", "Чекпоинт, папка или архив")
 private val fileBtn = L("File…", "Файл…")

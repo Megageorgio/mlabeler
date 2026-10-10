@@ -96,6 +96,29 @@ fun Tip(text: String, content: @Composable () -> Unit) {
     ) { content() }
 }
 
+/**
+ * The explanation of a setting behind a small round "?": faint, in the colours of the text so it suits every theme,
+ * a little clearer under the pointer; the explanation is shown as a tooltip.
+ */
+@Composable
+fun HelpMark(text: String, modifier: Modifier = Modifier) {
+    if (text.isEmpty()) return
+    val c = T.c
+    val source = remember { MutableInteractionSource() }
+    val hovered by source.collectIsHoveredAsState()
+    val ink = c.muted.copy(alpha = if (hovered) 0.95f else 0.55f)
+    Tip(text) {
+        Box(
+            modifier.size(15.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                .background(c.muted.copy(alpha = if (hovered) 0.16f else 0.08f))
+                .hoverable(source),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("?", color = ink, fontSize = 10.sp, lineHeight = 10.sp)
+        }
+    }
+}
+
 /** Icon button; [hint] becomes the tooltip, [keys] are shown after it. */
 @Composable
 fun IconBtn(

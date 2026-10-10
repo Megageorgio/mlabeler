@@ -46,7 +46,7 @@ private val fromOtoMissingT = L("oto.ini → .inf where there are none", "oto.in
 private val fromOtoAllT = L("oto.ini → .inf for all", "oto.ini → .inf для всех")
 private val toOtoT = L(".inf → oto.ini", ".inf → oto.ini")
 private val otoHintT = L("NiaoNiao: the offset is the start, the preutterance and the fixed part end where the vowel starts, the cutoff is the end; the decay, which oto.ini lacks, is placed from the loudness. Recordings of several syllables (VCV, long takes) or named in kana are cut into one recording per syllable in a new folder <folder>_niaoniao.",
-    "NiaoNiao: смещение — начало, преутерация и фиксированная часть кончаются там, где начинается гласная, отсечка — конец; затухание, которого в oto.ini нет, ставится по громкости. Записи из нескольких слогов (VCV, длинные дубли) или с именами каной режутся на отдельные записи по слогу в новой папке <папка>_niaoniao.")
+    "NiaoNiao: смещение — начало, преутерация и фиксированная часть заканчиваются там, где начинается гласная, отсечка — конец; затухание, которого в oto.ini нет, ставится по громкости. Записи из нескольких слогов (VCV, длинные дубли) или с именами каной разрезаются на отдельные записи по слогу в новой папке <папка>_niaoniao.")
 private val toLabT = L("oto.ini → .lab", "oto.ini → .lab")
 private val labHintT = L(".lab: the consonant of each syllable from the overlap to the preutterance, the vowel up to the cutoff or the next consonant, SP between them. The old label files go to .mlabeler/backup.",
     ".lab: согласная каждого слога от перекрытия до преутерации, гласная до отсечки или до следующей согласной, между ними SP. Старая разметка уходит в .mlabeler/backup.")

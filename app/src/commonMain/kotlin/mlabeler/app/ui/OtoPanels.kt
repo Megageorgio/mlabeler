@@ -293,7 +293,7 @@ private val afterT = mlabeler.app.i18n.L("After moving a marker by hand", "По�
 private val afterNoneT = mlabeler.app.i18n.L("Stay", "Остаться")
 private val afterNextT = mlabeler.app.i18n.L("Next entry", "Следующая запись")
 private val afterDoneT = mlabeler.app.i18n.L("Mark done", "Отметить готовой")
-private val afterBothT = mlabeler.app.i18n.L("Mark done, next entry", "Отметить готовой и дальше")
+private val afterBothT = mlabeler.app.i18n.L("Mark done, next entry", "Отметить готовой и перейти к следующей")
 private val afterMarkerT = mlabeler.app.i18n.L("Only after this marker", "Только после этого маркера")
 private val anyMarkerT = mlabeler.app.i18n.L("Any", "Любого")
 

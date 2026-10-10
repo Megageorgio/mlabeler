@@ -34,7 +34,7 @@ import mlabeler.core.io.encodeText
 val importTitle = L("Import a vLabeler project", "Импорт проекта vLabeler")
 private val hint = L("Projects (.lbp) found in this folder and the one above it. Labels and oto.ini are written next to the recordings (old files go to .mlabeler/backup), done/star/tag notes are kept.",
     "Проекты (.lbp) в этой папке и в папке выше. Разметка и oto.ini записываются рядом с записями (старые файлы — в .mlabeler/backup), отметки «готово», «звезда» и метки сохраняются.")
-private val noneFound = L("No .lbp files here. Put the project file into this folder.", "Здесь нет файлов .lbp. Положите файл проекта в эту папку.")
+private val noneFound = L("No .lbp files here. Put the project file into this folder.", "Здесь нет файлов .lbp. Поместите файл проекта в эту папку.")
 private val imported = L("Imported: {0} files", "Импортировано файлов: {0}")
 private val importBtn = L("Import", "Импортировать")
 

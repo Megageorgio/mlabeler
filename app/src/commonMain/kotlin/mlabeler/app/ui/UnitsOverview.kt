@@ -43,7 +43,7 @@ import mlabeler.core.io.Paths
 private val titleT = L("Transitions of the folder (.trans)", "Переходы папки (.trans)")
 private val aboutT = L(
     "Every transition between two phonemes in the .seg/.trans recordings of the folder, and where the transcriptions keep it. A transition kept in several recordings only makes the voicebank bigger: listen to them and keep the best one. Kept ones are switched on; a click changes it.",
-    "Все переходы между фонемами в записях .seg/.trans этой папки и где они оставлены в транскрипциях. Переход, оставленный в нескольких записях, только утяжеляет банк: прослушайте их и оставьте лучший. Оставленные включены; щелчок меняет выбор.",
+    "Все переходы между фонемами в записях .seg/.trans этой папки и где они оставлены в транскрипциях. Переход, оставленный в нескольких записях, только увеличивает размер банка: прослушайте их и оставьте лучший. Оставленные включены; щелчок меняет выбор.",
 )
 private val readingT = L("Reading the recordings… {0} of {1}", "Чтение записей… {0} из {1}")
 private val noneT = L("No .seg/.trans recordings in this folder", "В этой папке нет записей .seg/.trans")
@@ -58,9 +58,9 @@ private val sortT = L("Order:", "Порядок:")
 private val sortNameT = L("By name", "По имени")
 private val sortKeptT = L("Kept most often", "Чаще оставлены")
 private val sortFoundT = L("Found most often", "Чаще встречаются")
-private val perFolderT = L("Repeats count only inside one folder (one pitch)", "Повторы считаются только внутри одной папки (одного питча)")
+private val perFolderT = L("Repeats count only inside one folder (one pitch)", "Повторы считаются только внутри одной папки (одной высоты тона)")
 private val perFolderHint = L("With a sub-folder per pitch, the same transition in another folder is not a repeat: each pitch keeps its own.",
-    "Если в каждой подпапке свой питч, такой же переход в другой папке не считается повтором: у каждого питча остаётся свой.")
+    "Если в каждой подпапке своя высота тона, такой же переход в другой папке не считается повтором: для каждой высоты остаётся свой.")
 private val onlyThisT = L("Only here", "Только здесь")
 private val applyT = L("Save ({0} files)", "Сохранить (файлов: {0})")
 private val savedT = L("Transitions saved in {0} files", "Переходы сохранены в файлах: {0}")

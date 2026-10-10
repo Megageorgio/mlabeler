@@ -43,7 +43,7 @@ import mlabeler.app.theme.T
 /** Short names under toolbar buttons. */
 object ToolLabels {
     val prev = L("Back", "Назад")
-    val next = L("Next", "Дальше")
+    val next = L("Next", "Далее")
     val save = L("Save", "Сохранить")
     val undo = L("Undo", "Отменить")
     val redo = L("Redo", "Вернуть")

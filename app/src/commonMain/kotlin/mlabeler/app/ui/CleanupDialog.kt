@@ -107,7 +107,7 @@ private fun Hint(text: String, compact: Boolean) {
 @Composable
 private fun Heading(title: String, hint: String, compact: Boolean) {
     SectionTitle(title) {
-        if (compact) Tip(hint) { Text("?", color = T.c.muted, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp)) }
+        if (compact) HelpMark(hint, Modifier.padding(horizontal = 4.dp))
     }
 }
 

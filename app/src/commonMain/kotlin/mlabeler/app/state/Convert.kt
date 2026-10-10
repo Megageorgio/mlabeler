@@ -47,4 +47,4 @@ fun EditorState.convertLabels(files: List<Item>, target: LabelFormat, makeDefaul
     return done to errors
 }
 
-private val convertedT = L("Converted {0} label files to {1}; the old ones are in .mlabeler/backup", "Переведено файлов разметки в {1}: {0}; старые лежат в .mlabeler/backup")
+private val convertedT = L("Converted {0} label files to {1}; the old ones are in .mlabeler/backup", "Переведено файлов разметки в {1}: {0}; старые сохранены в .mlabeler/backup")

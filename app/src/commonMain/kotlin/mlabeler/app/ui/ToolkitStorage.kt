@@ -38,7 +38,7 @@ private object StorageTitles {
     val engines = L("Engines (Python environments)", "Движки (окружения Python)")
     val leftovers = L("Leftovers of jobs: {0}", "Остатки задач: {0}")
     val leftoversHint = L("Uploaded recordings, results and unfinished downloads. The toolkit removes those older than {0} days by itself when it starts.",
-        "Загруженные записи, результаты и недокачанные файлы. Тулкит сам удаляет те, что старше {0} дн., при запуске.")
+        "Загруженные записи, результаты и незавершённые скачивания. Тулкит сам удаляет те, что старше {0} дн., при запуске.")
     val engineDownloads = L("Downloaded by the engines themselves (Whisper and others): {0}", "Скачано самими движками (Whisper и другие): {0}")
     val clean = L("Clean up", "Очистить")
     val cleaned = L("Freed {0}", "Освобождено {0}")
@@ -47,7 +47,7 @@ private object StorageTitles {
     val refresh = L("Count again", "Пересчитать")
     val counting = L("Counting…", "Подсчёт…")
     val notRunning = L("The toolkit has to be running to show this.", "Чтобы это показать, тулкит должен быть запущен.")
-    val older = L("This toolkit can't count its disk space yet; update it.", "Этот тулкит ещё не умеет считать место на диске; обновите его.")
+    val older = L("This toolkit can't count its disk space yet; update it.", "Эта версия тулкита не поддерживает подсчёт места на диске; обновите тулкит.")
 }
 
 /** Sizes of the toolkit's models, engines and leftovers, with buttons to remove them. */

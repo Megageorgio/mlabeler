@@ -46,7 +46,7 @@ private val normalT = L("As trained", "Как обучена")
 private val safeT = L("Carefully", "Осторожно")
 private val modeAboutT = L(
     "As trained: for labels of the model's language and style. Carefully: only confident boundaries and not far, for other languages or another labelling style; it gains less but practically never makes labels worse. Auto: carefully when most phonemes are unknown to the model.",
-    "Как обучена — для разметки на языке и в стиле модели. Осторожно — только уверенные границы и недалеко, для других языков или другого стиля разметки: выигрыш меньше, но разметка практически не портится. Авто — осторожно, если большинство фонем модели незнакомы.",
+    "Как обучена — для разметки на языке и в стиле модели. Осторожно — только уверенные границы и недалеко, для других языков или другого стиля разметки: выигрыш меньше, но разметка практически не ухудшается. Авто — осторожно, если большинство фонем модели незнакомы.",
 )
 private val noModelsT = L("No refiner models in the toolkit", "В тулките нет моделей-уточнителей")
 private val runT = L("Refine", "Уточнить")
@@ -96,10 +96,7 @@ fun RefineAfterSwitch(app: AppState) {
     val c = T.c
     val r = app.settings.toolkit.refine
     fun set(v: RefineSettings) = app.update { it.copy(toolkit = it.toolkit.copy(refine = v)) }
-    Row(Modifier.fillMaxWidth().padding(top = 10.dp).clickable { set(r.copy(enabled = !r.enabled)) }, verticalAlignment = Alignment.CenterVertically) {
-        Text(afterT(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
-        Toggle(r.enabled, { v -> set(r.copy(enabled = v)) })
-    }
+    SwitchRow(afterT(), r.enabled) { v -> set(r.copy(enabled = v)) }
     if (r.enabled) Column(Modifier.padding(top = 4.dp).fillMaxWidth().background(c.panelAlt).padding(10.dp)) { RefineOptions(app, r) { set(it) } }
 }
 

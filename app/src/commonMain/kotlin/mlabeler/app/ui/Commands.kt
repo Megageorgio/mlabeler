@@ -256,16 +256,16 @@ object Commands {
         else a.wordsCheck = WordsCheck(t.lastModel, t.lastLanguage.takeIf { it.isNotEmpty() && it != "*" })
     }.only(Mode.Labels)
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
-    val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: клик выбирает, перетаскивание двигает"), listOf(Chord(Key.One)), { it.app.settings.edit.tools }) { _, a ->
+    val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: щелчок выбирает, перетаскивание двигает"), listOf(Chord(Key.One)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "cursor")) }
     }.only(Mode.Labels)
-    val toolCut = Command("tool-cut", L("Cut tool: click adds a boundary", "Ножницы: клик ставит границу"), listOf(Chord(Key.Two)), { it.app.settings.edit.tools }) { _, a ->
+    val toolCut = Command("tool-cut", L("Cut tool: click adds a boundary", "Ножницы: щелчок ставит границу"), listOf(Chord(Key.Two)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = if (it.edit.tool == "cut") "cursor" else "cut")) }
     }.only(Mode.Labels)
     val toolPan = Command("tool-pan", L("Hand tool: dragging scrolls", "Рука: перетаскивание прокручивает"), listOf(Chord(Key.Three)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "pan")) }
     }.only(Mode.Labels)
-    val toolPlay = Command("tool-play", L("Play tool: a click plays the phoneme", "Проигрывание: клик воспроизводит фонему"), listOf(Chord(Key.Four)), { it.app.settings.edit.tools }) { _, a ->
+    val toolPlay = Command("tool-play", L("Play tool: a click plays the phoneme", "Проигрывание: щелчок воспроизводит фонему"), listOf(Chord(Key.Four)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "play")) }
     }.only(Mode.Labels)
     val labelsBigger = Command("labels-bigger", L("Bigger label text", "Крупнее текст меток"), listOf(Chord(Key.Equals, ctrl = true, shift = true))) { _, a ->

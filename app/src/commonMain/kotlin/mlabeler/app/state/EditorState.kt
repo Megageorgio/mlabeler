@@ -2437,4 +2437,4 @@ private val mergedT = mlabeler.app.i18n.L("Joined {0} recordings into {1}", "С�
 private val mergeExistsT = mlabeler.app.i18n.L("{0} already exists", "{0} уже существует")
 private val badMergeNameT = mlabeler.app.i18n.L("the name is empty or has characters a file name can't have", "имя пустое или в нём есть недопустимые символы")
 private val trashedT = mlabeler.app.i18n.L("{0} was moved to {1}", "{0} перемещён в {1}")
-private val fileOpFailedT = mlabeler.app.i18n.L("Couldn't do it: {0}", "Не получилось: {0}")
+private val fileOpFailedT = mlabeler.app.i18n.L("The operation failed: {0}", "Не удалось выполнить: {0}")

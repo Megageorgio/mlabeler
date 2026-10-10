@@ -116,7 +116,7 @@ private object CheckTitles {
 
 private val tipsAtStartT = mlabeler.app.i18n.L("Tip of the day at start", "Совет дня при запуске")
 private val titleBarMenuT = mlabeler.app.i18n.L("Menus in the window title", "Меню в заголовке окна")
-private val restartT = mlabeler.app.i18n.L("Takes effect after restarting mLabeler", "Сработает после перезапуска mLabeler")
+private val restartT = mlabeler.app.i18n.L("Takes effect after restarting mLabeler", "Вступит в силу после перезапуска mLabeler")
 private val minimapT = mlabeler.app.i18n.L("Map of the whole recording instead of the scroll bar", "Карта всей записи вместо полосы прокрутки")
 private val phonemeColorsT = mlabeler.app.i18n.L("Phonemes tinted by kind (vowels, consonants, pauses)", "Подсветка фонем по типу (гласные, согласные, паузы)")
 private val animationsT = mlabeler.app.i18n.L("Animations", "Анимации")
@@ -926,10 +926,10 @@ object MouseTitles {
         "Инструменты мыши (ножницы, рука, проигрывание) — клавиши 1–4 и кнопка на панели")
     val toolsOff = L("Off: the left button always works as the cursor. Right and middle clicks keep their own actions below.",
         "Выключены: левая кнопка всегда работает как курсор. У правой и средней кнопок остаются свои действия ниже.")
-    val cursor = L("Cursor: click selects, drag moves (1)", "Курсор: клик выбирает, перетаскивание двигает (1)")
-    val cut = L("Scissors: click adds a boundary (2)", "Ножницы: клик ставит границу (2)")
+    val cursor = L("Cursor: click selects, drag moves (1)", "Курсор: щелчок выбирает, перетаскивание двигает (1)")
+    val cut = L("Scissors: click adds a boundary (2)", "Ножницы: щелчок ставит границу (2)")
     val pan = L("Hand: dragging scrolls (3)", "Рука: перетаскивание прокручивает (3)")
-    val playTool = L("Play: a click plays the phoneme (4)", "Проигрывание: клик воспроизводит фонему (4)")
+    val playTool = L("Play: a click plays the phoneme (4)", "Проигрывание: щелчок воспроизводит фонему (4)")
     val cutOnLanes = L("Scissors cut on label lanes too (otherwise clicks there do what is set below)",
         "Ножницы режут и на полосах разметки (иначе щелчки там выполняют действия, заданные ниже)")
     val wheel = L("Mouse wheel", "Колесо мыши")
@@ -937,22 +937,22 @@ object MouseTitles {
     val wheelPhonemes = L("Steps through phonemes, Space plays the chosen one (Shift+wheel scrolls)",
         "Переходит по фонемам, пробел воспроизводит выбранную (Shift+колесо — прокрутка)")
     val toolHint = L("Near a boundary both tools drag it. Shift+click and dragging over the audio select a part in both.",
-        "Рядом с границей оба инструмента её перемещают. Shift+клик и перетаскивание по звуку выделяют фрагмент в обоих.")
+        "Рядом с границей оба инструмента её перемещают. Shift+щелчок и перетаскивание по звуку выделяют фрагмент в обоих.")
     val askName = L("Type the name of the new part right away", "Сразу вводить название новой части")
     val playIt = L("Play the part before a new boundary", "Проигрывать часть перед новой границей")
     val leftHint = L("Near a boundary a press always drags it; Shift+click and dragging over the audio select a part. Each click below can be set to select, split, play and more.",
         "Рядом с границей нажатие всегда перемещает её; Shift+щелчок и перетаскивание по звуку выделяют фрагмент. Каждому щелчку ниже можно назначить действие: выбрать, разрезать, воспроизвести и другие.")
     val onLabels = L("On label lanes", "На полосах разметки")
     val onAudio = L("On the waveform and spectrogram", "На волне и спектрограмме")
-    val double = L("Double click", "Двойной клик")
-    val right = L("Right click", "Правый клик")
-    val middle = L("Middle click (dragging with it scrolls)", "Средний клик (с перетаскиванием — прокрутка)")
-    val ctrl = L("Ctrl+click", "Ctrl+клик")
-    val alt = L("Alt+click", "Alt+клик")
+    val double = L("Double click", "Двойной щелчок")
+    val right = L("Right click", "Щелчок правой кнопкой")
+    val middle = L("Middle click (dragging with it scrolls)", "Щелчок средней кнопкой (с перетаскиванием — прокрутка)")
+    val ctrl = L("Ctrl+click", "Ctrl+щелчок")
+    val alt = L("Alt+click", "Alt+щелчок")
     val selectAfterDrag = L("Touching a boundary (moving or pressing it) selects its phoneme: Space plays it, Delete removes it",
         "Касание границы (перетаскивание или нажатие) выделяет её фонему: пробел воспроизводит её, Delete удаляет")
     val audioDeselects = L("A click on the waveform or spectrogram clears the selection (Space plays from there)",
-        "Клик по волне или спектрограмме снимает выделение (пробел воспроизводит с этого места)")
+        "Щелчок по волне или спектрограмме снимает выделение (пробел воспроизводит с этого места)")
     val spaceRestarts = L("Space while playing starts again (instead of stopping)", "Пробел во время воспроизведения начинает заново (а не останавливает)")
     val owner = L("A boundary belongs to the phoneme…", "Граница относится к фонеме…")
     val ownerHint = L("Delete on a selected boundary removes that phoneme, Space plays it, and a new boundary creates it (that part gets the new name).",
@@ -1158,7 +1158,7 @@ internal object SettingsHelp {
             h("Interface", titleBarMenuT, "The program draws the window title itself and puts the menus in it, saving a row. Window buttons, dragging, double click and resizing at the edges keep working; on macOS the system's round buttons stay. Some window-manager features (snapping to screen halves, the frame shadow) may not work. Takes effect after a restart.",
                 "Программа сама рисует заголовок окна и ставит в него меню — на одну строку меньше. Кнопки окна, перетаскивание, двойной щелчок и изменение размера за края работают; на macOS остаются системные круглые кнопки. Некоторые возможности оконной системы (прилипание к половине экрана, тень рамки) могут не работать. Действует после перезапуска."),
             h("Interface", minimapT, "A thin strip with the whole recording: its loudness, the labelled parts and the part on screen as a window. It replaces the scroll bar: drag the window to move the view, drag its edge to zoom, press elsewhere to go there; the wheel scrolls, Ctrl+wheel zooms.",
-                "Тонкая полоса со всей записью: громкость, размеченные места и видимая часть в виде окошка. Заменяет полосу прокрутки: перетащите окошко — вид сдвинется, потяните за его край — изменится масштаб, нажмите в другом месте — вид перейдёт туда; колесо листает, Ctrl+колесо меняет масштаб."),
+                "Тонкая полоса со всей записью: громкость, размеченные места и видимая часть в виде рамки. Заменяет полосу прокрутки: перетащите рамку — вид сдвинется, потяните за её край — изменится масштаб, нажмите в другом месте — вид перейдёт туда; колесо прокручивает, Ctrl+колесо меняет масштаб."),
             h("Interface", phonemeColorsT, "Vowels, consonants and pauses get a light tint of the theme's colours on the phoneme lane.",
                 "Гласные, согласные и паузы на дорожке фонем слегка подкрашиваются цветами темы."),
             h("Interface", animationsT, "Normal: short fades and slides. Reduced: quicker fades only. Off: everything at once.",
@@ -1168,7 +1168,7 @@ internal object SettingsHelp {
             h("Interface", flashChangesT, "The intervals that changed glow in the accent colour and fade out in about a second.",
                 "Изменившиеся интервалы подсвечиваются цветом акцента и гаснут примерно за секунду."),
             h("Interface", hoverBoundaryT, "Before you grab a boundary, the one that would move is drawn thicker. Off by default.",
-                "Прежде чем вы схватите границу, та, что сдвинется, рисуется толще. По умолчанию выключено."),
+                "Перед захватом границы та, что будет сдвинута, рисуется толще. По умолчанию выключено."),
             h("Interface", tipsAtStartT, "At every start a tip about a less obvious feature or setting; Help → Tip of the day shows them any time.",
                 "При каждом запуске — совет о неочевидной функции или настройке; Справка → Совет дня показывает их в любое время."),
             h("Interface", MenuTitles.statusBar, "The line at the bottom: phoneme number, done files, scale and more; below it you choose what it shows.",
@@ -1264,6 +1264,134 @@ internal object SettingsHelp {
             h("Toolkit", S.toolkitAutoStart, "The toolkit starts automatically when a tool needs it and stops once no program uses it any more.", "Тулкит запускается автоматически, когда он нужен инструменту, и закрывается, когда им больше не пользуется ни одна программа."),
             h("Toolkit", S.toolkitShare, "Phones and tablets in the same network can use the toolkit of this computer. A token protects it.",
                 "Телефоны и планшеты в той же сети могут пользоваться тулкитом этого компьютера. Доступ защищён токеном."),
+
+            // Dialogs.kt: settings pages
+            h("General", niaoAlwaysT, "Off: the NiaoNiao tools appear only in a folder with .inf marks. On: in every folder, to place the first marks in new recordings. Off by default.",
+                "Выключено: инструменты NiaoNiao видны только в папке с метками .inf. Включено: во всех папках, чтобы расставить первые метки в новых записях. По умолчанию выключено."),
+            h("General", niaoSpreadT, "Without a pitch range set above, the bank check marks sounds further than this from the middle pitch of the bank, in semitones. Default: 2.",
+                "Если диапазон высоты выше не задан, проверка банка отмечает звуки, которые дальше этого от средней высоты банка, в полутонах. По умолчанию 2."),
+            h("Interface", S.environments, "Ready sets of panels, lanes, toolbar buttons, menu and status bars. Choosing one changes all of these at once; your own set can be saved here under a name.",
+                "Готовые наборы панелей, полос, кнопок панели инструментов, строк меню и статуса. Выбор среды меняет всё это сразу; свой набор можно сохранить здесь под своим именем."),
+            h("Interface", doneSoundOnT, "When a job over many files that took long enough ends, the chosen sound file plays, so you can do something else meanwhile. Off by default.",
+                "Когда заканчивается работа по многим файлам, которая шла достаточно долго, проигрывается выбранный звуковой файл: в это время можно заниматься другим. По умолчанию выключено."),
+            h("Interface", doneSoundMinT, "Jobs shorter than this end without a sound. 0: the sound plays after every job. Default: 20 s.",
+                "Работа короче этого заканчивается без звука. 0: звук после любой работы. По умолчанию 20 с."),
+            h("View", S.toggleFiles, "The panel with the list of files and the list of all labels (Ctrl+B).", "Панель со списком файлов и списком всех меток (Ctrl+B)."),
+            h("View", S.toggleInspector, "The panel with details of the selection, checks and comparison (Ctrl+I).", "Панель со свойствами выбранного, проверками и сравнением (Ctrl+I)."),
+            h("Spectrogram", detailT, "Ready combinations of window length, step and bands below. Higher detail is sharper but takes longer to build and more memory.",
+                "Готовые сочетания длины окна, шага и числа полос ниже. Более высокая чёткость даёт более резкую картинку, но строится дольше и занимает больше памяти."),
+            h("Checks", CheckTitles.edges, "The phoneme lane of every recording must start and end with a pause (SP by default; empty field: any pause). Recordings without it are marked. Off by default.",
+                "Дорожка фонем каждой записи должна начинаться и заканчиваться паузой (по умолчанию SP; пустое поле: любая пауза). Записи без неё отмечаются. По умолчанию выключено."),
+            h("Toolkit", S.toolkitUrl, "Where mLabeler looks for mVocalToolkit. The default address is the toolkit on this computer; for a toolkit on another computer enter its address and its token.",
+                "Где mLabeler ищет mVocalToolkit. Адрес по умолчанию указывает на тулкит этого компьютера; для тулкита на другом компьютере введите его адрес и токен."),
+
+            // StatusBar.kt
+            h("Interface", L("Percent next to the numbers", "Проценты рядом с номерами"), "The status bar adds the share in percent to the counters, e.g. 12 / 40 (30%). On by default.",
+                "Строка состояния добавляет к счётчикам долю в процентах, например 12 / 40 (30%). По умолчанию включено."),
+
+            // UpdateUi.kt
+            h("About", UpdateTitles.checkOnStart, "At every start the list of releases on GitHub is checked for a newer version of the chosen kind. Off: only Check now does it.",
+                "При каждом запуске список выпусков на GitHub проверяется на более новую версию выбранного типа. Выключено: проверка только по кнопке «Проверить сейчас»."),
+            h("About", UpdateTitles.autoInstall, "A newer version found by the check is downloaded in the background and installed when the program closes. Off: the program only reports it.",
+                "Найденная проверкой новая версия скачивается в фоне и устанавливается при закрытии программы. Выключено: программа только сообщает о ней."),
+
+            // ToolkitPanel.kt
+            h("Toolkit", L("Processing device", "Устройство для вычислений"), "Where the toolkit runs the models. Auto: an NVIDIA graphics card when there is one, else the processor. The processor is slower but needs no video memory.",
+                "Где тулкит выполняет модели. Авто: видеокарта NVIDIA, если она есть, иначе процессор. Процессор медленнее, но не требует видеопамяти."),
+
+            // ThemeEditor.kt (Themes page: the editor of a custom theme and the font)
+            h("Themes", L("Interface font", "Шрифт интерфейса"), "Any font installed in the system for all text of the program. As in the theme: the font of the chosen theme. The wheel over the button steps through the fonts.",
+                "Любой установленный в системе шрифт для всего текста программы. «Как в теме»: шрифт выбранной темы. Колесо мыши над кнопкой перебирает шрифты."),
+            h("Themes", L("Boundaries over the audio", "Границы поверх звука"), "How the boundary lines over the waveform and spectrogram look: colour, thickness and dashed, dotted or solid.",
+                "Как выглядят линии границ поверх волны и спектрограммы: цвет, толщина и вид линии (пунктир, точки или сплошная)."),
+            h("Themes", boundWidthT, "Thickness of the boundary lines over the audio, in pixels.", "Толщина линий границ поверх звука, в пикселях."),
+            h("Themes", L("Window title (when the menus are in it)", "Заголовок окна (когда меню в нём)"), "Look of the title the program draws itself when the menus are in the window title: plain, blue with round buttons, or a classic stripe.",
+                "Вид заголовка, который программа рисует сама, когда меню находится в заголовке окна: обычный, синий с круглыми кнопками или классическая полоса."),
+            h("Themes", L("Tier colours", "Цвета слоёв"), "Colours of the stripe at the left of each label lane, used in turn. The first two also tint vowels and consonants.",
+                "Цвета полосы слева у каждой дорожки разметки, по очереди. Первые два также используются для подсветки гласных и согласных."),
+            h("Themes", L("Spectrogram colours (quiet → loud)", "Цвета спектрограммы (тихо → громко)"), "The scale from the quietest to the loudest sound. It is used when the spectrogram colours are set to Theme.",
+                "Шкала от самого тихого звука к самому громкому. Используется, когда в цветах спектрограммы выбрана тема."),
+            h("Themes", L("Window background", "Фон окна"), "A gradient or a picture behind the panels. It shows only through panels that are less than fully solid.",
+                "Градиент или картинка за панелями. Они видны только сквозь панели с неполной плотностью."),
+            h("Themes", L("How strongly the picture shows", "Насколько видна картинка"), "Opacity of the background picture; lower blends it into the background colour.",
+                "Непрозрачность фоновой картинки; чем меньше, тем сильнее она сливается с цветом фона."),
+            h("Themes", L("Panels solid", "Плотность панелей"), "Opacity of the panels. Below 100% the gradient or picture of the background shows through them.",
+                "Непрозрачность панелей. Ниже 100% сквозь них виден градиент или картинка фона."),
+            h("Themes", L("Waveform and spectrogram solid", "Плотность волны и спектрограммы"), "Opacity of the waveform and spectrogram lanes over the background. Not set by hand: it follows the panels.",
+                "Непрозрачность полос волны и спектрограммы поверх фона. Если не задана вручную, следует за плотностью панелей."),
+
+            // AutolabelDialog.kt
+            h("", L("Breaths (AP) where they can be heard", "Вдохи (AP) там, где они слышны"), "The aligner places AP where it hears a breath (SOFA, HubertFA; TIFA may put one in a pause). Off: no breaths are added. On by default.",
+                "Модель выравнивания ставит AP там, где слышит вдох (SOFA, HubertFA; TIFA может поставить его в паузе). Выключено: вдохи не добавляются. По умолчанию включено."),
+            h("", L("Align long recordings again by segments between pauses", "Повторно выравнивать длинные записи по сегментам между паузами"), "After the first pass a long recording is cut at pauses and each segment is aligned again on its own, which keeps boundaries from drifting. Off: one pass over the whole recording.",
+                "После первого прохода длинная запись режется по паузам, и каждый сегмент выравнивается заново отдельно: так границы меньше смещаются. Выключено: один проход по всей записи."),
+            h("", L("Maximum segment length", "Максимальная длина сегмента"), "Segments of the second pass are at most this long, in seconds. Default: 25 s.",
+                "Сегменты второго прохода не длиннее этого, в секундах. По умолчанию 25 с."),
+            h("", L("Confidence threshold (older models; −1 = the model's own)", "Порог уверенности (старые модели; −1 — как задано в модели)"), "Phonemes the model is less sure about than this are merged into their neighbours. Higher: fewer, surer phonemes. −1 keeps the value stored in the model.",
+                "Фонемы, в которых модель уверена меньше этого, сливаются с соседними. Больше: меньше фонем, но надёжнее. −1: значение, заданное в модели."),
+            h("", L("Holding a phoneme (Viterbi): higher = fewer, longer phonemes", "Удержание фонемы (Витерби): больше — меньше и длиннее фонемы"), "How strongly the Viterbi decoder prefers staying in the current phoneme over switching to the next. Default: 5.",
+                "Насколько декодер Витерби предпочитает остаться в текущей фонеме, а не перейти к следующей. По умолчанию 5."),
+            h("", L("Silence level (share of full scale)", "Уровень тишины (доля от максимума)"), "Sound quieter than this share of the maximum level counts as silence. Default: 0.005.",
+                "Звук тише этой доли от максимального уровня считается тишиной. По умолчанию 0,005."),
+            h("", L("Shortest silence marked as SP", "Самая короткая тишина, которая станет SP"), "Silence at least this long becomes an SP pause; shorter silence stays inside the phonemes. Default: 0.5 s.",
+                "Тишина не короче этого становится паузой SP; более короткая остаётся внутри фонем. По умолчанию 0,5 с."),
+
+            // RefineDialog.kt
+            h("", L("Refine the boundaries afterwards (a refiner model)", "Уточнить границы после этого (модель-уточнитель)"), "After autolabelling, a refiner model moves the boundaries closer to the sound; the model and how boldly it works are chosen below. Off by default.",
+                "После авторазметки модель-уточнитель сдвигает границы точнее по звуку; модель и степень вмешательства выбираются ниже. По умолчанию выключено."),
+
+            // AutoOtoDialog.kt
+            h("", L("Offset before the overlap, ms", "Offset до overlap, мс"), "For syllables with a consonant the offset is placed this far before the overlap. Default: 140 ms.",
+                "Для слогов с согласной offset ставится на таком расстоянии до overlap. По умолчанию 140 мс."),
+            h("", L("Consonant part into the vowel, ms", "Consonant заходит в гласную, мс"), "The fixed part (consonant marker) ends this far after the start of the vowel. Default: 100 ms.",
+                "Неизменяемая часть (маркер consonant) заканчивается на таком расстоянии после начала гласной. По умолчанию 100 мс."),
+
+            // CleanupDialog.kt
+            h("", L("Sensitivity", "Чувствительность"), "Clicks: higher finds weaker clicks (1–10, default 5). Noise: how far above the taken noise a sound may be and still be lowered, in dB; higher removes more noise but can touch quiet parts of the voice.",
+                "Щелчки: чем больше, тем более слабые щелчки находятся (1–10, по умолчанию 5). Шум: насколько звук может быть громче взятого шума и всё ещё снижаться, в дБ; больше убирает больше шума, но может затронуть тихие части голоса."),
+            h("", L("Longest click", "Самый длинный щелчок"), "Events longer than this are treated as sound and left alone. Default: 3 ms.",
+                "События длиннее этого считаются звуком и не изменяются. По умолчанию 3 мс."),
+            h("", L("Loudest point after normalising", "Самая громкая точка после нормализации"), "Normalising scales the level so the loudest sample reaches this many dB below full scale. Default: −1 dB.",
+                "Нормализация меняет громкость так, чтобы самый громкий сэмпл оказался на столько дБ ниже максимума. По умолчанию −1 дБ."),
+            h("", L("Change the level by", "Изменить громкость на"), "How much the level changes, in dB; negative values make it quieter. Loud parts may clip when raised too far.",
+                "На сколько меняется громкость, в дБ; отрицательные значения делают тише. При сильном усилении громкие места могут исказиться."),
+            h("", L("Silence is quieter than (from the loudest part)", "Тишина — тише чем (от самого громкого)"), "Trimming treats as silence everything this many dB below the loudest part of the recording. Default: −45 dB.",
+                "При обрезке тишиной считается всё, что на столько дБ тише самого громкого места записи. По умолчанию −45 дБ."),
+            h("", L("Silence kept at each end", "Оставить тишины с каждого края"), "This much silence stays before the first and after the last sound when trimming. Default: 200 ms.",
+                "Столько тишины остаётся перед первым и после последнего звука при обрезке. По умолчанию 200 мс."),
+            h("", L("Lower by", "Снизить на"), "How much the noise is lowered, in dB. Higher is cleaner but may sound unnatural. Default: 12 dB.",
+                "На сколько снижается шум, в дБ. Больше: чище, но звук может стать неестественным. По умолчанию 12 дБ."),
+            h("", L("Frequency smoothing", "Сглаживание по частоте"), "The reduction is averaged over this many neighbouring frequency bands, so the remaining noise doesn't chirp. 0: no smoothing. Default: 3.",
+                "Подавление усредняется по стольким соседним полосам частот, чтобы остаточный шум не звенел. 0: без сглаживания. По умолчанию 3."),
+
+            // DsExportDialog.kt
+            h("", L("Longest segment", "Самый длинный сегмент"), "Recordings are cut at pauses into segments up to this long. Singing without a pause stays whole even when longer. Default: 15 s.",
+                "Записи режутся по паузам на сегменты не длиннее этого. Пение без пауз остаётся целым, даже если оно длиннее. По умолчанию 15 с."),
+            h("", L("Shortest segment", "Самый короткий сегмент"), "Segments shorter than this are left out of the dataset. Default: 1 s.",
+                "Сегменты короче этого не попадают в датасет. По умолчанию 1 с."),
+            h("", L("Silence at the edges", "Тишина по краям"), "Silence kept before and after the singing of each segment, never past the middle of the pause to the next one. Default: 0.3 s.",
+                "Тишина, которая остаётся до и после пения в каждом сегменте, но не дальше середины паузы до соседнего. По умолчанию 0,3 с."),
+
+            // ContextMenus.kt
+            h("", L("Move the joined recordings to the trash", "Перенести склеенные записи в корзину"), "After joining, the source recordings and their labels go to .mlabeler/trash in the folder, where they can be restored. Off: they stay in place.",
+                "После склейки исходные записи и их разметка переносятся в .mlabeler/trash внутри папки, откуда их можно вернуть. Выключено: они остаются на месте."),
+
+            // OtoPanels.kt
+            h("", L("A marker counts as different from", "Маркер считается другим от"), "Entries are listed when any of their markers differs from the compared oto.ini by at least this much. Default: 10 ms.",
+                "В списке показываются записи, у которых хотя бы один маркер отличается от сравниваемого oto.ini не меньше чем на это значение. По умолчанию 10 мс."),
+
+            // Skipped on purpose:
+            // AboutTitles.author, AboutTitles.thanks, S.about, S.files, S.screen, S.editing, S.checks, S.toolkit, S.colors,
+            // MenuTitles.panels, MenuTitles.toolbar: group headings only.
+            // MouseTitles.tool ("Clicks"), PlayTitles.playback, scaleT, whatToShow: containers of switches and sliders that have their own hints.
+            // CheckTitles.scripts: container; its explanation is shown as text inside and "Run them" has a hint.
+            // doneSoundT: container; doneSoundOnT and doneSoundMinT carry the hints.
+            // niaoTitleT ("NiaoNiao"): container; niaoAlwaysT and niaoSpreadT carry the hints.
+            // UpdateTitles.section ("Updates"): container; the channel explanation is shown as text inside.
+            // StorageTitles.title ("Disk space"), OwnModels title ("Your own models"): containers with their own text inside.
+            // ThemeEditor themesT, nameT, title (the colour groups Interface / Signals / Waveform and labels): containers.
+            // OtoPanels afterT: shown as plain Text above chips, not through SwitchRow/ValueSlider/Fold, so a hint would never show.
+            // The two "Sensitivity" sliders in CleanupDialog.kt share one title, so they share the single entry above.
         )
     }
 
@@ -1297,10 +1425,7 @@ internal val LocalSettingFocus = androidx.compose.runtime.compositionLocalOf<Str
 @Composable
 internal fun SettingHelpMark(title: String) {
     val help = SettingsHelp.forTitle(title) ?: return
-    Tip(help.hint()) {
-        Text("?", color = T.c.muted, fontSize = 11.sp,
-            modifier = Modifier.padding(start = 6.dp).border(T.c.borderWidth, T.c.border.copy(alpha = 0.6f), RoundedCornerShape(8.dp)).padding(horizontal = 5.dp))
-    }
+    HelpMark(help.hint(), Modifier.padding(start = 6.dp))
 }
 
 /** Highlight and scroll for the setting a search result points at. */

@@ -77,7 +77,7 @@ private val noSongs = L("Add a song to sing over (WAV, MP3, FLAC…). Songs, the
     "Добавьте песню для исполнения (WAV, MP3, FLAC…). Песни, их тексты и минусы хранятся в папке программы, а не в датасете; в датасет попадают только ваши дубли.")
 private val addSongT = L("Add a song…", "Добавить песню…")
 private val songPathT = L("Path to a song file", "Путь к файлу песни")
-private val songsFolderT = L("Or put files into: {0}", "Или положите файлы в: {0}")
+private val songsFolderT = L("Or put files into: {0}", "Или поместите файлы в: {0}")
 private val separateT = L("Make a backing track", "Создать минус")
 private val separateHint = L("The toolkit removes the voice from the song; the result is kept for the next time.",
     "Тулкит уберёт голос из песни; результат сохранится на следующий раз.")

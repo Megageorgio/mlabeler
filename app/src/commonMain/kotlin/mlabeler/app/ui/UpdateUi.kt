@@ -39,7 +39,7 @@ internal object UpdateTitles {
         "Доступна версия {0} (установлена {1}). Загрузка откроется в браузере; на телефоне откройте скачанный файл, чтобы установить его.")
     val autoInstall = L("Download and install new versions by itself", "Скачивать и устанавливать новые версии самостоятельно")
     val autoInstallHint = L("The new version is downloaded in the background and put in place when the program closes, or at once with Restart and update. The settings, models and the toolkit stay as they are.",
-        "Новая версия скачивается в фоне и ставится при закрытии программы или сразу по кнопке «Перезапустить и обновить». Настройки, модели и тулкит остаются как есть.")
+        "Новая версия скачивается в фоне и устанавливается при закрытии программы или сразу по кнопке «Перезапустить и обновить». Настройки, модели и тулкит остаются как есть.")
     val autoInstallHintPhone = L("The new version is downloaded in the background; Install opens the system installer, which asks to confirm.",
         "Новая версия скачивается в фоне; кнопка «Установить» открывает системную установку, которая попросит подтверждение.")
     val downloadInstall = L("Download and install", "Скачать и установить")
@@ -49,7 +49,7 @@ internal object UpdateTitles {
     val onClose = L("When I close it", "При закрытии")
     val readyTitle = L("A new version is ready", "Новая версия готова")
     val readyText = L("Version {0} is downloaded (installed: {1}). It is put in place when mLabeler closes, or now with Restart and update; your work is saved first.",
-        "Версия {0} скачана (установлена {1}). Она встанет при закрытии mLabeler или сразу по кнопке «Перезапустить и обновить»; работа перед этим сохранится.")
+        "Версия {0} скачана (установлена {1}). Она будет установлена при закрытии mLabeler или сразу по кнопке «Перезапустить и обновить»; работа перед этим сохранится.")
     val readyTextPhone = L("Version {0} is downloaded (installed: {1}). Install opens the system installer.",
         "Версия {0} скачана (установлена {1}). Кнопка «Установить» откроет системную установку.")
     fun channelName(c: String) = when (c) { "alpha" -> alpha(); "beta" -> beta(); else -> stable() }

@@ -149,7 +149,7 @@ object S {
     val cannotSave = L("Cannot save: {0}", "Не удалось сохранить: {0}")
     val cannotPlay = L("Playback failed: {0}", "Не удалось воспроизвести: {0}")
     val unsupportedAudio = L("This audio format is not supported here. Convert it to WAV.",
-        "Этот формат здесь не поддерживается. Сконвертируйте в WAV.")
+        "Этот формат здесь не поддерживается. Преобразуйте его в WAV.")
     val labelsUnreadable = L("Labels could not be read: {0}. Saving will replace them.",
         "Разметку не удалось прочитать: {0}. При сохранении она будет заменена.")
     val newTierName = L("tier {0}", "слой {0}")
@@ -268,7 +268,7 @@ object S {
     val environmentUpdate = L("Save changes to \"{0}\"", "Сохранить изменения в «{0}»")
     val reset = L("Reset", "Сбросить")
     val chooseEnvironment = L("Choose a work environment", "Выберите рабочую среду")
-    val chooseEnvironmentHint = L("It can be changed later in View → Work environment.", "Её можно сменить потом: Вид → Рабочая среда.")
+    val chooseEnvironmentHint = L("It can be changed later in View → Work environment.", "Её можно изменить позже: Вид → Рабочая среда.")
     val overlayWaveFill = L("Filled waveform in the overlaid view", "Закрашенная волна в наложенном виде")
     val overlayWaveFillAlpha = L("Waveform opacity over the spectrogram", "Непрозрачность волны поверх спектрограммы")
     val resetToDefault = L("Back to default", "Вернуть по умолчанию")

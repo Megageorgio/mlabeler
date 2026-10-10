@@ -55,10 +55,10 @@ private object SetupTitles {
     val saving = L("Saving the labels", "Сохранение разметки")
     val savingHint = L("Changes can be saved when you go to another file, and also every so often while you work in one file, so a power cut or a crash loses little.",
         "Изменения могут сохраняться при переходе к другому файлу, а также время от времени, пока вы работаете в одном файле: при сбое или отключении питания почти ничего не потеряется.")
-    val autosaveEvery = L("Also save every", "Ещё сохранять каждые")
+    val autosaveEvery = L("Also save every", "Также сохранять каждые")
     val autosaveOff = L("never", "никогда")
     val minutes = L("min", "мин")
-    val next = L("Next", "Дальше")
+    val next = L("Next", "Далее")
     val back = L("Back", "Назад")
 }
 
