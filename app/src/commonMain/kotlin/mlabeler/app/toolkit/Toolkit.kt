@@ -270,11 +270,12 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
 
     /**
      * Starts phoneme recognition without lyrics (WFL-ASR models); returns the job id. With [phonemes] the model
-     * places exactly these phonemes (forced alignment).
+     * places exactly these phonemes (forced alignment). [extraLanguages]: other languages of the song for a
+     * multilingual model; without phonemes each phrase gets the best-fitting language and its labels "lang/phoneme".
      */
     suspend fun segment(fileId: String, model: String, language: String? = null, phonemes: List<String> = emptyList(),
                         options: mlabeler.app.state.WflSettings = mlabeler.app.state.WflSettings(),
-                        refine: mlabeler.app.state.RefineSettings? = null): String {
+                        refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList()): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -286,6 +287,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             }
             put("model", model)
             if (language != null) put("language", language)
+            if (extraLanguages.isNotEmpty()) put("extra_languages", buildJsonArray { extraLanguages.forEach { add(JsonPrimitive(it)) } })
             if (options.confidence >= 0f) put("confidence_threshold", options.confidence.toDouble())
             put("decoder", options.decoder)
             put("viterbi_bias", options.viterbiBias.toDouble())

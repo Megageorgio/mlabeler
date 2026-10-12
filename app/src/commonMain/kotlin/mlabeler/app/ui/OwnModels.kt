@@ -45,7 +45,9 @@ private val kindHfa = L("Aligns to text (HubertFA)", "Выравнивает п�
 private val kindTifa = L("Aligns to text (TIFA)", "Выравнивает по тексту (TIFA)")
 private val kindRefiner = L("Refines boundaries (mRefinerModel)", "Уточняет границы (mRefinerModel)")
 private val langT = L("Language", "Язык")
-private val langHint = L("code, e.g. ru", "код, например ru")
+private val langHint = L("code, e.g. ru; several: ja, en", "код, например ru; несколько: ja, en")
+private val langNote = L("A WFL-ASR model with langs.txt gets its own languages, whatever is written here.",
+    "Модель WFL-ASR с файлом langs.txt получает свои языки из него, что бы здесь ни было написано.")
 private val nameT = L("Name in the list", "Название в списке")
 private val addBtn = L("Add the model", "Добавить модель")
 private val adding = L("Adding… (the checkpoint is copied)", "Добавление… (чекпоинт копируется)")
@@ -102,13 +104,14 @@ fun OwnModelsSection(app: AppState) {
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 Text(langT() + (LanguageNames.of(lang, "").takeIf { it.isNotEmpty() }?.let { " · $it" } ?: ""), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
-                Field(lang, { lang = it.trim().lowercase() }, Modifier.fillMaxWidth(), placeholder = langHint())
+                Field(lang, { lang = it.lowercase() }, Modifier.fillMaxWidth(), placeholder = langHint())
             }
             Column(Modifier.weight(2f)) {
                 Text(nameT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
                 Field(name, { name = it }, Modifier.fillMaxWidth(), placeholder = path.substringAfterLast('\\').substringAfterLast('/').substringBeforeLast('.'))
             }
         }
+        if (engine == "wfl_asr") Text(langNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Btn(addBtn(), primary = true, enabled = path.isNotBlank() && !busy) {
                 busy = true

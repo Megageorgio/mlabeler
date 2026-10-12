@@ -136,6 +136,10 @@ private val ownModelLink = L("Add your own model…", "Добавить свою
 private val checkTextsLink = L("Check the texts of the files, recognise the empty ones…", "Проверить тексты файлов, распознать пустые…")
 private val checkWordsLink = L("Check the words and own words of the model…", "Проверить слова и собственные слова модели…")
 private val otherLangs = L("Other languages in the text", "Другие языки в тексте")
+private val otherLangsWflNote = L("For songs in several languages. Without phonemes every phrase gets the language that fits it best, " +
+    "its labels with the language in front (en/s). With phonemes, write other-language ones as en/s.",
+    "Для песен на нескольких языках. Без фонем каждая фраза получает язык, который ей лучше подходит, " +
+    "её метки — с языком впереди (en/s). С фонемами пишите фонемы другого языка как en/s.")
 private val otherLangsNote = L("For example English words in Chinese lyrics. Their phonemes get the language in front: en/s.",
     "Например, английские слова в китайском тексте. Их фонемы будут с языком впереди: en/s.")
 
@@ -165,9 +169,11 @@ fun AutolabelDialog(app: AppState) {
     var lang by remember(task) { mutableStateOf(settings.lastLanguage) }
     var model by remember(task) { mutableStateOf(if (recognizeMode) settings.lastSegmentModel else settings.lastModel) }
     var extraLangs by remember { mutableStateOf(settings.extraLanguages) }
-    // a model that reads several languages in one text (TIFA): the other languages it knows
+    // a model that reads several languages in one text (TIFA), or a multilingual WFL-ASR model (recognition):
+    // the other languages it knows
     val modelEngine = langs?.firstNotNullOfOrNull { g -> g.models.firstOrNull { it.id == model }?.engine }
-    val otherLangCodes = if (modelEngine != "tifa" || recognizeMode) emptyList()
+    val severalLanguages = if (recognizeMode) modelEngine?.startsWith("wfl") == true else modelEngine == "tifa"
+    val otherLangCodes = if (!severalLanguages) emptyList()
         else langs.orEmpty().filter { g -> g.code != lang && g.code != "*" && g.models.any { it.id == model } }.map { it.code }
     val extra = extraLangs.filter { it in otherLangCodes }
     LaunchedEffect(langs) {
@@ -202,7 +208,8 @@ fun AutolabelDialog(app: AppState) {
             val files = if (batch) ed.batchFiles(which) else emptyList()
             Btn(run(), primary = true, enabled = modelOk && error == null && !textMissing && !recognising && (!batch || files.isNotEmpty())) {
                 app.update {
-                    val t = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang)
+                    val t = if (recognizeMode) it.toolkit.copy(lastSegmentModel = model, lastLanguage = lang,
+                        extraLanguages = if (otherLangCodes.isEmpty()) it.toolkit.extraLanguages else extra)
                     else it.toolkit.copy(lastModel = model, lastLanguage = lang, whisper = whisper, whisperDirect = if (batch) it.toolkit.whisperDirect else direct,
                         extraLanguages = if (otherLangCodes.isEmpty()) it.toolkit.extraLanguages else extra)
                     it.copy(toolkit = t)
@@ -282,7 +289,7 @@ fun AutolabelDialog(app: AppState) {
                         Chip(name, code in extra) { extraLangs = if (code in extraLangs) extraLangs - code else extraLangs + code }
                     }
                 }
-                Text(otherLangsNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(if (recognizeMode) otherLangsWflNote() else otherLangsNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             }
             Text(ownModelLink(), color = c.accent, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)
                 .clickable { app.settingsPage = "Toolkit"; app.showAutolabel = false; app.showSettings = true })

@@ -165,7 +165,7 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
             val fileId = client.upload(it.name + "_part.wav", wav)
             val job = if (recognize) {
-                client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter())
+                client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter(), extraLanguages)
             } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
                 settings.toolkit.breaths, settings.toolkit.splitSeconds.takeIf { settings.toolkit.splitLong })
             serverJob = job
@@ -252,7 +252,7 @@ fun EditorState.autolabelFiles(
                     } else null
                     val upload = if (Wav.isWav(bytes)) bytes else withContext(Dispatchers.Default) { Wav.encode16(a) }
                     val fileId = client.upload(Paths.stem(f.audioPath) + ".wav", upload)
-                    val job = if (recognize) client.segment(fileId, model, language, known, settings.toolkit.wfl, refineAfter())
+                    val job = if (recognize) client.segment(fileId, model, language, known, settings.toolkit.wfl, refineAfter(), extraLanguages)
                     else {
                         val asPhonemes = source == EditorState.BatchText.Labels || (txt != null && (phonemes || mlabeler.core.format.TextImport.looksLikeLab(txt)))
                         val text = when {
