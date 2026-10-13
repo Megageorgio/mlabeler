@@ -279,7 +279,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
      */
     suspend fun segment(fileId: String, model: String, language: String? = null, phonemes: List<String> = emptyList(),
                         options: mlabeler.app.state.WflSettings = mlabeler.app.state.WflSettings(),
-                        refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList()): String {
+                        refine: mlabeler.app.state.RefineSettings? = null, extraLanguages: List<String> = emptyList(), confidence: Boolean = false): String {
         val req = buildJsonObject {
             putJsonObject("input") {
                 put("items", buildJsonArray {
@@ -297,6 +297,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             put("viterbi_bias", options.viterbiBias.toDouble())
             put("silence_threshold", options.silenceThreshold.toDouble())
             put("min_silence_duration", options.minSilence.toDouble())
+            if (confidence) put("confidence", true)
             putRefine(refine)
             putJsonObject("output") {
                 put("formats", JsonArray(emptyList()))
@@ -441,7 +442,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         }
 
         /** Tiers of the first item's label, times shifted by [offset] seconds. */
-        fun labelOf(result: JsonObject, offset: Double, duration: Double, index: Int = 0): LabelDoc {
+        fun labelOf(result: JsonObject, offset: Double, duration: Double, index: Int = 0, confidence: Boolean = true): LabelDoc {
             val item = result["items"]!!.jsonArray.getOrNull(index)?.jsonObject ?: throw ToolkitException("no result")
             if ((item["ok"] as? JsonPrimitive)?.content == "false") throw ToolkitException((item["error"] as? JsonPrimitive)?.content ?: "failed")
             val tiers = item["label"]?.jsonObject?.get("tiers")?.jsonObject ?: throw ToolkitException("no labels in the result")
@@ -453,7 +454,7 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
                     Triple(o["start"]!!.jsonPrimitive.content.toDouble() + offset, o["end"]!!.jsonPrimitive.content.toDouble() + offset, o["text"]!!.jsonPrimitive.content)
                 }
                 val conf = tiers[name]!!.jsonArray.map { (it.jsonObject["confidence"] as? JsonPrimitive)?.doubleOrNull?.toFloat() }
-                IntervalTier.fromIntervals(name, ivs, offset + duration, if (conf.any { it != null }) conf else null)
+                IntervalTier.fromIntervals(name, ivs, offset + duration, if (confidence && conf.any { it != null }) conf else null)
             })
         }
     }

@@ -360,6 +360,8 @@ private fun sectionTitle(s: Section) = when (s) {
 }
 
 /** Settings split into pages: a list on the left on wide windows, tabs on top on narrow ones. */
+private val confidenceBelowT = L("Mark a phoneme when the model's confidence is below", "Отмечать фонему, если уверенность модели ниже")
+
 @Composable
 fun SettingsDialog(app: AppState) {
     val c = T.c
@@ -598,6 +600,10 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier, fi
                         app.update { it.copy(checks = it.checks.copy(phrasePauseMs = v.roundToInt().toDouble())) }
                     }
                     Text(CheckTitles.zeroOff(), color = c.muted, fontSize = 12.sp)
+                    MarkUnsureSwitch(app)
+                    ValueSlider(confidenceBelowT(), s.checks.confidenceBelow * 100, 5f..95f, "%", default = dC.confidenceBelow * 100) { v ->
+                        app.update { it.copy(checks = it.checks.copy(confidenceBelow = v.roundToInt() / 100f)) }
+                    }
                     SwitchRow(CheckTitles.diffsinger(), s.checks.diffsinger) { v -> app.update { it.copy(checks = it.checks.copy(diffsinger = v)) } }
                     SwitchRow(CheckTitles.edges(), s.checks.pauseAtEdges) { v -> app.update { it.copy(checks = it.checks.copy(pauseAtEdges = v)) } }
                     if (s.checks.pauseAtEdges) {

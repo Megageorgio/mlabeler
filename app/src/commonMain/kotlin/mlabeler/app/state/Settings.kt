@@ -203,6 +203,11 @@ data class ToolkitSettings(
     val token: String = "",
     val lastModel: String = "",
     val lastLanguage: String = "",
+    /**
+     * Autolabelling (and quick labelling) keeps the model's confidence in every phoneme, so the checks mark those
+     * it isn't sure of (below checks.confidenceBelow). Off by default.
+     */
+    val markUnsure: Boolean = false,
     /** The author last given to an own model (Settings → Autolabel → your own models). */
     val lastAuthor: String = "",
     /** Other languages that may occur in the text (TIFA models), e.g. en for English words in Chinese lyrics. */

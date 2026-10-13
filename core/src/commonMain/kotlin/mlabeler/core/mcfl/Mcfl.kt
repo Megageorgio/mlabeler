@@ -36,7 +36,8 @@ import kotlin.math.sin
  * repository's mcfl_infer.py.
  */
 class Mcfl(config: String, weights: ByteArray) {
-    data class Segment(val start: Double, val end: Double, val label: String)
+    /** [confidence]: the mean probability of the label over its frames (0..1), when asked for. */
+    data class Segment(val start: Double, val end: Double, val label: String, val confidence: Float? = null)
 
     val name: String
     /** Language codes, in the order of their ids. */
@@ -147,7 +148,8 @@ class Mcfl(config: String, weights: ByteArray) {
      * Labels [audio] in [language]: continuous segments covering all of it, in seconds from its start. Long audio
      * goes in overlapping windows. [native]: shared phoneme names become the language's own. [progress] gets 0..1.
      */
-    suspend fun label(audio: Audio, language: String, native: Boolean = true, threads: Int = 1, progress: (Double) -> Unit = {}): List<Segment> {
+    suspend fun label(audio: Audio, language: String, native: Boolean = true, threads: Int = 1, confidence: Boolean = false,
+                      progress: (Double) -> Unit = {}): List<Segment> {
         val lid = languages.indexOf(language)
         if (lid < 0) throw IllegalArgumentException("$name has no language $language: ${languages.joinToString(" ")}")
         val a = (if (audio.sampleRate == sr) audio.samples.copyOf() else Dataset.resample(audio, sr).samples)
@@ -155,7 +157,8 @@ class Mcfl(config: String, weights: ByteArray) {
         for (v in a) peak = max(peak, abs(v))
         for (i in a.indices) a[i] = a[i] / (peak + 1e-8f)
         val (lp, off, frames) = frames(a, lid, threads, progress)
-        val segs = Decoder(lid).decode(lp, off, frames, a)
+        var segs = Decoder(lid).decode(lp, off, frames, a)
+        if (confidence) segs = withConfidence(segs, lp, frames)
         return if (!native) segs else segs.map { s -> merge[s.label]?.get(language)?.let { s.copy(label = it) } ?: s }
     }
 
@@ -167,6 +170,22 @@ class Mcfl(config: String, weights: ByteArray) {
         for (i in a.indices) a[i] = a[i] / (peak + 1e-8f)
         val (lp, off, _) = frames(a, languages.indexOf(language), 1) {}
         return lp to off
+    }
+
+    /** Each segment with the mean probability (B- + I- of its label) over its frames. */
+    private fun withConfidence(segs: List<Segment>, lp: FloatArray, frames: Int): List<Segment> {
+        val nl = labels.size
+        val index = labels.withIndex().associate { (i, l) -> l to i }
+        val fd = fd()
+        return segs.map { s ->
+            val cols = listOfNotNull(index["B-${s.label}"], index["I-${s.label}"])
+            if (cols.isEmpty() || frames == 0) return@map s
+            val f0 = (s.start / fd).toInt().coerceIn(0, frames - 1)
+            val f1 = kotlin.math.round(s.end / fd).toInt().coerceIn(f0 + 1, frames)
+            var sum = 0.0
+            for (f in f0 until f1) for (c in cols) sum += exp(lp[f * nl + c].toDouble())
+            s.copy(confidence = (sum / (f1 - f0)).toFloat())
+        }
     }
 
     private fun fd() = decode["frame_sec"]?.jsonPrimitive?.double ?: 0.02

@@ -90,6 +90,20 @@ fun RefineOptions(app: AppState, r: RefineSettings, onChange: (RefineSettings) -
     Text(modeAboutT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
 }
 
+internal val markUnsureT = L("Mark the phonemes the model isn't sure of (checks)", "Отмечать фонемы, в которых модель не уверена (проверка)")
+internal val markUnsureAboutT = L(
+    "The model's confidence in every phoneme is kept (WFL-ASR, MCFL, quick labelling); the checks mark those below the threshold of Settings → Checks, with the percent. A phoneme set by hand, even confirmed with Enter unchanged, loses its mark.",
+    "Уверенность модели в каждой фонеме сохраняется (WFL-ASR, MCFL, быстрая разметка); проверка отмечает фонемы ниже порога из Настройки → Проверки, с процентом. Фонема, проставленная вручную (даже подтверждённая Enter без изменений), отметку теряет.",
+)
+
+/** The switch: keep the model's confidence and mark the unsure phonemes (off by default). */
+@Composable
+fun MarkUnsureSwitch(app: AppState, hint: Boolean = true) {
+    val c = T.c
+    SwitchRow(markUnsureT(), app.settings.toolkit.markUnsure) { v -> app.update { it.copy(toolkit = it.toolkit.copy(markUnsure = v)) } }
+    if (hint && app.settings.toolkit.markUnsure) Text(markUnsureAboutT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+}
+
 /** The switch in the autolabel dialog: refine after labelling (kept in the settings, off by default). */
 @Composable
 fun RefineAfterSwitch(app: AppState) {

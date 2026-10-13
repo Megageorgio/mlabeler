@@ -130,9 +130,12 @@ object Edits {
     fun setText(doc: LabelDoc, ref: IntervalRef, text: String): LabelDoc {
         // a name typed for an interval that no longer exists (undone, merged, another file) is dropped
         val tier = doc.tiers.getOrNull(ref.tier) as? IntervalTier ?: return doc
-        if (ref.index !in tier.texts.indices || tier.texts[ref.index] == text) return doc
+        if (ref.index !in tier.texts.indices) return doc
+        // a label set by hand, even the same one confirmed again, is no longer the model's guess: its confidence goes
+        val conf = tier.confidence?.takeIf { it[ref.index] != null }?.toMutableList()?.apply { this[ref.index] = null }
+        if (tier.texts[ref.index] == text && conf == null) return doc
         val nt = tier.texts.toMutableList().apply { this[ref.index] = text }
-        return doc.replace(ref.tier, tier.copy(texts = nt))
+        return doc.replace(ref.tier, tier.copy(texts = nt, confidence = conf?.takeIf { c -> c.any { it != null } } ?: if (conf != null) null else tier.confidence))
     }
 
     /** Sets texts of several intervals at once (bulk rename). */

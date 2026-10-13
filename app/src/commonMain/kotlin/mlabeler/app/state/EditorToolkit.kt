@@ -165,7 +165,8 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
             val fileId = client.upload(it.name + "_part.wav", wav)
             val job = if (recognize) {
-                client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter(), extraLanguages)
+                client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter(), extraLanguages,
+                    confidence = settings.toolkit.markUnsure)
             } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
                 settings.toolkit.breaths, settings.toolkit.splitSeconds.takeIf { settings.toolkit.splitLong })
             serverJob = job
@@ -178,7 +179,8 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
                 if (prev != null && prev.substringBefore(':').substringBefore('(').trim() != key) { toolkitSteps.add(prev); while (toolkitSteps.size > 6) toolkitSteps.removeAt(0) }
                 toolkitBusy = st
             }
-            val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate)
+            val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate,
+                confidence = settings.toolkit.markUnsure)
             if (replace) {
                 placeLabels(part, from, to)
             } else {
@@ -257,7 +259,7 @@ fun EditorState.autolabelFiles(
                     } else null
                     val upload = if (Wav.isWav(bytes)) bytes else withContext(Dispatchers.Default) { Wav.encode16(a) }
                     val fileId = client.upload(Paths.stem(f.audioPath) + ".wav", upload)
-                    val job = if (recognize) client.segment(fileId, model, language, known, settings.toolkit.wfl, refineAfter(), extraLanguages)
+                    val job = if (recognize) client.segment(fileId, model, language, known, settings.toolkit.wfl, refineAfter(), extraLanguages, confidence = settings.toolkit.markUnsure)
                     else {
                         val asPhonemes = source == EditorState.BatchText.Labels || (txt != null && (phonemes || mlabeler.core.format.TextImport.looksLikeLab(txt)))
                         val text = when {
@@ -276,7 +278,7 @@ fun EditorState.autolabelFiles(
                     }
                     serverJob = null
                     mlabeler.app.toolkit.ToolkitClient.diagnosisOf(result)?.takeIf { it.weak }?.let { unsure += f.name + " · " + selfCheckShort(it) }
-                    val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, 0.0, a.duration)
+                    val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, 0.0, a.duration, confidence = settings.toolkit.markUnsure)
                     fun merged(d: LabelDoc): LabelDoc {
                         var out = d
                         for (pt in part.tiers.filterIsInstance<IntervalTier>()) {
