@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -471,6 +473,25 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                         val region = g.region(down.position.y, (if (touch) 16f else 8f) * density)
                         val mods = first.keyboardModifiers
                         fun timeAt(x: Float) = ed.viewStart + x / ed.pixelsPerSecond
+                        // a second finger turns any touch into a pinch: it zooms and pans until the fingers are up,
+                        // whatever the first finger touched (a boundary, the brush…)
+                        suspend fun AwaitPointerEventScope.pinch(start: PointerEvent) {
+                            var ev = start
+                            while (true) {
+                                val pressed = ev.changes.filter { it.pressed }
+                                if (pressed.isEmpty()) break
+                                if (pressed.size >= 2) {
+                                    val zoom = ev.calculateZoom()
+                                    val centroid = ev.calculateCentroid(useCurrent = true)
+                                    val prevCentroid = ev.calculateCentroid(useCurrent = false)
+                                    if (zoom != 1f) ed.zoom(zoom.toDouble(), ed.viewStart + centroid.x / ed.pixelsPerSecond)
+                                    ed.scrollBy((prevCentroid.x - centroid.x).toDouble())
+                                }
+                                ev.changes.forEach { it.consume() }
+                                ev = awaitPointerEvent()
+                            }
+                        }
+                        fun twoFingers(ev: PointerEvent) = ev.changes.count { it.pressed } >= 2
                         val downTime = timeAt(down.position.x)
 
                         // lines between lanes: the two lanes share their height differently (labels: their row height)
@@ -558,6 +579,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             var last = down.position
                             while (true) {
                                 val ev = awaitPointerEvent()
+                                if (twoFingers(ev)) { pinch(ev); return@awaitEachGesture }
                                 val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
                                 if (!chg.pressed) break
                                 val p = chg.position
@@ -733,6 +755,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             var moved = false
                             while (true) {
                                 val ev = awaitPointerEvent()
+                                if (touch && twoFingers(ev)) { ed.endNoteDrag(); pinch(ev); return@awaitEachGesture }
                                 val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
                                 if (!chg.pressed) break
                                 if (chg.positionChange() != Offset.Zero) {
@@ -755,10 +778,18 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                             val offset = (tier?.bounds?.get(bound.bound) ?: downTime) - downTime
                             // with a mouse the boundary goes right under the pointer; a finger would hide it, so it keeps its distance
                             val follow = if (touch) offset else 0.0
+                            val selectedBefore = ed.selection
                             ed.beginDrag(bound)
                             var moved = false
                             while (true) {
                                 val ev = awaitPointerEvent()
+                                if (twoFingers(ev)) {
+                                    // the first finger of a pinch landed on a boundary: it isn't moved or selected
+                                    ed.cancelDrag()
+                                    ed.selection = selectedBefore
+                                    pinch(ev)
+                                    return@awaitEachGesture
+                                }
                                 val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
                                 if (!chg.pressed) break
                                 if (chg.positionChange() != Offset.Zero) {
