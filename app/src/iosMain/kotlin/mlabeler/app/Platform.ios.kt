@@ -119,4 +119,9 @@ actual class AudioOut actual constructor() {
 @Composable
 actual fun StorageAccess(content: @Composable () -> Unit) = content()
 
-actual fun builtinAsset(path: String): ByteArray? = null
+/** The files of app/builtin are copied into the app bundle as the folder "builtin" (iosApp/project.yml). */
+actual fun builtinAsset(path: String): ByteArray? {
+    val root = platform.Foundation.NSBundle.mainBundle.resourcePath ?: return null
+    val file = "$root/builtin/$path"
+    return if (mlabeler.core.io.PlatformFs.exists(file)) runCatching { mlabeler.core.io.PlatformFs.read(file) }.getOrNull() else null
+}

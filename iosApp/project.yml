@@ -8,7 +8,12 @@ targets:
   mLabeler:
     type: application
     platform: iOS
-    sources: [iosApp]
+    sources:
+      - iosApp
+      # files that come with the program (the quick labelling model), as the folder "builtin" in the bundle
+      - path: ../app/builtin
+        type: folder
+        buildPhase: resources
     info:
       path: iosApp/Info.plist
       properties:
