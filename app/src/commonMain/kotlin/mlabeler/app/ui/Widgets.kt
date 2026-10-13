@@ -618,12 +618,15 @@ fun ClassicSlider(value: Float, range: ClosedFloatingPointRange<Float>, onChange
 
 /**
  * Vertical scrolling with a quiet hint that there is more: a thin bar at the right edge, shown only when the
- * content does not fit (brighter while it moves).
+ * content does not fit (brighter while it moves). With a mouse the bar can be grabbed and dragged, and a press next
+ * to it jumps there; it widens under the pointer.
  */
 @Composable
 fun Modifier.scrollWithHint(state: androidx.compose.foundation.ScrollState = androidx.compose.foundation.rememberScrollState()): Modifier {
     val c = T.c
     val color = c.muted
+    var hot by remember { mutableStateOf(false) }
+    var dragging by remember { mutableStateOf(false) }
     return this.drawWithContent {
         drawContent()
         val max = state.maxValue
@@ -632,13 +635,48 @@ fun Modifier.scrollWithHint(state: androidx.compose.foundation.ScrollState = and
         val total = h + max
         val thumb = (h * h / total).coerceAtLeast(24.dp.toPx()).coerceAtMost(h)
         val top = (h - thumb) * state.value / max
-        val w = 3.dp.toPx()
+        val w = (if (hot || dragging) 6.dp else 3.dp).toPx()
         drawRoundRect(
-            color.copy(alpha = if (state.isScrollInProgress) 0.7f else 0.35f),
+            color.copy(alpha = if (dragging) 0.85f else if (state.isScrollInProgress || hot) 0.7f else 0.35f),
             topLeft = androidx.compose.ui.geometry.Offset(size.width - w - 2.dp.toPx(), top),
             size = androidx.compose.ui.geometry.Size(w, thumb),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2, w / 2),
         )
+    }.pointerInput(state) {
+        awaitPointerEventScope {
+            while (true) {
+                val e = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                val ch = e.changes.firstOrNull() ?: continue
+                val max = state.maxValue
+                val strip = 12.dp.toPx()
+                val mouse = ch.type == androidx.compose.ui.input.pointer.PointerType.Mouse
+                val onBar = mouse && max > 0 && max != Int.MAX_VALUE && ch.position.x >= size.width - strip
+                if (e.type == androidx.compose.ui.input.pointer.PointerEventType.Exit) { hot = false; continue }
+                if (!ch.pressed) { hot = onBar; continue }
+                if (!onBar || ch.previousPressed) continue
+                // grabbed: the thumb follows the pointer; a press beside the thumb brings its middle there
+                val h = size.height.toFloat()
+                val thumb = (h * h / (h + max)).coerceAtLeast(24.dp.toPx()).coerceAtMost(h)
+                val top = (h - thumb) * state.value / max
+                val grab = if (ch.position.y in top..top + thumb) ch.position.y - top else thumb / 2
+                fun scrollTo(y: Float) {
+                    val t = (y - grab).coerceIn(0f, (h - thumb).coerceAtLeast(1f))
+                    val target = (t / (h - thumb).coerceAtLeast(1f) * max).toInt()
+                    state.dispatchRawDelta((target - state.value).toFloat())
+                }
+                dragging = true
+                scrollTo(ch.position.y)
+                ch.consume()
+                while (true) {
+                    val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    val c2 = ev.changes.firstOrNull { it.id == ch.id } ?: break
+                    if (!c2.pressed) { c2.consume(); break }
+                    scrollTo(c2.position.y)
+                    c2.consume()
+                }
+                dragging = false
+            }
+        }
     }.verticalScroll(state)
 }
 
