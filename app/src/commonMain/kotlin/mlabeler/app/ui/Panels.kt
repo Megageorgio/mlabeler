@@ -552,8 +552,8 @@ private val compareHint = mlabeler.app.i18n.L(
 private val addFolder = mlabeler.app.i18n.L("Add folder…", "Добавить папку…")
 private val useThese = mlabeler.app.i18n.L("Use these labels", "Использовать эту разметку")
 private val prevDiff = mlabeler.app.i18n.L("Previous place where they differ", "Предыдущее место, где они расходятся")
-private val nextDiff = mlabeler.app.i18n.L("Next place where they differ (a boundary 30 ms or more away, or another text)",
-    "Следующее место, где они расходятся (граница дальше 30 мс или другой текст)")
+private val nextDiff = mlabeler.app.i18n.L("Next place where they differ (a boundary 30 ms or more away, or an incorrect label)",
+    "Следующее место, где они расходятся (граница дальше 30 мс или некорректная метка)")
 private val diffCount = mlabeler.app.i18n.L("{0} places differ", "мест с расхождениями: {0}")
 private val noDiff = mlabeler.app.i18n.L("no differences", "расхождений нет")
 private val wholeFolder = mlabeler.app.i18n.L("Whole folder", "Вся папка")
@@ -565,8 +565,8 @@ private val counting = mlabeler.app.i18n.L("Counting…", "Подсчёт…")
 private val showRef = mlabeler.app.i18n.L("Show under the labels", "Показать под разметкой")
 private val hideRef = mlabeler.app.i18n.L("Hide (stays in this list)", "Скрыть (останется в этом списке)")
 private val noMatch = mlabeler.app.i18n.L("no labels for this file", "для этого файла разметки нет")
-private val statsLine = mlabeler.app.i18n.L("{0} ms average, {1} ms median, {2}% under 20 ms, {3} other texts",
-    "в среднем {0} мс, медиана {1} мс, {2}% ближе 20 мс, другой текст: {3}")
+private val statsLine = mlabeler.app.i18n.L("{0} ms average, {1} ms median, {2}% under 20 ms, {3} incorrect",
+    "в среднем {0} мс, медиана {1} мс, {2}% ближе 20 мс, некорректно: {3}")
 
 @Composable
 private fun CompareSection(ed: EditorState) {
