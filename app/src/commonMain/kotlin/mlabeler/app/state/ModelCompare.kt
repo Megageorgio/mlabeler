@@ -29,12 +29,11 @@ import mlabeler.core.model.LabelDoc
  */
 class ModelComparison(private val ed: EditorState) {
     /**
-     * A model and how it runs: [withPhonemes] gives it the phonemes of the labels to place (WFL-ASR can; MCFL only
-     * recognises). [key] tells the two runs of one model apart.
+     * A model and how it runs: [withPhonemes] gives it the phonemes of the labels to place (it only finds their
+     * boundaries). [key] tells the two runs of one model apart.
      */
     data class Candidate(val id: String, val name: String, val engine: String, val author: String = "", val withPhonemes: Boolean = false) {
         val key: String get() = if (withPhonemes) "$id#phonemes" else id
-        val takesPhonemes: Boolean get() = engine != "mcfl"
     }
 
     /** One model's result over everything compared. */

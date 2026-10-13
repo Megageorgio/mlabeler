@@ -70,8 +70,8 @@ private val withoutT = L("Without phonemes", "Без фонем")
 private val withT = L("With the phonemes of the labels", "С фонемами разметки")
 private val bothT = L("Both", "Оба варианта")
 private val withAboutT = L(
-    "With phonemes a model only places the phonemes of your labels (WFL-ASR): the boundaries are what is compared. MCFL can't take phonemes and runs without them.",
-    "С фонемами модель только расставляет фонемы вашей разметки (WFL-ASR): сравниваются границы. MCFL фонемы не принимает и работает без них.",
+    "With phonemes a model only places the phonemes of your labels: the boundaries are what is compared.",
+    "С фонемами модель только расставляет фонемы вашей разметки: сравниваются границы.",
 )
 private val withSuffix = L("with phonemes", "с фонемами")
 private val withoutSuffix = L("without phonemes", "без фонем")
@@ -103,13 +103,13 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
         }
     }
     val picked = candidates.filter { it.id in mc.chosen }.flatMap { m ->
-        // the runs of each model: without phonemes, with them (models that take them), or both
+        // the runs of each model: without phonemes, with them, or both
         val without = m.copy(name = if (mc.phonemeMode == 0) m.name else m.name + " · " + withoutSuffix())
         val with = m.copy(name = m.name + " · " + withSuffix(), withPhonemes = true)
         when (mc.phonemeMode) {
             0 -> listOf(m)
-            1 -> listOf(if (m.takesPhonemes) with else without)
-            else -> if (m.takesPhonemes) listOf(without, with) else listOf(without)
+            1 -> listOf(with)
+            else -> listOf(without, with)
         }
     }
 
