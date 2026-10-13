@@ -41,7 +41,7 @@ object Environments {
             Environment(
                 "labeling", LayoutSettings(showInspector = true),
                 ToolbarSettings(listOf(ToolbarGroups.FILES, ToolbarGroups.HISTORY, ToolbarGroups.PLAY, ToolbarGroups.EDIT, ToolbarGroups.MODES,
-                    ToolbarGroups.AUTO, ToolbarGroups.MARKS, ToolbarGroups.ZOOM), labels = true, big = false),
+                    ToolbarGroups.AUTO, ToolbarGroups.QUICK, ToolbarGroups.MARKS, ToolbarGroups.ZOOM), labels = true, big = false),
             )
         },
         BuiltIn(
@@ -51,7 +51,7 @@ object Environments {
             Environment(
                 "singing", LayoutSettings(showInspector = true, showPitch = true, pitchOverSpectrogram = false, showPower = true, waveShare = 0.3f),
                 ToolbarSettings(listOf(ToolbarGroups.FILES, ToolbarGroups.HISTORY, ToolbarGroups.PLAY, ToolbarGroups.EDIT, ToolbarGroups.MODES,
-                    ToolbarGroups.AUTO, ToolbarGroups.MARKS, ToolbarGroups.ZOOM), labels = true, big = false),
+                    ToolbarGroups.AUTO, ToolbarGroups.QUICK, ToolbarGroups.MARKS, ToolbarGroups.ZOOM), labels = true, big = false),
             )
         },
         BuiltIn(
@@ -60,7 +60,7 @@ object Environments {
         ) {
             Environment(
                 "oto", LayoutSettings(showInspector = true, entriesSeparate = true, entriesSide = "left", showPitch = false, waveShare = 0.45f),
-                ToolbarSettings(listOf(ToolbarGroups.FILES, ToolbarGroups.HISTORY, ToolbarGroups.PLAY, ToolbarGroups.MODES, ToolbarGroups.AUTO,
+                ToolbarSettings(listOf(ToolbarGroups.FILES, ToolbarGroups.HISTORY, ToolbarGroups.PLAY, ToolbarGroups.MODES, ToolbarGroups.AUTO, ToolbarGroups.QUICK,
                     ToolbarGroups.ZOOM), labels = true, big = false),
             )
         },
@@ -89,8 +89,8 @@ object Environments {
                     overlayDim = 0.34f, overlayWaveFill = true, overlayWaveFillAlpha = 1f,
                 ),
                 ToolbarSettings(
-                    listOf(ToolbarGroups.HISTORY, ToolbarGroups.AUTO, ToolbarGroups.MARKS, ToolbarGroups.VIEW, ToolbarGroups.EXTRAS, ToolbarGroups.FILES),
-                    order = listOf(ToolbarGroups.PLAY, ToolbarGroups.EDIT, ToolbarGroups.HISTORY, ToolbarGroups.MODES, ToolbarGroups.AUTO,
+                    listOf(ToolbarGroups.HISTORY, ToolbarGroups.AUTO, ToolbarGroups.QUICK, ToolbarGroups.MARKS, ToolbarGroups.VIEW, ToolbarGroups.EXTRAS, ToolbarGroups.FILES),
+                    order = listOf(ToolbarGroups.PLAY, ToolbarGroups.EDIT, ToolbarGroups.HISTORY, ToolbarGroups.MODES, ToolbarGroups.AUTO, ToolbarGroups.QUICK,
                         ToolbarGroups.MARKS, ToolbarGroups.VIEW, ToolbarGroups.EXTRAS, ToolbarGroups.FILES, ToolbarGroups.ZOOM),
                     scaleButton = false,
                 ),

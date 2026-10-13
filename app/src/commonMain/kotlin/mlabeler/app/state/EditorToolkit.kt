@@ -180,15 +180,7 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             }
             val part = mlabeler.app.toolkit.ToolkitClient.labelOf(result, s0.toDouble() / a.sampleRate, (s1 - s0).toDouble() / a.sampleRate)
             if (replace) {
-                updateDocShowingChanges { d ->
-                    var out = d
-                    for (pt in part.tiers.filterIsInstance<IntervalTier>()) {
-                        val k = out.tierIndex(pt.name).takeIf { k -> k >= 0 } ?: if (pt.name == "phones") out.phonemeTierIndex() else -1
-                        if (k >= 0) out = out.replace(k, mlabeler.core.edit.RangeEdits.replace(out.tiers[k] as IntervalTier, from, to, pt))
-                        else out = out.copy(tiers = listOf(mlabeler.core.edit.RangeEdits.replace(IntervalTier.empty(pt.name, duration), from, to, pt)) + out.tiers)
-                    }
-                    out
-                }
+                placeLabels(part, from, to)
             } else {
                 modelResults[it.id] = modelResults[it.id].orEmpty() + EditorState.Reference(model, "", part, from to to)
                 loadReferences()
@@ -205,6 +197,19 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             toolkitBusy = null
             toolkitProgress = null
         }
+    }
+}
+
+/** Puts the tiers of [part] into [from]..[to] of the tiers with the same names ("phones": the phoneme tier). */
+fun EditorState.placeLabels(part: LabelDoc, from: Double, to: Double) {
+    updateDocShowingChanges { d ->
+        var out = d
+        for (pt in part.tiers.filterIsInstance<IntervalTier>()) {
+            val k = out.tierIndex(pt.name).takeIf { k -> k >= 0 } ?: if (pt.name == "phones") out.phonemeTierIndex() else -1
+            if (k >= 0) out = out.replace(k, mlabeler.core.edit.RangeEdits.replace(out.tiers[k] as IntervalTier, from, to, pt))
+            else out = out.copy(tiers = listOf(mlabeler.core.edit.RangeEdits.replace(IntervalTier.empty(pt.name, duration), from, to, pt)) + out.tiers)
+        }
+        out
     }
 }
 

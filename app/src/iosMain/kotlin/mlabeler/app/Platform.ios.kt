@@ -118,3 +118,5 @@ actual class AudioOut actual constructor() {
 
 @Composable
 actual fun StorageAccess(content: @Composable () -> Unit) = content()
+
+actual fun builtinAsset(path: String): ByteArray? = null

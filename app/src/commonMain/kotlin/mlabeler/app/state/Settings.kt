@@ -244,6 +244,13 @@ data class ToolkitSettings(
     }
 }
 
+/** Quick labelling by the model that comes with the program (see [mlabeler.app.state.QuickLabel]). */
+@Serializable
+data class QuickLabelSettings(
+    /** Language of the singing; empty = the language of the interface if the model knows it, else English. */
+    val language: String = "",
+)
+
 @Serializable
 data class ToolbarSettings(
     /** Button groups shown, in order. */
@@ -256,7 +263,28 @@ data class ToolbarSettings(
     /** A button with the interface scale in percent (null = on phones and tablets only). */
     val scaleButton: Boolean? = null,
 ) {
-    fun fullOrder(): List<String> = (order + groups + ToolbarGroups.all).distinct().filter { it in ToolbarGroups.all }
+    fun fullOrder(): List<String> {
+        val known = (order + groups).distinct().filter { it in ToolbarGroups.all }.toMutableList()
+        // a group this list hasn't met yet goes after the one before it in [ToolbarGroups.all]
+        for ((i, g) in ToolbarGroups.all.withIndex()) if (g !in known) {
+            val after = ToolbarGroups.all.subList(0, i).lastOrNull { it in known }
+            known.add(if (after == null) 0 else known.indexOf(after) + 1, g)
+        }
+        return known
+    }
+
+    /**
+     * Groups added to the program after these settings were saved: placed after the group before them and shown
+     * when [ToolbarGroups.shownWith] is shown (the quick labelling next to autolabel).
+     */
+    fun withNewGroups(): ToolbarSettings {
+        val known = (order + groups).toSet()
+        val new = ToolbarGroups.all.filter { it !in known }
+        if (new.isEmpty() || known.isEmpty()) return this
+        val o = fullOrder()
+        val vis = groups.toSet() + new.filter { ToolbarGroups.shownWith[it] in groups }
+        return copy(order = o, groups = o.filter { it in vis })
+    }
 
     /** Shows or hides [g] keeping every group where it was. */
     fun toggled(g: String, on: Boolean): ToolbarSettings {
@@ -284,10 +312,14 @@ object ToolbarGroups {
     const val VIEW = "view"
     const val ZOOM = "zoom"
     const val AUTO = "auto"
+    /** Quick labelling by the built-in MCFL model, with its language. */
+    const val QUICK = "quick"
     const val MARKS = "marks"
     const val EXTRAS = "extras"
-    val all = listOf(FILES, HISTORY, PLAY, EDIT, MODES, AUTO, MARKS, VIEW, ZOOM, EXTRAS)
-    val simple = listOf(FILES, HISTORY, PLAY, EDIT, MODES, AUTO)
+    val all = listOf(FILES, HISTORY, PLAY, EDIT, MODES, AUTO, QUICK, MARKS, VIEW, ZOOM, EXTRAS)
+    val simple = listOf(FILES, HISTORY, PLAY, EDIT, MODES, AUTO, QUICK)
+    /** A group new to saved settings is shown if this one is. */
+    val shownWith = mapOf(QUICK to AUTO)
 }
 
 @Serializable
@@ -301,6 +333,7 @@ data class AppSettings(
     val edit: EditSettings = EditSettings(),
     val checks: CheckSettings = CheckSettings(),
     val toolkit: ToolkitSettings = ToolkitSettings(),
+    val quick: QuickLabelSettings = QuickLabelSettings(),
     /** Key bindings changed by the user: command id to chords ("ctrl+shift+<key code>"). */
     val keymap: Map<String, List<String>> = emptyMap(),
     /** Last parameters per plugin, as JSON objects. */
@@ -363,7 +396,9 @@ data class AppSettings(
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
 
         fun load(): AppSettings = try {
-            if (PlatformFs.exists(path)) Workspace.json.decodeFromString(serializer(), PlatformFs.read(path).decodeToString()) else AppSettings()
+            if (PlatformFs.exists(path)) Workspace.json.decodeFromString(serializer(), PlatformFs.read(path).decodeToString())
+                .let { it.copy(toolbar = it.toolbar.withNewGroups()) }
+            else AppSettings()
         } catch (e: Exception) {
             AppSettings()
         }

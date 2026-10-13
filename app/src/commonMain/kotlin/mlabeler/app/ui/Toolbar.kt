@@ -65,6 +65,7 @@ object ToolLabels {
     val fit = L("Whole", "Весь")
     val autolabel = L("Autolabel", "Авторазметка")
     val autoOto = L("Auto-oto", "Авто-ото")
+    val quick = L("Quick", "Быстро")
     val done = L("Done", "Готово")
     val star = L("Star", "Отметка")
     val plugins = L("Plugins", "Плагины")
@@ -84,6 +85,7 @@ object ToolLabels {
         ToolbarGroups.VIEW -> L("View", "Вид")
         ToolbarGroups.ZOOM -> L("Zoom", "Масштаб")
         ToolbarGroups.AUTO -> L("Automatic", "Автоматика")
+        ToolbarGroups.QUICK -> L("Quick labelling", "Быстрая разметка")
         ToolbarGroups.MARKS -> L("Marks", "Отметки")
         ToolbarGroups.EXTRAS -> L("Plugins and commands", "Плагины и команды")
         else -> L(id, id)
@@ -207,6 +209,10 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
                 if (ed.mode == Mode.Oto) B(Icons.magic, ToolLabels.autoOto, Commands.autoOto)
                 else B(Icons.magic, ToolLabels.autolabel, Commands.autolabel)
             }
+            ToolbarGroups.QUICK -> if (ed.mode != Mode.Oto) Group {
+                B(Icons.bolt, ToolLabels.quick, Commands.quickLabel, hint = Commands.quickLabel.title() + " — " + quickHint())
+                QuickLanguageTool(app, lab, big)
+            }
             ToolbarGroups.MARKS -> Group {
                 val marks = if (ed.mode == Mode.Oto) ed.oto.current()?.let { ed.oto.marks(it) } else ed.item?.let { ed.marks(it) }
                 B(Icons.check, ToolLabels.done, Commands.done, active = marks?.done == true)
@@ -258,6 +264,43 @@ fun ScaleTool(app: AppState, scale: Float, labels: Boolean, big: Boolean) {
                     androidx.compose.material3.DropdownMenuItem(
                         { Text((if (kotlin.math.abs(scale * 100 - p) < 1) "✓  " else "     ") + "$p%", fontSize = 14.sp) },
                         onClick = { open = false; app.update { it.copy(scale = p / 100f) } },
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val quickHint = L("the model that comes with mLabeler, in the language next to the button; no toolkit needed",
+    "встроенная модель mLabeler, на языке рядом с кнопкой; тулкит не нужен")
+private val quickLanguageHint = L("Language of the singing for quick labelling", "Язык пения для быстрой разметки")
+
+/** The language of quick labelling: its code; a tap opens the list of the model's languages. */
+@Composable
+private fun QuickLanguageTool(app: AppState, labels: Boolean, big: Boolean) {
+    val c = T.c
+    var open by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val lang = mlabeler.app.state.QuickLabel.language(app.settings)
+    Tip(quickLanguageHint()) {
+        Box {
+            Box(
+                Modifier.clip(RoundedCornerShape(c.radius)).clickable { open = true }
+                    .then(if (big && labels) Modifier.height(if (Platform.isMobile) 52.dp else 48.dp).widthIn(min = 44.dp) else Modifier.height(if (big) 40.dp else targetSize))
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (big && labels) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(lang.uppercase(), color = c.text, fontSize = 14.sp)
+                        Text("▾", color = c.muted, fontSize = 11.sp, maxLines = 1)
+                    }
+                } else Text(lang.uppercase() + " ▾", color = c.muted, fontSize = 12.sp)
+            }
+            MenuPopup(open, onDismiss = { open = false }, focusable = true) {
+                for ((code, name) in mlabeler.app.state.QuickLabel.languages) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        { Text((if (code == lang) "✓  " else "     ") + name + "  ·  " + code, fontSize = 14.sp) },
+                        onClick = { open = false; app.update { it.copy(quick = it.quick.copy(language = code)) } },
                     )
                 }
             }

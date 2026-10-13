@@ -77,6 +77,7 @@ object Icons {
     val command = icon("command", "M4 6h16v12H4z", "M7 10l3 2-3 2", "M12 14h5")
     val back = icon("back", "M15 5l-7 7 7 7")
     val layers = icon("layers", "M12 4l8 4-8 4-8-4z", "M4 12l8 4 8-4", "M4 16l8 4 8-4")
+    val bolt = icon("bolt", "M13 3L5 13.5h6L10 21l8-10.5h-6z")
     val magic = icon("magic", "M4 20L15 9", "M14 4v3", "M19 9h-3", "M17.5 5.5l-2 2", "M20 14v.01", "M10 4v.01")
     val plugin = icon("plugin", "M9 3v4", "M15 3v4", "M6 7h12v4a6 6 0 0 1-12 0z", "M12 17v4")
     val pipette = icon("pipette", "M14.5 4.5l5 5", "M17 2.5a2.1 2.1 0 0 1 3 3l-2 2-3-3z", "M15.5 7.5L6 17l-1.5 3.5L8 19l9.5-9.5")

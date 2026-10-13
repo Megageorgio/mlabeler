@@ -83,3 +83,6 @@ expect fun systemFontFamily(name: String): androidx.compose.ui.text.font.FontFam
 
 /** Date and time of [epochMs] in the local time zone, e.g. "2026-10-06 17:42". */
 expect fun formatDateTime(epochMs: Long): String
+
+/** A file that comes with the program (app/builtin/[path]), null when this build has none. */
+expect fun builtinAsset(path: String): ByteArray?

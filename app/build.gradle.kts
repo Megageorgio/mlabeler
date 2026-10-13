@@ -77,6 +77,8 @@ kotlin {
             implementation(libs.quickjs)
         }
         val desktopMain by getting {
+            // files that come with the program (the quick labelling model), also Android assets
+            resources.srcDir("builtin")
             dependencies {
                 // -Pdesktop.target=windows builds a Windows portable folder from any OS (see windowsPortableLibs)
                 val windowsOnly = findProperty("desktop.target") == "windows"
@@ -135,6 +137,7 @@ android {
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
+    sourceSets["main"].assets.srcDir("builtin")
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 

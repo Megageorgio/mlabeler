@@ -19,6 +19,7 @@ import mlabeler.app.state.toggleSide
 import mlabeler.core.format.OtoMarker
 import mlabeler.app.state.playResynth
 import mlabeler.app.state.phonemesFromWords
+import mlabeler.app.state.quickLabel
 
 /** A key combination. "Ctrl" is Cmd on macOS. */
 data class Chord(val key: Key, val ctrl: Boolean = false, val shift: Boolean = false, val alt: Boolean = false) {
@@ -256,6 +257,9 @@ object Commands {
         else a.wordsCheck = WordsCheck(t.lastModel, t.lastLanguage.takeIf { it.isNotEmpty() && it != "*" })
     }.only(Mode.Labels)
     val autolabel = Command("autolabel", L("Autolabel the selected part…", "Авторазметка выделенного…"), listOf(ch('A', ctrl = true, shift = true))) { _, a -> a.showAutolabel = true }.only(Mode.Labels)
+    val quickLabel = Command("quick-label", L("Quick labelling of the selected part", "Быстрая разметка выделенного"), listOf(ch('L', ctrl = true, shift = true))) { e, a ->
+        e.finishEditing(); e.quickLabel(mlabeler.app.state.QuickLabel.language(a.settings))
+    }.only(Mode.Labels)
     val toolCursor = Command("tool-cursor", L("Cursor tool: click selects, drag moves", "Курсор: щелчок выбирает, перетаскивание двигает"), listOf(Chord(Key.One)), { it.app.settings.edit.tools }) { _, a ->
         a.update { it.copy(edit = it.edit.copy(tool = "cursor")) }
     }.only(Mode.Labels)
@@ -304,7 +308,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, refine, g2p, modelWords, convert, ust, nfc, niao, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, quickLabel, refine, g2p, modelWords, convert, ust, nfc, niao, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf, resynthSave,

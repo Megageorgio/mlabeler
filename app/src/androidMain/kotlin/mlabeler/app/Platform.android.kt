@@ -332,3 +332,6 @@ private class FloatArrayBuilder {
     }
     fun toArray() = data.copyOf(size)
 }
+
+actual fun builtinAsset(path: String): ByteArray? =
+    runCatching { AndroidContext.context.assets.open(path).use { it.readBytes() } }.getOrNull()
