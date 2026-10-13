@@ -1,5 +1,8 @@
 package mlabeler.app.ui
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,6 +61,9 @@ private val dictPick = L("Pick a dictionary to see phonemes it lacks and ones ne
 private val notInDict = L("Not in the dictionary", "Нет в словаре")
 private val unusedT = L("Never used", "Ни разу не встретились")
 private val allGood = L("All phonemes are in the dictionary and all of it is used", "Все фонемы есть в словаре, и весь словарь использован")
+private val chartT = L("Phonemes", "Фонемы")
+private val chartHint = L("How often each phoneme is in the labels, the most frequent first; rare ones in the warning colour. A click finds it.",
+    "Сколько раз каждая фонема есть в разметке, частые первыми; редкие — цветом предупреждения. Щелчок ищет её.")
 private val notesT = L("Notes", "Ноты")
 private val notesHint = L("How much is sung on each note. Gaps in the range are notes the model hasn't heard.",
     "Сколько спето на каждой ноте. Пропуски в диапазоне — ноты, которых модель не слышала.")
@@ -140,6 +146,13 @@ fun DatasetSummaryDialog(app: AppState, ed: EditorState) {
                 }
             }
 
+            val sung = stats.phonemes.filter { it.name !in pauses }
+            if (sung.isNotEmpty()) {
+                SectionTitle(chartT())
+                Text(chartHint(), color = c.muted, fontSize = 11.sp)
+                PhonemeBars(sung, rareLimit) { find(it) }
+            }
+
             if (stats.notes.isNotEmpty()) {
                 SectionTitle(notesT())
                 Text(notesHint(), color = c.muted, fontSize = 11.sp)
@@ -190,6 +203,30 @@ private fun NoteBars(stats: DatasetStats) {
                 Box(Modifier.fillMaxWidth().weight((s / most).toFloat().coerceAtLeast(0.02f)).background(if (s == 0.0) c.danger.copy(alpha = 0.6f) else c.accent))
                 if ((m - lo) % 3 == 0 || hi - lo < 12) Text(mlabeler.core.format.NoteNames.format(m.toDouble()), color = c.muted, fontSize = 9.sp, maxLines = 1)
                 else Text(" ", fontSize = 9.sp)
+            }
+        }
+    }
+}
+
+/** How often each phoneme occurs, the most frequent first; a click on a bar finds the phoneme. */
+@Composable
+private fun PhonemeBars(phonemes: List<DatasetStats.PhonemeStat>, rareLimit: Int, onClick: (String) -> Unit) {
+    val c = T.c
+    val sorted = phonemes.sortedByDescending { it.count }
+    val most = sorted.first().count.coerceAtLeast(1)
+    Row(Modifier.fillMaxWidth().height(150.dp).padding(top = 8.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
+        for (p in sorted) {
+            val share = p.count.toFloat() / most
+            Tip("${p.name} · ${p.count}") {
+                Column(Modifier.width(22.dp).fillMaxHeight().clickable { onClick(p.name) }, verticalArrangement = Arrangement.Bottom,
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(Modifier.fillMaxWidth().weight((1 - share).coerceAtLeast(0.001f)))
+                    Box(Modifier.width(14.dp).weight(share.coerceAtLeast(0.02f))
+                        .clip(RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                        .background(if (p.count <= rareLimit) c.warn else c.accent))
+                    Text(p.name, color = c.muted, fontSize = 9.sp, maxLines = 1)
+                }
             }
         }
     }

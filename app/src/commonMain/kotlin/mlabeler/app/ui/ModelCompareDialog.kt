@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,6 +66,8 @@ private val legendT = L(
     "PER — доля фонем, в которых модель ошиблась (заменила, пропустила или добавила); паузы (SP, AP…) не считаются, метки сравниваются как есть. Границы — насколько расходятся начала и концы общих фонем, среднее и медиана. Скорость — секунд звука на секунду работы. «Показать» выводит фонемы модели на этом файле под вашей разметкой.",
 )
 private val failedT = L("failed on {0} files", "ошибки на {0} файлах")
+private val barsPerT = L("Phoneme error rate", "Доля ошибок в фонемах (PER)")
+private val barsBoundT = L("Mean boundary error", "Средняя ошибка границ")
 private val phonemesT = L("Phonemes", "Фонемы")
 private val withoutT = L("Without phonemes", "Без фонем")
 private val withT = L("With the phonemes of the labels", "С фонемами разметки")
@@ -216,8 +219,37 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
                         }
                     }
                 }
+                ResultBars(mc.rows.filter { it.files > 0 })
                 Text(legendT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
     }
+}
+
+/** The results as bars: phoneme error rate and mean boundary error of every model (shorter is better). */
+@Composable
+private fun ResultBars(rows: List<ModelComparison.Row>) {
+    if (rows.isEmpty()) return
+    val c = T.c
+    @Composable
+    fun chart(title: String, value: (ModelComparison.Row) -> Double, text: (Double) -> String) {
+        Text(title, color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+        val most = rows.maxOf(value).coerceAtLeast(1e-9)
+        val best = rows.minOf(value)
+        for (r in rows) {
+            val v = value(r)
+            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(r.model.name, color = c.text, fontSize = 11.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.width(220.dp).padding(end = 8.dp))
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Box(Modifier.weight((v / most).toFloat().coerceAtLeast(0.005f)).height(12.dp)
+                        .background(if (v == best) c.accent else c.accent.copy(alpha = 0.45f), androidx.compose.foundation.shape.RoundedCornerShape(3.dp)))
+                    androidx.compose.foundation.layout.Box(Modifier.weight((1 - v / most).toFloat().coerceAtLeast(0.005f)))
+                }
+                Text(text(v), color = if (v == best) c.accent else c.muted, fontSize = 11.sp, modifier = Modifier.width(56.dp).padding(start = 6.dp))
+            }
+        }
+    }
+    chart(barsPerT(), { it.score.per }) { "${(it * 1000).roundToInt() / 10.0}%" }
+    chart(barsBoundT(), { it.score.meanMs }) { "${it.roundToInt()} ms" }
 }
