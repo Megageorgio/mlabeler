@@ -165,9 +165,9 @@ fun EditorState.autolabel(from: Double, to: Double, model: String, language: Str
             val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
             val fileId = client.upload(it.name + "_part.wav", wav)
             val job = if (recognize) {
-                client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, refineAfter(), extraLanguages,
+                client.segment(fileId, model, language, text.split(Regex("\\s+")).filter { p -> p.isNotEmpty() }, settings.toolkit.wfl, null, extraLanguages,
                     confidence = settings.toolkit.markUnsure)
-            } else client.align(fileId, model, language, text, phonemes, whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
+            } else client.align(fileId, model, language, text, phonemes, whisper, null, extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
                 settings.toolkit.breaths, settings.toolkit.splitSeconds.takeIf { settings.toolkit.splitLong })
             serverJob = job
             val result = client.await(job, { toolkitDetail = it }) { p, stage ->
@@ -259,7 +259,7 @@ fun EditorState.autolabelFiles(
                     } else null
                     val upload = if (Wav.isWav(bytes)) bytes else withContext(Dispatchers.Default) { Wav.encode16(a) }
                     val fileId = client.upload(Paths.stem(f.audioPath) + ".wav", upload)
-                    val job = if (recognize) client.segment(fileId, model, language, known, settings.toolkit.wfl, refineAfter(), extraLanguages, confidence = settings.toolkit.markUnsure)
+                    val job = if (recognize) client.segment(fileId, model, language, known, settings.toolkit.wfl, null, extraLanguages, confidence = settings.toolkit.markUnsure)
                     else {
                         val asPhonemes = source == EditorState.BatchText.Labels || (txt != null && (phonemes || mlabeler.core.format.TextImport.looksLikeLab(txt)))
                         val text = when {
@@ -268,7 +268,7 @@ fun EditorState.autolabelFiles(
                             else -> ""
                         }
                         if (text.isBlank() && !whisper) error(noText())
-                        client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, refineAfter(), extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
+                        client.align(fileId, model, language, text, asPhonemes && text.isNotBlank(), whisper, null, extraLanguages, settings.toolkit.whisperModel, settings.toolkit.skipUnknownWords,
                             settings.toolkit.breaths, settings.toolkit.splitSeconds.takeIf { settings.toolkit.splitLong })
                     }
                     serverJob = job
@@ -386,61 +386,41 @@ private val g2pBusy = L("Words to phonemes", "Слова в фонемы")
 private val g2pDone = L("Phonemes of {0} words written under them", "Фонемы {0} слов записаны под ними")
 private val g2pMissing = L("No phonemes for: {0}. Write them in the model's own words.", "Нет фонем для: {0}. Впишите их в собственные слова модели.")
 
-/** The refinement done after autolabelling, when it's on in the settings. */
-internal fun EditorState.refineAfter(): RefineSettings? = settings.toolkit.refine.takeIf { it.enabled && it.model.isNotBlank() }
-
 /**
- * Refines the boundaries of the phoneme tier of [doc] within [from]..[to] (all of it by default) with the refiner
- * model: the part of the recording is uploaded with its phonemes; returns the labelling with the boundaries moved.
+ * Refines the boundaries of the phoneme tier of [doc] within [from]..[to] (all of it by default): the built-in MCFL
+ * model places its phonemes anew over that part of the sound ([language]); returns the labelling with the boundaries
+ * moved (the words with them) and how many moved.
  */
-internal suspend fun EditorState.refinedDoc(
-    client: mlabeler.app.toolkit.ToolkitClient, name: String, a: Audio, doc: LabelDoc, from: Double, to: Double,
-    r: RefineSettings, progress: (Double, String) -> Unit,
-): Pair<LabelDoc, Int> {
+internal suspend fun EditorState.refinedDoc(a: Audio, doc: LabelDoc, from: Double, to: Double, language: String,
+                                            progress: (Double) -> Unit): Pair<LabelDoc, Int> {
     val k = doc.phonemeTierIndex()
     val tier = doc.tiers.getOrNull(k) as? IntervalTier ?: return doc to 0
     val range = mlabeler.core.edit.BoundaryMoves.inside(tier, from, to)
     if (range.count() < 2) return doc to 0
     val t0 = tier.startOf(range.first)
     val t1 = tier.endOf(range.last)
-    val s0 = (t0 * a.sampleRate).toInt().coerceIn(0, a.samples.size)
-    val s1 = (t1 * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
-    val wav = withContext(Dispatchers.Default) { Wav.encode16(Audio(a.sampleRate, a.samples.copyOfRange(s0, s1))) }
-    val fileId = client.upload("${name}_refine.wav", wav)
-    val offset = s0.toDouble() / a.sampleRate
-    val segments = range.map { i -> Triple(tier.startOf(i) - offset, tier.endOf(i) - offset, tier.texts[i]) }
-    val job = client.refine(fileId, segments, r.model, r.mode)
-    val result = try { client.await(job, { toolkitDetail = it }, progress) } catch (e: kotlinx.coroutines.CancellationException) {
-        withContext(kotlinx.coroutines.NonCancellable) { client.cancel(job) }
-        throw e
+    val model = QuickLabel.model() ?: throw IllegalStateException(QuickLabel.noModel())
+    val part = withContext(Dispatchers.Default) { mlabeler.core.ds.Dataset.cutAudio(a, t0, t1, 0) }
+    val segs = withContext(Dispatchers.Default) {
+        model.align(part, language, range.map { tier.texts[it].trim() }, Platform.cores.coerceIn(1, 8), progress = progress)
     }
-    val got = mlabeler.app.toolkit.ToolkitClient.labelOf(result, offset, (s1 - s0).toDouble() / a.sampleRate)
-    val phones = got.tiers.filterIsInstance<IntervalTier>().firstOrNull { it.name == "phones" } ?: got.tiers.filterIsInstance<IntervalTier>().first()
-    // the toolkit may close gaps or round: take the start of each sent interval, in order
-    val starts = (0 until phones.size).map { phones.startOf(it) }
-    if (starts.size != range.count()) return doc to 0
-    val out = mlabeler.core.edit.BoundaryMoves.apply(doc, k, range, starts)
+    if (segs.size != range.count()) return doc to 0
+    val out = mlabeler.core.edit.BoundaryMoves.apply(doc, k, range, segs.map { t0 + it.start })
     val moved = range.drop(1).count { i -> kotlin.math.abs((out.tiers[k] as IntervalTier).startOf(i) - tier.startOf(i)) > 0.0005 }
     return out to moved
 }
 
 /** Refines the phoneme boundaries of the open file within [from]..[to] (undoable). */
-fun EditorState.refineBoundaries(from: Double, to: Double, r: RefineSettings) {
-    describeWork("Refining boundaries", r.model)
+fun EditorState.refineBoundaries(from: Double, to: Double, language: String) {
+    describeWork("Refining boundaries", QuickLabel.MODEL)
     val a = audio ?: return
     val it = item ?: return
     val d = doc ?: return
     toolkitJob?.cancel()
     toolkitJob = scope.launch {
-        val client = app.toolkit.client()
         try {
-            toolkitBusySince = now()
-            toolkitSteps.clear()
-            toolkitDetail = null
-            toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
-            if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
-            toolkitBusy = S.uploading()
-            val (out, moved) = refinedDoc(client, it.name, a, d, from, to, r) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
+            beginToolkitWork(refiningT())
+            val (out, moved) = refinedDoc(a, d, from, to, language) { p -> toolkitProgress = p }
             if (moved > 0) updateDocShowingChanges { out }
             app.message(refinedT.format(moved))
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -455,12 +435,11 @@ fun EditorState.refineBoundaries(from: Double, to: Double, r: RefineSettings) {
 }
 
 /** Refines the phoneme boundaries of the labels of [files] and saves them (the open one through its history). */
-fun EditorState.refineFiles(files: List<Item>, r: RefineSettings) {
+fun EditorState.refineFiles(files: List<Item>, language: String) {
     if (files.isEmpty()) return
-    describeWork("Refining ${files.size} files", r.model)
+    describeWork("Refining ${files.size} files", QuickLabel.MODEL)
     toolkitJob?.cancel()
     toolkitJob = scope.launch {
-        val client = app.toolkit.client()
         val failed = mutableListOf<String>()
         var done = 0
         var moved = 0
@@ -468,8 +447,6 @@ fun EditorState.refineFiles(files: List<Item>, r: RefineSettings) {
             toolkitBusySince = now()
             toolkitSteps.clear()
             toolkitDetail = null
-            toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
-            if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
             for ((n, f) in files.withIndex()) {
                 val head = batchFile.format(n + 1, files.size, f.name)
                 toolkitBusy = head
@@ -481,10 +458,7 @@ fun EditorState.refineFiles(files: List<Item>, r: RefineSettings) {
                         if (Wav.isWav(bytes)) Wav.decode(bytes) else Platform.decodeAudio(f.audioPath) ?: error(S.unsupportedAudio())
                     }
                     val current = (if (f.id == item?.id) doc else workspace.readLabels(f, a.duration)) ?: continue
-                    val (out, m) = refinedDoc(client, Paths.stem(f.audioPath), a, current, 0.0, a.duration, r) { p, stage ->
-                        toolkitProgress = (n + p) / files.size
-                        toolkitBusy = head + " · " + stage.ifEmpty { S.toolkit() }
-                    }
+                    val (out, m) = refinedDoc(a, current, 0.0, a.duration, language) { p -> toolkitProgress = (n + p) / files.size }
                     moved += m
                     if (m > 0) {
                         if (f.id == item?.id) {
@@ -517,6 +491,7 @@ fun EditorState.refineFiles(files: List<Item>, r: RefineSettings) {
 }
 
 private val refinedT = L("Boundaries moved: {0}", "Сдвинуто границ: {0}")
+private val refiningT = L("Refining boundaries", "Уточнение границ")
 private val refinedFilesT = L("Refined {0} files, boundaries moved: {1}", "Уточнено файлов: {0}, сдвинуто границ: {1}")
 private val batchFile = L("File {0} of {1}: {2}", "Файл {0} из {1}: {2}")
 private val batchDone = L("Labelled {0} files", "Размечено файлов: {0}")

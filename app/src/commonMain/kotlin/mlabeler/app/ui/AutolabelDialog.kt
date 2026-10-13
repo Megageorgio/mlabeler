@@ -433,7 +433,6 @@ fun AutolabelDialog(app: AppState) {
                     if (tk.splitLong) ValueSlider(splitLenT(), tk.splitSeconds, 5f..60f, " s", default = 25f) { v -> set { it.copy(splitSeconds = kotlin.math.round(v)) } }
                 }
             }
-            RefineAfterSwitch(app)
             MarkUnsureSwitch(app)
             if (!batch) Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(forCompare(), !replace) { replace = false }

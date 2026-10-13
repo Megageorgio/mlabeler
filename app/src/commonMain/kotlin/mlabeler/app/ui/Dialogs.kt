@@ -1445,8 +1445,6 @@ internal object SettingsHelp {
                 "Тишина не короче этого становится паузой SP; более короткая остаётся внутри фонем. По умолчанию 0,5 с."),
 
             // RefineDialog.kt
-            h("", L("Refine the boundaries afterwards (a refiner model)", "Уточнить границы после этого (модель-уточнитель)"), "After autolabelling, a refiner model moves the boundaries closer to the sound; the model and how boldly it works are chosen below. Off by default.",
-                "После авторазметки модель-уточнитель сдвигает границы точнее по звуку; модель и степень вмешательства выбираются ниже. По умолчанию выключено."),
 
             // AutoOtoDialog.kt
             h("", L("Offset before the overlap, ms", "Offset до overlap, мс"), "For syllables with a consonant the offset is placed this far before the overlap. Default: 140 ms.",
