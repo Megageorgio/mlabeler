@@ -400,6 +400,8 @@ data class AppSettings(
         fun load(): AppSettings = try {
             if (PlatformFs.exists(path)) Workspace.json.decodeFromString(serializer(), PlatformFs.read(path).decodeToString())
                 .let { it.copy(toolbar = it.toolbar.withNewGroups()) }
+                // phones: the size button turned off only by the "studio" environment comes back (on by default there)
+                .let { if (Platform.isMobile && it.environment == "studio" && it.toolbar.scaleButton == false) it.copy(toolbar = it.toolbar.copy(scaleButton = null)) else it }
             else AppSettings()
         } catch (e: Exception) {
             AppSettings()

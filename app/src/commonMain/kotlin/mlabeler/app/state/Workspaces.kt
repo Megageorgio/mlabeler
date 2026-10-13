@@ -124,7 +124,9 @@ object Environments {
         setupDone = true,
         menuBar = e.env.menuBar && !Platform.isMobile,
         statusBar = e.env.statusBar,
-        toolbar = e.env.toolbar,
+        // phones keep their own interface size button (on unless turned off there): an environment made on a
+        // computer doesn't take it away
+        toolbar = if (Platform.isMobile) e.env.toolbar.copy(scaleButton = s.toolbar.scaleButton) else e.env.toolbar,
         edit = s.edit.copy(tools = e.env.tools),
         layout = e.env.layout.copy(
             filesWidth = s.layout.filesWidth, inspectorWidth = s.layout.inspectorWidth,
@@ -135,7 +137,8 @@ object Environments {
     /** True when the interface still looks exactly like [e] (panel sizes aside). */
     fun matches(s: AppSettings, e: EnvironmentEntry): Boolean {
         val norm = { l: LayoutSettings -> l.copy(filesWidth = 0f, inspectorWidth = 0f, tierHeight = 0f, waveShare = 0f, leftCollapsed = false, rightCollapsed = false) }
-        return norm(s.layout) == norm(e.env.layout) && s.toolbar.copy(order = emptyList()) == e.env.toolbar.copy(order = emptyList()) && s.statusBar == e.env.statusBar && s.edit.tools == e.env.tools &&
+        val tb = { t: ToolbarSettings -> t.copy(order = emptyList(), scaleButton = if (Platform.isMobile) null else t.scaleButton) }
+        return norm(s.layout) == norm(e.env.layout) && tb(s.toolbar) == tb(e.env.toolbar) && s.statusBar == e.env.statusBar && s.edit.tools == e.env.tools &&
             (Platform.isMobile || s.menuBar == e.env.menuBar)
     }
 
