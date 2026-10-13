@@ -147,7 +147,45 @@ actual object LocalToolkit {
             .sortedBy { if (it.startsWith("192.168.")) 0 else if (it.startsWith("10.")) 1 else 2 }
     }.getOrDefault(emptyList())
 
-    actual fun uvInstallCommand(): List<String> =
-        if (windows) listOf("powershell", "-NoProfile", "-ExecutionPolicy", "ByPass", "-Command", "irm https://astral.sh/uv/install.ps1 | iex")
-        else listOf("sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh")
+    /**
+     * Windows: uv's release archive is downloaded from GitHub and unpacked into UV_INSTALL_DIR (the portable build)
+     * or ~\.localin, where uv's own installer puts it (running that installer as "irm … | iex" in PowerShell
+     * looks like a trojan to antivirus heuristics). Elsewhere uv's install script.
+     */
+    actual suspend fun installUv(onLine: (String) -> Unit): Boolean {
+        if (!windows) return run(listOf("sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"), onLine) == 0
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val arch = if (System.getProperty("os.arch").orEmpty().contains("aarch64")) "aarch64" else "x86_64"
+                val url = "https://github.com/astral-sh/uv/releases/latest/download/uv-$arch-pc-windows-msvc.zip"
+                val dir = File(System.getenv("UV_INSTALL_DIR") ?: File(System.getProperty("user.home"), ".local/bin").path)
+                dir.mkdirs()
+                onLine("> $url")
+                var conn = java.net.URI(url).toURL().openConnection() as java.net.HttpURLConnection
+                // GitHub answers with redirects to its download host
+                for (k in 0 until 5) {
+                    conn.instanceFollowRedirects = true
+                    conn.connectTimeout = 30_000
+                    conn.readTimeout = 60_000
+                    val code = conn.responseCode
+                    if (code !in 300..399) break
+                    conn = java.net.URI(conn.getHeaderField("Location")).toURL().openConnection() as java.net.HttpURLConnection
+                }
+                if (conn.responseCode != 200) error("HTTP ${conn.responseCode}")
+                var n = 0
+                java.util.zip.ZipInputStream(conn.inputStream.buffered()).use { z ->
+                    while (true) {
+                        val e = z.nextEntry ?: break
+                        val name = e.name.substringAfterLast('/')
+                        if (!e.isDirectory && name.endsWith(".exe")) {
+                            File(dir, name).outputStream().use { z.copyTo(it) }
+                            onLine("$name -> $dir")
+                            n++
+                        }
+                    }
+                }
+                n > 0
+            }.getOrElse { onLine("uv: ${it.message ?: it}"); false }
+        }
+    }
 }

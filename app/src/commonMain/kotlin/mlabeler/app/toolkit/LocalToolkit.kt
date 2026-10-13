@@ -30,6 +30,6 @@ expect object LocalToolkit {
     /** Addresses of this computer in the local network, for connecting from a phone. */
     fun lanAddresses(): List<String>
 
-    /** The command that installs uv itself. */
-    fun uvInstallCommand(): List<String>
+    /** Installs uv itself, passing what it does to [onLine]; true when it went without an error. */
+    suspend fun installUv(onLine: (String) -> Unit): Boolean
 }

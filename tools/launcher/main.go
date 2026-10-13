@@ -91,6 +91,12 @@ func main() {
 		fail(err.Error())
 	}
 	dir := filepath.Dir(exe)
+	// started by the closing program to install a downloaded update (see update.go)
+	if len(os.Args) > 1 && os.Args[1] == "--apply-update" {
+		applyUpdate(dir, os.Args[2:])
+		return
+	}
+	cleanOldExe(dir)
 	// java.exe (a console program) started without a window: the app and everything it starts (the toolkit,
 	// its engines, ffmpeg) share one hidden console, so no console windows pop up.
 	// runtime\bin\mLabeler.exe is java.exe with the program's name and icon (as the Task Manager shows it)

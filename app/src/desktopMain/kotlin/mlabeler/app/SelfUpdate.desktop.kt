@@ -67,13 +67,23 @@ actual object SelfUpdate {
         val dir = installDir ?: return "not supported"
         val tag = prepared() ?: return "nothing to install"
         val src = newRoot(tag) ?: return "nothing to install"
-        val start = if (Platform.legacyWindows) File(dir, "mLabeler (Windows 7, 8.1).cmd") else File(dir, "mLabeler.exe")
-        val script = updateScript(ProcessHandle.current().pid(), src, dir, updates, readyFile, tag, start, restart)
-        val encoded = java.util.Base64.getEncoder().encodeToString(script.toByteArray(Charsets.UTF_16LE))
+        val pid = ProcessHandle.current().pid()
         return runCatching {
-            ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", encoded)
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD)
-                .directory(updates).start()
+            if (!Platform.legacyWindows) {
+                // mLabeler.exe installs it once this program is gone (a hidden PowerShell script did it before,
+                // which antivirus heuristics took for a trojan); the new launcher arrives with the update
+                ProcessBuilder(File(dir, "mLabeler.exe").path, "--apply-update", pid.toString(), updates.path, if (restart) "1" else "0")
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .directory(dir).start()
+            } else {
+                // Windows 7 and 8.1 start without mLabeler.exe (it doesn't run there): the script does it
+                val start = File(dir, "mLabeler (Windows 7, 8.1).cmd")
+                val script = updateScript(pid, src, dir, updates, readyFile, tag, start, restart)
+                val encoded = java.util.Base64.getEncoder().encodeToString(script.toByteArray(Charsets.UTF_16LE))
+                ProcessBuilder("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-EncodedCommand", encoded)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .directory(updates).start()
+            }
             done = true
             null
         }.getOrElse { it.message ?: it.toString() }

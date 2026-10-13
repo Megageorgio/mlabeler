@@ -383,9 +383,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
                 var uv = LocalToolkit.findUv()
                 if (uv == null) {
                     addLog(gettingUv())
-                    val cmd = LocalToolkit.uvInstallCommand()
-                    addLog("> " + cmd.joinToString(" "))
-                    LocalToolkit.run(cmd, ::addLog)
+                    LocalToolkit.installUv(::addLog)
                     uv = LocalToolkit.findUv()
                 }
                 if (uv == null) {
