@@ -48,6 +48,7 @@ private val allT = L("All", "Все")
 private val noneT = L("None", "Ни одной")
 private val noToolkitT = L("The models are those of the toolkit: start it to compare them", "Сравниваются модели тулкита: запустите его")
 private val runT = L("Compare", "Сравнить")
+private val loadingT = L("Asking the toolkit for models…", "Запрос моделей у тулкита…")
 private val stopT = L("Stop", "Остановить")
 private val resultT = L("Results", "Результаты")
 private val colModel = L("Model", "Модель")
@@ -123,6 +124,7 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
         }) {
             Text(titleT(), color = c.text, fontSize = 17.sp)
             Text(aboutT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+            Column(Modifier.padding(top = 10.dp)) { ToolkitStatus(app) }
             SectionTitle(whatT())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (selected != null) Chip(selectedT(), scope == ModelComparison.Scope.Selection) { scope = ModelComparison.Scope.Selection }
@@ -146,7 +148,13 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
                 }.padding(horizontal = 6.dp))
                 Text(noneT(), color = c.accent, fontSize = 12.sp, modifier = Modifier.clickable { mc.chosen.removeAll { id -> candidates.any { it.id == id } } }.padding(horizontal = 6.dp))
             }
-            if (error != null || toolkitLangs == null) Text(error ?: noToolkitT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+            when {
+                error != null -> Text(error, color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                // still asking: the models come when the toolkit answers; "start it" only when it isn't running
+                toolkitLangs == null -> Text(if (app.toolkit.status in setOf(mlabeler.app.toolkit.ToolkitManager.Status.Missing, mlabeler.app.toolkit.ToolkitManager.Status.Off,
+                    mlabeler.app.toolkit.ToolkitManager.Status.Failed)) noToolkitT() else loadingT(),
+                    color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+            }
             Column {
                 for (m in candidates) {
                     val on = m.id in mc.chosen
