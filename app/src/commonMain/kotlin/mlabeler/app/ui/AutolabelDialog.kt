@@ -274,7 +274,12 @@ fun AutolabelDialog(app: AppState) {
                                     .padding(horizontal = 10.dp, vertical = 7.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(m.name, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(m.name, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))
+                                    // who made it: quiet, after the name
+                                    if (m.author.isNotBlank()) Text(m.author, color = c.muted.copy(alpha = 0.8f), fontSize = 11.sp, maxLines = 1,
+                                        modifier = Modifier.padding(start = 8.dp, end = 8.dp))
+                                }
                                 Text(if (m.installed) m.engine else m.engine + " · " + notInstalled(), color = c.muted, fontSize = 11.sp)
                             }
                         }

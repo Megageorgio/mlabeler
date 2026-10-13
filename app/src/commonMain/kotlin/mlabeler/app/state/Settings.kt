@@ -203,6 +203,8 @@ data class ToolkitSettings(
     val token: String = "",
     val lastModel: String = "",
     val lastLanguage: String = "",
+    /** The author last given to an own model (Settings → Autolabel → your own models). */
+    val lastAuthor: String = "",
     /** Other languages that may occur in the text (TIFA models), e.g. en for English words in Chinese lyrics. */
     val extraLanguages: List<String> = emptyList(),
     /** Model for recognising phonemes without lyrics. */

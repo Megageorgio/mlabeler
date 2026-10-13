@@ -49,6 +49,7 @@ private val langHint = L("code, e.g. ru; several: ja, en", "код, наприм
 private val langNote = L("A WFL-ASR model with langs.txt gets its own languages, whatever is written here.",
     "Модель WFL-ASR с файлом langs.txt получает свои языки из него, что бы здесь ни было написано.")
 private val nameT = L("Name in the list", "Название в списке")
+private val authorT = L("Author", "Автор")
 private val addBtn = L("Add the model", "Добавить модель")
 private val adding = L("Adding… (the checkpoint is copied)", "Добавление… (чекпоинт копируется)")
 private val added = L("Added: {0}. It is in the Autolabel window under its language.", "Добавлено: {0}. Модель доступна в окне авторазметки в разделе своего языка.")
@@ -66,6 +67,7 @@ fun OwnModelsSection(app: AppState) {
     var engine by remember { mutableStateOf("wfl_asr") }
     var lang by remember { mutableStateOf("ru") }
     var name by remember { mutableStateOf("") }
+    var author by remember { mutableStateOf(app.settings.toolkit.lastAuthor) }
     var busy by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
     var mine by remember { mutableStateOf<List<ToolkitClient.InstalledModel>>(emptyList()) }
@@ -110,6 +112,10 @@ fun OwnModelsSection(app: AppState) {
                 Text(nameT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
                 Field(name, { name = it }, Modifier.fillMaxWidth(), placeholder = path.substringAfterLast('\\').substringAfterLast('/').substringBeforeLast('.'))
             }
+            Column(Modifier.weight(1.5f)) {
+                Text(authorT(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                Field(author, { author = it }, Modifier.fillMaxWidth())
+            }
         }
         if (engine == "wfl_asr") Text(langNote(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -126,7 +132,8 @@ fun OwnModelsSection(app: AppState) {
                         val id = name.ifBlank { if (parent.isNotEmpty()) "$parent-$stem" else stem }
                             .lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-')
                         val ids = tk.client().importModel(engine, path, id, name.ifBlank { null } ?: "$parent/$stem".trimStart('/'),
-                            lang.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() })
+                            lang.split(',', ' ').map { it.trim() }.filter { it.isNotEmpty() }, author)
+                        app.update { it.copy(toolkit = it.toolkit.copy(lastAuthor = author.trim())) }
                         result = true to (if (engine == "refiner") addedRefiner else added).format(ids.joinToString())
                         tk.modelsVersion++
                     } catch (e: kotlinx.coroutines.CancellationException) {
@@ -148,7 +155,7 @@ fun OwnModelsSection(app: AppState) {
                 for (m in mine) Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(m.name.ifBlank { m.id }, color = c.text, fontSize = 13.sp)
-                        Text(m.id + " · " + m.engine + " · " + m.languages.joinToString { LanguageNames.of(it) }, color = c.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        Text(listOfNotNull(m.id, m.engine, m.languages.joinToString { LanguageNames.of(it) }, m.author.ifBlank { null }).joinToString(" · "), color = c.muted, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                     }
                     Btn(removeBtn()) {
                         scope.launch {

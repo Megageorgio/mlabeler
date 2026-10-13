@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
@@ -20,7 +21,7 @@ import mlabeler.core.model.LabelDoc
 
 class ToolkitException(message: String) : Exception(message)
 
-data class ToolkitModel(val id: String, val name: String, val engine: String, val installed: Boolean)
+data class ToolkitModel(val id: String, val name: String, val engine: String, val installed: Boolean, val author: String = "")
 data class ToolkitLanguage(val code: String, val name: String, val models: List<ToolkitModel>)
 
 /** The few calls of mVocalToolkit's HTTP API that the editor needs. */
@@ -97,13 +98,14 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
                         (mo["name"] as? JsonPrimitive)?.content ?: mo["id"]!!.jsonPrimitive.content,
                         (mo["engine"] as? JsonPrimitive)?.content ?: "",
                         (mo["installed"] as? JsonPrimitive)?.content == "true",
+                        (mo["author"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
                     )
                 },
             )
         }
 
     /** A model on the toolkit's computer. */
-    data class InstalledModel(val id: String, val name: String, val engine: String, val languages: List<String>, val source: String)
+    data class InstalledModel(val id: String, val name: String, val engine: String, val languages: List<String>, val source: String, val author: String = "")
 
     suspend fun installedModels(): List<InstalledModel> = call("GET", "/models/installed").jsonArray.map { m ->
         val o = m.jsonObject
@@ -113,15 +115,17 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
             (o["engine"] as? JsonPrimitive)?.content ?: "",
             (o["languages"] as? JsonArray)?.map { it.jsonPrimitive.content } ?: emptyList(),
             (o["source"] as? JsonPrimitive)?.content ?: "",
+            (o["author"] as? JsonPrimitive)?.contentOrNull.orEmpty(),
         )
     }
 
     /** Registers a model file, folder or archive at [path] on the toolkit's computer; returns the new model ids. */
-    suspend fun importModel(engine: String, path: String, id: String?, name: String?, languages: List<String>): List<String> {
+    suspend fun importModel(engine: String, path: String, id: String?, name: String?, languages: List<String>, author: String = ""): List<String> {
         val req = buildJsonObject {
             put("engine", engine); put("path", path)
             if (!id.isNullOrBlank()) put("id", id)
             if (!name.isNullOrBlank()) put("name", name)
+            if (author.isNotBlank()) put("author", author.trim())
             if (languages.isNotEmpty()) put("languages", buildJsonArray { languages.forEach { add(JsonPrimitive(it)) } })
         }
         return call("POST", "/models/import", req, timeoutMs = 600_000).jsonArray.map { it.jsonObject["id"]!!.jsonPrimitive.content }
