@@ -60,7 +60,7 @@ object QuickLabel {
 fun EditorState.quickLabel(language: String) {
     val a = audio ?: return
     var (from, to) = range ?: selectedSpan() ?: (0.0 to duration)
-    // phonemes already there (Settings: on by default) are placed anew instead of recognised
+    // phonemes already there are placed anew instead of recognised (off by default, in the language menu)
     val pt = doc?.let { d -> d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier }
     val known = if (!settings.quick.usePhonemes || pt == null) emptyList()
         else (0 until pt.size).filter { (pt.startOf(it) + pt.endOf(it)) / 2 in from..to && pt.texts[it].isNotBlank() }
