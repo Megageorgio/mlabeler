@@ -28,7 +28,14 @@ import mlabeler.core.model.LabelDoc
  * comparison tier.
  */
 class ModelComparison(private val ed: EditorState) {
-    data class Candidate(val id: String, val name: String, val engine: String, val author: String = "")
+    /**
+     * A model and how it runs: [withPhonemes] gives it the phonemes of the labels to place (WFL-ASR can; MCFL and
+     * the built-in model only recognise). [key] tells the two runs of one model apart.
+     */
+    data class Candidate(val id: String, val name: String, val engine: String, val author: String = "", val withPhonemes: Boolean = false) {
+        val key: String get() = if (withPhonemes) "$id#phonemes" else id
+        val takesPhonemes: Boolean get() = id != BUILTIN && engine != "mcfl"
+    }
 
     /** One model's result over everything compared. */
     data class Row(val model: Candidate, val score: PhonemeScore, val seconds: Double, val audioSeconds: Double, val files: Int, val failed: List<String>) {
@@ -48,18 +55,20 @@ class ModelComparison(private val ed: EditorState) {
     /** Models ticked in the window (kept while the folder is open). */
     val chosen = mutableStateListOf<String>()
     var language by mutableStateOf("")
+    /** 0: without phonemes, 1: with the phonemes of the labels, 2: both, in one table. */
+    var phonemeMode by mutableStateOf(0)
     /** The open file's results per model (only when it was compared), for [show]. */
     private val openResults = mutableMapOf<String, Pair<LabelDoc, Pair<Double, Double>>>()
     var openFile: String? by mutableStateOf(null)
         private set
     private var job: Job? = null
 
-    fun canShow(modelId: String) = openFile == ed.item?.id && modelId in openResults
+    fun canShow(m: Candidate) = openFile == ed.item?.id && m.key in openResults
 
     /** The model's phonemes on the open file as a comparison tier under the labels. */
     fun show(m: Candidate) {
         val it = ed.item ?: return
-        val (doc, range) = openResults[m.id] ?: return
+        val (doc, range) = openResults[m.key] ?: return
         ed.modelResults[it.id] = ed.modelResults[it.id].orEmpty().filter { r -> r.name != m.name } + EditorState.Reference(m.name, "", doc, range)
         ed.loadReferences()
     }
@@ -83,17 +92,17 @@ class ModelComparison(private val ed: EditorState) {
         fraction = 0.0
         ed.describeWork("Comparing models", models.joinToString { it.name })
         job = ed.workScope.launch {
-            val scores = models.associate { it.id to PhonemeScore.EMPTY }.toMutableMap()
-            val seconds = models.associate { it.id to 0.0 }.toMutableMap()
-            val audioSec = models.associate { it.id to 0.0 }.toMutableMap()
-            val done = models.associate { it.id to 0 }.toMutableMap()
-            val failed = models.associate { it.id to mutableListOf<String>() }
+            val scores = models.associate { it.key to PhonemeScore.EMPTY }.toMutableMap()
+            val seconds = models.associate { it.key to 0.0 }.toMutableMap()
+            val audioSec = models.associate { it.key to 0.0 }.toMutableMap()
+            val done = models.associate { it.key to 0 }.toMutableMap()
+            val failed = models.associate { it.key to mutableListOf<String>() }
             val toolkitModels = models.filter { it.id != BUILTIN }
             val client = if (toolkitModels.isEmpty()) null else ed.app.toolkit.client()
             var serverJob: String? = null
             fun publish() {
                 rows.clear()
-                rows.addAll(models.map { m -> Row(m, scores[m.id]!!, seconds[m.id]!!, audioSec[m.id]!!, done[m.id]!!, failed[m.id]!!) }
+                rows.addAll(models.map { m -> Row(m, scores[m.key]!!, seconds[m.key]!!, audioSec[m.key]!!, done[m.key]!!, failed[m.key]!!) }
                     .sortedWith(compareBy({ it.files == 0 }, { it.score.per }, { it.score.meanMs })))
             }
             try {
@@ -113,6 +122,8 @@ class ModelComparison(private val ed: EditorState) {
                     if (ref == null || ref.texts.none { it.isNotBlank() && it.trim() !in ModelScore.PAUSES }) continue
                     val (from, to) = if (scope == Scope.Selection && selected != null) selected else 0.0 to a.duration
                     val part = withContext(Dispatchers.Default) { Dataset.cutAudio(a, from, to, 0) }
+                    // the phonemes of the labels in this part, for the runs that place them
+                    val known = (0 until ref.size).filter { (ref.startOf(it) + ref.endOf(it)) / 2 in from..to }.map { ref.texts[it].trim() }.filter { it.isNotEmpty() }
                     var fileId: String? = null
                     for ((k, m) in models.withIndex()) {
                         progress = fileT.format(n + 1, files.size, f.name) + " · " + m.name
@@ -126,7 +137,7 @@ class ModelComparison(private val ed: EditorState) {
                             } else {
                                 val c = client!!
                                 if (fileId == null) fileId = c.upload(Paths.stem(f.audioPath) + "_compare.wav", withContext(Dispatchers.Default) { Wav.encode16(part) })
-                                val jobId = c.segment(fileId!!, m.id, language, emptyList(), ed.settings.toolkit.wfl, null)
+                                val jobId = c.segment(fileId!!, m.id, language, if (m.withPhonemes) known else emptyList(), ed.settings.toolkit.wfl, null)
                                 serverJob = jobId
                                 val result = c.await(jobId) { _, _ -> }
                                 serverJob = null
@@ -134,18 +145,18 @@ class ModelComparison(private val ed: EditorState) {
                                 (d.tiers.firstOrNull { (it as? IntervalTier)?.name == "phones" } ?: d.tiers.getOrNull(d.phonemeTierIndex())) as? IntervalTier
                                     ?: error("no phonemes in the result")
                             }
-                            seconds[m.id] = seconds[m.id]!! + (ed.now() - t0) / 1000.0
-                            audioSec[m.id] = audioSec[m.id]!! + part.duration
-                            scores[m.id] = scores[m.id]!! + ModelScore.score(ref, hyp, from, to)
-                            done[m.id] = done[m.id]!! + 1
+                            seconds[m.key] = seconds[m.key]!! + (ed.now() - t0) / 1000.0
+                            audioSec[m.key] = audioSec[m.key]!! + part.duration
+                            scores[m.key] = scores[m.key]!! + ModelScore.score(ref, hyp, from, to)
+                            done[m.key] = done[m.key]!! + 1
                             if (isOpen) {
-                                openResults[m.id] = LabelDoc(listOf(hyp)) to (from to to)
+                                openResults[m.key] = LabelDoc(listOf(hyp)) to (from to to)
                                 openFile = f.id
                             }
                         } catch (e: kotlinx.coroutines.CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            failed[m.id]!!.add(f.name + ": " + (e.message ?: e.toString()).lineSequence().firstOrNull { it.isNotBlank() }.orEmpty())
+                            failed[m.key]!!.add(f.name + ": " + (e.message ?: e.toString()).lineSequence().firstOrNull { it.isNotBlank() }.orEmpty())
                         }
                         publish()
                     }

@@ -36,8 +36,8 @@ import kotlin.math.roundToInt
 
 private val titleT = L("Compare autolabel models", "Сравнение моделей авторазметки")
 private val aboutT = L(
-    "Every ticked model recognises the phonemes without text; the phonemes of your labels are the truth they are measured against. Nothing in the labels changes.",
-    "Каждая отмеченная модель распознаёт фонемы без текста; фонемы вашей разметки — эталон, с которым их сравнивают. В разметке ничего не меняется.",
+    "Every ticked model labels the audio (without text, or placing the phonemes of your labels); the phonemes of your labels are the truth it is measured against. Nothing in the labels changes.",
+    "Каждая отмеченная модель размечает звук (без текста или расставляя фонемы вашей разметки); фонемы вашей разметки — эталон, с которым её сравнивают. В разметке ничего не меняется.",
 )
 private val whatT = L("What", "Что сравнивать")
 private val selectedT = L("Selected part", "Выделенное")
@@ -65,6 +65,16 @@ private val legendT = L(
     "PER — доля фонем, в которых модель ошиблась (заменила, пропустила или добавила); паузы (SP, AP…) не считаются, метки сравниваются как есть. Границы — насколько расходятся начала и концы общих фонем, среднее и медиана. Скорость — секунд звука на секунду работы. «Показать» выводит фонемы модели на этом файле под вашей разметкой.",
 )
 private val failedT = L("failed on {0} files", "ошибки на {0} файлах")
+private val phonemesT = L("Phonemes", "Фонемы")
+private val withoutT = L("Without phonemes", "Без фонем")
+private val withT = L("With the phonemes of the labels", "С фонемами разметки")
+private val bothT = L("Both", "Оба варианта")
+private val withAboutT = L(
+    "With phonemes a model only places the phonemes of your labels (WFL-ASR): the boundaries are what is compared. MCFL and the built-in model can't take phonemes and run without them.",
+    "С фонемами модель только расставляет фонемы вашей разметки (WFL-ASR): сравниваются границы. MCFL и встроенная модель фонемы не принимают и работают без них.",
+)
+private val withSuffix = L("with phonemes", "с фонемами")
+private val withoutSuffix = L("without phonemes", "без фонем")
 
 @Composable
 fun ModelCompareDialog(app: AppState, ed: EditorState) {
@@ -93,7 +103,16 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
             for (m in g.flatMap { it.models }.distinctBy { it.id }) add(Candidate(m.id, m.name, m.engine, m.author))
         }
     }
-    val picked = candidates.filter { it.id in mc.chosen }
+    val picked = candidates.filter { it.id in mc.chosen }.flatMap { m ->
+        // the runs of each model: without phonemes, with them (models that take them), or both
+        val without = m.copy(name = if (mc.phonemeMode == 0) m.name else m.name + " · " + withoutSuffix())
+        val with = m.copy(name = m.name + " · " + withSuffix(), withPhonemes = true)
+        when (mc.phonemeMode) {
+            0 -> listOf(m)
+            1 -> listOf(if (m.takesPhonemes) with else without)
+            else -> if (m.takesPhonemes) listOf(without, with) else listOf(without)
+        }
+    }
 
     Overlay({ close() }, 860) {
         DialogContent(footer = {
@@ -116,6 +135,13 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (code in codes) Chip(LanguageNames.of(code), code == lang) { mc.language = code }
             }
+            SectionTitle(phonemesT())
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(withoutT(), mc.phonemeMode == 0) { mc.phonemeMode = 0 }
+                Chip(withT(), mc.phonemeMode == 1) { mc.phonemeMode = 1 }
+                Chip(bothT(), mc.phonemeMode == 2) { mc.phonemeMode = 2 }
+            }
+            if (mc.phonemeMode != 0) Text(withAboutT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             SectionTitle(modelsT()) {
                 Text(allT(), color = c.accent, fontSize = 12.sp, modifier = Modifier.clickable {
                     mc.chosen.removeAll { id -> candidates.any { it.id == id } }; mc.chosen.addAll(candidates.map { it.id })
@@ -171,7 +197,7 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
                             cell("${(s.within(50.0) * 100).roundToInt()}%", 56f)
                             cell("${r.speed.roundToInt()}×", 60f)
                             Row(Modifier.width(74.dp), horizontalArrangement = Arrangement.End) {
-                                if (mc.canShow(r.model.id)) Text(showT(), color = c.accent, fontSize = 12.sp, modifier = Modifier.clickable { mc.show(r.model) }.padding(horizontal = 6.dp))
+                                if (mc.canShow(r.model)) Text(showT(), color = c.accent, fontSize = 12.sp, modifier = Modifier.clickable { mc.show(r.model) }.padding(horizontal = 6.dp))
                             }
                         }
                     }
