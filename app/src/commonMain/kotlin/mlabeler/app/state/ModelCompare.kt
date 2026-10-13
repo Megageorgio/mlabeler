@@ -22,7 +22,7 @@ import mlabeler.core.model.IntervalTier
 import mlabeler.core.model.LabelDoc
 
 /**
- * Several phoneme recognisers of the toolkit (no text: WFL-ASR, MCFL) run on the same audio of one
+ * Several models of the toolkit (recognisers: WFL-ASR, MCFL; aligners with Whisper's words: SOFA, HubertFA, TIFA) run on the same audio of one
  * language, each scored against the phonemes of the labels, which are taken as the truth: phoneme error rate,
  * boundary errors, speed. Nothing in the labels changes; a model's result on the open file can be shown as a
  * comparison tier.
@@ -34,6 +34,8 @@ class ModelComparison(private val ed: EditorState) {
      */
     data class Candidate(val id: String, val name: String, val engine: String, val author: String = "", val withPhonemes: Boolean = false) {
         val key: String get() = if (withPhonemes) "$id#phonemes" else id
+        /** An aligner (SOFA, HubertFA, TIFA): without phonemes it places Whisper's words, spelt by its G2P. */
+        val aligner: Boolean get() = engine in ALIGNERS
     }
 
     /** One model's result over everything compared. */
@@ -127,7 +129,15 @@ class ModelComparison(private val ed: EditorState) {
                         val t0 = ed.now()
                         try {
                             if (fileId == null) fileId = client.upload(Paths.stem(f.audioPath) + "_compare.wav", withContext(Dispatchers.Default) { Wav.encode16(part) })
-                            val jobId = client.segment(fileId!!, m.id, language, if (m.withPhonemes) known else emptyList(), ed.settings.toolkit.wfl, null)
+                            val jobId = if (m.aligner) {
+                                // aligners need a text: the phonemes of the labels, or Whisper's words spelt by the model's G2P;
+                                // words no dictionary or G2P can spell are left out
+                                val tk = ed.settings.toolkit
+                                if (m.withPhonemes) client.align(fileId!!, m.id, language, known.joinToString(" "), phonemes = true, whisper = false,
+                                    skipUnknown = true, breaths = tk.breaths, splitSeconds = tk.splitSeconds.takeIf { tk.splitLong })
+                                else client.align(fileId!!, m.id, language, "", phonemes = false, whisper = true, whisperModel = tk.whisperModel,
+                                    skipUnknown = true, breaths = tk.breaths, splitSeconds = tk.splitSeconds.takeIf { tk.splitLong })
+                            } else client.segment(fileId!!, m.id, language, if (m.withPhonemes) known else emptyList(), ed.settings.toolkit.wfl, null)
                             serverJob = jobId
                             val result = client.await(jobId) { _, _ -> }
                             serverJob = null
@@ -166,6 +176,7 @@ class ModelComparison(private val ed: EditorState) {
     }
 
     companion object {
+        val ALIGNERS = setOf("sofa", "hubertfa", "tifa")
         private val fileT = L("File {0} of {1}: {2}", "Файл {0} из {1}: {2}")
         private val stoppedT = L("Stopped: the table has what was done", "Остановлено: в таблице то, что успели")
         private val nothingT = L("Nothing compared: no file has phonemes to compare with", "Нечего сравнивать: ни в одном файле нет фонем-эталона")

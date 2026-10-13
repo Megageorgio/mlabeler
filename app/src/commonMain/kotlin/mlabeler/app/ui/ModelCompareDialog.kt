@@ -36,8 +36,8 @@ import kotlin.math.roundToInt
 
 private val titleT = L("Compare autolabel models", "Сравнение моделей авторазметки")
 private val aboutT = L(
-    "Every ticked model labels the audio (without text, or placing the phonemes of your labels); the phonemes of your labels are the truth it is measured against. Nothing in the labels changes.",
-    "Каждая отмеченная модель размечает звук (без текста или расставляя фонемы вашей разметки); фонемы вашей разметки — эталон, с которым её сравнивают. В разметке ничего не меняется.",
+    "Every ticked model labels the audio (without text, or placing the phonemes of your labels); the phonemes of your labels are the truth it is measured against. Aligners (SOFA, HubertFA, TIFA) without phonemes place Whisper's words spelt by their G2P; a file that fails is skipped. Nothing in the labels changes.",
+    "Каждая отмеченная модель размечает звук (без текста или расставляя фонемы вашей разметки); фонемы вашей разметки — эталон, с которым её сравнивают. Выравниватели (SOFA, HubertFA, TIFA) без фонем расставляют слова Whisper, переведённые в фонемы их G2P; файл с ошибкой пропускается. В разметке ничего не меняется.",
 )
 private val whatT = L("What", "Что сравнивать")
 private val selectedT = L("Selected part", "Выделенное")
@@ -86,8 +86,12 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
     }
     val labelled = remember(ed.items) { ed.items.count { it.labelPath != null } }
     var scope by remember { mutableStateOf(if (selected != null) ModelComparison.Scope.Selection else ModelComparison.Scope.File) }
-    val (toolkitLangs, error) = rememberToolkitModels(app, "segment")
-    // languages with recognisers in the toolkit
+    val (segmentLangs, error) = rememberToolkitModels(app, "segment")
+    val (alignLangs, alignError) = rememberToolkitModels(app, "align")
+    // recognisers and aligners together (an aligner gets Whisper's words or the phonemes of the labels)
+    val toolkitLangs = remember(segmentLangs, alignLangs) {
+        if (segmentLangs == null && alignLangs == null) null else segmentLangs.orEmpty() + alignLangs.orEmpty()
+    }
     val codes = remember(toolkitLangs) {
         toolkitLangs.orEmpty().map { it.code }.filter { it != "*" }.distinct()
             .sortedBy { LanguageNames.of(it).lowercase() }
@@ -99,7 +103,8 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
     val candidates = remember(toolkitLangs, lang) {
         buildList {
             val g = toolkitLangs.orEmpty().filter { it.code == lang || it.code == "*" }
-            for (m in g.flatMap { it.models }.distinctBy { it.id }) add(Candidate(m.id, m.name, m.engine, m.author))
+            // recognisers first, then aligners
+            for (m in g.flatMap { it.models }.distinctBy { it.id }.sortedBy { it.engine in ModelComparison.ALIGNERS }) add(Candidate(m.id, m.name, m.engine, m.author))
         }
     }
     val picked = candidates.filter { it.id in mc.chosen }.flatMap { m ->
@@ -149,7 +154,7 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
                 Text(noneT(), color = c.accent, fontSize = 12.sp, modifier = Modifier.clickable { mc.chosen.removeAll { id -> candidates.any { it.id == id } } }.padding(horizontal = 6.dp))
             }
             when {
-                error != null -> Text(error, color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
+                (error ?: alignError) != null && toolkitLangs == null -> Text((error ?: alignError)!!, color = c.danger, fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
                 // still asking: the models come when the toolkit answers; "start it" only when it isn't running
                 toolkitLangs == null -> Text(if (app.toolkit.status in setOf(mlabeler.app.toolkit.ToolkitManager.Status.Missing, mlabeler.app.toolkit.ToolkitManager.Status.Off,
                     mlabeler.app.toolkit.ToolkitManager.Status.Failed)) noToolkitT() else loadingT(),
