@@ -65,6 +65,7 @@ class AppState(private val scope: CoroutineScope) {
     var showSummary by mutableStateOf(false)
     var showPhonemeCuts by mutableStateOf(false)
     var showRefine by mutableStateOf(false)
+    var showModelCompare by mutableStateOf(false)
     var showConvert by mutableStateOf(false)
     var showResynth by mutableStateOf(false)
     var showUst by mutableStateOf(false)

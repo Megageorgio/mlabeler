@@ -244,6 +244,7 @@ object Commands {
     val unitPair = Command("unit-pair", L("Transition from this phoneme to the next: keep or take away", "Переход от этой фонемы к следующей: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(2) }.only(Mode.Labels)
     val unitSingle = Command("unit-single", L("This phoneme held: keep or take away", "Эта фонема протяжно: оставить или убрать"), emptyList()) { e, _ -> e.toggleUnit(1) }.only(Mode.Labels)
     val unitsOverview = Command("units-overview", L("Transitions of the folder (.trans)…", "Переходы папки (.trans)…"), emptyList()) { _, a -> a.showUnitsOverview = true }.only(Mode.Labels)
+    val compareModels = Command("compare-models", L("Compare autolabel models…", "Сравнить модели авторазметки…"), emptyList()) { _, a -> a.showModelCompare = true }.only(Mode.Labels)
     val refine = Command("refine-boundaries", L("Refine boundaries…", "Уточнить границы…"), emptyList()) { _, a -> a.showRefine = true }.only(Mode.Labels)
     val niao = Command("niaoniao", L("NiaoNiao voicebank…", "Банк NiaoNiao…"), emptyList(), { it.niaoShown() }) { _, a -> a.showNiao = true }.only(Mode.Labels)
     val nfc = Command("normalize-names", L("Normalise file names (files from a Mac)…", "Нормализовать имена файлов (файлы с Mac)…"), emptyList()) { _, a -> a.showNfc = true }
@@ -311,7 +312,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, quickLabel, refine, g2p, modelWords, convert, ust, nfc, niao, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, quickLabel, compareModels, refine, g2p, modelWords, convert, ust, nfc, niao, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf, resynthSave,

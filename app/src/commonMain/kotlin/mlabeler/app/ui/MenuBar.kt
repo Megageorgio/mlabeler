@@ -282,7 +282,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     }
     val tools = buildList {
         if (oto) add(item(Commands.autoOto, ed, app)) else {
-            add(item(Commands.autolabel, ed, app)); add(item(Commands.quickLabel, ed, app)); add(item(Commands.refine, ed, app))
+            add(item(Commands.autolabel, ed, app)); add(item(Commands.quickLabel, ed, app)); add(item(Commands.compareModels, ed, app)); add(item(Commands.refine, ed, app))
             add(MSub(MenuTitles.words(), listOf(item(Commands.g2p, ed, app), item(Commands.modelWords, ed, app))))
         }
         add(MSub(MenuTitles.soundTools(), buildList {

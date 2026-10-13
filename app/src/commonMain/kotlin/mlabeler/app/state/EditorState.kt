@@ -603,6 +603,9 @@ class EditorState(
     val referenceTiers: List<Pair<Int, IntervalTier>> get() =
         references.withIndex().filter { (_, r) -> !isHidden(r) }.flatMap { (k, r) -> r.doc.tiers.filterIsInstance<IntervalTier>().map { k to it } }
 
+    /** Comparison of several phoneme recognisers against these labels (Tools → Compare autolabel models). */
+    val modelComparison by lazy { ModelComparison(this) }
+
     /** Results of autolabelled parts kept for comparison (per file, not saved). */
     internal val modelResults = mutableMapOf<String, List<Reference>>()
 
