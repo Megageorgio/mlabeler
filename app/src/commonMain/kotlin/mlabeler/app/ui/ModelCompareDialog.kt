@@ -164,9 +164,12 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(if (on) "☑" else "☐", color = if (on) c.accent else c.muted, fontSize = 15.sp, modifier = Modifier.width(24.dp))
-                        Text(m.name, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))
-                        if (m.author.isNotBlank()) Text(m.author, color = c.muted.copy(alpha = 0.8f), fontSize = 11.sp, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
-                        Text(m.engine, color = c.muted, fontSize = 11.sp, modifier = Modifier.weight(1f).padding(start = 8.dp), textAlign = TextAlign.End)
+                        // the name with its author takes the room; the engine stays at the right edge
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Text(m.name, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))
+                            if (m.author.isNotBlank()) Text(m.author, color = c.muted.copy(alpha = 0.8f), fontSize = 11.sp, maxLines = 1, modifier = Modifier.padding(start = 8.dp))
+                        }
+                        Text(m.engine, color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
                     }
                 }
             }
