@@ -20,7 +20,8 @@ import mlabeler.core.model.LabelDoc
  */
 object QuickLabel {
     const val MODEL = "MCFL_multi13_s_v0.0.1"
-    private const val FILE = "mcfl/$MODEL.mcfl"
+    /** The release files of the model (github.com/Megageorgio/MCFL, release Multi13_v0.0.1). */
+    private const val DIR = "mcfl/$MODEL"
 
     /** The model's languages. */
     val codes = listOf("de", "el", "en", "es", "fr", "it", "ja", "ko", "nan", "pt", "ru", "yue", "zh")
@@ -39,7 +40,11 @@ object QuickLabel {
 
     /** The model, read once (a few MB); null when this build has none. */
     suspend fun model(): Mcfl? = lock.withLock {
-        model ?: withContext(Dispatchers.Default) { builtinAsset(FILE)?.let { Mcfl(it) } }.also { model = it }
+        model ?: withContext(Dispatchers.Default) {
+            val config = builtinAsset("$DIR/model.json") ?: return@withContext null
+            val weights = builtinAsset("$DIR/model.safetensors") ?: return@withContext null
+            Mcfl(config.decodeToString(), weights)
+        }.also { model = it }
     }
 
     val working = L("Quick labelling", "Быстрая разметка")

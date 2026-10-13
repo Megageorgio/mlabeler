@@ -22,7 +22,8 @@ import kotlin.test.assertTrue
  * the same synthetic sound with model.onnx in fp32).
  */
 class McflTest {
-    private val model by lazy { Mcfl(File("../app/builtin/mcfl/MCFL_multi13_s_v0.0.1.mcfl").readBytes()) }
+    private val dir = File("../app/builtin/mcfl/MCFL_multi13_s_v0.0.1")
+    private val model by lazy { Mcfl(File(dir, "model.json").readText(), File(dir, "model.safetensors").readBytes()) }
     private val golden by lazy { Json.parseToJsonElement(javaClass.getResource("/mcfl-golden.json")!!.readText()).jsonObject }
 
     private fun synth(): Audio {

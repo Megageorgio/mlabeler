@@ -31,10 +31,11 @@ import kotlin.math.sin
  *
  * The network: audio 16 kHz -> STFT -> 80 log-mel -> stride-2 convolution (20 ms frames) + GELU -> + language
  * embedding -> blocks of a depthwise dilated convolution and two pointwise ones with a residual -> B-/I- tag
- * log-probabilities and the start/end offsets inside a frame. The model is a .mcfl file made by tools/mcfl-pack.py
- * from an exported MCFL package; the decoding is that of the package's mcfl_infer.py.
+ * log-probabilities and the start/end offsets inside a frame. The model is the "mcfl-v1" release format of MCFL
+ * (model.json + model.safetensors, fp16 weights with the batch norms folded in); the decoding is that of the
+ * repository's mcfl_infer.py.
  */
-class Mcfl(bytes: ByteArray) {
+class Mcfl(config: String, weights: ByteArray) {
     data class Segment(val start: Double, val end: Double, val label: String)
 
     val name: String
@@ -78,53 +79,55 @@ class Mcfl(bytes: ByteArray) {
     private val sinT: FloatArray
 
     init {
-        if (bytes.size < 12 || bytes.decodeToString(0, 4) != "MCFL") throw IllegalArgumentException("Not an MCFL model")
-        val n = le32(bytes, 8)
-        val h = Json.parseToJsonElement(bytes.decodeToString(12, 12 + n)).jsonObject
-        val base = 12 + n + (4 - (12 + n) % 4) % 4
-        val tensors = h["tensors"]!!.jsonObject
-        fun t(key: String): Pair<FloatArray, List<Int>> {
+        val h = Json.parseToJsonElement(config).jsonObject
+        if (h["format"]?.jsonPrimitive?.content != "mcfl-v1") throw IllegalArgumentException("Not an MCFL model (format mcfl-v1)")
+        // safetensors: u64 length of the JSON header, the header, the data
+        val n = le32(weights, 0)
+        val tensors = Json.parseToJsonElement(weights.decodeToString(8, 8 + n)).jsonObject
+        val base = 8 + n
+        fun t(key: String): FloatArray {
             val d = tensors[key]?.jsonObject ?: throw IllegalArgumentException("The model has no $key")
-            val shape = d["shape"]!!.jsonArray.map { it.jsonPrimitive.int }
-            val count = shape.fold(1) { a, b -> a * b }
-            val off = base + d["offset"]!!.jsonPrimitive.int
-            val f16 = d["dtype"]!!.jsonPrimitive.content == "f16"
-            val out = FloatArray(count)
-            if (f16) for (i in 0 until count) out[i] = halfToFloat(le16(bytes, off + 2 * i))
-            else for (i in 0 until count) out[i] = Float.fromBits(le32(bytes, off + 4 * i))
-            return out to shape
+            val (from, to) = d["data_offsets"]!!.jsonArray.map { it.jsonPrimitive.int }
+            return when (val dt = d["dtype"]!!.jsonPrimitive.content) {
+                "F16" -> FloatArray((to - from) / 2) { i -> halfToFloat(le16(weights, base + from + 2 * i)) }
+                "F32" -> FloatArray((to - from) / 4) { i -> Float.fromBits(le32(weights, base + from + 4 * i)) }
+                else -> throw IllegalArgumentException("$key: $dt is not supported")
+            }
         }
         fun ints(key: String) = h[key]!!.jsonPrimitive.int
         name = h["name"]?.jsonPrimitive?.content ?: "MCFL"
-        languages = h["langs"]!!.jsonArray.map { it.jsonPrimitive.content }
+        val ids = h["langs"]!!.jsonObject.mapValues { it.value.jsonPrimitive.int }
+        languages = ids.entries.sortedBy { it.value }.map { it.key }
         labels = h["labels"]!!.jsonArray.map { it.jsonPrimitive.content }
         langPhonemes = h["lang_phonemes"]!!.jsonObject.mapValues { (_, v) -> v.jsonArray.map { it.jsonPrimitive.content }.toSet() }
-        merge = h["merge"]!!.jsonObject.mapValues { (_, v) -> v.jsonObject.mapValues { it.value.jsonPrimitive.content } }
-        shared = (h["shared"] as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet() ?: setOf("AP", "SP", "cl", "vf", "exh")
-        decode = h["decode"]?.jsonObject ?: JsonObject(emptyMap())
-        sr = ints("sr"); nFft = ints("n_fft"); hop = ints("hop"); nMels = ints("n_mels")
-        ch = ints("channels"); kernel = ints("kernel"); stemK = ints("stem_kernel")
+        merge = (h["phoneme_merge_map"] as? JsonObject)?.mapValues { (_, v) -> v.jsonObject.mapValues { it.value.jsonPrimitive.content } }.orEmpty()
+        shared = (h["shared_labels"] as? JsonArray)?.map { it.jsonPrimitive.content }?.toSet() ?: setOf("AP", "SP", "cl", "vf", "exh")
+        decode = JsonObject((h["decode"]?.jsonObject ?: JsonObject(emptyMap())) + listOfNotNull(h["frame_sec"]?.let { "frame_sec" to it }))
+        sr = ints("sample_rate"); nFft = ints("n_fft"); hop = ints("hop"); nMels = ints("n_mels")
+        ch = ints("channels"); kernel = ints("kernel")
         hidden = ch * ints("expand")
         dilations = h["dilations"]!!.jsonArray.map { it.jsonPrimitive.int }.toIntArray()
 
-        melFb = t("mel_fb").first
-        melMean = t("mel_mean").first
-        melStd = t("mel_std").first
+        melFb = t("mel_fb")
+        melMean = t("mel_mean")
+        melStd = t("mel_std")
+        val sw = t("stem.w")
+        stemK = sw.size / (ch * nMels)
         // [ch][mels][k] -> [k][mels][ch]
-        stemW = t("stem_w").first.let { w -> FloatArray(w.size).also { o -> for (c in 0 until ch) for (m in 0 until nMels) for (k in 0 until stemK) o[(k * nMels + m) * ch + c] = w[(c * nMels + m) * stemK + k] } }
-        stemB = t("stem_b").first
-        lang = t("lang").first
+        stemW = FloatArray(sw.size).also { o -> for (c in 0 until ch) for (m in 0 until nMels) for (k in 0 until stemK) o[(k * nMels + m) * ch + c] = sw[(c * nMels + m) * stemK + k] }
+        stemB = t("stem.b")
+        lang = t("lang")
         val nb = dilations.size
-        dwW = Array(nb) { i -> t("b$i.dw_w").first.let { w -> transpose(w, ch, kernel) } }
-        dwB = Array(nb) { i -> t("b$i.dw_b").first }
-        pw1W = Array(nb) { i -> transpose(t("b$i.pw1_w").first, hidden, ch) }
-        pw1B = Array(nb) { i -> t("b$i.pw1_b").first }
-        pw2W = Array(nb) { i -> transpose(t("b$i.pw2_w").first, ch, hidden) }
-        pw2B = Array(nb) { i -> t("b$i.pw2_b").first }
-        clsW = transpose(t("cls_w").first, labels.size, ch)
-        clsB = t("cls_b").first
-        offW = transpose(t("off_w").first, 2, ch)
-        offB = t("off_b").first
+        dwW = Array(nb) { i -> transpose(t("blocks.$i.dw.w"), ch, kernel) }
+        dwB = Array(nb) { i -> t("blocks.$i.dw.b") }
+        pw1W = Array(nb) { i -> transpose(t("blocks.$i.pw1.w"), hidden, ch) }
+        pw1B = Array(nb) { i -> t("blocks.$i.pw1.b") }
+        pw2W = Array(nb) { i -> transpose(t("blocks.$i.pw2.w"), ch, hidden) }
+        pw2B = Array(nb) { i -> t("blocks.$i.pw2.b") }
+        clsW = transpose(t("cls.w"), labels.size, ch)
+        clsB = t("cls.b")
+        offW = transpose(t("off.w"), 2, ch)
+        offB = t("off.b")
 
         val bins = nFft / 2 + 1
         cosT = FloatArray(bins * nFft)
