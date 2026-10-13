@@ -370,6 +370,8 @@ fun SettingsDialog(app: AppState) {
     var query by remember { mutableStateOf("") }
     var focusTitle by remember { mutableStateOf<String?>(null) }
     val folds = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
+    // per page: whether it fits the window with every block open (then its blocks start open)
+    val fits = remember { androidx.compose.runtime.mutableStateMapOf<Section, Boolean>() }
     Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820, dim = app.settings.settingsDim) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // on a small window the search goes under the title instead of squeezing it
@@ -408,7 +410,7 @@ fun SettingsDialog(app: AppState) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) { for (s in Section.entries) Chip(sectionTitle(s), s == section) { section = s; focusTitle = null } }
                     Divider()
-                    SettingsPage(app, section, Modifier.fillMaxWidth().weight(1f, fill = false))
+                    SettingsPage(app, section, Modifier.fillMaxWidth().weight(1f, fill = false), fits[section]) { fits[section] = it }
                 }
             } else {
                 Row(Modifier.fillMaxWidth().height(minOf(800.dp, maxHeight))) {
@@ -426,7 +428,7 @@ fun SettingsDialog(app: AppState) {
                         }
                     }
                     Divider(vertical = true)
-                    SettingsPage(app, section, Modifier.weight(1f))
+                    SettingsPage(app, section, Modifier.weight(1f), fits[section]) { fits[section] = it }
                 }
             }
             }
@@ -434,8 +436,12 @@ fun SettingsDialog(app: AppState) {
     }
 }
 
+/**
+ * A page of the settings. Its blocks start open when the whole page, open, fits the window ([fits] true): the
+ * first time a page is shown it is laid out open and unseen, measured, and [onMeasured] tells whether it fitted.
+ */
 @Composable
-private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
+private fun SettingsPage(app: AppState, section: Section, modifier: Modifier, fits: Boolean?, onMeasured: (Boolean) -> Unit) {
     val c = T.c
     val s = app.settings
     val dE = mlabeler.app.state.EditSettings()
@@ -443,7 +449,15 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
     val dL = mlabeler.app.state.LayoutSettings()
     val dC = mlabeler.core.check.CheckSettings()
     val dScale = if (mlabeler.app.Platform.isMobile) 0.8f else 1f
-    Column(modifier.scrollWithHint().padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
+    var viewport by remember(section) { mutableStateOf(0) }
+    var content by remember(section) { mutableStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(section, viewport, content) {
+        if (fits == null && viewport > 0 && content > 0) onMeasured(content <= viewport)
+    }
+    Column(modifier.onSizeChanged { viewport = it.height }.scrollWithHint()) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalFoldDefault provides (fits ?: true)) {
+    Column(Modifier.onSizeChanged { content = it.height }.graphicsLayer { alpha = if (fits == null) 0f else 1f }
+        .padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
         when (section) {
             Section.General -> {
                 Fold(S.language()) {
@@ -644,6 +658,8 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier) {
             }
         }
         if (section == Section.General) { Spacer(Modifier.height(28.dp)); DangerZone(app) }
+    }
+    }
     }
 }
 
@@ -1534,14 +1550,17 @@ internal val LocalFolds = androidx.compose.runtime.compositionLocalOf<MutableMap
 /** Opens the block around a setting the search jumped to. */
 private val LocalFoldOpen = androidx.compose.runtime.compositionLocalOf<(() -> Unit)?> { null }
 
-/** A block of settings under a title that opens and closes with a click; closed at first. */
+/** How a block starts: open when its page fits the window open (see SettingsPage), else closed. */
+internal val LocalFoldDefault = androidx.compose.runtime.compositionLocalOf { false }
+
+/** A block of settings under a title that opens and closes with a click; it starts as [LocalFoldDefault] says. */
 @Composable
 internal fun Fold(title: String, content: @Composable () -> Unit) {
     val c = T.c
     val shape = RoundedCornerShape(c.radius)
     val folds = LocalFolds.current
-    var own by remember { mutableStateOf(false) }
-    val open = folds?.get(title) ?: own
+    var own by remember { mutableStateOf<Boolean?>(null) }
+    val open = folds?.get(title) ?: own ?: LocalFoldDefault.current
     fun set(v: Boolean) { if (folds != null) folds[title] = v else own = v }
     val focus = LocalSettingFocus.current
     // after a jump from the search the closed blocks are composed once out of sight: the one with the setting opens
