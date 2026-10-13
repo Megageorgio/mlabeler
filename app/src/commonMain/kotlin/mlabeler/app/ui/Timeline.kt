@@ -412,7 +412,11 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                     val r = g.region(ch.position.y, 8 * density)
                                     val hb = if (ed.app.settings.hoverBoundary && ed.mode == Mode.Labels) hitBound(ed, g, r, ch.position.x, 6 * density) else null
                                     if (hb != ed.hoverBound) ed.hoverBound = hb
+                                    // the brush of sound editing shows its circle over the spectrogram
+                                    val onSpec = ed.soundMode && ed.brush && g.specBottom > g.specTop && ch.position.y in g.specTop..g.specBottom
+                                    ed.brushAt = if (onSpec) ch.position.x to ch.position.y else null
                                     hoverIcon = when {
+                                        onSpec -> PointerIcon.Crosshair
                                         r is Region.LaneSplit -> PointerIcon.Hand
                                         hitBound(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
                                         hitOto(ed, g, r, ch.position.x, 6 * density) != null -> resizeHorizontalIcon
@@ -422,7 +426,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                         else -> PointerIcon.Default
                                     }
                                 }
-                                PointerEventType.Exit -> if (ch.type == PointerType.Mouse) { ed.cursor = null; ed.hoverBound = null }
+                                PointerEventType.Exit -> if (ch.type == PointerType.Mouse) { ed.cursor = null; ed.hoverBound = null; ed.brushAt = null }
                                 PointerEventType.Scroll -> {
                                     val d = ch.scrollDelta
                                     val mods = e.keyboardModifiers
@@ -531,6 +535,43 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 }
                             }
                             ed.endGainStroke()
+                            return@awaitEachGesture
+                        }
+
+                        // sound editing with the brush: paints a part of the spectrogram. A new stroke starts a new
+                        // selection, Shift adds to it, Alt or the right button erases from it
+                        if (ed.soundMode && ed.brush && ed.mode == Mode.Labels && g.specBottom > g.specTop &&
+                            down.position.y in g.specTop..g.specBottom && !first.buttons.isTertiaryPressed) {
+                            val erase = first.buttons.isSecondaryPressed || mods.isAltPressed
+                            if (ed.maskItem != ed.item?.id || (!erase && !mods.isShiftPressed)) ed.spectralMask.clear()
+                            ed.maskItem = ed.item?.id
+                            val cs = ed.app.settings.clean
+                            val r = cs.brushSize * density
+                            val h = g.specBottom - g.specTop
+                            val melTop = brushMelTop(ed)
+                            fun dab(p: Offset) {
+                                val mel = ((g.specBottom - p.y) / h).coerceIn(0f, 1f) * melTop
+                                ed.spectralMask.add(mlabeler.core.dsp.SpectralMask.Dab(timeAt(p.x), mel, r / ed.pixelsPerSecond, r / h * melTop, cs.brushSoftness, erase))
+                            }
+                            dab(down.position)
+                            ed.maskVersion++
+                            var last = down.position
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val chg = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!chg.pressed) break
+                                val p = chg.position
+                                val dist = hypot(p.x - last.x, p.y - last.y)
+                                val spacing = (r / 4).coerceAtLeast(1f)
+                                if (dist >= spacing) {
+                                    val steps = (dist / spacing).toInt()
+                                    for (s in 1..steps) dab(last + (p - last) * (s.toFloat() / steps))
+                                    last = p
+                                    ed.maskVersion++
+                                }
+                                ed.brushAt = p.x to p.y
+                                chg.consume()
+                            }
                             return@awaitEachGesture
                         }
 
@@ -867,6 +908,7 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
         Canvas(Modifier.fillMaxSize().clipToBounds()) {
             val g = geom(size, density, layout, tierCount)
             drawCursor(ed, g, c) { t -> ((t - ed.viewStart) * ed.pixelsPerSecond).toFloat() }
+            drawSpectralMask(ed, g, c)
         }
         // the lock in the corner of the ruler fixes the sizes of lanes and side panels
         Box(Modifier.align(Alignment.TopEnd).padding(end = 2.dp)) {
@@ -1048,4 +1090,44 @@ object LaneTitles {
     fun name(id: String) = names[id]?.invoke() ?: id
     val up = mlabeler.app.i18n.L("Move the lane up", "Полосу выше")
     val down = mlabeler.app.i18n.L("Move the lane down", "Полосу ниже")
+}
+
+/** The top of the spectrogram as drawn, in mel (the brush works in the picture's own scale). */
+internal fun brushMelTop(ed: EditorState): Double {
+    val top = ed.app.settings.view.maxFreq.toDouble()
+    return Spectrogram.hzToMel(min(top, ed.spectrogram?.maxFreq ?: top))
+}
+
+/** What the brush painted, tinted over the spectrogram, and the brush's circle (its hard core dashed inside). */
+internal fun DrawScope.drawSpectralMask(ed: EditorState, g: Geom, c: Tokens) {
+    if (!ed.soundMode || g.specBottom <= g.specTop) return
+    @Suppress("UNUSED_VARIABLE") val v = ed.maskVersion
+    val h = g.specBottom - g.specTop
+    val melTop = brushMelTop(ed)
+    if (ed.spectralMask.dabs.isNotEmpty() && ed.maskItem == ed.item?.id) {
+        val step = 3f * density
+        val nx = (size.width / step).toInt() + 1
+        val ny = (h / step).toInt() + 1
+        val pps = ed.pixelsPerSecond
+        val mels = DoubleArray(ny) { k -> ((k + 0.5) * step / h) * melTop }
+        val grid = ed.spectralMask.raster(ed.viewStart + step / 2 / pps, step / pps, nx, mels)
+        val rgb = c.accent.toArgb() and 0xFFFFFF
+        val px = IntArray(nx * ny)
+        for (i in 0 until nx) for (k in 0 until ny) {
+            val m = grid[i * ny + k]
+            if (m > 0.01f) px[(ny - 1 - k) * nx + i] = ((m * 0.5f * 255).toInt() shl 24) or rgb
+        }
+        val img = imageFromArgb(nx, ny, px)
+        drawImage(img, srcOffset = IntOffset.Zero, srcSize = IntSize(nx, ny),
+            dstOffset = IntOffset(0, (g.specBottom - ny * step).toInt()), dstSize = IntSize((nx * step).toInt(), (ny * step).toInt()),
+            filterQuality = FilterQuality.Low)
+    }
+    val at = ed.brushAt ?: return
+    if (!ed.brush || at.second !in g.specTop..g.specBottom) return
+    val r = ed.app.settings.clean.brushSize * density
+    val o = Offset(at.first, at.second)
+    drawCircle(c.text.copy(alpha = 0.85f), r, o, style = Stroke(1.2f * density))
+    val core = r * (1f - ed.app.settings.clean.brushSoftness)
+    if (core > 2 * density && core < r - density) drawCircle(c.text.copy(alpha = 0.5f), core, o,
+        style = Stroke(1f * density, pathEffect = PathEffect.dashPathEffect(floatArrayOf(3 * density, 3 * density))))
 }

@@ -121,7 +121,10 @@ object Commands {
     val save = Command("save", S.save, listOf(ch('S', ctrl = true))) { e, _ -> e.save() }
     val split = Command("split", S.split, listOf(ch('S'))) { e, _ -> e.splitAt() }
     val merge = Command("merge", S.merge, listOf(ch('M'))) { e, _ -> e.mergeSelected() }
-    val delete = Command("delete", S.removeBoundary, listOf(Chord(Key.Delete), Chord(Key.Backspace))) { e, _ -> e.deleteSelected() }
+    val delete = Command("delete", S.removeBoundary, listOf(Chord(Key.Delete), Chord(Key.Backspace))) { e, _ ->
+        // sound editing: what the brush painted on the spectrogram goes
+        if (e.soundMode && !e.spectralMask.isEmpty()) e.cleanup.erasePainted() else e.deleteSelected()
+    }
     val rename = Command("rename", S.rename, listOf(Chord(Key.Enter), Chord(Key.F2)), { it.selectedInterval() != null }) { e, _ ->
         e.selectedInterval()?.let { e.editingText = it }
     }
@@ -298,7 +301,7 @@ object Commands {
     }
     val reloadAudio = Command("reload-audio", L("Read the recording again", "Перечитать запись"), listOf(Chord(Key.F5))) { e, _ -> e.reloadAudio() }
     val deselect = Command("deselect", L("Clear the selection", "Снять выделение"), listOf(Chord(Key.Escape))) { e, _ ->
-        e.selection = mlabeler.app.state.Selection.None; e.range = null
+        e.selection = mlabeler.app.state.Selection.None; e.range = null; e.clearMask()
     }
     val workspace = Command("workspace", L("Folder settings…", "Настройки папки…"), listOf(ch('M', ctrl = true))) { _, a -> a.showWorkspace = true }
 

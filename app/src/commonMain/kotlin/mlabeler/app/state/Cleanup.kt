@@ -32,6 +32,10 @@ data class CleanSettings(
     /** Trimming silence at the ends: what counts as silence (dB below the loudest part) and how much of it stays. */
     val trimThresholdDb: Float = -45f,
     val trimPadMs: Float = 200f,
+    /** The spectrogram brush: radius (dp), softness of its edge 0..1, how much the painted sound is lowered (dB). */
+    val brushSize: Float = 20f,
+    val brushSoftness: Float = 0.6f,
+    val brushReductionDb: Float = 40f,
 )
 
 /**
@@ -293,6 +297,31 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
         ed.playBuffer(Audio(a.sampleRate, out))
     }
 
+    /**
+     * Removes the sound painted with the brush: the painted frequencies are lowered by brushReductionDb at the
+     * painted times, the soft edge of the brush less. Ctrl+Z undoes it.
+     */
+    fun erasePainted() = run("brush") {
+        val mask = ed.spectralMask
+        if (ed.maskItem != ed.item?.id) { ed.clearMask(); return@run }
+        val span = mask.span() ?: return@run
+        val snapshot = mlabeler.core.dsp.SpectralMask().also { m -> mask.dabs.forEach { m.add(it) } }
+        val db = app.settings.clean.brushReductionDb
+        val changed = modify { w, ch, x ->
+            val pad = (0.1 * w.sampleRate).toInt()
+            val from = ((span.first * w.sampleRate).toInt() - pad).coerceIn(0, w.frames)
+            val to = ((span.second * w.sampleRate).toInt() + pad).coerceIn(from, w.frames)
+            if (to - from < 2) 0 else {
+                val y = Repair.attenuate(x.copyOfRange(from, to), w.sampleRate, from.toDouble() / w.sampleRate, snapshot, db)
+                var c = 0
+                for (i in y.indices) if (w.set(from + i, ch, y[i])) c++
+                c
+            }
+        }
+        ed.clearMask()
+        app.message(if (changed > 0) brushDone() else brushNothing())
+    }
+
     fun undo() = run("undo") {
         if (ed.undoAudio()) app.message(undone())
     }
@@ -396,6 +425,8 @@ class Cleanup(private val ed: EditorState, private val app: AppState) {
     }
 
     companion object {
+        val brushDone = L("The painted sound is removed. Ctrl+Z undoes it.", "Закрашенный звук убран. Отмена — Ctrl+Z.")
+        val brushNothing = L("Nothing changed: the painted part is silent already", "Ничего не изменилось: закрашенное и так тихое")
         val onlyWav = L("Only WAV recordings can be cleaned", "Очистка доступна только для WAV-записей")
         val noClicks = L("No clicks found", "Щелчков не найдено")
         val clicksFound = L("Clicks found: {0}. They are marked in red above the waveform.", "Найдено щелчков: {0}. Они отмечены красным над волной.")

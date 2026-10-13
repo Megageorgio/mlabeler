@@ -62,6 +62,7 @@ fun SoundPanel(app: AppState, ed: EditorState, modifier: Modifier, titled: Boole
             Text(SoundTitles.phrases(), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
             Toggle(l.soundPhrases, { v -> app.update { it.copy(layout = it.layout.copy(soundPhrases = v)) } })
         }
+        BrushTools(app, ed)
         CleanupTools(app, ed, compact = true)
     }
 }

@@ -1427,7 +1427,29 @@ class EditorState(
     }
 
     /** Sound editing mode: the recording is changed, the labels can't be (they move only with cut sound). */
-    var soundMode by mutableStateOf(false)
+    private var soundModeOn by mutableStateOf(false)
+    var soundMode: Boolean
+        get() = soundModeOn
+        set(v) {
+            soundModeOn = v
+            if (!v) { brush = false; clearMask() }
+        }
+
+    /** Sound editing: the brush paints a part of the spectrogram ([spectralMask]); Delete removes that sound. */
+    var brush by mutableStateOf(false)
+    /** What the brush painted, in time and mel, for the file [maskItem]. */
+    val spectralMask = mlabeler.core.dsp.SpectralMask()
+    var maskItem: String? = null
+    /** Changes with every dab, so the picture of the mask is drawn again. */
+    var maskVersion by mutableStateOf(0)
+    /** The brush over the spectrogram (pixels), for its circle; null elsewhere. */
+    var brushAt by mutableStateOf<Pair<Float, Float>?>(null)
+
+    fun clearMask() {
+        if (spectralMask.dabs.isEmpty()) return
+        spectralMask.clear()
+        maskVersion++
+    }
     private var audioEditCommit = false
 
     fun commit(newDoc: LabelDoc) {

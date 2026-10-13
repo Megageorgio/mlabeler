@@ -196,3 +196,40 @@ fun CleanupTools(app: AppState, ed: mlabeler.app.state.EditorState, compact: Boo
         Btn(originalT(), enabled = cl.hasOriginal() && !cl.busy) { cl.restoreOriginal() }
     }
 }
+
+private val brushT = L("Brush on the spectrogram", "Кисть по спектрограмме")
+private val brushHint = L(
+    "Paint over a sound on the spectrogram (a breath, a click, a hum) and press Delete: those frequencies go at those moments, the rest stays. A new stroke starts a new selection; Shift adds to it, Alt or the right button erases from it, Esc clears it. Ctrl+Z undoes the change.",
+    "Закрасьте звук на спектрограмме (вдох, щелчок, гул) и нажмите Delete: эти частоты в эти моменты уходят, остальное остаётся. Новый мазок начинает новое выделение; Shift добавляет к нему, Alt или правая кнопка стирают из него, Esc сбрасывает. Отмена изменения — Ctrl+Z.",
+)
+private val brushOnT = L("Paint with the brush", "Рисовать кистью")
+private val brushSizeT = L("Size", "Размер")
+private val brushSoftT = L("Soft edge", "Мягкость края")
+private val brushDbT = L("Lower by", "Насколько убрать")
+private val brushEraseT = L("Remove the painted (Delete)", "Убрать закрашенное (Delete)")
+private val brushClearT = L("Clear", "Сбросить")
+
+/** The spectrogram brush of sound editing mode: on and off, its size, edge and strength, and removing what it painted. */
+@Composable
+fun BrushTools(app: AppState, ed: mlabeler.app.state.EditorState) {
+    val c = T.c
+    val cs = app.settings.clean
+    val dflt = CleanSettings()
+    fun set(f: (CleanSettings) -> CleanSettings) = app.update { it.copy(clean = f(it.clean)) }
+    Heading(brushT(), brushHint(), true)
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(brushOnT(), color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Toggle(ed.brush, { v -> ed.brush = v; if (!v) ed.brushAt = null })
+    }
+    if (ed.brush) {
+        ValueSlider(brushSizeT(), cs.brushSize, 4f..80f, "px", default = dflt.brushSize) { v -> set { it.copy(brushSize = v.toInt().toFloat()) } }
+        ValueSlider(brushSoftT(), cs.brushSoftness * 100, 0f..100f, "%", default = dflt.brushSoftness * 100) { v -> set { it.copy(brushSoftness = v.toInt() / 100f) } }
+        ValueSlider(brushDbT(), cs.brushReductionDb, 6f..80f, "dB", default = dflt.brushReductionDb) { v -> set { it.copy(brushReductionDb = v.toInt().toFloat()) } }
+        ed.maskVersion // drawn again when the painting changes
+        val painted = !ed.spectralMask.isEmpty()
+        FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Btn(brushEraseT(), primary = true, enabled = painted && !ed.cleanup.busy) { ed.cleanup.erasePainted() }
+            if (painted) Btn(brushClearT()) { ed.clearMask() }
+        }
+    }
+}

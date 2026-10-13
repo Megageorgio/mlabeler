@@ -223,4 +223,44 @@ object Repair {
         }
         return FloatArray(x.size) { i -> val j = i + pad; if (norm[j] > 1e-9) (out[j] / norm[j]).toFloat() else x[i] }
     }
+
+    /**
+     * Lowers the parts of [x] painted in [mask] by up to [reductionDb] (a soft edge lowers less): the samples are
+     * cut into overlapping windows, each window's spectrum is scaled by the mask at its time, and they are added
+     * back together. [start]: the time of x[0] in the recording, seconds. Returns the new samples.
+     */
+    fun attenuate(x: FloatArray, sampleRate: Int, start: Double, mask: SpectralMask, reductionDb: Float): FloatArray {
+        if (x.isEmpty() || mask.isEmpty()) return x
+        val fft = Fft(N)
+        val bins = N / 2 + 1
+        val pad = N
+        val len = x.size + 2 * pad
+        val src = DoubleArray(len) { i -> val j = i - pad; if (j in x.indices) x[j].toDouble() else 0.0 }
+        val out = DoubleArray(len)
+        val norm = DoubleArray(len)
+        val frames = (len - N) / HOP + 1
+        // the mask at every window's centre and every bin
+        val mels = DoubleArray(bins) { Spectrogram.hzToMel(it.toDouble() * sampleRate / N) }
+        val t0 = start + (N / 2 - pad).toDouble() / sampleRate
+        val m = mask.raster(t0, HOP.toDouble() / sampleRate, frames, mels)
+        val perDb = -ln(10.0) / 20.0 * reductionDb
+        for (f in 0 until frames) {
+            val p = f * HOP
+            val re = DoubleArray(N) { src[p + it] * window[it] }
+            val im = DoubleArray(N)
+            fft.transform(re, im)
+            for (k in 0 until bins) {
+                val g = exp(perDb * m[f * bins + k])
+                re[k] *= g; im[k] *= g
+                if (k in 1 until N / 2) { re[N - k] = re[k]; im[N - k] = -im[k] }
+            }
+            for (k in 0 until N) im[k] = -im[k]
+            fft.transform(re, im)
+            for (i in 0 until N) {
+                out[p + i] += re[i] / N * window[i]
+                norm[p + i] += window[i] * window[i]
+            }
+        }
+        return FloatArray(x.size) { i -> val j = i + pad; if (norm[j] > 1e-9) (out[j] / norm[j]).toFloat() else x[i] }
+    }
 }
