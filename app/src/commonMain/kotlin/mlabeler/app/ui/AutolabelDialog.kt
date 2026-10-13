@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.border
 import androidx.compose.foundation.verticalScroll
@@ -44,7 +43,14 @@ private val howT = L("How", "Как")
 private val byText = L("Place a known text", "Расставить известный текст")
 private val byText2 = L("SOFA, HubertFA, TIFA · the text is needed", "SOFA, HubertFA, TIFA · нужен текст")
 private val recognize = L("Recognise phonemes", "Распознать фонемы")
-private val recognize2 = L("WFL · no text needed", "WFL · текст не нужен")
+private val recognize2 = L("WFL, MCFL · no text needed", "WFL, MCFL · текст не нужен")
+private val allKinds = L("All", "Все")
+
+/** Names of the engines in the filter of the model list. */
+private fun engineTitle(e: String) = when (e) {
+    "sofa" -> "SOFA"; "hubertfa" -> "HubertFA"; "tifa" -> "TIFA"; "wfl_asr" -> "WFL-ASR"; "mcfl" -> "MCFL"; else -> e
+}
+private val engineOrder = listOf("sofa", "hubertfa", "tifa", "wfl_asr", "mcfl")
 private val byTextAbout = L("The aligner places what is sung: words (turned into phonemes with the model's dictionary) or phonemes. It doesn't guess the text; without text it can only work after Whisper has recognised the words.",
     "Выравниватель расставляет то, что поётся: слова (разбивая их на фонемы по словарю модели) или фонемы. Текст он не определяет; при отсутствии текста сначала нужно распознать слова через Whisper.")
 private val recognizeAbout = L("The model hears the phonemes itself, no text needed. If you know the phonemes, enter them: then it only places them.",
@@ -165,7 +171,17 @@ fun AutolabelDialog(app: AppState) {
     val range = if (whole || selected == null) 0.0 to ed.duration else selected
     var recognizeMode by remember { mutableStateOf(false) }
     val task = if (recognizeMode) "segment" else "align"
-    val (langs, error) = rememberToolkitModels(app, task)
+    val (allLangs, error) = rememberToolkitModels(app, task)
+    // the kind of model shown ("" = all), within the chosen way of labelling
+    var kind by remember(task) { mutableStateOf("") }
+    val kinds = remember(allLangs) {
+        allLangs.orEmpty().flatMap { g -> g.models.map { it.engine } }.distinct()
+            .sortedWith(compareBy({ engineOrder.indexOf(it).let { i -> if (i < 0) 99 else i } }, { it }))
+    }
+    val langs = remember(allLangs, kind) {
+        if (kind.isEmpty() || kind !in kinds) allLangs
+        else allLangs?.map { g -> g.copy(models = g.models.filter { it.engine == kind }) }?.filter { it.models.isNotEmpty() }
+    }
     var lang by remember(task) { mutableStateOf(settings.lastLanguage) }
     var model by remember(task) { mutableStateOf(if (recognizeMode) settings.lastSegmentModel else settings.lastModel) }
     var extraLangs by remember { mutableStateOf(settings.extraLanguages) }
@@ -255,6 +271,10 @@ fun AutolabelDialog(app: AppState) {
                 Choice(recognize(), recognize2(), recognizeMode, Modifier.weight(1f)) { recognizeMode = true }
             }
             Text(if (recognizeMode) recognizeAbout() else byTextAbout(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+            if (kinds.size > 1) androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(allKinds(), kind.isEmpty() || kind !in kinds) { kind = "" }
+                for (k in kinds) Chip(engineTitle(k), kind == k) { kind = k }
+            }
             SectionTitle(S.language() + " · " + L("model", "модель")())
             when {
                 error != null -> Text(error, color = c.danger, fontSize = 13.sp)
@@ -266,7 +286,8 @@ fun AutolabelDialog(app: AppState) {
                         for (l in langs.sortedWith(compareBy({ it.code == "*" }, { mlabeler.app.i18n.LanguageNames.of(it.code, it.name) }))) Chip(mlabeler.app.i18n.LanguageNames.of(l.code, l.name), l.code == lang) { lang = l.code }
                     }
                     val models = langs.firstOrNull { it.code == lang }?.models.orEmpty()
-                    Column(Modifier.padding(top = 6.dp).heightIn(max = 200.dp).scrollWithHint()) {
+                    // no scroll of its own: the window scrolls (two scrolls inside each other are awkward)
+                    Column(Modifier.padding(top = 6.dp)) {
                         for (m in models) {
                             val sel = m.id == model
                             Row(
