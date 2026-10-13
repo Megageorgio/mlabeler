@@ -362,6 +362,9 @@ private fun sectionTitle(s: Section) = when (s) {
 /** Settings split into pages: a list on the left on wide windows, tabs on top on narrow ones. */
 private val confidenceBelowT = L("Mark a phoneme when the model's confidence is below", "Отмечать фонему, если уверенность модели ниже")
 
+private val expandAllT = L("Expand all", "Развернуть все")
+private val collapseAllT = L("Collapse all", "Свернуть все")
+
 @Composable
 fun SettingsDialog(app: AppState) {
     val c = T.c
@@ -372,8 +375,9 @@ fun SettingsDialog(app: AppState) {
     var query by remember { mutableStateOf("") }
     var focusTitle by remember { mutableStateOf<String?>(null) }
     val folds = remember { androidx.compose.runtime.mutableStateMapOf<String, Boolean>() }
-    // per page: whether it fits the window with every block open (then its blocks start open)
-    val fits = remember { androidx.compose.runtime.mutableStateMapOf<Section, Boolean>() }
+    // how the blocks start: all open (the default) or all closed, by the buttons at the top of a page
+    var foldsOpen by remember { mutableStateOf(true) }
+    val setAll: (Boolean) -> Unit = { v -> folds.clear(); foldsOpen = v }
     Overlay({ app.showSettings = false; app.editor?.requestFocus?.invoke() }, 820, dim = app.settings.settingsDim) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // on a small window the search goes under the title instead of squeezing it
@@ -412,7 +416,7 @@ fun SettingsDialog(app: AppState) {
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) { for (s in Section.entries) Chip(sectionTitle(s), s == section) { section = s; focusTitle = null } }
                     Divider()
-                    SettingsPage(app, section, Modifier.fillMaxWidth().weight(1f, fill = false), fits[section]) { fits[section] = it }
+                    SettingsPage(app, section, Modifier.fillMaxWidth().weight(1f, fill = false), foldsOpen, setAll)
                 }
             } else {
                 Row(Modifier.fillMaxWidth().height(minOf(800.dp, maxHeight))) {
@@ -430,7 +434,7 @@ fun SettingsDialog(app: AppState) {
                         }
                     }
                     Divider(vertical = true)
-                    SettingsPage(app, section, Modifier.weight(1f), fits[section]) { fits[section] = it }
+                    SettingsPage(app, section, Modifier.weight(1f), foldsOpen, setAll)
                 }
             }
             }
@@ -438,12 +442,9 @@ fun SettingsDialog(app: AppState) {
     }
 }
 
-/**
- * A page of the settings. Its blocks start open when the whole page, open, fits the window ([fits] true): the
- * first time a page is shown it is laid out open and unseen, measured, and [onMeasured] tells whether it fitted.
- */
+/** A page of the settings. Its blocks are all open at first ([foldsOpen]); two links at the top open or close them all. */
 @Composable
-private fun SettingsPage(app: AppState, section: Section, modifier: Modifier, fits: Boolean?, onMeasured: (Boolean) -> Unit) {
+private fun SettingsPage(app: AppState, section: Section, modifier: Modifier, foldsOpen: Boolean, setAll: (Boolean) -> Unit) {
     val c = T.c
     val s = app.settings
     val dE = mlabeler.app.state.EditSettings()
@@ -451,15 +452,14 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier, fi
     val dL = mlabeler.app.state.LayoutSettings()
     val dC = mlabeler.core.check.CheckSettings()
     val dScale = if (mlabeler.app.Platform.isMobile) 0.8f else 1f
-    var viewport by remember(section) { mutableStateOf(0) }
-    var content by remember(section) { mutableStateOf(0) }
-    androidx.compose.runtime.LaunchedEffect(section, viewport, content) {
-        if (fits == null && viewport > 0 && content > 0) onMeasured(content <= viewport)
-    }
-    Column(modifier.onSizeChanged { viewport = it.height }.scrollWithHint()) {
-    androidx.compose.runtime.CompositionLocalProvider(LocalFoldDefault provides (fits ?: true)) {
-    Column(Modifier.onSizeChanged { content = it.height }.graphicsLayer { alpha = if (fits == null) 0f else 1f }
-        .padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
+    Column(modifier.scrollWithHint()) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalFoldDefault provides foldsOpen) {
+    Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 20.dp)) {
+        // open or close every block of the page: quiet links, as "All / None" elsewhere
+        if (section != Section.About) Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.End) {
+            Text(expandAllT(), color = c.accent, fontSize = 12.sp, modifier = Modifier.clip(RoundedCornerShape(c.radius)).clickable { setAll(true) }.padding(horizontal = 6.dp, vertical = 2.dp))
+            Text(collapseAllT(), color = c.accent, fontSize = 12.sp, modifier = Modifier.clip(RoundedCornerShape(c.radius)).clickable { setAll(false) }.padding(horizontal = 6.dp, vertical = 2.dp))
+        }
         when (section) {
             Section.General -> {
                 Fold(S.language()) {
@@ -1554,7 +1554,7 @@ internal val LocalFolds = androidx.compose.runtime.compositionLocalOf<MutableMap
 /** Opens the block around a setting the search jumped to. */
 private val LocalFoldOpen = androidx.compose.runtime.compositionLocalOf<(() -> Unit)?> { null }
 
-/** How a block starts: open when its page fits the window open (see SettingsPage), else closed. */
+/** How a block starts: open by default; "Collapse all" on a settings page closes them (see SettingsPage). */
 internal val LocalFoldDefault = androidx.compose.runtime.compositionLocalOf { false }
 
 /** A block of settings under a title that opens and closes with a click; it starts as [LocalFoldDefault] says. */
