@@ -256,6 +256,8 @@ data class ToolkitSettings(
 data class QuickLabelSettings(
     /** Language of the singing; empty = the language of the interface if the model knows it, else English. */
     val language: String = "",
+    /** Phonemes already in the selected part are placed anew (the model only finds their boundaries). */
+    val usePhonemes: Boolean = true,
 )
 
 @Serializable

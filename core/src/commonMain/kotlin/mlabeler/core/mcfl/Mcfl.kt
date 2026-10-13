@@ -162,6 +162,93 @@ class Mcfl(config: String, weights: ByteArray) {
         return if (!native) segs else segs.map { s -> merge[s.label]?.get(language)?.let { s.copy(label = it) } ?: s }
     }
 
+    /**
+     * Places known [phonemes] (in order, the language's own names) over [audio]: the best path through their B-/I-
+     * tags, each at least one frame. A phoneme the model doesn't know may take any label of the language. Returns
+     * continuous segments with exactly the given names.
+     */
+    suspend fun align(audio: Audio, language: String, phonemes: List<String>, threads: Int = 1, confidence: Boolean = false,
+                      progress: (Double) -> Unit = {}): List<Segment> {
+        val lid = languages.indexOf(language)
+        if (lid < 0) throw IllegalArgumentException("$name has no language $language: ${languages.joinToString(" ")}")
+        if (phonemes.isEmpty()) return emptyList()
+        val a = (if (audio.sampleRate == sr) audio.samples.copyOf() else Dataset.resample(audio, sr).samples)
+        var peak = 0f
+        for (v in a) peak = max(peak, abs(v))
+        for (i in a.indices) a[i] = a[i] / (peak + 1e-8f)
+        val (lp, off, t) = frames(a, lid, threads) { progress(it * 0.9) }
+        val k = phonemes.size
+        if (k > t) throw IllegalArgumentException("$k phonemes don't fit in ${t * fd()} s")
+        val nl = labels.size
+        // the language's B-/I- columns, log-softmaxed per frame (as the decoder without text does)
+        val keep = phonemes(language) + shared
+        val cols = labels.indices.filter { labels[it] != "O" && labels[it].drop(2) in keep }.toIntArray()
+        val col = cols.withIndex().associate { (j, c) -> labels[c] to j }
+        val nc = cols.size
+        val sub = DoubleArray(t * nc)
+        for (f in 0 until t) {
+            var m = Double.NEGATIVE_INFINITY
+            for (j in 0 until nc) m = max(m, lp[f * nl + cols[j]].toDouble())
+            var s = 0.0
+            for (j in 0 until nc) s += exp(lp[f * nl + cols[j]] - m)
+            val lse = m + ln(s)
+            for (j in 0 until nc) sub[f * nc + j] = lp[f * nl + cols[j]] - lse
+        }
+        val toCanon = merge.entries.mapNotNull { (canon, per) -> per[language]?.let { it to canon } }.toMap()
+        val canon = phonemes.map { toCanon[it] ?: it }
+        // per token its B and I column, -1: unknown (the best label of the frame)
+        val bc = IntArray(k) { col["B-${canon[it]}"]?.takeIf { _ -> col.containsKey("I-${canon[it]}") } ?: -1 }
+        val ic = IntArray(k) { if (bc[it] < 0) -1 else col["I-${canon[it]}"]!! }
+        val best = DoubleArray(t) { f -> var m = Double.NEGATIVE_INFINITY; for (j in 0 until nc) m = max(m, sub[f * nc + j]); m }
+        fun bAt(f: Int, j: Int) = if (bc[j] < 0) best[f] else sub[f * nc + bc[j]]
+        fun iAt(f: Int, j: Int) = if (ic[j] < 0) best[f] else sub[f * nc + ic[j]]
+        val logb = ln(decode["viterbi_bias"]?.jsonPrimitive?.double ?: 1.0)
+        val neg = -1e18
+        var sb = DoubleArray(k) { neg }
+        var si = DoubleArray(k) { neg }
+        sb[0] = bAt(0, 0)
+        // per frame and token: the I came from the B (else from the I); the B came from the previous token's B
+        val fromB = BooleanArray(t * k)
+        val startFromB = BooleanArray(t * k)
+        for (f in 1 until t) {
+            coroutineContext.ensureActive()
+            val nb = DoubleArray(k)
+            val ni = DoubleArray(k)
+            for (j in 0 until k) {
+                val prevEnd = if (j == 0) neg else { val b = sb[j - 1] >= si[j - 1]; startFromB[f * k + j] = b; if (b) sb[j - 1] else si[j - 1] }
+                nb[j] = prevEnd + bAt(f, j)
+                val fb = sb[j] >= si[j]
+                fromB[f * k + j] = fb
+                ni[j] = (if (fb) sb[j] else si[j]) + logb + iAt(f, j)
+            }
+            sb = nb; si = ni
+        }
+        val starts = IntArray(k)
+        var j = k - 1
+        var inB = sb[j] >= si[j]
+        for (f in t - 1 downTo 1) {
+            if (inB) {
+                starts[j] = f
+                inB = startFromB[f * k + j]
+                j--
+                if (j < 0) break
+            } else inB = fromB[f * k + j]
+        }
+        val fd = fd()
+        var segs = (0 until k).map { n ->
+            val f0 = starts[n]
+            val f1 = if (n + 1 < k) starts[n + 1] - 1 else t - 1
+            Segment((f0 + off[f0 * 2]) * fd, (f1 + off[f1 * 2 + 1]) * fd, canon[n])
+        }
+        if (confidence) segs = withConfidence(segs, lp, t)
+        // continuous, with the given names
+        val dur = a.size.toDouble() / sr
+        val startsSec = DoubleArray(k)
+        for (n in 0 until k) startsSec[n] = if (n == 0) 0.0 else max(startsSec[n - 1] + 1e-4, segs[n].start).coerceAtMost(dur)
+        progress(1.0)
+        return (0 until k).map { n -> segs[n].copy(start = startsSec[n], end = if (n + 1 < k) startsSec[n + 1] else dur, label = phonemes[n]) }
+    }
+
     /** Log-probabilities and offsets of [audio] at 16 kHz (for tests). */
     internal suspend fun debugFrames(audio: Audio, language: String): Pair<FloatArray, FloatArray> {
         val a = audio.samples.copyOf()

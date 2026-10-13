@@ -273,6 +273,7 @@ fun ScaleTool(app: AppState, scale: Float, labels: Boolean, big: Boolean) {
 
 private val quickHint = L("the model that comes with mLabeler, in the language next to the button; no toolkit needed",
     "встроенная модель mLabeler, на языке рядом с кнопкой; тулкит не нужен")
+private val quickPhonemesT = L("Place the phonemes already there (only their boundaries are found)", "Расставлять уже записанные фонемы (ищутся только границы)")
 private val quickLanguageHint = L("Language of the singing for quick labelling", "Язык пения для быстрой разметки")
 
 /** The language of quick labelling: its code; a tap opens the list of the model's languages. */
@@ -297,6 +298,12 @@ private fun QuickLanguageTool(app: AppState, labels: Boolean, big: Boolean) {
                 } else Text(lang.uppercase() + " ▾", color = c.muted, fontSize = 12.sp)
             }
             MenuPopup(open, onDismiss = { open = false }, focusable = true) {
+                val use = app.settings.quick.usePhonemes
+                androidx.compose.material3.DropdownMenuItem(
+                    { Text((if (use) "✓  " else "     ") + quickPhonemesT(), fontSize = 14.sp, color = c.accent) },
+                    onClick = { app.update { it.copy(quick = it.quick.copy(usePhonemes = !use)) } },
+                )
+                Divider()
                 for ((code, name) in mlabeler.app.state.QuickLabel.languages()) {
                     androidx.compose.material3.DropdownMenuItem(
                         { Text((if (code == lang) "✓  " else "     ") + name + "  ·  " + code, fontSize = 14.sp) },

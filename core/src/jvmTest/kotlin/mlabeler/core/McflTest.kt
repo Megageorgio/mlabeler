@@ -62,6 +62,19 @@ class McflTest {
     }
 
     @Test
+    fun knownPhonemesArePlacedWhereTheModelHearsThem() = runBlocking {
+        // the phonemes it recognises itself, given back: the same names, the boundaries close to its own
+        val got = model.label(synth(), "ru", confidence = true)
+        val aligned = model.align(synth(), "ru", got.map { it.label }, threads = 2, confidence = true)
+        assertEquals(got.map { it.label }, aligned.map { it.label })
+        val d = got.zip(aligned).drop(1).map { (a, b) -> abs(a.start - b.start) }.sorted()
+        assertTrue(d[d.size / 2] < 0.03, "median boundary difference ${d[d.size / 2]} s")
+        assertEquals(0.0, aligned.first().start); assertEquals(4.5, aligned.last().end, 1e-6)
+        assertTrue(aligned.zipWithNext().all { (a, b) -> a.end == b.start && b.start > a.start })
+        assertTrue(aligned.all { it.confidence != null })
+    }
+
+    @Test
     fun segmentsMatchPython() = runBlocking {
         for (lang in listOf("ru", "ja")) {
             val want = golden["segments"]!!.jsonObject[lang]!!.jsonArray.map { s -> s.jsonArray.let { Triple(it[0].jsonPrimitive.double, it[1].jsonPrimitive.double, it[2].jsonPrimitive.content) } }

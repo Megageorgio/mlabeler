@@ -49,6 +49,7 @@ object QuickLabel {
 
     val working = L("Quick labelling", "Быстрая разметка")
     val done = L("Quick labelling finished ({0}). Ctrl+Z undoes it.", "Быстрая разметка готова ({0}). Отмена — Ctrl+Z.")
+    val aligned = L("{0} phonemes of the labels placed anew ({1}). Ctrl+Z undoes it.", "Фонемы разметки расставлены заново: {0} ({1}). Отмена — Ctrl+Z.")
     val noModel = L("This build has no quick labelling model", "В этой сборке нет модели быстрой разметки")
 }
 
@@ -58,7 +59,13 @@ object QuickLabel {
  */
 fun EditorState.quickLabel(language: String) {
     val a = audio ?: return
-    val (from, to) = range ?: selectedSpan() ?: (0.0 to duration)
+    var (from, to) = range ?: selectedSpan() ?: (0.0 to duration)
+    // phonemes already there (Settings: on by default) are placed anew instead of recognised
+    val pt = doc?.let { d -> d.tiers.getOrNull(d.phonemeTierIndex()) as? IntervalTier }
+    val known = if (!settings.quick.usePhonemes || pt == null) emptyList()
+        else (0 until pt.size).filter { (pt.startOf(it) + pt.endOf(it)) / 2 in from..to && pt.texts[it].isNotBlank() }
+    val align = known.any { pt!!.texts[it].trim() !in mlabeler.core.check.ModelScore.PAUSES }
+    if (align) { from = pt!!.startOf(known.first()); to = pt.endOf(known.last()) }
     if (to - from < 0.05) return
     describeWork("Quick labelling", QuickLabel.MODEL)
     toolkitJob?.cancel()
@@ -68,12 +75,14 @@ fun EditorState.quickLabel(language: String) {
             val m = QuickLabel.model() ?: throw IllegalStateException(QuickLabel.noModel())
             val part = withContext(Dispatchers.Default) { Dataset.cutAudio(a, from, to, 0) }
             val segs = withContext(Dispatchers.Default) {
-                m.label(part, language, threads = Platform.cores.coerceIn(1, 8), confidence = settings.toolkit.markUnsure) { p -> toolkitProgress = p }
+                val threads = Platform.cores.coerceIn(1, 8)
+                if (align) m.align(part, language, known.map { pt!!.texts[it].trim() }, threads, settings.toolkit.markUnsure) { p -> toolkitProgress = p }
+                else m.label(part, language, threads = threads, confidence = settings.toolkit.markUnsure) { p -> toolkitProgress = p }
             }
             val tier = IntervalTier.fromIntervals("phones", segs.map { Triple(from + it.start, from + it.end, it.label) }, from + part.duration,
                 segs.map { it.confidence }.takeIf { c -> c.any { it != null } })
             placeLabels(LabelDoc(listOf(tier)), from, to)
-            app.message(QuickLabel.done.format(language))
+            app.message(if (align) QuickLabel.aligned.format(known.size, language) else QuickLabel.done.format(language))
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
