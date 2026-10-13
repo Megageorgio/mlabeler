@@ -22,19 +22,19 @@ import mlabeler.core.model.IntervalTier
 import mlabeler.core.model.LabelDoc
 
 /**
- * Several phoneme recognisers (no text: WFL-ASR, MCFL, the built-in quick model) run on the same audio of one
+ * Several phoneme recognisers of the toolkit (no text: WFL-ASR, MCFL) run on the same audio of one
  * language, each scored against the phonemes of the labels, which are taken as the truth: phoneme error rate,
  * boundary errors, speed. Nothing in the labels changes; a model's result on the open file can be shown as a
  * comparison tier.
  */
 class ModelComparison(private val ed: EditorState) {
     /**
-     * A model and how it runs: [withPhonemes] gives it the phonemes of the labels to place (WFL-ASR can; MCFL and
-     * the built-in model only recognise). [key] tells the two runs of one model apart.
+     * A model and how it runs: [withPhonemes] gives it the phonemes of the labels to place (WFL-ASR can; MCFL only
+     * recognises). [key] tells the two runs of one model apart.
      */
     data class Candidate(val id: String, val name: String, val engine: String, val author: String = "", val withPhonemes: Boolean = false) {
         val key: String get() = if (withPhonemes) "$id#phonemes" else id
-        val takesPhonemes: Boolean get() = id != BUILTIN && engine != "mcfl"
+        val takesPhonemes: Boolean get() = engine != "mcfl"
     }
 
     /** One model's result over everything compared. */
@@ -97,8 +97,7 @@ class ModelComparison(private val ed: EditorState) {
             val audioSec = models.associate { it.key to 0.0 }.toMutableMap()
             val done = models.associate { it.key to 0 }.toMutableMap()
             val failed = models.associate { it.key to mutableListOf<String>() }
-            val toolkitModels = models.filter { it.id != BUILTIN }
-            val client = if (toolkitModels.isEmpty()) null else ed.app.toolkit.client()
+            val client = ed.app.toolkit.client()
             var serverJob: String? = null
             fun publish() {
                 rows.clear()
@@ -106,10 +105,8 @@ class ModelComparison(private val ed: EditorState) {
                     .sortedWith(compareBy({ it.files == 0 }, { it.score.per }, { it.score.meanMs })))
             }
             try {
-                if (client != null) {
-                    progress = mlabeler.app.toolkit.ToolkitManager.starting()
-                    if (!ed.app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(ed.app.toolkit.statusText())
-                }
+                progress = mlabeler.app.toolkit.ToolkitManager.starting()
+                if (!ed.app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(ed.app.toolkit.statusText())
                 for ((n, f) in files.withIndex()) {
                     progress = fileT.format(n + 1, files.size, f.name)
                     val isOpen = f.id == open?.id
@@ -130,21 +127,14 @@ class ModelComparison(private val ed: EditorState) {
                         fraction = (n + k.toDouble() / models.size) / files.size
                         val t0 = ed.now()
                         try {
-                            val hyp: IntervalTier = if (m.id == BUILTIN) {
-                                val model = QuickLabel.model() ?: error(QuickLabel.noModel())
-                                val segs = withContext(Dispatchers.Default) { model.label(part, language, threads = Platform.cores.coerceIn(1, 8)) }
-                                IntervalTier.fromIntervals("phones", segs.map { Triple(from + it.start, from + it.end, it.label) }, from + part.duration, null)
-                            } else {
-                                val c = client!!
-                                if (fileId == null) fileId = c.upload(Paths.stem(f.audioPath) + "_compare.wav", withContext(Dispatchers.Default) { Wav.encode16(part) })
-                                val jobId = c.segment(fileId!!, m.id, language, if (m.withPhonemes) known else emptyList(), ed.settings.toolkit.wfl, null)
-                                serverJob = jobId
-                                val result = c.await(jobId) { _, _ -> }
-                                serverJob = null
-                                val d = mlabeler.app.toolkit.ToolkitClient.labelOf(result, from, part.duration)
-                                (d.tiers.firstOrNull { (it as? IntervalTier)?.name == "phones" } ?: d.tiers.getOrNull(d.phonemeTierIndex())) as? IntervalTier
-                                    ?: error("no phonemes in the result")
-                            }
+                            if (fileId == null) fileId = client.upload(Paths.stem(f.audioPath) + "_compare.wav", withContext(Dispatchers.Default) { Wav.encode16(part) })
+                            val jobId = client.segment(fileId!!, m.id, language, if (m.withPhonemes) known else emptyList(), ed.settings.toolkit.wfl, null)
+                            serverJob = jobId
+                            val result = client.await(jobId) { _, _ -> }
+                            serverJob = null
+                            val d = mlabeler.app.toolkit.ToolkitClient.labelOf(result, from, part.duration)
+                            val hyp = (d.tiers.firstOrNull { (it as? IntervalTier)?.name == "phones" } ?: d.tiers.getOrNull(d.phonemeTierIndex())) as? IntervalTier
+                                ?: error("no phonemes in the result")
                             seconds[m.key] = seconds[m.key]!! + (ed.now() - t0) / 1000.0
                             audioSec[m.key] = audioSec[m.key]!! + part.duration
                             scores[m.key] = scores[m.key]!! + ModelScore.score(ref, hyp, from, to)
@@ -164,7 +154,7 @@ class ModelComparison(private val ed: EditorState) {
                 publish()
                 progress = if (rows.none { it.files > 0 }) nothingT() else null
             } catch (e: kotlinx.coroutines.CancellationException) {
-                serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { runCatching { client?.cancel(id) } } }
+                serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { runCatching { client.cancel(id) } } }
                 progress = stoppedT()
                 throw e
             } catch (e: Exception) {
@@ -177,8 +167,6 @@ class ModelComparison(private val ed: EditorState) {
     }
 
     companion object {
-        /** The model that comes with mLabeler (quick labelling). */
-        const val BUILTIN = "builtin:mcfl"
         private val fileT = L("File {0} of {1}: {2}", "Файл {0} из {1}: {2}")
         private val stoppedT = L("Stopped: the table has what was done", "Остановлено: в таблице то, что успели")
         private val nothingT = L("Nothing compared: no file has phonemes to compare with", "Нечего сравнивать: ни в одном файле нет фонем-эталона")

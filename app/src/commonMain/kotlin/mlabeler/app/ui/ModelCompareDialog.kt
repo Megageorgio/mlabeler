@@ -46,8 +46,7 @@ private val folderT = L("Labelled files of the folder ({0})", "Размечен�
 private val modelsT = L("Models", "Модели")
 private val allT = L("All", "Все")
 private val noneT = L("None", "Ни одной")
-private val builtinT = L("Quick labelling (built in)", "Быстрая разметка (встроенная)")
-private val noToolkitT = L("The toolkit isn't running: only the built-in model can be compared", "Тулкит не запущен: сравнить можно только встроенную модель")
+private val noToolkitT = L("The models are those of the toolkit: start it to compare them", "Сравниваются модели тулкита: запустите его")
 private val runT = L("Compare", "Сравнить")
 private val stopT = L("Stop", "Остановить")
 private val resultT = L("Results", "Результаты")
@@ -70,8 +69,8 @@ private val withoutT = L("Without phonemes", "Без фонем")
 private val withT = L("With the phonemes of the labels", "С фонемами разметки")
 private val bothT = L("Both", "Оба варианта")
 private val withAboutT = L(
-    "With phonemes a model only places the phonemes of your labels (WFL-ASR): the boundaries are what is compared. MCFL and the built-in model can't take phonemes and run without them.",
-    "С фонемами модель только расставляет фонемы вашей разметки (WFL-ASR): сравниваются границы. MCFL и встроенная модель фонемы не принимают и работают без них.",
+    "With phonemes a model only places the phonemes of your labels (WFL-ASR): the boundaries are what is compared. MCFL can't take phonemes and runs without them.",
+    "С фонемами модель только расставляет фонемы вашей разметки (WFL-ASR): сравниваются границы. MCFL фонемы не принимает и работает без них.",
 )
 private val withSuffix = L("with phonemes", "с фонемами")
 private val withoutSuffix = L("without phonemes", "без фонем")
@@ -87,9 +86,9 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
     val labelled = remember(ed.items) { ed.items.count { it.labelPath != null } }
     var scope by remember { mutableStateOf(if (selected != null) ModelComparison.Scope.Selection else ModelComparison.Scope.File) }
     val (toolkitLangs, error) = rememberToolkitModels(app, "segment")
-    // languages: those with recognisers in the toolkit and those of the built-in model
+    // languages with recognisers in the toolkit
     val codes = remember(toolkitLangs) {
-        (toolkitLangs.orEmpty().map { it.code }.filter { it != "*" } + QuickLabel.codes).distinct()
+        toolkitLangs.orEmpty().map { it.code }.filter { it != "*" }.distinct()
             .sortedBy { LanguageNames.of(it).lowercase() }
     }
     LaunchedEffect(codes) {
@@ -98,7 +97,6 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
     val lang = mc.language
     val candidates = remember(toolkitLangs, lang) {
         buildList {
-            if (lang in QuickLabel.codes) add(Candidate(ModelComparison.BUILTIN, builtinT(), "mcfl", "m & HHS_kt"))
             val g = toolkitLangs.orEmpty().filter { it.code == lang || it.code == "*" }
             for (m in g.flatMap { it.models }.distinctBy { it.id }) add(Candidate(m.id, m.name, m.engine, m.author))
         }
