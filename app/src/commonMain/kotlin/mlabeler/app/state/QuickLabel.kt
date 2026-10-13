@@ -22,16 +22,14 @@ object QuickLabel {
     const val MODEL = "MCFL_multi13_s_v0.0.1"
     private const val FILE = "mcfl/$MODEL.mcfl"
 
-    /** The model's languages with their own names, in the model's order. */
-    val languages = listOf(
-        "de" to "Deutsch", "el" to "Ελληνικά", "en" to "English", "es" to "Español", "fr" to "Français",
-        "it" to "Italiano", "ja" to "日本語", "ko" to "한국어", "nan" to "臺灣話 (Min Nan)", "pt" to "Português",
-        "ru" to "Русский", "yue" to "粵語", "zh" to "中文",
-    )
+    /** The model's languages. */
+    val codes = listOf("de", "el", "en", "es", "fr", "it", "ja", "ko", "nan", "pt", "ru", "yue", "zh")
+
+    /** The languages with their names in the language of the interface, by name. */
+    fun languages(): List<Pair<String, String>> = codes.map { it to mlabeler.app.i18n.LanguageNames.of(it) }.sortedBy { it.second.lowercase() }
 
     /** The chosen language: the saved one, else that of the interface if the model knows it, else English. */
     fun language(s: AppSettings): String {
-        val codes = languages.map { it.first }
         return s.quick.language.takeIf { it in codes }
             ?: s.language.ifEmpty { Platform.systemLanguage }.takeIf { it in codes } ?: "en"
     }

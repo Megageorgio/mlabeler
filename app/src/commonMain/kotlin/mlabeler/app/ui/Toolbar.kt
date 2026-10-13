@@ -297,7 +297,7 @@ private fun QuickLanguageTool(app: AppState, labels: Boolean, big: Boolean) {
                 } else Text(lang.uppercase() + " ▾", color = c.muted, fontSize = 12.sp)
             }
             MenuPopup(open, onDismiss = { open = false }, focusable = true) {
-                for ((code, name) in mlabeler.app.state.QuickLabel.languages) {
+                for ((code, name) in mlabeler.app.state.QuickLabel.languages()) {
                     androidx.compose.material3.DropdownMenuItem(
                         { Text((if (code == lang) "✓  " else "     ") + name + "  ·  " + code, fontSize = 14.sp) },
                         onClick = { open = false; app.update { it.copy(quick = it.quick.copy(language = code)) } },
