@@ -400,6 +400,7 @@ data class AppSettings(
     val niao: NiaoSettings = NiaoSettings(),
     val workTime: WorkTimeSettings = WorkTimeSettings(),
     val discord: DiscordSettings = DiscordSettings(),
+    val otoNote: OtoNoteSettings = OtoNoteSettings(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
@@ -534,6 +535,23 @@ data class KaraokeSettings(
     val musicLevel: Float = 1f,
     val separation: String = "auto",
     val whisper: String = "whisper-large-v3-turbo",
+)
+
+/**
+ * oto.ini: an entry sung as a note through the toolkit, to hear how the voicebank will sound with it. [method]:
+ * "world", "nsf" (the DiffSinger vocoder [model]) or "resampler" (an UTAU resampler program at [resampler] on the
+ * toolkit's computer, with [flags]). [tone]: a note name ("C4"); empty = from the alias or the folder name ("ka_C4",
+ * "A3"), else the recording's own pitch. [notes]: 2 sings the entry twice in a row to hear how it joins.
+ */
+@Serializable
+data class OtoNoteSettings(
+    val method: String = "world",
+    val model: String = "pc-nsf-hifigan-2025.02",
+    val resampler: String = "",
+    val flags: String = "",
+    val tone: String = "",
+    val lengthMs: Int = 600,
+    val notes: Int = 1,
 )
 
 /** A sound played when long work (autolabelling and the like) ends: off and without a sound by default. */

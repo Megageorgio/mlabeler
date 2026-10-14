@@ -45,6 +45,9 @@ import mlabeler.app.i18n.L
 import mlabeler.app.i18n.S
 import mlabeler.app.state.EditorState
 import mlabeler.app.state.FileFilter
+import mlabeler.app.state.otoNoteNamed
+import mlabeler.app.state.playOtoNote
+import kotlinx.coroutines.launch
 import mlabeler.app.theme.T
 import mlabeler.core.format.OtoMarker
 import mlabeler.core.format.formatNumberPublic
@@ -226,11 +229,83 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
         }
         Text(otoLockHint(), color = c.muted, fontSize = 11.sp)
         OtoAfterEdit(ed.app)
+        OtoNoteSection(ed)
         OtoCompareSection(ed)
         androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Btn(Commands.otoDuplicate.title()) { ed.oto.duplicate() }
             Btn(Commands.otoDelete.title()) { ed.oto.delete() }
         }
+    }
+}
+
+private val noteTitleT = L("Listen as a note", "Прослушать нотой")
+private val noteAboutT = L(
+    "The toolkit sings the entry on a note, as the voicebank will sound with it. Two notes in a row show how the overlap and preutterance join.",
+    "Тулкит поёт запись на ноте, как будет звучать голосовой банк. Две ноты подряд показывают, как стыкуются overlap и preutterance.",
+)
+private val noteWorldT = L("Quick (WORLD)", "Быстро (WORLD)")
+private val noteNsfT = L("DiffSinger vocoder (NSF-HiFiGAN)", "Вокодер DiffSinger (NSF-HiFiGAN)")
+private val noteResamplerT = L("UTAU resampler", "Ресемплер UTAU")
+private val noteNsfNoteT = L("NSF-HiFiGAN by OpenVPI: CC BY-NC-SA 4.0, non-commercial use only; downloaded on first use.",
+    "NSF-HiFiGAN от OpenVPI: CC BY-NC-SA 4.0, только некоммерческое использование; загружается при первом использовании.")
+private val noteResamplerPathT = L("Resampler program on the toolkit's computer (moresampler.exe, TIPS…)", "Программа-ресемплер на компьютере тулкита (moresampler.exe, TIPS…)")
+private val noteChooseT = L("Choose…", "Выбрать…")
+private val noteFlagsT = L("Flags (e.g. g-5)", "Флаги (например g-5)")
+private val noteToneT = L("Note", "Нота")
+private val noteToneAutoT = L("auto ({0})", "авто ({0})")
+private val noteOwnPitchT = L("its pitch", "своя высота")
+private val noteLengthT = L("Length, ms", "Длина, мс")
+private val noteOneT = L("One note", "Одна нота")
+private val noteTwoT = L("Two in a row", "Две подряд")
+
+/** An oto entry sung on a note through the toolkit ([playOtoNote]) and how. */
+@Composable
+private fun OtoNoteSection(ed: EditorState) {
+    val c = T.c
+    val app = ed.app
+    val n = app.settings.otoNote
+    fun set(f: (mlabeler.app.state.OtoNoteSettings) -> mlabeler.app.state.OtoNoteSettings) = app.update { it.copy(otoNote = f(it.otoNote)) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    SectionTitle(noteTitleT()) {
+        IconBtn(Icons.play, Commands.otoNote.title() + "  (" + Commands.otoNote.keyLabel + ")", size = 26.dp) { ed.playOtoNote() }
+    }
+    Text(noteAboutT(), color = c.muted, fontSize = 11.sp)
+    androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Chip(noteWorldT(), n.method == "world") { set { it.copy(method = "world") } }
+        Chip(noteNsfT(), n.method == "nsf") { set { it.copy(method = "nsf") } }
+        Chip(noteResamplerT(), n.method == "resampler") { set { it.copy(method = "resampler") } }
+    }
+    if (n.method == "nsf") Text(noteNsfNoteT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+    if (n.method == "resampler") {
+        Text(noteResamplerPathT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            var path by remember { mutableStateOf(n.resampler) }
+            Field(path, { path = it; set { s -> s.copy(resampler = it.trim()) } }, Modifier.weight(1f))
+            // the toolkit started by this program runs on this computer, so a file here is a file there
+            if (Platform.hasNativeFolderPicker) Btn(noteChooseT()) {
+                scope.launch {
+                    val f = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { Platform.pickFileNative(noteResamplerPathT(), emptyList(), null) }
+                    if (f != null) { path = f; set { s -> s.copy(resampler = f) } }
+                }
+            }
+        }
+        var flags by remember { mutableStateOf(n.flags) }
+        Field(flags, { flags = it; set { s -> s.copy(flags = it.trim()) } }, Modifier.fillMaxWidth().padding(top = 6.dp), placeholder = noteFlagsT())
+    }
+    val e = ed.oto.current()
+    // the note it will be sung on when none is set: from the alias or folder name, else the pitch under the entry
+    val auto = e?.let { ed.otoNoteNamed(it) }?.let { mlabeler.core.format.NoteNames.format(it) } ?: noteOwnPitchT()
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(noteToneT(), color = c.text, fontSize = 13.sp, modifier = Modifier.width(52.dp))
+        var tone by remember { mutableStateOf(n.tone) }
+        Field(tone, { tone = it; set { s -> s.copy(tone = it.trim()) } }, Modifier.weight(1f), placeholder = noteToneAutoT.format(auto))
+        Text(noteLengthT(), color = c.text, fontSize = 13.sp)
+        var len by remember { mutableStateOf(n.lengthMs.toString()) }
+        Field(len, { len = it; it.trim().toIntOrNull()?.let { v -> set { s -> s.copy(lengthMs = v.coerceIn(50, 10_000)) } } }, Modifier.width(72.dp))
+    }
+    androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Chip(noteOneT(), n.notes < 2) { set { it.copy(notes = 1) } }
+        Chip(noteTwoT(), n.notes >= 2) { set { it.copy(notes = 2) } }
     }
 }
 

@@ -88,6 +88,74 @@ fun EditorState.playResynth(method: String) {
 }
 
 /**
+ * The note an oto.ini entry is sung on: the one set in the settings; else a note name at the end of the alias or of
+ * the folder ("ka_C4", "a か D#4", a folder "A3"); else the recording's own pitch under the entry; else C4.
+ */
+fun EditorState.otoNoteTone(e: mlabeler.core.format.OtoEntry): Double {
+    otoNoteNamed(e)?.let { return it }
+    val a = audio ?: return 60.0
+    val abs = oto.absolute(e)
+    val s0 = (abs.preutterance / 1000 * a.sampleRate).toInt().coerceIn(0, a.samples.size)
+    val s1 = (abs.right / 1000 * a.sampleRate).toInt().coerceIn(s0, a.samples.size)
+    if (s1 - s0 < a.sampleRate / 20) return 60.0
+    val f0 = mlabeler.core.dsp.Pitch.yin(a.samples.copyOfRange(s0, s1), a.sampleRate).values.filter { !it.isNaN() && it > 0f }.sorted()
+    if (f0.isEmpty()) return 60.0
+    return kotlin.math.round(mlabeler.core.dsp.Pitch.hzToMidi(f0[f0.size / 2].toDouble()))
+}
+
+/** The note of [otoNoteTone] that is written somewhere (the settings, the alias, the folder), or null. */
+fun EditorState.otoNoteNamed(e: mlabeler.core.format.OtoEntry): Double? {
+    fun noteIn(s: String) = Regex("([A-G][#b]?\\d)$").find(s.trim())?.let { mlabeler.core.format.NoteNames.parse(it.groupValues[1]) }
+    return mlabeler.core.format.NoteNames.parse(app.settings.otoNote.tone.trim()) ?: noteIn(e.alias)
+        ?: item?.let { noteIn(Paths.name(Paths.parent(it.audioPath))) }
+}
+
+/**
+ * Plays the selected oto.ini entry sung as a note by the toolkit, as a voicebank would sound with it: WORLD, the
+ * DiffSinger vocoder or an UTAU resampler, on the note and length of [OtoNoteSettings] (see [otoNoteTone]).
+ */
+fun EditorState.playOtoNote() {
+    val e = oto.current() ?: return
+    val a = audio ?: return
+    val set = app.settings.otoNote
+    if (set.method == "resampler" && set.resampler.isBlank()) return app.message(noResampler(), error = true)
+    describeWork("Singing", if (set.method == "nsf") set.model else set.method)
+    toolkitJob?.cancel()
+    toolkitJob = scope.launch {
+        val client = app.toolkit.client()
+        var serverJob: String? = null
+        try {
+            val tone = withContext(Dispatchers.Default) { otoNoteTone(e) }
+            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+            if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
+            toolkitBusy = S.uploading()
+            val wav = withContext(Dispatchers.Default) { Wav.encode16(a) }
+            val fileId = client.upload(Paths.stem(e.sample).ifEmpty { "sample" } + ".wav", wav)
+            val job = client.otoNote(fileId, e, tone, set.lengthMs.coerceIn(50, 10_000), set.notes.coerceIn(1, 2), set.method, set.model, set.resampler, set.flags)
+            serverJob = job
+            val result = client.await(job, { toolkitDetail = it }) { p, stage -> toolkitProgress = p; toolkitBusy = stage.ifEmpty { S.toolkit() } }
+            serverJob = null
+            val path = (result["file"] as? kotlinx.serialization.json.JsonPrimitive)?.content ?: throw mlabeler.app.toolkit.ToolkitException("no file in the result")
+            val out = withContext(Dispatchers.Default) { Wav.decode(client.download(path)) }
+            playBuffer(out)
+            app.message(otoNotePlayed.format(e.alias, mlabeler.core.format.NoteNames.format(tone)))
+        } catch (x: kotlinx.coroutines.CancellationException) {
+            serverJob?.let { id -> withContext(kotlinx.coroutines.NonCancellable) { client.cancel(id) } }
+            throw x
+        } catch (x: Exception) {
+            app.message(x.message ?: x.toString(), error = true)
+        } finally {
+            toolkitBusy = null
+            toolkitProgress = null
+        }
+    }
+}
+
+private val noResampler = L("Choose the resampler program in the \"Listen as a note\" settings of the inspector first.",
+    "Сначала выберите программу-ресемплер в настройках «Прослушать нотой» в инспекторе.")
+private val otoNotePlayed = L("{0} sung on {1}", "{0} спето на {1}")
+
+/**
  * Sings the whole recording again with the pitch as it is now (the analysed f0 with what was drawn) through the
  * toolkit ("world" or "nsf") and saves it: in place of the recording ([asCopy] false; Ctrl+Z undoes it, the drawing
  * goes since the sound has that pitch now) or as <name>_f0.wav next to it.

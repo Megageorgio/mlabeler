@@ -18,6 +18,7 @@ import mlabeler.app.state.togglePanel
 import mlabeler.app.state.toggleSide
 import mlabeler.core.format.OtoMarker
 import mlabeler.app.state.playResynth
+import mlabeler.app.state.playOtoNote
 import mlabeler.app.state.phonemesFromWords
 import mlabeler.app.state.quickLabel
 
@@ -189,6 +190,7 @@ object Commands {
     val otoLock = Command("oto-lock", L("Preutterance moves all markers", "Preutterance двигает все маркеры"), listOf(ch('G'))) { _, a ->
         a.update { it.copy(edit = it.edit.copy(otoLockedDrag = !it.edit.otoLockedDrag)) }
     }.only(Mode.Oto)
+    val otoNote = Command("oto-note", L("Listen as a note (toolkit)", "Прослушать нотой (тулкит)"), listOf(ch('J'))) { e, _ -> e.playOtoNote() }.only(Mode.Oto)
     val resynthWorld = Command("resynth-world", L("Listen with the drawn pitch (quick)", "Прослушать с нарисованной высотой (быстро)"), emptyList()) { e, _ -> e.playResynth("world") }.only(Mode.Labels)
     val resynthNsf = Command("resynth-nsf", L("Listen with the drawn pitch (DiffSinger vocoder)", "Прослушать с нарисованной высотой (вокодер DiffSinger)"), emptyList()) { e, a ->
         a.message(L("The vocoder is NSF-HiFiGAN by OpenVPI (CC BY-NC-SA 4.0: non-commercial use only); it is downloaded on first use.",
@@ -312,7 +314,7 @@ object Commands {
     }
 
     val all = listOf(
-        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, quickLabel, compareModels, refine, g2p, modelWords, convert, ust, nfc, niao, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock,
+        leftSide, rightSide, labelsBigger, labelsSmaller, cleanup, mute, cutAudio, soundMode, lockLayout, reloadAudio, deselect, playOnDrag, pitchUp, pitchDown, notesFromAudio, groupPhonemes, notesFromGroups, fillQueue, arrange, f0Pencil, vuv, dynPencil, dynApply, reviewNext, reviewPrev, summary, phonemeCuts, soundCheck, exportDs, midiOut, midiIn, overlay, tiersOnTop, namesOnAudio, autoOto, record, karaoke, notepad, importLbp, plugins, slot1, slot2, slot3, slot4, help, tips, workspace, autolabel, quickLabel, compareModels, refine, g2p, modelWords, convert, ust, nfc, niao, unitsOverview, unitPair, unitSingle, speed, batchRename, otoLeft, otoOverlap, otoPreu, otoCons, otoRight, nextEntry, prevEntry, otoDelete, otoDuplicate, otoAdd, otoLock, otoNote,
         togglePlay, playFrom, loop, ripple, linked, undo, redo, save, split, merge, delete, rename, setLeft, setRight,
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf, resynthSave,

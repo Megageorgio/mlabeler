@@ -382,6 +382,25 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return call("POST", "/resynth", req).jsonObject["id"]!!.jsonPrimitive.content
     }
 
+    /**
+     * Starts singing an oto.ini entry of an uploaded recording as a note of MIDI pitch [tone], [lengthMs] long
+     * ([notes] 2: twice in a row): "world", "nsf" (with the vocoder [model]) or "resampler" (the UTAU resampler
+     * program at [resampler] on the toolkit's computer); returns the job id.
+     */
+    suspend fun otoNote(fileId: String, e: mlabeler.core.format.OtoEntry, tone: Double, lengthMs: Int, notes: Int, method: String,
+                        model: String, resampler: String, flags: String): String {
+        val req = buildJsonObject {
+            putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", fileId) }) }) }
+            put("offset", e.offset); put("consonant", e.consonant); put("cutoff", e.cutoff)
+            put("preutterance", e.preutterance); put("overlap", e.overlap)
+            put("tone", tone); put("length", lengthMs); put("notes", notes); put("method", method)
+            if (model.isNotBlank()) put("model", model)
+            if (resampler.isNotBlank()) put("resampler", resampler)
+            put("flags", flags)
+        }
+        return call("POST", "/oto/note", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
     /** Downloads a result file of a job. */
     suspend fun download(path: String): ByteArray {
         val enc = buildString {

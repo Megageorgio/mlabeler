@@ -163,6 +163,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
             add(item(Commands.otoDelete, ed, app))
             add(MSub(MenuTitles.markersAtCursor(), listOf(Commands.otoLeft, Commands.otoOverlap, Commands.otoPreu, Commands.otoCons, Commands.otoRight).map { item(it, ed, app) }))
             add(item(Commands.otoLock, ed, app, checked = s.edit.otoLockedDrag))
+            add(item(Commands.otoNote, ed, app))
             add(MSep)
             add(item(Commands.batchRename, ed, app))
         } else {
