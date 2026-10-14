@@ -58,7 +58,7 @@ fun EditorState.playResynth(method: String) {
         val client = app.toolkit.client()
         var serverJob: String? = null
         try {
-            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting(), resynthTitle())
             if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
             toolkitBusy = S.uploading()
             val s0 = (from.coerceAtLeast(0.0) * a.sampleRate).toInt().coerceIn(0, a.samples.size)
@@ -126,7 +126,7 @@ fun EditorState.playOtoNote() {
         var serverJob: String? = null
         try {
             val tone = withContext(Dispatchers.Default) { otoNoteTone(e) }
-            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting(), otoNoteTitle())
             if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
             toolkitBusy = S.uploading()
             val wav = withContext(Dispatchers.Default) { Wav.encode16(a) }
@@ -153,6 +153,8 @@ fun EditorState.playOtoNote() {
 
 private val noResampler = L("Choose the resampler program in the \"Listen as a note\" settings of the inspector first.",
     "Сначала выберите программу-ресемплер в настройках «Прослушать нотой» в инспекторе.")
+private val otoNoteTitle = L("The toolkit sings the entry", "Тулкит поёт запись")
+private val resynthTitle = L("The toolkit sings with the drawn pitch", "Тулкит поёт с нарисованной высотой")
 private val otoNotePlayed = L("{0} sung on {1}", "{0} спето на {1}")
 
 /**
@@ -171,7 +173,7 @@ fun EditorState.saveResynth(method: String, asCopy: Boolean) {
         val client = app.toolkit.client()
         var serverJob: String? = null
         try {
-            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting())
+            beginToolkitWork(mlabeler.app.toolkit.ToolkitManager.starting(), resynthTitle())
             if (!app.toolkit.ensure()) throw mlabeler.app.toolkit.ToolkitException(app.toolkit.statusText())
             toolkitBusy = S.uploading()
             val wav = withContext(Dispatchers.Default) { Wav.encode16(a) }

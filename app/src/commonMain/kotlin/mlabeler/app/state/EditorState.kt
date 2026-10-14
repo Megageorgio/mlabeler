@@ -682,8 +682,13 @@ class EditorState(
     var toolkitBusySince = 0L
         internal set
 
-    /** Marks the start of toolkit work shown in the busy panel (its time counts from here). */
-    fun beginToolkitWork(what: String) {
+    /** What the busy panel calls the work (null = autolabel), e.g. a note being sung, which does not touch the labels. */
+    var toolkitTitle by mutableStateOf<String?>(null)
+        private set
+
+    /** Marks the start of toolkit work shown in the busy panel (its time counts from here); [title]: see [toolkitTitle]. */
+    fun beginToolkitWork(what: String, title: String? = null) {
+        toolkitTitle = title
         toolkitBusySince = now()
         toolkitSteps.clear()
         toolkitDetail = null

@@ -37,6 +37,8 @@ import mlabeler.app.theme.T
 private val working = L("Autolabel is running", "Идёт авторазметка")
 private val waitHint = L("While autolabel runs, the labels can't be changed, so the result is placed exactly where it belongs.",
     "Пока идёт авторазметка, разметку изменить нельзя: так результат будет помещён точно на своё место.")
+private val otherHint = L("The first time the toolkit may install what it needs; later this takes a moment.",
+    "В первый раз тулкит может устанавливать нужное; потом это занимает мгновение.")
 private val elapsed = L("{0} so far", "прошло {0}")
 private val stopT = L("Stop", "Остановить")
 private val modelResult = L("Model result", "Результат модели")
@@ -53,7 +55,7 @@ fun AutolabelBusy(ed: EditorState) {
         Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.55f))
             .clickable(remember { MutableInteractionSource() }, null) { },
         contentAlignment = Alignment.Center,
-    ) { ToolkitBusyCard(ed, working(), waitHint()) { ed.cancelToolkit() } }
+    ) { ToolkitBusyCard(ed, ed.toolkitTitle ?: working(), if (ed.toolkitTitle != null) otherHint() else waitHint()) { ed.cancelToolkit() } }
 }
 
 /** What the toolkit is doing for [ed]: the steps so far, the current one with its numbers, the time, a stop button. */
