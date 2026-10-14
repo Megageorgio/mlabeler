@@ -26,12 +26,16 @@ import mlabeler.app.theme.T
 import mlabeler.core.edit.Edits
 import mlabeler.core.edit.IntervalRef
 import mlabeler.core.model.IntervalTier
+import mlabeler.core.oto.Kana
 
 private val title = L("Rename in bulk", "Пакетное переименование")
 private val modePattern = L("Pattern", "Шаблон")
 private val modeExact = L("Replace a name", "Заменить имя")
 private val modeSuffix = L("Add to the end", "Добавить в конец")
 private val modePrefix = L("Add to the start", "Добавить в начало")
+private val modeKana = L("Kana and romaji", "Кана и ромадзи")
+private val toRomaji = L("Kana → romaji (a か → a ka)", "Кана → ромадзи (a か → a ka)")
+private val toKana = L("Romaji → kana (a ka → a か)", "Ромадзи → кана (a ka → a か)")
 private val find = L("Find (regular expression)", "Найти (регулярное выражение)")
 private val replace = L("Replace with ($1, $2 … for groups)", "Заменить на ($1, $2 … — группы)")
 private val exactFrom = L("Name (exactly, e.g. ax)", "Имя (целиком, например ax)")
@@ -64,10 +68,11 @@ fun BatchRenameDialog(app: AppState) {
     var to by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf("") }
     var copies by remember { mutableStateOf(false) }
+    var kanaOut by remember { mutableStateOf(false) }
     val oto = ed.mode == Mode.Oto
     val tierName = (ed.doc?.tiers?.getOrNull(ed.activeTier) as? IntervalTier)?.name ?: "phones"
     // the renaming as a function of a name; null while the pattern is broken or empty
-    val built: Result<((String) -> String)?> = remember(mode, from, to, filter) {
+    val built: Result<((String) -> String)?> = remember(mode, from, to, filter, kanaOut) {
         runCatching {
             val only = if (filter.isBlank()) null else Regex(filter)
             fun guard(f: (String) -> String): (String) -> String = { s -> if (s.isEmpty() || only != null && !only.containsMatchIn(s)) s else f(s) }
@@ -75,15 +80,18 @@ fun BatchRenameDialog(app: AppState) {
                 0 -> if (from.isEmpty()) null else Regex(from).let { r -> { s: String -> r.replace(s, to) } }
                 1 -> if (from.isEmpty()) null else guard { s -> if (s == from) to else s }
                 2 -> if (to.isEmpty()) null else guard { s -> s + to }
+                4 -> guard { s -> if (kanaOut) Kana.aliasToKana(s) else Kana.aliasToRomaji(s) }
                 else -> if (to.isEmpty()) null else guard { s -> to + s }
             }
         }
     }
     val fn = built.getOrNull()
-    val changes: List<Pair<String, String>> = remember(fn, everywhere, oto, tierName, ed.docVersion, ed.oto.version, copies) {
+    // oto: copies under the new names instead of renaming (patterns and kana)
+    val dup = oto && copies && (mode == 0 || mode == 4) && !everywhere
+    val changes: List<Pair<String, String>> = remember(fn, everywhere, oto, tierName, ed.docVersion, ed.oto.version, dup) {
         val f = fn ?: return@remember emptyList()
         when {
-            oto && copies && mode == 0 && !everywhere -> ed.oto.previewDuplicates(Regex(from), to)
+            dup -> ed.oto.previewRenamedCopies(f)
             oto && everywhere -> ed.oto.previewEverywhere(f)
             oto -> ed.oto.entries.mapNotNull { e -> f(e.alias).takeIf { it != e.alias }?.let { e.alias to it } }
             everywhere -> ed.previewEverywhere(tierName, f).map { (file, a, b) -> "$file: $a" to b }
@@ -96,11 +104,10 @@ fun BatchRenameDialog(app: AppState) {
     Overlay({ close() }, 560) {
         DialogContent(footer = {
             Btn(mlabeler.app.i18n.S.cancel()) { close() }
-            val dup = oto && copies && mode == 0 && !everywhere
             Btn(if (dup) duplicateBtn() else apply(), primary = true, enabled = fn != null && changes.isNotEmpty()) {
                 val f = fn ?: return@Btn
                 when {
-                    dup -> app.message(duplicated.format(ed.oto.duplicateMatching(Regex(from), to)))
+                    dup -> app.message(duplicated.format(ed.oto.duplicateRenamed(f)))
                     oto && everywhere -> app.message(renamed.format(ed.oto.renameEverywhere(f)))
                     oto -> app.message(renamed.format(ed.oto.renameAll(ed.oto.entries.indices.toList(), f)))
                     everywhere -> ed.renameEverywhere(tierName, f).let { (files, n) -> app.message(renamedFiles.format(n, files)) }
@@ -116,7 +123,7 @@ fun BatchRenameDialog(app: AppState) {
         }) {
             Text(title(), color = c.text, fontSize = 17.sp)
             androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                for ((k, t) in listOf(modePattern, modeExact, modeSuffix, modePrefix).withIndex()) Chip(t(), mode == k) { mode = k }
+                for ((k, t) in listOf(modePattern, modeExact, modeSuffix, modePrefix, modeKana).withIndex()) Chip(t(), mode == k) { mode = k }
             }
             androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(scopeThis(), !everywhere) { everywhere = false }
@@ -140,6 +147,18 @@ fun BatchRenameDialog(app: AppState) {
                     Field(from, { from = it }, ff.focusRequester(focus))
                     Text(exactTo(), color = c.muted, fontSize = 12.sp)
                     Field(to, { to = it }, ff)
+                }
+                4 -> {
+                    androidx.compose.foundation.layout.FlowRow(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Chip(toRomaji(), !kanaOut) { kanaOut = false }
+                        Chip(toKana(), kanaOut) { kanaOut = true }
+                    }
+                    if (oto && !everywhere) Row(Modifier.fillMaxWidth().padding(bottom = 8.dp).clickable { copies = !copies }, verticalAlignment = Alignment.CenterVertically) {
+                        Text(keepOld(), color = c.text, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Toggle(copies, { copies = it })
+                    }
+                    Text(onlyMatching(), color = c.muted, fontSize = 12.sp)
+                    Field(filter, { filter = it }, ff.focusRequester(focus))
                 }
                 else -> {
                     Text(addText(), color = c.muted, fontSize = 12.sp)

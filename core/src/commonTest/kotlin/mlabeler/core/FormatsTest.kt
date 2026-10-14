@@ -339,6 +339,40 @@ class AutoOtoTest {
         assertEquals(listOf("-b", "-ba", "ab", "ba", "ab-", "b"), e.map { it.alias })
         assertTrue(e.all { it.offset >= 0 && it.preutterance >= it.overlap })
     }
+
+    @Test
+    fun aliasKanaAndRomaji() {
+        val k = mlabeler.core.oto.Kana
+        assertEquals("a ka", k.aliasToRomaji("a か"))
+        assertEquals("- kya", k.aliasToRomaji("- きゃ"))
+        assertEquals("ka_C4", k.aliasToRomaji("か_C4"))
+        assertEquals("a k", k.aliasToRomaji("a k"))
+        assertEquals("a か", k.aliasToKana("a ka"))
+        assertEquals("- か", k.aliasToKana("- ka"))
+        assertEquals("かC4", k.aliasToKana("kaC4"))
+        assertEquals("a k", k.aliasToKana("a k"))
+        assertEquals("a n", k.aliasToKana("a n"))
+        assertEquals("ん", k.aliasToKana("n"))
+        assertEquals("a あ", k.aliasToKana("a a"))
+        assertEquals("a か", k.aliasToKana("a か"))
+    }
+
+    @Test
+    fun cvvcVowelAfterVowelIsOneEntry() {
+        val syl = mlabeler.core.oto.Syllables.fromName("_かいさ")
+        val t = listOf(
+            mlabeler.core.oto.SyllableTiming(syl[0], 0.50, 0.60, 1.20),
+            mlabeler.core.oto.SyllableTiming(syl[1], 1.20, 1.20, 1.80),
+            mlabeler.core.oto.SyllableTiming(syl[2], 1.80, 1.90, 2.50),
+        )
+        val e = mlabeler.core.oto.AutoOto.entries("_かいさ.wav", t, 2800.0, mlabeler.core.oto.AutoOtoSettings(style = mlabeler.core.oto.RecStyle.CVVC))
+        val aliases = e.map { it.alias }
+        assertTrue("a い" in aliases, aliases.toString())
+        assertTrue("い" in aliases && "i s" in aliases && "a k" !in aliases, aliases.toString())
+        val vv = e.first { it.alias == "a い" }
+        assertEquals(1200.0, vv.offset + vv.preutterance, 0.001)
+        assertTrue(vv.offset > 600 && vv.overlap in 0.0..vv.preutterance && vv.consonant > vv.preutterance)
+    }
 }
 
 class VLabelerImportTest {

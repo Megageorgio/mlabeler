@@ -106,6 +106,25 @@ object Kana {
         buildMap { for ((k, v) in table) if (k.all { it in 'ぁ'..'ゖ' } && v !in this) put(v, k) }
     }
 
+    /** An alias with its kana written in romaji: "a か" → "a ka", "- きゃ" → "- kya"; other text stays. */
+    fun aliasToRomaji(alias: String): String = Regex("[぀-ヿ]+").replace(alias) { m ->
+        if (m.value.all { it == 'ー' || it == '・' }) m.value else split(m.value).joinToString("") { romaji(it) ?: it }
+    }
+
+    /**
+     * An alias with its syllable written in kana, as UTAU banks and phonemizers expect: "a ka" → "a か",
+     * "- ka" → "- か", "kaC4" → "かC4". Only the last word is the syllable (the first of "a ka" is the vowel
+     * before it); unchanged when it is not a Japanese romaji syllable, and "n" after a vowel ("a n" may be the
+     * consonant n of a CVVC bank, not ん).
+     */
+    fun aliasToKana(alias: String): String {
+        val i = alias.lastIndexOf(' ') + 1
+        val m = Regex("^([a-z]+)(.*)$").find(alias.substring(i)) ?: return alias
+        if (i > 0 && m.groupValues[1] == "n") return alias
+        val kana = fromRomaji(m.groupValues[1]) ?: return alias
+        return alias.substring(0, i) + kana + m.groupValues[2]
+    }
+
     fun romaji(kana: String): String? = table[kana] ?: run {
         // a kana and a small one: the consonant of the first and the sound of the small one
         if (kana.length != 2) return@run null
@@ -612,6 +631,16 @@ object AutoOto {
                     val vcLeft = max(v + s.fixedMs, nc - 175)
                     val vc = OtoAbsolute(vcLeft, max(vcLeft, nc - 75), max(vcLeft, nc - 25), nc + min(5.0, (nv - nc) / 2), min(nv, nc + 40).coerceAtLeast(nc + 10))
                     out += OtoEntry.fromAbsolute(sample, t.syllable.vowel + " " + nt.syllable.consonant, vc, lengthMs, negativeCutoff = true)
+                } else {
+                    // a vowel after a vowel ("a い") is one entry across the joint, as in VCV, besides the bare vowel
+                    val nv = nt.vStart * 1000
+                    val after = timings.getOrNull(k + 2)?.cStart?.times(1000)
+                    val nEnd = (after ?: (nt.vEnd * 1000)) - if (after == null) 40.0 else s.endMarginMs
+                    val ovl = nv - s.vowelOverlapMs - s.overlapBeforeMs
+                    val l = (ovl - s.vowelLeftMs).coerceAtLeast(v + 20).coerceAtMost(nv)
+                    val f = min(nv + s.fixedMs, max(nv + 10, nEnd - 10))
+                    val vv = OtoAbsolute(l, ovl.coerceIn(l, nv), nv, f, max(nEnd, f + 10).coerceAtMost(lengthMs))
+                    out += OtoEntry.fromAbsolute(sample, t.syllable.vowel + " " + nt.syllable.text, vv, lengthMs, negativeCutoff = true)
                 }
             }
         }

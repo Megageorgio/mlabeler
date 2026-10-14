@@ -89,17 +89,16 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     }
 
     /**
-     * Copies every entry whose alias [pattern] matches, the copy named by [replacement] ($1… for groups), right after
-     * it; copies whose alias the sample already has are left out. One undo step; returns how many were added.
+     * Adds after every entry a copy named by [rename] (when that changes the alias); copies whose alias the sample
+     * already has are left out. One undo step; returns how many were added.
      */
-    fun duplicateMatching(pattern: Regex, replacement: String): Int {
+    fun duplicateRenamed(rename: (String) -> String): Int {
         val list = mutableListOf<OtoEntry>()
         val have = entries.map { it.sample.lowercase() + "|" + it.alias }.toMutableSet()
         var n = 0
         for (e in entries) {
             list += e
-            if (!pattern.containsMatchIn(e.alias)) continue
-            val alias = pattern.replace(e.alias, replacement)
+            val alias = rename(e.alias)
             if (alias == e.alias || !have.add(e.sample.lowercase() + "|" + alias)) continue
             list += e.copy(alias = alias)
             n++
@@ -108,12 +107,11 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         return n
     }
 
-    /** What the copies of [duplicateMatching] would be: alias → alias of the copy. */
-    fun previewDuplicates(pattern: Regex, replacement: String): List<Pair<String, String>> {
+    /** What the copies of [duplicateRenamed] would be: alias → alias of the copy. */
+    fun previewRenamedCopies(rename: (String) -> String): List<Pair<String, String>> {
         val have = entries.map { it.sample.lowercase() + "|" + it.alias }.toMutableSet()
         return entries.mapNotNull { e ->
-            if (!pattern.containsMatchIn(e.alias)) return@mapNotNull null
-            val alias = pattern.replace(e.alias, replacement)
+            val alias = rename(e.alias)
             if (alias == e.alias || !have.add(e.sample.lowercase() + "|" + alias)) null else e.alias to alias
         }
     }
