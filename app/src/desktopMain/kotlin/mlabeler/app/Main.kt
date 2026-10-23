@@ -18,6 +18,8 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 
 fun main(args: Array<String>) {
     // where the graphics and folder-dialog libraries unpack themselves if they are not next to the program:
@@ -44,16 +46,36 @@ private fun run(args: Array<String>) = application {
     val size = System.getenv("MLABELER_WINDOW")?.split('x')?.mapNotNull { it.toIntOrNull() }?.takeIf { it.size == 2 }
     val state = rememberWindowState(size = if (size != null) DpSize(size[0].dp, size[1].dp) else DpSize(1280.dp, 800.dp))
     val app = rememberAppState()
+    val quitScope = rememberCoroutineScope()
     // the window is hidden at once; the toolkit is told while the program still runs normally (a shutdown hook
     // can't load the classes it needs any more), then the program ends
     val awtWindow = androidx.compose.runtime.remember { arrayOfNulls<java.awt.Window>(1) }
+    androidx.compose.runtime.DisposableEffect(app) {
+        val desktop = if (Platform.isMac && java.awt.Desktop.isDesktopSupported()) java.awt.Desktop.getDesktop() else null
+        val handlesQuit = desktop?.isSupported(java.awt.Desktop.Action.APP_QUIT_HANDLER) == true
+        val handlesOpen = desktop?.isSupported(java.awt.Desktop.Action.APP_OPEN_FILE) == true
+        if (handlesQuit) desktop?.setQuitHandler { _, response ->
+            // Dock/Cmd-Q must use the same pending-save checks as closing the window.
+            response.cancelQuit()
+            java.awt.EventQueue.invokeLater { app.requestQuit() }
+        }
+        if (handlesOpen) desktop?.setOpenFileHandler { event ->
+            java.awt.EventQueue.invokeLater { app.openDropped(event.files.map { it.absolutePath }) }
+        }
+        onDispose {
+            if (handlesQuit) desktop?.setQuitHandler(null)
+            if (handlesOpen) desktop?.setOpenFileHandler(null)
+        }
+    }
     app.quit = {
-        app.close(stopToolkit = false)
+      quitScope.launch {
+        if (!app.preserveSession(saveEditor = false) || !app.close(stopToolkit = false)) return@launch
         awtWindow[0]?.isVisible = false
         Thread({
             runCatching { app.toolkit.close() }
             java.awt.EventQueue.invokeLater { exitApplication() }
         }, "mlabeler-exit").start()
+      }
     }
     androidx.compose.runtime.LaunchedEffect(Unit) {
         args.firstOrNull()?.let { app.openFolder(it) }

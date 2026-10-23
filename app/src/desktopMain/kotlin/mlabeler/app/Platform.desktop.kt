@@ -6,8 +6,6 @@ import mlabeler.core.audio.Audio
 import mlabeler.core.audio.Wav
 import java.awt.Cursor
 import java.awt.Desktop
-import java.awt.FileDialog
-import java.awt.Frame
 import java.io.File
 import java.util.Locale
 import javax.sound.sampled.AudioFormat
@@ -55,38 +53,16 @@ actual object Platform {
     actual val hasNativeFolderPicker: Boolean = true
 
     actual fun pickFileNative(title: String, extensions: List<String>, start: String?): String? {
-        runCatching { return NativeFolderDialog.pickFile(extensions, start) }.onFailure { System.err.println("native file dialog: $it") }
-        val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
-        if (start != null) d.directory = start
-        if (extensions.isNotEmpty()) d.setFilenameFilter { _, name -> extensions.any { name.endsWith(".$it", ignoreCase = true) } }
-        d.isVisible = true
-        val dir = d.directory ?: return null
-        val file = d.file ?: return null
-        return File(dir, file).path
+        if (!isMac) runCatching { return NativeFolderDialog.pickFile(extensions, start) }
+            .onFailure { System.err.println("native file dialog: $it") }
+        return AwtFilePicker.pick(title, start, directories = false, extensions = extensions)
     }
 
     actual fun pickFolderNative(title: String, start: String?): String? {
         // the system folder dialog (Explorer on Windows, with the address bar; GTK/portal on Linux; Finder on macOS)
-        runCatching { return NativeFolderDialog.pick(start) }.onFailure { System.err.println("native folder dialog: $it") }
-        if (isMac) {
-            System.setProperty("apple.awt.fileDialogForDirectories", "true")
-            try {
-                val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
-                if (start != null) d.directory = start
-                d.isVisible = true
-                val dir = d.directory ?: return null
-                val file = d.file ?: return null
-                return File(dir, file).path
-            } finally {
-                System.setProperty("apple.awt.fileDialogForDirectories", "false")
-            }
-        }
-        // last resort: an Open dialog where any file in the folder opens the folder
-        val d = FileDialog(null as Frame?, title, FileDialog.LOAD)
-        if (start != null) d.directory = start
-        d.isVisible = true
-        val dir = d.directory ?: return null
-        return File(dir).path
+        if (!isMac) runCatching { return NativeFolderDialog.pick(start) }
+            .onFailure { System.err.println("native folder dialog: $it") }
+        return AwtFilePicker.pick(title, start, directories = true)
     }
 
     private val ffmpeg: String? by lazy {

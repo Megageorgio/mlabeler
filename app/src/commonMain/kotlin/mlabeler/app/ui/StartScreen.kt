@@ -71,6 +71,7 @@ fun StartScreen(app: AppState) {
                 IconBtn(Icons.settings, S.settings()) { app.showSettings = true }
             }
             Spacer(Modifier.height(28.dp))
+            if (app.openingFolder) Text(mlabeler.app.i18n.L("Opening folder…", "Открытие папки…")(), color = c.muted)
             val open = {
                 if (Platform.hasNativeFolderPicker) {
                     app.pickFolder(S.openFolder()) { app.openFolder(it) }

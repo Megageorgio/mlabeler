@@ -42,9 +42,11 @@ private fun nsEncoding(charset: String): ULong = when (charset.uppercase().repla
     else -> NSUTF8StringEncoding
 }
 
-private fun ByteArray.toNSData(): NSData = usePinned { NSData.dataWithBytes(it.addressOf(0), size.toULong()) }
+private fun ByteArray.toNSData(): NSData = if (isEmpty()) NSData.dataWithBytes(null, 0uL)
+    else usePinned { NSData.dataWithBytes(it.addressOf(0), size.toULong()) }
 
 private fun NSData.toByteArray(): ByteArray {
+    check(length <= Int.MAX_VALUE.toULong()) { "File is too large" }
     val n = length.toInt()
     val out = ByteArray(n)
     if (n > 0) out.usePinned { memcpy(it.addressOf(0), bytes, length) }
@@ -79,10 +81,10 @@ actual val PlatformFs: FileSystem = object : FileSystem {
     override fun read(path: String): ByteArray = fm.contentsAtPath(path)?.toByteArray() ?: error("Cannot read $path")
     override fun write(path: String, bytes: ByteArray) {
         mkdirs(Paths.parent(path))
-        bytes.toNSData().writeToFile(path, atomically = true)
+        check(bytes.toNSData().writeToFile(path, atomically = true)) { "Cannot write $path. Check available storage and file access." }
     }
     override fun mkdirs(path: String) {
-        fm.createDirectoryAtPath(path, true, null, null)
+        if (path.isNotEmpty()) check(fm.createDirectoryAtPath(path, true, null, null)) { "Cannot create directory $path" }
     }
     override fun delete(path: String): Boolean = fm.removeItemAtPath(path, null)
     override fun rename(from: String, to: String): Boolean = fm.moveItemAtPath(from, to, null)

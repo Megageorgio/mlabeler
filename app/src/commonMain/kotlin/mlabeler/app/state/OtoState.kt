@@ -18,7 +18,7 @@ import mlabeler.core.io.decodeGuess
 import mlabeler.core.io.encodeText
 
 /** One oto.ini: its entries with undo, and the charset it was read with. */
-class OtoBook(val path: String, val charset: String, entries: List<OtoEntry>) {
+class OtoBook(val path: String, val charset: String, entries: List<OtoEntry>, val readError: String? = null) {
     val originalEntries = entries.toList()
     val history = History(entries)
     val entries: List<OtoEntry> get() = history.current
@@ -178,16 +178,20 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     private fun bookAt(path: String): OtoBook {
         return books.getOrPut(path) {
             val fs = ed.workspace.fs
-            if (fs.exists(path)) {
-                val bytes = fs.read(path)
-                // an empty oto.ini gets the encoding UTAU expects
-                val (text, cs) = if (bytes.isEmpty()) "" to "Shift_JIS" else decodeGuess(bytes, "Shift_JIS")
-                OtoBook(path, cs, runCatching { OtoIni.read(text) }.getOrElse {
-                    app.message(S.labelsUnreadable.format(it.message ?: ""), error = true)
-                    emptyList()
-                })
-            } else {
-                OtoBook(path, "Shift_JIS", emptyList())
+            try {
+                if (fs.exists(path)) {
+                    val bytes = fs.read(path)
+                    // an empty oto.ini gets the encoding UTAU expects
+                    val (text, cs) = if (bytes.isEmpty()) "" to "Shift_JIS" else decodeGuess(bytes, "Shift_JIS")
+                    OtoBook(path, cs, OtoIni.read(text))
+                } else {
+                    OtoBook(path, "Shift_JIS", emptyList())
+                }
+            } catch (e: Exception) {
+                val message = S.labelsUnreadable.format(e.message ?: e.toString())
+                app.message(message, error = true)
+                // An unreadable bank must never be replaced with the empty error placeholder.
+                OtoBook(path, "Shift_JIS", emptyList(), readError = message)
             }
         }
     }
@@ -258,7 +262,9 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
     }
 
     private fun commit(list: List<OtoEntry>) {
-        book()?.history?.push(list)
+        val b = book() ?: return
+        b.readError?.let { app.message(it, error = true); return }
+        b.history.push(list)
         version++
     }
 
@@ -511,11 +517,13 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         onItemOpened()
     }
 
-    fun save(quiet: Boolean = false) {
+    fun save(quiet: Boolean = false): Boolean {
         val fs = ed.workspace.fs
+        var saved = true
         for (b in books.values) {
             if (!b.history.dirty) continue
             try {
+                check(b.readError == null) { b.readError.orEmpty() }
                 if (fs.exists(b.path) && b.path !in backedUp) {
                     val rel = ed.workspace.relative(b.path).replace('/', '_')
                     fs.copy(b.path, Paths.join(Paths.join(ed.workspace.metaDir, "backup"), rel + "." + mlabeler.core.io.Workspace.timestamp()))
@@ -525,10 +533,12 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                 b.history.markSaved()
                 if (!quiet) app.message(S.saved.format(ed.workspace.relative(b.path)))
             } catch (e: Exception) {
+                saved = false
                 app.message(S.cannotSave.format(e.message ?: e.toString()), error = true)
             }
         }
         version++
+        return saved
     }
 }
 

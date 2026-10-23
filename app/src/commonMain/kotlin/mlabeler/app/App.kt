@@ -32,6 +32,11 @@ fun rememberAppState(): AppState {
 
 @Composable
 fun App(app: AppState = rememberAppState()) {
+    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+    DisposableEffect(app, focus) {
+        app.finishUiEditing = { focus.clearFocus(force = true) }
+        onDispose { app.finishUiEditing = {} }
+    }
     DisposableEffect(app) { onDispose { app.close() } }
     androidx.compose.runtime.LaunchedEffect(app) { app.showCrashReport() }
     val base = LocalDensity.current

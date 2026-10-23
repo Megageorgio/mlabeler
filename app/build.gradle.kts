@@ -76,6 +76,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.quickjs)
         }
+        commonTest.dependencies { implementation(kotlin("test")) }
         val desktopMain by getting {
             // files that come with the program (the quick labelling model), also Android assets
             resources.srcDir("builtin")
@@ -150,13 +151,30 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Rpm)
             packageName = "mLabeler"
             packageVersion = appVersion.substringBefore('-').let { if (it.startsWith("0.")) "1." + it.removePrefix("0.") else it }
-            modules("java.desktop", "jdk.unsupported")
+            modules("java.desktop", "jdk.unsupported", "jdk.charsets")
             windows { menu = true; perUserInstall = true; upgradeUuid = "6f1d1d7e-2b8e-4c39-9a41-6b2a0c6d0f2e"; iconFile.set(rootProject.file("art/icon.ico")) }
-            macOS { bundleID = "pw.msan.mlabeler"; iconFile.set(rootProject.file("art/icon.icns")) }
+            macOS {
+                bundleID = "pw.msan.mlabeler"
+                minimumSystemVersion = "12.0"
+                iconFile.set(rootProject.file("art/icon.icns"))
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>NSMicrophoneUsageDescription</key>
+                        <string>mLabeler records samples for voicebanks and datasets.</string>
+                        <key>NSLocalNetworkUsageDescription</key>
+                        <string>mLabeler connects to mVocalToolkit on your local network.</string>
+                    """.trimIndent()
+                }
+            }
             linux { iconFile.set(rootProject.file("art/icon.png")) }
         }
         buildTypes.release.proguard { isEnabled.set(false) }
     }
+}
+
+// State tests must never read or replace the real user's preferences.
+tasks.withType<Test>().configureEach {
+    environment("MLABELER_HOME", layout.buildDirectory.dir("test-home").get().asFile.absolutePath)
 }
 
 // Jars for a portable Windows build (JRE + launcher are added by tools/windows-portable.sh).

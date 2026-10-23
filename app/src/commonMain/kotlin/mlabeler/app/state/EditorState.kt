@@ -567,14 +567,14 @@ class EditorState(
     }
 
     fun scan() {
-        items = workspace.scan()
+        workspace.scan()
+        acceptScan(detectMode(workspace))
+    }
+
+    internal fun acceptScan(detectedMode: Mode) {
+        items = workspace.items
         readLabelTimes()
-        mode = when (workspace.state.kind) {
-            "oto" -> Mode.Oto
-            "labels" -> Mode.Labels
-            // folders of UTAU voicebanks are oto work
-            else -> if (items.any { oto.hasOto(it) } && items.none { it.labelPath != null }) Mode.Oto else Mode.Labels
-        }
+        mode = detectedMode
         if (index !in items.indices) {
             val last = workspace.state.lastItem
             open(items.indexOfFirst { it.id == last }.takeIf { it >= 0 } ?: if (items.isNotEmpty()) 0 else -1)
@@ -1242,7 +1242,7 @@ class EditorState(
             index = -1
             return
         }
-        if (settings.edit.saveOnSwitch && labelsDirty) saveLabels(quiet = true)
+        if (settings.edit.saveOnSwitch && labelsDirty && !saveLabels(quiet = true)) return
         rememberView()
         carriedZoom = if (audio != null) pixelsPerSecond else null
         stop()
@@ -1565,9 +1565,9 @@ class EditorState(
         if (activeTier !in d.tiers.indices) activeTier = 0
     }
 
-    fun save(quiet: Boolean = false) {
+    fun save(quiet: Boolean = false): Boolean {
         if (mode == Mode.Oto) return oto.save(quiet)
-        saveLabels(quiet)
+        return saveLabels(quiet)
     }
 
     /**
@@ -1598,10 +1598,10 @@ class EditorState(
         return e.getOrNull(kotlin.math.round(time / hop).toInt())?.takeIf { !it.isNaN() }
     }
 
-    internal fun saveLabels(quiet: Boolean) {
-        val it = item ?: return
-        val d = committed ?: return
-        val h = history ?: return
+    internal fun saveLabels(quiet: Boolean): Boolean {
+        val it = item ?: return true
+        val d = committed ?: return true
+        val h = history ?: return true
         try {
             val updated = workspace.writeLabels(it, d, duration, if (it.labelFormat == null) (workspace.state.defaultFormat) else null,
                 f0 = if (f0Edits != null) ::drawnF0At else null)
@@ -1612,17 +1612,43 @@ class EditorState(
             labelMtime[updated.id] = updated.labelPath?.let { p -> workspace.fs.lastModified(p) } ?: 0L
             docVersion++
             if (!quiet) app.message(S.saved.format(Paths.name(updated.labelPath ?: "")))
+            return true
         } catch (e: Exception) {
             app.message(S.cannotSave.format(e.message ?: e.toString()), error = true)
+            return false
         }
     }
 
-    fun saveAllOnClose() {
-        if (settings.edit.saveOnSwitch && labelsDirty) saveLabels(quiet = true)
-        if (settings.edit.saveOnSwitch && oto.dirty) oto.save(quiet = true)
+    /** Includes files edited earlier with save-on-switch disabled. Failed writes keep their undo histories dirty. */
+    fun savePendingChanges(): Boolean {
+        finishEditing()
+        var saved = !labelsDirty || saveLabels(quiet = true)
+        for ((id, h) in histories) {
+            if (!h.dirty || id == item?.id) continue
+            try {
+                val original = items.firstOrNull { it.id == id } ?: error("Recording is missing: $id")
+                val d = h.current
+                val updated = workspace.writeLabels(original, d, d.end,
+                    if (original.labelFormat == null) workspace.state.defaultFormat else null)
+                items = items.map { if (it.id == id) updated else it }
+                h.markSaved()
+            } catch (e: Exception) {
+                saved = false
+                app.message(S.cannotSave.format(e.message ?: e.toString()), error = true)
+            }
+        }
+        if (!oto.save(quiet = true)) saved = false
+        labelIndex = null
+        docVersion++
+        return saved
+    }
+
+    fun saveAllOnClose(): Boolean {
+        if (settings.edit.saveOnSwitch && !savePendingChanges()) return false
         rememberView()
         player.release()
         scope.cancel()
+        return true
     }
 
     // ---------- selection ----------
@@ -2203,6 +2229,14 @@ class EditorState(
     private var fitLimit = Double.MAX_VALUE
 
     companion object {
+        internal fun detectMode(workspace: Workspace): Mode = when (workspace.state.kind) {
+            "oto" -> Mode.Oto
+            "labels" -> Mode.Labels
+            else -> if (workspace.items.none { it.labelPath != null } && workspace.items.any {
+                workspace.fs.exists(Paths.join(Paths.parent(it.audioPath), "oto.ini"))
+            }) Mode.Oto else Mode.Labels
+        }
+
         /** For each interval tier of [after]: the spans of intervals that are not in the same tier of [before]. */
         fun changedSpansOf(before: LabelDoc, after: LabelDoc): Map<Int, List<Pair<Double, Double>>> {
             val out = mutableMapOf<Int, List<Pair<Double, Double>>>()

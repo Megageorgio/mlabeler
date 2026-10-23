@@ -10,6 +10,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import mlabeler.app.Platform
 import mlabeler.app.i18n.Lang
 import mlabeler.core.io.PlatformFs
@@ -192,12 +194,23 @@ class AppState(private val scope: CoroutineScope) {
     var recorder by mutableStateOf<mlabeler.app.recorder.RecorderState?>(null)
         private set
 
+    private fun launchFileAction(action: suspend () -> Unit) = scope.launch {
+        try { action() } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            message(e.message ?: e.toString(), error = true)
+        }
+    }
+
     /** Opens the recorder for [folder] (saving the editor's changes first). */
     fun openRecorder(folder: String) {
         if (!PlatformFs.isDirectory(folder)) return
-        editor?.let { if (it.dirty) it.save(quiet = true) }
-        workTimer.flush()
-        recorder = mlabeler.app.recorder.RecorderState(folder, this, scope)
+        launchFileAction {
+            if (!preserveSession()) return@launchFileAction
+            recorder?.close()
+            if (karaoke?.close() == false) return@launchFileAction
+            karaoke = null
+            recorder = mlabeler.app.recorder.RecorderState(folder, this@AppState, scope)
+        }
     }
 
     var karaoke by mutableStateOf<mlabeler.app.recorder.KaraokeState?>(null)
@@ -206,21 +219,30 @@ class AppState(private val scope: CoroutineScope) {
     /** Opens singing along the songs of [folder]. */
     fun openKaraoke(folder: String) {
         if (!PlatformFs.isDirectory(folder)) return
-        editor?.let { if (it.dirty) it.save(quiet = true) }
-        workTimer.flush()
-        recorder?.close(); recorder = null
-        karaoke = mlabeler.app.recorder.KaraokeState(folder, this, scope)
+        launchFileAction {
+            if (!preserveSession()) return@launchFileAction
+            recorder?.close()
+            if (karaoke?.close() == false) return@launchFileAction
+            recorder = null
+            karaoke = mlabeler.app.recorder.KaraokeState(folder, this@AppState, scope)
+        }
     }
 
     fun closeKaraoke() {
-        karaoke?.close()
-        karaoke = null
+        val current = karaoke ?: return
+        if (!current.close()) return
+        scope.launch { if (current.awaitSaves() && karaoke === current) karaoke = null }
     }
 
     fun closeRecorder() {
-        recorder?.close()
-        recorder = null
-        editor?.rescan()
+        val current = recorder ?: return
+        current.close()
+        scope.launch {
+            if (current.awaitSaves() && recorder === current) {
+                recorder = null
+                editor?.rescan()
+            }
+        }
     }
     /** Set while the in-app folder browser is open for a pick. */
     var folderPick by mutableStateOf<((String) -> Unit)?>(null)
@@ -231,8 +253,13 @@ class AppState(private val scope: CoroutineScope) {
             val start = editor?.workspace?.root?.let { mlabeler.core.io.Paths.parent(it) }
                 ?: settings.recent.firstOrNull()?.let { mlabeler.core.io.Paths.parent(it) }
             scope.launch {
-                val picked = kotlinx.coroutines.withContext(Dispatchers.Default) { mlabeler.app.Platform.pickFolderNative(title, start) }
-                picked?.let(onPick)
+                try {
+                    val picked = withContext(Dispatchers.Default) { Platform.pickFolderNative(title, start) }
+                    picked?.let(onPick)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    message(e.message ?: e.toString(), error = true)
+                }
             }
         } else {
             folderPick = onPick
@@ -313,20 +340,40 @@ class AppState(private val scope: CoroutineScope) {
         message = null
     }
 
-    fun openFolder(path: String) {
-        if (!PlatformFs.isDirectory(path)) return
-        closeFolder()
-        val ws = Workspace(path)
-        val ed = EditorState(ws, this, CoroutineScope(SupervisorJob() + Dispatchers.Main))
-        editor = ed
-        ed.scan()
-        reloadPlugins()
-        // the first folder ever opened: show how things work
-        if (!settings.seenHelp) {
-            showHelp = true
-            update { it.copy(seenHelp = true) }
+    private var openingJob: Job? = null
+    private var openingSequence = 0
+    var openingFolder by mutableStateOf(false)
+        private set
+
+    fun openFolder(path: String, recordingPath: String? = null) {
+        if (!closeFolder()) return
+        val sequence = ++openingSequence
+        openingFolder = true
+        openingJob = scope.launch {
+            try {
+                val (ws, mode) = withContext(Dispatchers.Default) {
+                    check(PlatformFs.isDirectory(path)) { "Cannot open folder: $path" }
+                    val workspace = Workspace(path)
+                    workspace.scan()
+                    workspace to EditorState.detectMode(workspace)
+                }
+                val ed = EditorState(ws, this@AppState, CoroutineScope(SupervisorJob() + Dispatchers.Main))
+                editor = ed
+                ed.acceptScan(mode)
+                recordingPath?.let { ed.openPath(it) }
+                reloadPlugins()
+                if (!settings.seenHelp) {
+                    showHelp = true
+                    update { it.copy(seenHelp = true) }
+                }
+                update { it.copy(recent = (listOf(path) + it.recent.filter { r -> r != path }).take(12)) }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                message(e.message ?: e.toString(), error = true)
+            } finally {
+                if (sequence == openingSequence) openingFolder = false
+            }
         }
-        update { it.copy(recent = (listOf(path) + it.recent.filter { r -> r != path }).take(12)) }
     }
 
     /** Something to do after leaving the open folder, waiting for an answer about unsaved changes. */
@@ -334,6 +381,8 @@ class AppState(private val scope: CoroutineScope) {
 
     /** Runs [action] (which leaves the folder); with unsaved changes and "save when switching" off, asks first. */
     fun leaveFolderThen(action: () -> Unit) {
+        finishUiEditing()
+        editor?.finishEditing()
         val ed = editor
         if (ed != null && ed.dirty && !settings.edit.saveOnSwitch) pendingLeave = action else action()
     }
@@ -358,16 +407,19 @@ class AppState(private val scope: CoroutineScope) {
         var folder = mlabeler.core.io.Paths.parent(first)
         if (mlabeler.core.io.Paths.name(folder).lowercase() in setOf("wav", "wavs", "audio", "raw")) folder = mlabeler.core.io.Paths.parent(folder)
         leaveFolderThen {
-            openFolder(folder)
-            editor?.openPath(first)
+            openFolder(folder, recordingPath = first)
         }
         return true
     }
 
-    fun closeFolder() {
+    fun closeFolder(): Boolean {
+        openingSequence++
+        openingJob?.cancel()
+        openingFolder = false
         workTimer.flush()
-        editor?.saveAllOnClose()
+        if (editor?.saveAllOnClose() == false) return false
         editor = null
+        return true
     }
 
     fun forgetRecent(path: String) = update { it.copy(recent = it.recent - path) }
@@ -378,7 +430,7 @@ class AppState(private val scope: CoroutineScope) {
      * folders are not touched.
      */
     fun deleteAllProgramData() {
-        closeFolder()
+        if (!closeFolder()) return
         val dir = Platform.dataDir()
         fun wipe(p: String) {
             if (PlatformFs.isDirectory(p)) runCatching { PlatformFs.list(p) }.getOrDefault(emptyList()).forEach { wipe(it) }
@@ -394,6 +446,7 @@ class AppState(private val scope: CoroutineScope) {
 
     /** Closes the program (set by the window on computers); used to restart into a new version. */
     var quit: (() -> Unit)? = null
+    internal var finishUiEditing: () -> Unit = {}
 
     /** Closes the program, first asking about unsaved labels (when "save when switching files" is off). */
     fun requestQuit() {
@@ -405,10 +458,30 @@ class AppState(private val scope: CoroutineScope) {
      * Saves and lets go of what the program holds. [stopToolkit] false: the window does that after it is gone
      * (telling the toolkit can take a few seconds when it is busy or gone).
      */
-    fun close(stopToolkit: Boolean = true) {
+    suspend fun preserveSession(saveEditor: Boolean = true): Boolean {
+        finishUiEditing()
+        recorder?.stop(interactive = false)
+        recorder?.stopPlayback()
+        karaoke?.stopRecording()
+        karaoke?.stop()
+        editor?.stop()
+        val recordingSaved = recorder?.awaitSaves() != false
+        val karaokeSaved = karaoke?.awaitSaves() != false
+        val lyricsSaved = karaoke?.let { !it.dirty || it.save() } != false
         workTimer.flush()
-        editor?.saveAllOnClose()
+        if (!saveEditor) return recordingSaved && karaokeSaved && lyricsSaved
+        val ed = editor ?: return recordingSaved && karaokeSaved && lyricsSaved
+        val editorSaved = ed.savePendingChanges()
+        return recordingSaved && karaokeSaved && lyricsSaved && editorSaved
+    }
+
+    fun close(stopToolkit: Boolean = true): Boolean {
+        workTimer.flush()
+        recorder?.close()
+        if (karaoke?.close() == false) return false
+        if (editor?.saveAllOnClose() == false) return false
         if (stopToolkit) toolkit.close()
         updater.onExit()
+        return true
     }
 }

@@ -11,10 +11,7 @@ import platform.AVFAudio.AVAudioEngine
 import platform.AVFAudio.AVAudioFormat
 import platform.AVFAudio.AVAudioPCMBuffer
 import platform.AVFAudio.AVAudioPlayerNode
-import platform.AVFAudio.AVAudioPlayerNodeBufferLoops
-import platform.AVFAudio.AVAudioSession
-import platform.AVFAudio.AVAudioSessionCategoryPlayback
-import platform.AVFAudio.setActive
+import platform.AVFAudio.AVAudioPlayerNodeCompletionDataPlayedBack
 import platform.Foundation.NSDocumentDirectory
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSLocale
@@ -23,6 +20,8 @@ import platform.Foundation.NSUserDomainMask
 import platform.Foundation.currentLocale
 import platform.Foundation.languageCode
 import platform.Foundation.NSApplicationSupportDirectory
+import platform.Foundation.NSOperationQueue
+import platform.darwin.NSObjectProtocol
 
 actual object Platform {
     actual val name: String = "iOS"
@@ -48,7 +47,7 @@ actual object Platform {
     actual val hasNativeFolderPicker: Boolean = false
     actual fun pickFolderNative(title: String, start: String?): String? = null
     actual fun pickFileNative(title: String, extensions: List<String>, start: String?): String? = null
-    actual fun decodeAudio(path: String): Audio? = null
+    actual fun decodeAudio(path: String): Audio? = decodeAppleAudio(path)
     actual fun openInFileManager(path: String) = Unit
     actual fun applyScreen(orientation: String, fullscreen: Boolean) = Unit
 }
@@ -62,42 +61,65 @@ actual class AudioOut actual constructor() {
     private var length = 0
     private var loopMode = false
     private var sampleRate = 44100.0
+    private var generation = 0L
+    private var observer: NSObjectProtocol? = null
 
     actual fun play(audio: Audio, from: Int, to: Int, loop: Boolean) {
         stop()
-        runCatching {
-            AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryPlayback, null)
-            AVAudioSession.sharedInstance().setActive(true, null)
-        }
+        require(from in 0..audio.samples.size && to in from..audio.samples.size && audio.sampleRate > 0) { "Invalid audio range" }
         val n = to - from
+        if (n == 0) return
+        val run = ++generation
+        try {
+        AppleAudioSession.acquire(this, recording = false) { if (generation == run) stop() }
         val format = AVAudioFormat(standardFormatWithSampleRate = audio.sampleRate.toDouble(), channels = 1u)
-        val buffer = AVAudioPCMBuffer(pCMFormat = format, frameCapacity = n.toUInt()) ?: return
-        buffer.frameLength = n.toUInt()
-        val ch = buffer.floatChannelData!![0]!!
-        for (i in 0 until n) ch[i] = audio.samples[from + i]
         val e = AVAudioEngine()
+        engine = e
         val p = AVAudioPlayerNode()
+        node = p
         e.attachNode(p)
         e.connect(p, e.mainMixerNode, format)
         e.prepare()
-        e.startAndReturnError(null)
-        p.scheduleBuffer(buffer, null, if (loop) AVAudioPlayerNodeBufferLoops else 0u) {
-            if (!loop) node = null
-        }
-        p.play()
-        engine = e
-        node = p
+        checkAppleAudio("Start playback") { e.startAndReturnError(it) }
         start = from
         length = n
         loopMode = loop
         sampleRate = audio.sampleRate.toDouble()
+        observer = AppleAudioSession.watch(e) { if (engine === e && generation == run) stop() }
+        // Bound native memory even when playing a long recording. Keep three chunks queued to avoid gaps.
+        var cursor = from
+        fun enqueue() {
+            if (generation != run || node !== p) return
+            if (cursor >= to) { if (loop) cursor = from else return }
+            val count = minOf(16384, to - cursor)
+            val buffer = AVAudioPCMBuffer(pCMFormat = format, frameCapacity = count.toUInt())
+            buffer.frameLength = count.toUInt()
+            val ch = buffer.floatChannelData!![0]!!
+            for (i in 0 until count) ch[i] = audio.samples[cursor + i]
+            cursor += count
+            val last = !loop && cursor == to
+            p.scheduleBuffer(buffer, null, 0u, AVAudioPlayerNodeCompletionDataPlayedBack) { _ ->
+                NSOperationQueue.mainQueue.addOperationWithBlock {
+                    if (generation == run && node === p) {
+                        try { if (last) stop() else enqueue() } catch (_: Exception) { stop() }
+                    }
+                }
+            }
+        }
+        repeat(3) { enqueue() }
+        p.play()
+        } catch (e: Exception) { stop(); throw e }
     }
 
     actual fun stop() {
+        generation++
+        AppleAudioSession.unwatch(observer)
+        observer = null
         node?.stop()
         engine?.stop()
         node = null
         engine = null
+        AppleAudioSession.release(this)
     }
 
     actual val isPlaying: Boolean get() = node != null
@@ -109,7 +131,6 @@ actual class AudioOut actual constructor() {
         val played = t.sampleTime
         if (played < 0) return start
         val pos = if (loopMode) (played % length).toInt() else minOf(played, length.toLong()).toInt()
-        if (!loopMode && played >= length) node = null
         return start + pos
     }
 

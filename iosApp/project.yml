@@ -23,6 +23,9 @@ targets:
         UILaunchScreen: {}
         UIFileSharingEnabled: true
         NSMicrophoneUsageDescription: mLabeler records samples for voicebanks and datasets.
+        NSLocalNetworkUsageDescription: mLabeler connects to mVocalToolkit on your local network.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         LSSupportsOpeningDocumentsInPlace: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
@@ -31,7 +34,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: pw.msan.mlabeler
         # CI passes the real values from gradle.properties
-        MARKETING_VERSION: "0.1.1"
+        MARKETING_VERSION: "0.1.2"
         CURRENT_PROJECT_VERSION: "4"
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

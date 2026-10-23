@@ -1148,7 +1148,7 @@ fun LeaveDialog(app: AppState) {
         app.pendingLeave = null
         if (save == null) return
         // not saving: leaving the folder with "save when switching" off keeps the files as they are
-        if (save) ed?.save(quiet = true)
+        if (save && ed?.savePendingChanges() == false) return
         action()
     }
     Overlay({ done(null) }, 440) {

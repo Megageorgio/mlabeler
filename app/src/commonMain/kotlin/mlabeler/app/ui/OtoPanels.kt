@@ -186,7 +186,7 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
         SectionTitle(otoFile())
         ed.item?.let { Text(ed.workspace.relative(ed.oto.bookPath(it)), color = c.muted, fontSize = 12.sp) }
         ed.oto.book()?.let { Text(it.charset, color = c.muted, fontSize = 12.sp) }
-        Btn(L("Check alias coverage…", "Проверить покрытие алиасов…")()) { ed.app.showOtoReadiness = true }
+        Btn(L("Japanese bank: check aliases…", "Японский банк: проверить алиасы…")()) { ed.app.showOtoReadiness = true }
         if (e == null) {
             Spacer(Modifier.height(12.dp))
             Text(noEntries(), color = c.muted, fontSize = 13.sp)

@@ -34,12 +34,12 @@ fun OtoReadinessDialog(ed: EditorState, close: () -> Unit) {
         LazyColumn(Modifier.weight(1f, fill = false).heightIn(max = 640.dp).fillMaxWidth().padding(horizontal = 16.dp)) {
           item { Column(Modifier.padding(top = 16.dp, bottom = 8.dp)) {
             Text(L("Check Japanese alias coverage", "Проверить покрытие японских алиасов")(), color = c.text, fontSize = 17.sp)
-            Text(L("Choose the alias convention and required syllables. This checks names and basic timings; it does not run an OpenUtau phonemizer or judge the sound.",
-                "Выберите схему алиасов и нужные слоги. Проверяются имена и базовые параметры; фонемайзер OpenUtau не запускается, звучание не оценивается.")(), color = c.muted, fontSize = 12.sp)
+            Text(L("For Japanese voicebanks only; Russian and other language banks are not supported by this check. Choose the alias convention and required syllables. This checks names and basic timings; it does not run an OpenUtau phonemizer or judge the sound.",
+                "Проверка только для японских войсбанков; русские банки и банки других языков она не проверяет. Выберите схему алиасов и нужные слоги. Проверяются имена и базовые параметры; фонемайзер OpenUtau не запускается, звучание не оценивается.")(), color = c.muted, fontSize = 12.sp)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(L("Full coverage", "Полное покрытие")(), phonemizer == OtoReadiness.Phonemizer.FullCoverage) { phonemizer = OtoReadiness.Phonemizer.FullCoverage }
-                Chip("OpenUtau JA VCV (legacy)", phonemizer == OtoReadiness.Phonemizer.OpenUtauJaVcv) { phonemizer = OtoReadiness.Phonemizer.OpenUtauJaVcv }
-                Chip("OpenUtau JA CVVC (legacy)", phonemizer == OtoReadiness.Phonemizer.OpenUtauJaCvvc) { phonemizer = OtoReadiness.Phonemizer.OpenUtauJaCvvc }
+                Chip(L("OpenUtau: Japanese VCV (legacy)", "OpenUtau: японский VCV (legacy)")(), phonemizer == OtoReadiness.Phonemizer.OpenUtauJaVcv) { phonemizer = OtoReadiness.Phonemizer.OpenUtauJaVcv }
+                Chip(L("OpenUtau: Japanese CVVC (legacy)", "OpenUtau: японский CVVC (legacy)")(), phonemizer == OtoReadiness.Phonemizer.OpenUtauJaCvvc) { phonemizer = OtoReadiness.Phonemizer.OpenUtauJaCvvc }
             }
             Text(L("OpenUtau profiles check preferred and fallback aliases in one prefix/suffix group; prefix.map, voice colours and presamp.ini are not evaluated.",
                 "Профили OpenUtau проверяют основные и запасные алиасы в одной группе префикса/суффикса; prefix.map, цвета голоса и presamp.ini не учитываются.")(), color = c.muted, fontSize = 11.sp)

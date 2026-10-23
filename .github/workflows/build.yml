@@ -16,6 +16,8 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :core:jvmTest
+      - name: File access, pending saves and asynchronous opening regressions
+        run: ./gradlew :app:desktopTest --tests mlabeler.app.state.PendingSavesTest --tests mlabeler.app.SaveFailureTest --tests mlabeler.app.AppleWorkflowTest
 
   android:
     runs-on: ubuntu-latest
@@ -46,6 +48,8 @@ jobs:
           echo "APK: $APK"
           echo "apksigner: ${SIGNER:-not found in $SDK/build-tools}"
           if [ -n "$SIGNER" ]; then "$SIGNER" verify --print-certs "$APK" | grep -E "certificate (DN|SHA-256)" || echo "::warning::apksigner could not read the signature"; fi
+          AAPT=$(find "$SDK/build-tools" -name aapt -type f | sort -V | tail -1)
+          "$AAPT" dump permissions "$APK" | grep -F 'android.permission.INTERNET'
           if [ -z "$KEYSTORE_B64" ] && [[ "$GITHUB_REF" == refs/tags/* ]]; then
             echo "::error::No signing key (secret ANDROID_KEYSTORE_BASE64): the release APK would be signed with a temporary key"
             exit 1
@@ -70,6 +74,9 @@ jobs:
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :app:${{ matrix.task }}
+      - name: Check packaged macOS permissions, encodings and signature
+        if: runner.os == 'macOS'
+        run: python3 tools/check-apple-package.py macos app/build/compose/binaries/main/app/mLabeler.app
       # installer file names carry the app version, not the internal package version
       - shell: bash
         run: |
@@ -124,15 +131,14 @@ jobs:
           path: build/mLabeler-*-windows-x64-portable.zip
 
   ios:
-    # iOS builds take long: only for releases (tags) and runs started by hand
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    # Catch Apple API and file-system regressions before release, including on pull requests.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 21 }
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew :app:linkDebugFrameworkIosSimulatorArm64 :core:iosSimulatorArm64Test
+      - run: ./gradlew :app:linkDebugFrameworkIosSimulatorArm64 :core:iosSimulatorArm64Test :app:iosSimulatorArm64Test
 
   # An unsigned .ipa: people install it with AltStore, SideStore, Sideloadly or TrollStore,
   # which sign it with their own Apple ID.
@@ -160,6 +166,8 @@ jobs:
           mkdir -p Payload
           cp -R build/Release-iphoneos/mLabeler.app Payload/
           zip -qry "../mLabeler-$V-ios-unsigned.ipa" Payload
+          cd ..
+          python3 tools/check-apple-package.py ios "mLabeler-$V-ios-unsigned.ipa"
       - uses: actions/upload-artifact@v4
         with:
           name: mLabeler-ios
@@ -167,7 +175,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, android, desktop, windows-portable, linux-portable, ios-ipa]
+    needs: [test, android, desktop, windows-portable, linux-portable, ios, ios-ipa]
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:

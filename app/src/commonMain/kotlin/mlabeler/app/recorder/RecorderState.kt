@@ -108,6 +108,12 @@ class RecorderState(val folder: String, private val app: AppState, private val s
     private val output = AudioOut()
     private var chunks = kotlinx.coroutines.channels.Channel<FloatArray>(kotlinx.coroutines.channels.Channel.UNLIMITED)
     private var stopJob: Job? = null
+    private var captureMonitor: Job? = null
+    private var recordingRate = 44100
+    private val pendingSaves = mlabeler.app.state.PendingSaves(CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)) {
+        app.message(it.message ?: it.toString(), error = true)
+    }
+    suspend fun awaitSaves(): Boolean = pendingSaves.flush()
 
     init {
         loadList()
@@ -278,8 +284,8 @@ class RecorderState(val folder: String, private val app: AppState, private val s
         pitchJob?.cancel()
         if (a == null) return
         pitchJob = scope.launch {
-            val mono = if (a.channels > 1) FloatArray(a.samples.size / a.channels) { a.samples[it * a.channels] } else a.samples
-            val c = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(mono, a.sampleRate, hop = 0.01) }
+            // Audio.samples is already the mono mix, even when channels records a stereo source.
+            val c = withContext(Dispatchers.Default) { mlabeler.core.dsp.Pitch.yin(a.samples, a.sampleRate, hop = 0.01) }
             if (take === a) takePitch = c
         }
     }
@@ -332,6 +338,7 @@ class RecorderState(val folder: String, private val app: AppState, private val s
     private suspend fun startRecording(name: String) {
         val s = settings
         val sr = s.sampleRate
+        recordingRate = sr
         chunks.close()
         chunks = kotlinx.coroutines.channels.Channel(kotlinx.coroutines.channels.Channel.UNLIMITED)
         val sink = chunks
@@ -367,6 +374,15 @@ class RecorderState(val folder: String, private val app: AppState, private val s
             return
         }
         recording = true
+        captureMonitor = scope.launch {
+            while (recording) {
+                delay(100)
+                if (!input.isRecording) {
+                    app.message(micError.format("Audio input was interrupted"), error = true)
+                    stop(interactive = false)
+                }
+            }
+        }
         if (mix != null) runCatching { output.play(Audio(guide?.sampleRate ?: sr, mix), 0, mix.size, false) }
         val beat = if (s.bpm > 0) 60.0 / s.bpm else 0.0
         stopJob = scope.launch {
@@ -380,9 +396,10 @@ class RecorderState(val folder: String, private val app: AppState, private val s
 
     private var currentName: String? = null
 
-    fun stop() {
+    fun stop(interactive: Boolean = true) {
         if (!recording) return
         recording = false
+        captureMonitor?.cancel()
         stopJob?.cancel()
         countIn = 0
         input.stop()
@@ -393,9 +410,9 @@ class RecorderState(val folder: String, private val app: AppState, private val s
         val parts = ArrayList<FloatArray>()
         while (true) parts += chunks.tryReceive().getOrNull() ?: break
         val data = FloatArray(parts.sumOf { it.size }).also { out -> var p = 0; for (c in parts) { c.copyInto(out, p); p += c.size } }
-        if (data.size < settings.sampleRate / 10) return
-        scope.launch {
-            val audio = Audio(settings.sampleRate, data)
+        if (data.size < recordingRate / 10) return
+        val audio = Audio(recordingRate, data)
+        pendingSaves.submit {
             withContext(Dispatchers.Default) {
                 val path = pathOf(name)
                 if (fs.exists(path)) {
@@ -407,8 +424,8 @@ class RecorderState(val folder: String, private val app: AppState, private val s
             useTake(audio)
             version++
             app.message(savedTake.format("$name.wav"))
-            if (settings.listenBack) playRange(0.0, audio.duration)
-            else if (settings.autoNext && index < names.size - 1) select(index + 1)
+            if (interactive && settings.listenBack) playRange(0.0, audio.duration)
+            else if (interactive && settings.autoNext && index < names.size - 1) select(index + 1)
         }
     }
 
@@ -447,7 +464,7 @@ class RecorderState(val folder: String, private val app: AppState, private val s
     }
 
     fun close() {
-        if (recording) stop()
+        if (recording) stop(interactive = false)
         input.stop()
         output.release()
     }

@@ -62,6 +62,11 @@ class KaraokeState(
     private val fs = PlatformFs
     private val output = AudioOut()
     private val input = AudioIn()
+    private var captureMonitor: Job? = null
+    private val pendingSaves = mlabeler.app.state.PendingSaves(CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.Main)) {
+        app.message(it.message ?: it.toString(), error = true)
+    }
+    suspend fun awaitSaves(): Boolean = pendingSaves.flush()
 
     /** The songs: their files, lyrics (.lrc) and separated parts, outside any dataset. */
     val songsDir: String = Paths.join(Platform.dataDir(), "songs")
@@ -474,6 +479,15 @@ class KaraokeState(
                 score = null
                 leaked = false
                 recording = true
+                captureMonitor = scope.launch {
+                    while (recording) {
+                        delay(100)
+                        if (!input.isRecording) {
+                            app.message(micError.format("Audio input was interrupted"), error = true)
+                            stopRecording()
+                        }
+                    }
+                }
                 play(position)
             }
         }
@@ -482,6 +496,7 @@ class KaraokeState(
     fun stopRecording() {
         if (!recording) return
         recording = false
+        captureMonitor?.cancel()
         input.stop()
         val end = position
         stop()
@@ -504,7 +519,7 @@ class KaraokeState(
         val sc = score
         val split = splitLines
         val lat = latencyMs / 1000.0
-        scope.launch {
+        pendingSaves.submit {
             val leak = withContext(Dispatchers.Default) { played != null && leakage(take, played, sampleAt(start, played)) }
             withContext(Dispatchers.Default) {
                 fun save(n: String, a: Audio, text: String) {
@@ -609,8 +624,8 @@ class KaraokeState(
         dirty = true
     }
 
-    fun save() {
-        val name = song ?: return
+    fun save(): Boolean {
+        val name = song ?: return true
         val text = buildString {
             for (l in lines) {
                 val cs = kotlin.math.round(l.time * 100).toLong()
@@ -618,9 +633,10 @@ class KaraokeState(
                 append("[${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${c.toString().padStart(2, '0')}]${l.text}\n")
             }
         }
-        runCatching { fs.write(lrcPath(name), text.encodeToByteArray()) }
+        return runCatching { fs.write(lrcPath(name), text.encodeToByteArray()) }
             .onSuccess { dirty = false }
             .onFailure { app.message(it.message ?: it.toString(), error = true) }
+            .isSuccess
     }
 
     private fun readLrc(path: String): List<LyricLine> {
@@ -739,12 +755,13 @@ class KaraokeState(
         const val PITCH_HOP = 0.01
     }
 
-    fun close() {
+    fun close(): Boolean {
         if (recording) stopRecording()
-        if (dirty) save()
+        if (dirty && !save()) return false
         workJob?.cancel()
         stop()
         input.stop()
         output.release()
+        return true
     }
 }
