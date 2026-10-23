@@ -73,7 +73,10 @@ fun ToolkitBusyCard(ed: EditorState, title: String, hint: String, onStop: () -> 
                 Text(title, color = c.text, fontSize = 16.sp, modifier = Modifier.padding(start = 12.dp))
             }
             // earlier steps, then the current one with its numbers
-            for (s in ed.toolkitSteps) Text("✓ $s", color = c.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            for (s in ed.toolkitSteps) Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(Icons.check, null, Modifier.size(14.dp), tint = c.muted)
+                Text(s, color = c.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 4.dp))
+            }
             Text(stage, color = c.text, fontSize = 13.sp, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
             // the numbers of the step: which file is downloading, how much of it, how fast, how long still
             val job = ed.toolkitDetail

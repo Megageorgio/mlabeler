@@ -59,6 +59,7 @@ class AppState(private val scope: CoroutineScope) {
     /** The tip of the day: at start (once the first-start choice is made, unless turned off) or from Help. */
     var showTips by mutableStateOf(settings.setupDone && settings.tipsAtStart)
     var showAutoOto by mutableStateOf(false)
+    var showOtoReadiness by mutableStateOf(false)
     var showPlugins by mutableStateOf(false)
     var showImport by mutableStateOf(false)
     var showDsExport by mutableStateOf(false)

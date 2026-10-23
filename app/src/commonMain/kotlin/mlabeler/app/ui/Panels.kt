@@ -193,7 +193,7 @@ private fun FilesList(ed: EditorState, modifier: Modifier, onOpened: () -> Unit)
                         ),
                     )
                     Spacer(Modifier.width(10.dp))
-                    if (item.id in ed.pickedFiles) { Icon(Icons.check, null, Modifier.size(14.dp), tint = c.accent); Spacer(Modifier.width(6.dp)) }
+                    if (item.id in ed.pickedFiles) { Icon(Icons.check, null, Modifier.size(14.dp), tint = if (current && c.square) c.onAccent else c.accent); Spacer(Modifier.width(6.dp)) }
                     Column(Modifier.weight(1f)) {
                         Text(Paths.name(item.id), color = fg, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val sub = buildList {

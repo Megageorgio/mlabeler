@@ -107,10 +107,10 @@ kotlin {
 }
 
 android {
-    namespace = "io.github.megageorgio.mlabeler"
+    namespace = "pw.msan.mlabeler"
     compileSdk = 36
     defaultConfig {
-        applicationId = "io.github.megageorgio.mlabeler"
+        applicationId = "pw.msan.mlabeler"
         minSdk = 26
         targetSdk = 36
         versionCode = versionCodeOf(appVersion)
@@ -152,7 +152,7 @@ compose.desktop {
             packageVersion = appVersion.substringBefore('-').let { if (it.startsWith("0.")) "1." + it.removePrefix("0.") else it }
             modules("java.desktop", "jdk.unsupported")
             windows { menu = true; perUserInstall = true; upgradeUuid = "6f1d1d7e-2b8e-4c39-9a41-6b2a0c6d0f2e"; iconFile.set(rootProject.file("art/icon.ico")) }
-            macOS { bundleID = "io.github.megageorgio.mlabeler"; iconFile.set(rootProject.file("art/icon.icns")) }
+            macOS { bundleID = "pw.msan.mlabeler"; iconFile.set(rootProject.file("art/icon.icns")) }
             linux { iconFile.set(rootProject.file("art/icon.png")) }
         }
         buildTypes.release.proguard { isEnabled.set(false) }

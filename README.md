@@ -41,6 +41,10 @@ For **iOS** there is an unsigned `.ipa`. Install it with [AltStore](https://alts
 
 Android asks for access to all files, because label files are written next to the recordings in the opened folders.
 
+The application identifier is now `pw.msan.mlabeler` on Android, macOS and iOS. On Android this is a separate app
+from the previous `io.github.megageorgio.mlabeler`; settings and permissions do not migrate automatically.
+Recordings and labels in shared folders remain available after granting the new installation file access.
+
 ## Features
 
 **Labels**
@@ -66,6 +70,16 @@ Android asks for access to all files, because label files are written next to th
   level change, click repair and noise reduction. Every change can be undone, and the original file is kept.
 
 **oto and recording**
+- Automatic oto now has a review step: include/exclude individual additions, replacements and removals before
+  applying them as one undo step. Alias conflicts and failed recordings are listed separately.
+  Choose automatic spelling, kana, romaji or both, with an optional prefix/suffix; save custom profiles including
+  separate marker corrections for initial, CV, VC, VV, VCV and ending entries. Original defaults remain available.
+- Check Japanese alias coverage for a required syllable inventory and pitch/colour prefix/suffix group:
+  full CV/VCV/CVVC coverage or preferred/fallback aliases of OpenUtau JA VCV / JA CVVC (legacy).
+  These static checks do not run the plugins or evaluate `prefix.map`, voice colours or `presamp.ini`.
+- Listen to an oto entry as a note (J) through WORLD, the DiffSinger vocoder or an UTAU resampler.
+  Pin one entry and select another to audition their join. A uses the markers at opening; B uses current edits.
+  Pair playback needs mVocalToolkit with `/oto/pair`; existing single-note playback uses the original API.
 - An oto editor with automatic oto for CV / VCV / CVVC banks: the next entry or a done mark after an edit,
   copies of entries under new names by a pattern, the differences from another oto.ini entry by entry, the entries
   a `.ust` uses, file names from a Mac put in the composed form (NFC).

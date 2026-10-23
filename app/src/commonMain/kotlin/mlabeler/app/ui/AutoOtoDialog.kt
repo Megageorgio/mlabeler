@@ -31,6 +31,9 @@ import mlabeler.core.io.Paths
 import mlabeler.core.oto.AutoOtoSettings
 import mlabeler.core.oto.RecStyle
 import mlabeler.core.oto.Syllables
+import mlabeler.core.oto.AliasScript
+import mlabeler.core.oto.OtoEntryKind
+import mlabeler.core.oto.OtoRule
 import kotlin.math.roundToInt
 
 private val title = L("Automatic oto", "Автоматическое oto")
@@ -63,10 +66,17 @@ fun AutoOtoDialog(app: AppState) {
     val c = T.c
     fun close() { app.showAutoOto = false; ed.requestFocus() }
     var scope by remember { mutableStateOf(0) }
-    var style by remember { mutableStateOf(RecStyle.Auto) }
-    var bpm by remember { mutableStateOf("0") }
-    var left by remember { mutableStateOf(140f) }
-    var fixed by remember { mutableStateOf(100f) }
+    var options by remember { mutableStateOf(app.settings.autoOto) }
+    var style by remember { mutableStateOf(options.style) }
+    var bpm by remember { mutableStateOf(options.bpm.toString()) }
+    var left by remember { mutableStateOf(options.leftMarginMs.toFloat()) }
+    var fixed by remember { mutableStateOf(options.fixedMs.toFloat()) }
+    var profileName by remember { mutableStateOf("") }
+    var advanced by remember { mutableStateOf(false) }
+    var ruleKind by remember { mutableStateOf(OtoEntryKind.Initial) }
+    fun settings() = options.copy(style = style, bpm = bpm.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: 0.0,
+        leftMarginMs = left.toDouble(), fixedMs = fixed.toDouble())
+    fun load(s: AutoOtoSettings) { options = s; style = s.style; bpm = s.bpm.toString(); left = s.leftMarginMs.toFloat(); fixed = s.fixedMs.toFloat() }
     var replace by remember { mutableStateOf(true) }
     var useAligner by remember { mutableStateOf(false) }
     var langs by remember { mutableStateOf<List<ToolkitLanguage>?>(null) }
@@ -78,14 +88,38 @@ fun AutoOtoDialog(app: AppState) {
     Overlay({ close() }, 620) {
         DialogContent(footer = {
             Btn(S.cancel()) { close() }
-            Btn(start(), primary = true, enabled = !useAligner || model.isNotEmpty()) {
-                val settings = AutoOtoSettings(style = style, bpm = bpm.replace(',', '.').toDoubleOrNull() ?: 0.0, leftMarginMs = left.toDouble(), fixedMs = fixed.toDouble())
+            Btn(L("Generate preview", "Создать предпросмотр")(), primary = true, enabled = !useAligner || model.isNotEmpty()) {
+                val settings = settings()
+                app.update { it.copy(autoOto = settings) }
                 ed.oto.autoOto(scope, settings, replace, if (useAligner) model else null, lang.takeIf { it.isNotEmpty() && it != "*" })
                 close()
             }
         }) {
             Text(title(), color = c.text, fontSize = 17.sp)
             Text(hint(), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            SectionTitle(L("Profile", "Профиль")())
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Chip(L("Original defaults", "Исходные настройки")(), settings() == AutoOtoSettings()) { load(AutoOtoSettings()); profileName = "" }
+                for (p in app.settings.otoProfiles) Chip(p.name, settings() == p.settings) { load(p.settings); profileName = p.name }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Field(profileName, { profileName = it }, Modifier.weight(1f), placeholder = L("Profile name", "Имя профиля")())
+                Btn(S.save(), enabled = profileName.isNotBlank()) {
+                    val name = profileName.trim(); val s = settings()
+                    app.update { it.copy(otoProfiles = it.otoProfiles.filter { p -> p.name != name } + mlabeler.app.state.OtoProfile(name, s)) }
+                }
+                Btn(L("Delete", "Удалить")(), enabled = app.settings.otoProfiles.any { it.name == profileName.trim() }) {
+                    app.update { it.copy(otoProfiles = it.otoProfiles.filter { p -> p.name != profileName.trim() }) }; profileName = ""
+                }
+            }
+            SectionTitle(L("Alias spelling", "Письменность алиасов")())
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                for (a in AliasScript.entries) Chip(aliasScriptName(a), options.aliases == a) { options = options.copy(aliases = a) }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Field(options.aliasPrefix, { options = options.copy(aliasPrefix = it) }, Modifier.weight(1f), placeholder = L("Alias prefix", "Префикс алиаса")())
+                Field(options.aliasSuffix, { options = options.copy(aliasSuffix = it) }, Modifier.weight(1f), placeholder = L("Pitch/colour suffix", "Суффикс высоты/тембра")())
+            }
             ed.item?.let { Text(preview.format(Syllables.fromName(Paths.stem(it.audioPath)).joinToString(" ") { s -> s.text }), color = c.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)) }
             SectionTitle(which())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -123,6 +157,31 @@ fun AutoOtoDialog(app: AppState) {
             }
             ValueSlider(leftT(), left, 10f..300f, S.msUnit()) { left = it }
             ValueSlider(fixedT(), fixed, 10f..200f, S.msUnit()) { fixed = it }
+            Chip(L("Advanced rules", "Расширенные правила")(), advanced) { advanced = !advanced }
+            if (advanced) {
+                ValueSlider(L("Overlap before consonant, ms", "Overlap до согласной, мс")(), options.overlapBeforeMs.toFloat(), 0f..200f, S.msUnit()) { options = options.copy(overlapBeforeMs = it.toDouble()) }
+                ValueSlider(L("Vowel offset margin, ms", "Отступ offset для гласной, мс")(), options.vowelLeftMs.toFloat(), 0f..300f, S.msUnit()) { options = options.copy(vowelLeftMs = it.toDouble()) }
+                ValueSlider(L("Vowel overlap, ms", "Overlap гласной, мс")(), options.vowelOverlapMs.toFloat(), 0f..200f, S.msUnit()) { options = options.copy(vowelOverlapMs = it.toDouble()) }
+                ValueSlider(L("End margin, ms", "Отступ конца, мс")(), options.endMarginMs.toFloat(), 0f..300f, S.msUnit()) { options = options.copy(endMarginMs = it.toDouble()) }
+                Field(options.headPrefix, { options = options.copy(headPrefix = it) }, Modifier.fillMaxWidth(), placeholder = L("Initial alias prefix", "Префикс начальной записи")())
+                Field(options.endAlias, { options = options.copy(endAlias = it) }, Modifier.fillMaxWidth(), placeholder = L("Ending alias (blank: none)", "Конечный алиас (пусто: не создавать)")())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(L("Use initial prefix on CV entries", "Начальный префикс у CV-записей")(), modifier = Modifier.weight(1f), color = c.text)
+                    Toggle(options.cvWithHead, { options = options.copy(cvWithHead = it) })
+                }
+                Text(L("Corrections to the original rules, ms. Positive moves the marker later; zero preserves the original rule.",
+                    "Поправки к исходным правилам, мс. Плюс сдвигает маркер позже; ноль сохраняет исходное правило.")(), color = c.muted, fontSize = 12.sp)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (k in OtoEntryKind.entries) Chip(entryKindName(k), k == ruleKind) { ruleKind = k }
+                }
+                val rule = options.rules.lastOrNull { it.kind == ruleKind } ?: OtoRule(ruleKind)
+                fun change(r: OtoRule) { options = options.copy(rules = options.rules.filter { it.kind != r.kind } + r) }
+                ValueSlider("Offset", rule.offset.toFloat(), -200f..200f, S.msUnit()) { change(rule.copy(offset = it.toDouble())) }
+                ValueSlider("Overlap", rule.overlap.toFloat(), -200f..200f, S.msUnit()) { change(rule.copy(overlap = it.toDouble())) }
+                ValueSlider("Preutterance", rule.preutterance.toFloat(), -200f..200f, S.msUnit()) { change(rule.copy(preutterance = it.toDouble())) }
+                ValueSlider("Consonant", rule.consonant.toFloat(), -200f..200f, S.msUnit()) { change(rule.copy(consonant = it.toDouble())) }
+                ValueSlider("Cutoff", rule.cutoff.toFloat(), -200f..200f, S.msUnit()) { change(rule.copy(cutoff = it.toDouble())) }
+            }
             SectionTitle(existing())
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(replaceT(), replace) { replace = true }
@@ -130,4 +189,17 @@ fun AutoOtoDialog(app: AppState) {
             }
         }
     }
+}
+
+internal fun aliasScriptName(a: AliasScript): String = when (a) {
+    AliasScript.Auto -> L("Automatic (as before)", "Автоматически (как раньше)")()
+    AliasScript.Kana -> L("Kana", "Кана")()
+    AliasScript.Romaji -> L("Romaji", "Ромадзи")()
+    AliasScript.Both -> L("Both", "Оба варианта")()
+}
+
+internal fun entryKindName(k: OtoEntryKind): String = when (k) {
+    OtoEntryKind.Initial -> L("Initial", "Начальная")()
+    OtoEntryKind.Ending -> L("Ending", "Конечная")()
+    else -> k.name
 }

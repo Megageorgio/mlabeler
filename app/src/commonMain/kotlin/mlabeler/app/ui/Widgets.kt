@@ -3,6 +3,8 @@ package mlabeler.app.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -62,6 +64,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -538,10 +541,56 @@ fun Toggle(value: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Mod
         }
         return
     }
+    ClassicCheckMark(value, modifier.toggleable(value = value, role = Role.Checkbox, onValueChange = onChange))
+}
+
+/** Visual part of a checkable row. The row owns the click and checkbox semantics. */
+@Composable
+fun SelectionCheckbox(value: Boolean, modifier: Modifier = Modifier, enabled: Boolean = true, inverted: Boolean = false) {
+    val c = T.c
+    Box(modifier.size(24.dp), contentAlignment = Alignment.Center) {
+        if (c.checkboxes || c.crisp) {
+            ClassicCheckMark(value, Modifier.alpha(if (enabled) 1f else 0.38f))
+        } else {
+            androidx.compose.material3.Checkbox(
+                checked = value, onCheckedChange = null, enabled = enabled, modifier = Modifier.size(24.dp),
+                colors = androidx.compose.material3.CheckboxDefaults.colors(
+                    checkedColor = if (inverted) c.onAccent else c.accent,
+                    uncheckedColor = if (inverted) c.onAccent else c.muted,
+                    checkmarkColor = if (inverted) c.accent else c.onAccent,
+                    disabledCheckedColor = c.muted.copy(alpha = 0.38f),
+                    disabledUncheckedColor = c.muted.copy(alpha = 0.38f),
+                ),
+            )
+        }
+    }
+}
+
+/** A check-only menu indicator, drawn with the app's vector icon rather than a font glyph. */
+@Composable
+fun ChoiceMark(selected: Boolean, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    Box(modifier.size(20.dp), contentAlignment = Alignment.CenterStart) {
+        if (selected) Icon(Icons.check, null, Modifier.size(16.dp), tint = if (enabled) T.c.accent else T.c.muted)
+    }
+}
+
+@Composable
+fun CheckedLabel(text: String, selected: Boolean, fontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
+                 color: Color = T.c.text) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        ChoiceMark(selected)
+        Text(text, color = color, fontSize = fontSize)
+    }
+}
+
+/** Same sunken frame and tick used by classic-theme switches and selection checkboxes. */
+@Composable
+private fun ClassicCheckMark(value: Boolean, modifier: Modifier = Modifier) {
+    val c = T.c
     val box = if (c.dark) c.panelAlt else androidx.compose.ui.graphics.Color.White
     val tick = if (c.dark) c.text else androidx.compose.ui.graphics.Color.Black
     androidx.compose.foundation.Canvas(
-        modifier.size(16.dp).clickable(remember { MutableInteractionSource() }, null) { onChange(!value) },
+        modifier.size(16.dp),
     ) {
         val px = size.width / 16f
         // sunken frame: dark top-left, light bottom-right

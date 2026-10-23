@@ -10,6 +10,8 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1002,9 +1004,9 @@ private fun InterfacePage(app: AppState) {
         for ((i, g) in order.withIndex()) {
             val on = g in s.toolbar.groups
             Row(Modifier.fillMaxWidth().padding(vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (c.checkboxes) Toggle(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } }, Modifier.padding(horizontal = 12.dp, vertical = 12.dp))
-                else androidx.compose.material3.Checkbox(on, { v -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, v)) } },
-                    colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.muted, checkmarkColor = c.onAccent))
+                Box(Modifier.toggleable(value = on, role = Role.Checkbox) { checked -> app.update { st -> st.copy(toolbar = st.toolbar.toggled(g, checked)) } }) {
+                    SelectionCheckbox(on, Modifier.padding(horizontal = 12.dp, vertical = 12.dp))
+                }
                 Text(ToolLabels.group(g)(), color = if (on) c.text else c.muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
                 IconBtn(Icons.up, S.moveUp(), enabled = i > 0, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, -1)) } }
                 IconBtn(Icons.down, S.moveDown(), enabled = i < order.size - 1, size = 28.dp) { app.update { st -> st.copy(toolbar = st.toolbar.moved(g, 1)) } }
@@ -1123,7 +1125,7 @@ private fun ActionRow(title: String, value: String, onChange: (String) -> Unit) 
             MenuPopup(open, onDismiss = { open = false }, focusable = true) {
                 for (a in mlabeler.app.state.MouseActions.all) {
                     androidx.compose.material3.DropdownMenuItem(
-                        { Text((if (a == value) "✓  " else "     ") + MouseTitles.action(a), fontSize = 13.sp) },
+                        { CheckedLabel(MouseTitles.action(a), a == value) },
                         onClick = { open = false; onChange(a) },
                     )
                 }

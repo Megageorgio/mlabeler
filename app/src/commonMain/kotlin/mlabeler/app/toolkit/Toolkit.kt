@@ -401,6 +401,21 @@ class ToolkitClient(baseUrl: String, private val token: String = "") {
         return call("POST", "/oto/note", req).jsonObject["id"]!!.jsonPrimitive.content
     }
 
+    /** Dedicated endpoint so an older toolkit cannot silently ignore the second entry. */
+    suspend fun otoPair(firstId: String, first: mlabeler.core.format.OtoEntry, secondId: String, second: mlabeler.core.format.OtoEntry,
+                        tone: Double, lengthMs: Int, method: String, model: String, resampler: String, flags: String): String {
+        fun entry(id: String, e: mlabeler.core.format.OtoEntry) = buildJsonObject {
+            putJsonObject("input") { put("items", buildJsonArray { add(buildJsonObject { put("file_id", id) }) }) }
+            put("offset", e.offset); put("consonant", e.consonant); put("cutoff", e.cutoff)
+            put("preutterance", e.preutterance); put("overlap", e.overlap)
+        }
+        val req = JsonObject(entry(firstId, first) + buildJsonObject {
+            put("second", entry(secondId, second)); put("tone", tone); put("length", lengthMs); put("method", method)
+            put("model", model); put("resampler", resampler); put("flags", flags)
+        })
+        return call("POST", "/oto/pair", req).jsonObject["id"]!!.jsonPrimitive.content
+    }
+
     /** Downloads a result file of a job. */
     suspend fun download(path: String): ByteArray {
         val enc = buildString {

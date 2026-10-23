@@ -401,6 +401,8 @@ data class AppSettings(
     val workTime: WorkTimeSettings = WorkTimeSettings(),
     val discord: DiscordSettings = DiscordSettings(),
     val otoNote: OtoNoteSettings = OtoNoteSettings(),
+    val autoOto: mlabeler.core.oto.AutoOtoSettings = mlabeler.core.oto.AutoOtoSettings(),
+    val otoProfiles: List<OtoProfile> = emptyList(),
 ) {
     companion object {
         private val path get() = Paths.join(Platform.dataDir(), "settings.json")
@@ -553,6 +555,9 @@ data class OtoNoteSettings(
     val lengthMs: Int = 600,
     val notes: Int = 1,
 )
+
+@Serializable
+data class OtoProfile(val name: String, val settings: mlabeler.core.oto.AutoOtoSettings)
 
 /** A sound played when long work (autolabelling and the like) ends: off and without a sound by default. */
 @Serializable

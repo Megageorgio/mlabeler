@@ -19,11 +19,39 @@ import mlabeler.core.io.encodeText
 
 /** One oto.ini: its entries with undo, and the charset it was read with. */
 class OtoBook(val path: String, val charset: String, entries: List<OtoEntry>) {
+    val originalEntries = entries.toList()
     val history = History(entries)
     val entries: List<OtoEntry> get() = history.current
 }
 
 class OtoState(private val ed: EditorState, private val app: AppState) {
+    private var firstKey by mutableStateOf<Pair<String, OtoEntry>?>(null)
+    val transitionFirst: OtoEntry? get() = firstKey?.takeIf { it.first == book()?.path }?.second?.let { key ->
+        entries.firstOrNull { it.sample == key.sample && it.alias == key.alias }
+    }
+    fun pinTransitionFirst() { current()?.let { e -> book()?.let { firstKey = it.path to e } } }
+    fun clearTransitionFirst() { firstKey = null }
+    fun original(e: OtoEntry): OtoEntry? = book()?.originalEntries?.firstOrNull { it.sample == e.sample && it.alias == e.alias }
+    internal val auditionCache = linkedMapOf<String, mlabeler.core.audio.Audio>()
+    data class Preview(val path: String, val plan: mlabeler.core.oto.OtoPlan, val syllables: Map<String, String>, val errors: List<String>, val diskBytes: ByteArray?)
+    var autoPreview by mutableStateOf<Preview?>(null)
+        private set
+
+    fun dismissPreview() { autoPreview = null }
+
+    fun applyPreview(selectedRows: Set<Int>): Boolean {
+        val p = autoPreview ?: return false
+        val b = book() ?: return false
+        val disk = runCatching { if (ed.workspace.fs.exists(p.path)) ed.workspace.fs.read(p.path) else null }
+        if (b.path != p.path || b.entries != p.plan.before || disk.isFailure || !disk.getOrNull().contentEquals(p.diskBytes)) {
+            app.message(mlabeler.app.i18n.L("The oto changed: generate a new preview.", "Oto изменилось: создайте предпросмотр заново.")(), error = true)
+            return false
+        }
+        commit(p.plan.apply(selectedRows))
+        autoPreview = null
+        onItemOpened()
+        return true
+    }
     private val books = mutableMapOf<String, OtoBook>()
     private val backedUp = mutableSetOf<String>()
 
@@ -360,6 +388,9 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
      */
     fun autoOto(which: Int, settings: mlabeler.core.oto.AutoOtoSettings, replace: Boolean, aligner: String?, language: String?) {
         val item = ed.item ?: return
+        val path = bookPath(item)
+        val before = entries.toList()
+        autoPreview = null
         val dir = Paths.parent(item.audioPath)
         val have = entries.map { it.sample.lowercase() }.toSet()
         val targets = when (which) {
@@ -371,8 +402,13 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
         ed.toolkitJob?.cancel()
         ed.toolkitJob = ed.workScope.launch {
             val made = mutableMapOf<String, List<OtoEntry>>()
-            var failed = 0
+            val parsed = mutableMapOf<String, String>()
+            val errors = mutableListOf<String>()
+            var serverJob: String? = null
             try {
+                val diskBytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    if (ed.workspace.fs.exists(path)) ed.workspace.fs.read(path) else null
+                }
                 ed.describeWork("Placing oto.ini markers for ${targets.size} samples")
                 ed.beginToolkitWork("oto 0/${targets.size}")
                 // read every sample first; with an aligner they all go to the toolkit as one job (a job per file
@@ -388,22 +424,27 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                 class Sample(val name: String, val syl: List<mlabeler.core.oto.Syllable>, val audio: mlabeler.core.audio.Audio)
                 val samples = mutableListOf<Sample>()
                 for ((k, it) in targets.withIndex()) {
+                  try {
                     ed.toolkitBusy = readingT.format(k + 1, targets.size)
                     ed.toolkitProgress = if (aligner != null) 0.1 * k / targets.size else k.toDouble() / targets.size
                     val name = Paths.name(it.audioPath)
                     val stem = Paths.stem(it.audioPath)
                     val syl = mlabeler.core.oto.Syllables.fromName(mlabeler.core.oto.Syllables.reclistLine(stem, reclist, zeroBased) ?: stem, kana)
-                    if (syl.isEmpty()) { failed++; continue }
+                    parsed[name] = syl.joinToString(" ") { s -> s.text }
+                    if (syl.isEmpty()) { errors += "$name: no syllables"; continue }
                     val audio = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                         val bytes = ed.workspace.fs.read(it.audioPath)
                         if (mlabeler.core.audio.Wav.isWav(bytes)) mlabeler.core.audio.Wav.decode(bytes) else mlabeler.app.Platform.decodeAudio(it.audioPath)
-                    } ?: run { failed++; null } ?: continue
+                    } ?: error("Unsupported audio")
                     if (aligner == null) {
                         val timings = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
                             mlabeler.core.oto.AutoOto.segment(audio.samples, audio.sampleRate, syl, settings.bpm)
                         }
+                        require(timings.isNotEmpty()) { "No syllable timings found" }
                         made[name.lowercase()] = mlabeler.core.oto.AutoOto.entries(name, timings, audio.durationMs, settings)
                     } else samples += Sample(name, syl, audio)
+                  } catch (e: kotlinx.coroutines.CancellationException) { throw e
+                  } catch (e: Exception) { errors += Paths.name(it.audioPath) + ": " + (e.message ?: e.toString()) }
                 }
                 if (aligner != null && samples.isNotEmpty()) {
                     ed.toolkitBusy = mlabeler.app.toolkit.ToolkitManager.starting()
@@ -417,6 +458,7 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                         ids += client.upload(smp.name, bytes) to mlabeler.core.oto.AutoOto.phonemesFor(smp.syl)
                     }
                     val job = client.alignPhonemes(ids, aligner, language)
+                    serverJob = job
                     val res = client.await(job, { ed.toolkitDetail = it }) { p, stage ->
                         ed.toolkitProgress = 0.3 + 0.7 * p
                         // the toolkit's own words: loading the model, aligning a file…
@@ -425,34 +467,23 @@ class OtoState(private val ed: EditorState, private val app: AppState) {
                             ed.toolkitBusy = stage
                         }
                     }
+                    serverJob = null
                     for ((k, smp) in samples.withIndex()) {
                         try {
                             val doc = mlabeler.app.toolkit.ToolkitClient.labelOf(res, 0.0, smp.audio.duration, k)
                             val phones = doc.tiers[doc.phonemeTierIndex()] as mlabeler.core.model.IntervalTier
                             val timings = mlabeler.core.oto.AutoOto.fromPhonemes(phones, smp.syl)
+                            require(timings.size == smp.syl.size) { "The aligner did not place every syllable" }
                             made[smp.name.lowercase()] = mlabeler.core.oto.AutoOto.entries(smp.name, timings, smp.audio.durationMs, settings)
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e
                         } catch (e: Exception) {
-                            failed++
+                            errors += smp.name + ": " + (e.message ?: e.toString())
                         }
                     }
                 }
-                // one undo step for everything
-                val list = entries.toMutableList()
-                for ((sample, new) in made) {
-                    val existing = list.filter { e -> e.sample.lowercase() == sample }
-                    if (existing.isNotEmpty() && !replace) {
-                        val aliases = existing.map { e -> e.alias }.toSet()
-                        list += new.filter { e -> e.alias !in aliases }
-                    } else {
-                        val at = list.indexOfFirst { e -> e.sample.lowercase() == sample }
-                        list.removeAll { e -> e.sample.lowercase() == sample }
-                        list.addAll(if (at >= 0) at.coerceAtMost(list.size) else list.size, new)
-                    }
-                }
-                commit(list)
-                onItemOpened()
-                app.message(S.autoOtoDone.format(made.values.sumOf { it.size }, made.size, failed))
+                autoPreview = Preview(path, mlabeler.core.oto.OtoPlan(before, made.values.flatten(), made.keys, replace), parsed, errors, diskBytes)
             } catch (e: kotlinx.coroutines.CancellationException) {
+                serverJob?.let { id -> kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { app.toolkit.client().cancel(id) } }
                 throw e
             } catch (e: Exception) {
                 app.message(e.message ?: e.toString(), error = true)

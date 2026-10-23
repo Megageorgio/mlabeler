@@ -92,6 +92,8 @@ fun App(app: AppState = rememberAppState()) {
                     if (app.showSoundCheck && ed != null) mlabeler.app.ui.SoundCheckDialog(app, ed)
                     if (app.pendingLeave != null) mlabeler.app.ui.LeaveDialog(app)
                     if (app.showAutoOto && ed != null) mlabeler.app.ui.AutoOtoDialog(app)
+                    if (ed?.oto?.autoPreview != null) mlabeler.app.ui.OtoPreviewDialog(ed)
+                    if (app.showOtoReadiness && ed != null) mlabeler.app.ui.OtoReadinessDialog(ed) { app.showOtoReadiness = false; ed.requestFocus() }
                     if (app.errorDetails != null) mlabeler.app.ui.ErrorDetailsDialog(app)
                     app.folderPick?.let { pick ->
                         mlabeler.app.ui.FolderBrowser(

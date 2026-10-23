@@ -2,6 +2,8 @@ package mlabeler.app.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -168,10 +170,10 @@ fun ModelCompareDialog(app: AppState, ed: EditorState) {
                     val on = m.id in mc.chosen
                     Row(
                         Modifier.fillMaxWidth().background(if (on) c.accent.copy(alpha = 0.12f) else c.panel)
-                            .clickable { if (on) mc.chosen.remove(m.id) else mc.chosen.add(m.id) }.padding(horizontal = 10.dp, vertical = 6.dp),
+                            .toggleable(value = on, role = Role.Checkbox) { checked -> if (checked) mc.chosen.add(m.id) else mc.chosen.remove(m.id) }.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(if (on) "☑" else "☐", color = if (on) c.accent else c.muted, fontSize = 15.sp, modifier = Modifier.width(24.dp))
+                        SelectionCheckbox(on)
                         // the name with its author takes the room; the engine stays at the right edge
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             Text(m.name, color = c.text, fontSize = 13.sp, modifier = Modifier.weight(1f, fill = false))

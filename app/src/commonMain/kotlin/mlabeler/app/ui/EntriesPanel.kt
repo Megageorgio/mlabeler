@@ -177,10 +177,7 @@ fun EntriesPanel(ed: EditorState, modifier: Modifier = Modifier, onOpened: () ->
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val fg = if (active && c.square) c.onAccent else c.text
-                        if (picking && !all) androidx.compose.material3.Icon(
-                            if (e.index in picked) Icons.check else Icons.circle, null,
-                            Modifier.padding(end = 6.dp).width(14.dp), tint = if (e.index in picked) c.accent else c.muted,
-                        )
+                        if (picking && !all) SelectionCheckbox(e.index in picked, Modifier.padding(end = 6.dp), inverted = active && c.square)
                         Text((pos + 1).toString(), color = if (active && c.square) c.onAccent else c.muted, fontSize = 11.sp, modifier = Modifier.width(38.dp), maxLines = 1)
                         Text(e.text.ifEmpty { "∅" }, color = fg, fontSize = 13.sp, modifier = Modifier.width(62.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(

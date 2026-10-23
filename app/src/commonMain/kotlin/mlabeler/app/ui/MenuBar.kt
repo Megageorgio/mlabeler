@@ -336,7 +336,7 @@ fun MenuItems(entries: List<MenuEntry>, close: () -> Unit) {
         for ((k, e) in entries.withIndex()) when (e) {
             is MSep -> Box(Modifier.padding(vertical = 3.dp).fillMaxWidth().height(c.borderWidth).background(c.border))
             is MItem -> MenuRow(h, e.enabled, onHover = { openSub = -1 }, onClick = { close(); e.action() }) {
-                Text(if (e.checked == true) "✓" else "", color = c.accent, fontSize = 13.sp, modifier = Modifier.width(20.dp))
+                ChoiceMark(e.checked == true, enabled = e.enabled)
                 Text(e.title, fontSize = 13.sp, color = if (e.enabled) c.text else c.muted.copy(alpha = 0.6f), maxLines = 1, softWrap = false)
                 Spacer(Modifier.widthIn(min = 32.dp).weight(1f))
                 Text(e.keys, fontSize = 12.sp, color = c.muted, maxLines = 1, softWrap = false)

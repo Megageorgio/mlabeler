@@ -47,6 +47,7 @@ import mlabeler.app.state.EditorState
 import mlabeler.app.state.FileFilter
 import mlabeler.app.state.otoNoteNamed
 import mlabeler.app.state.playOtoNote
+import mlabeler.app.state.playOtoTransition
 import kotlinx.coroutines.launch
 import mlabeler.app.theme.T
 import mlabeler.core.format.OtoMarker
@@ -185,6 +186,7 @@ fun OtoInspector(ed: EditorState, modifier: Modifier = Modifier) {
         SectionTitle(otoFile())
         ed.item?.let { Text(ed.workspace.relative(ed.oto.bookPath(it)), color = c.muted, fontSize = 12.sp) }
         ed.oto.book()?.let { Text(it.charset, color = c.muted, fontSize = 12.sp) }
+        Btn(L("Check alias coverage…", "Проверить покрытие алиасов…")()) { ed.app.showOtoReadiness = true }
         if (e == null) {
             Spacer(Modifier.height(12.dp))
             Text(noEntries(), color = c.muted, fontSize = 13.sp)
@@ -306,6 +308,19 @@ private fun OtoNoteSection(ed: EditorState) {
     androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Chip(noteOneT(), n.notes < 2) { set { it.copy(notes = 1) } }
         Chip(noteTwoT(), n.notes >= 2) { set { it.copy(notes = 2) } }
+    }
+    SectionTitle(L("Transition between entries", "Переход между записями")())
+    Text(L("Pin the first entry, then select the second in the list. A uses the marker values from when oto.ini was opened; B uses your current edits. Same pitch and note length for both.",
+        "Закрепите первую запись, затем выберите вторую в списке. A — параметры при открытии oto.ini; B — текущие правки. Высота и длина нот одинаковы.")(), color = c.muted, fontSize = 11.sp)
+    Btn(L("Use selected as first", "Выбранную — первой")()) { ed.oto.pinTransitionFirst() }
+    val first = ed.oto.transitionFirst
+    if (first != null && e != null) {
+        Text("${first.alias} [${first.sample}] → ${e.alias} [${e.sample}]", color = c.text, fontSize = 12.sp)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Btn(L("A: at opening", "A: при открытии")(), enabled = ed.oto.original(first) != null && ed.oto.original(e) != null) { ed.playOtoTransition(true) }
+            Btn(L("B: current", "B: сейчас")()) { ed.playOtoTransition() }
+            Btn(L("Clear", "Сбросить")()) { ed.oto.clearTransitionFirst() }
+        }
     }
 }
 

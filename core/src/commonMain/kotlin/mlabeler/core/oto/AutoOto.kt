@@ -14,12 +14,14 @@ data class Syllable(val text: String, val consonant: String, val vowel: String)
 /** Where a syllable is in the recording, seconds: consonant start, vowel start, vowel end. */
 data class SyllableTiming(val syllable: Syllable, val cStart: Double, val vStart: Double, val vEnd: Double)
 
+@kotlinx.serialization.Serializable
 enum class RecStyle { Auto, CV, VCV, CVVC,
     /** Russian-style CVC: "-b", "-ba", "ab", "ba", "ab-", "b" from samples like "babab" (no spaces in aliases). */
     CVC,
     /** English ARPAsing: "- m", "m ah", "ah", "ah s", "s -" from samples named by ARPAbet phonemes ("m_ah_s"). */
     ARPA }
 
+@kotlinx.serialization.Serializable
 data class AutoOtoSettings(
     val style: RecStyle = RecStyle.Auto,
     /** Beats per minute of the recording; 0 = find syllables from the audio only. */
@@ -42,6 +44,10 @@ data class AutoOtoSettings(
     val headPrefix: String = "- ",
     /** CV entries in CVVC banks: with the "- " head prefix or plain. */
     val cvWithHead: Boolean = false,
+    val aliases: AliasScript = AliasScript.Auto,
+    val aliasPrefix: String = "",
+    val aliasSuffix: String = "",
+    val rules: List<OtoRule> = emptyList(),
 )
 
 object Kana {
@@ -578,7 +584,13 @@ object AutoOto {
      * preutterance at the vowel, the overlap a little before the consonant (in the vowel before it), the offset a
      * fixed distance before the overlap, the end of the entry well before the next consonant.
      */
-    fun entries(sample: String, timings: List<SyllableTiming>, lengthMs: Double, s: AutoOtoSettings): List<OtoEntry> {
+    fun entries(sample: String, timings: List<SyllableTiming>, lengthMs: Double, s: AutoOtoSettings): List<OtoEntry> =
+        legacyEntries(sample, timings, lengthMs, s).flatMap { e ->
+            val adjusted = s.rules.lastOrNull { it.kind == OtoRules.kind(e.alias, s.headPrefix, s.endAlias) }?.apply(e, lengthMs) ?: e
+            OtoRules.aliases(adjusted.alias, s.aliases).map { adjusted.copy(alias = s.aliasPrefix + it + s.aliasSuffix) }
+        }
+
+    private fun legacyEntries(sample: String, timings: List<SyllableTiming>, lengthMs: Double, s: AutoOtoSettings): List<OtoEntry> {
         val style = styleOf(timings.map { it.syllable }, s)
         if (style == RecStyle.CVC) return cvcEntries(sample, timings, lengthMs, s)
         if (style == RecStyle.ARPA) return arpaEntries(sample, timings, lengthMs)

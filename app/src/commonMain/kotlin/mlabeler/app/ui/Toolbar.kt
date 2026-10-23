@@ -262,7 +262,7 @@ fun ScaleTool(app: AppState, scale: Float, labels: Boolean, big: Boolean) {
             MenuPopup(open, onDismiss = { open = false }, focusable = true) {
                 for (p in listOf(50, 60, 70, 80, 90, 100, 115, 130, 150, 175)) {
                     androidx.compose.material3.DropdownMenuItem(
-                        { Text((if (kotlin.math.abs(scale * 100 - p) < 1) "✓  " else "     ") + "$p%", fontSize = 14.sp) },
+                        { CheckedLabel("$p%", kotlin.math.abs(scale * 100 - p) < 1, fontSize = 14.sp) },
                         onClick = { open = false; app.update { it.copy(scale = p / 100f) } },
                     )
                 }
@@ -300,13 +300,13 @@ private fun QuickLanguageTool(app: AppState, labels: Boolean, big: Boolean) {
             MenuPopup(open, onDismiss = { open = false }, focusable = true) {
                 val use = app.settings.quick.usePhonemes
                 androidx.compose.material3.DropdownMenuItem(
-                    { Text((if (use) "✓  " else "     ") + quickPhonemesT(), fontSize = 14.sp, color = c.accent) },
+                    { CheckedLabel(quickPhonemesT(), use, fontSize = 14.sp, color = c.accent) },
                     onClick = { app.update { it.copy(quick = it.quick.copy(usePhonemes = !use)) } },
                 )
                 Divider()
                 for ((code, name) in mlabeler.app.state.QuickLabel.languages()) {
                     androidx.compose.material3.DropdownMenuItem(
-                        { Text((if (code == lang) "✓  " else "     ") + name + "  ·  " + code, fontSize = 14.sp) },
+                        { CheckedLabel(name + "  ·  " + code, code == lang, fontSize = 14.sp) },
                         onClick = { open = false; app.update { it.copy(quick = it.quick.copy(language = code)) } },
                     )
                 }

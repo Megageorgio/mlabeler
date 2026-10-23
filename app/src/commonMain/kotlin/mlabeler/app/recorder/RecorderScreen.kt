@@ -633,7 +633,10 @@ private fun RecSettings(rec: RecorderState, onClose: () -> Unit) {
             var tgt by remember { mutableStateOf(s.targetNote) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Field(tgt, { tgt = it; rec.updateSettings { st -> st.copy(targetNote = it.trim()) } }, Modifier.width(120.dp), placeholder = "C4")
-                if (tgt.isNotBlank()) Text(if (rec.targetMidi != null) "✓" else "?", color = if (rec.targetMidi != null) c.ok else c.danger, modifier = Modifier.padding(start = 8.dp))
+                if (tgt.isNotBlank()) {
+                    if (rec.targetMidi != null) androidx.compose.material3.Icon(Icons.check, null, Modifier.padding(start = 8.dp).size(16.dp), tint = c.ok)
+                    else Text("?", color = c.danger, modifier = Modifier.padding(start = 8.dp))
+                }
             }
             SectionTitle(listenBackT())
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
