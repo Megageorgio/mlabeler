@@ -124,11 +124,19 @@ Android просит доступ ко всем файлам, потому чт�
 ./gradlew :core:jvmTest :app:desktopTest
 ```
 
-## Благодарности
+## Альтернативы для компьютера и общие функции
 
-Отдельная благодарность **HHS_kt** ([YouTube](https://www.youtube.com/@HHS_kt), [Telegram](https://t.me/hhs_kt_666)),
-**Gitreti** и **XHR0ME** ([X](https://x.com/ExChroma), [Telegram](https://t.me/xhr0m1),
-[YouTube](https://www.youtube.com/@chr0ma313)).
+Для работы на Windows, macOS или Linux я рекомендую **vLabeler** и **SLabeler**.
+Сейчас я считаю их более стабильными вариантами, чем mLabeler.
+
+Ряд функций mLabeler есть и в этих проектах:
+
+- **[vLabeler](https://github.com/sdercolin/vlabeler)** — редактирование `.lab` и UTAU `oto.ini`,
+  правка нескольких записей и работа с несколькими файлами, настраиваемое управление клавиатурой и мышью,
+  отметки «готово», звёздочки и теги, плагины пакетной обработки и пользовательские скрипты.
+- **[SLabeler](https://m-lo7.itch.io/slabeler)** — волна и спектрограмма с редактированием фонем,
+  пианоролл с рисованием высоты тона, группировка фонем по словарям, разделение и объединение нот (slur cutting),
+  сегментация аудио, экспорт датасетов DiffSinger и настраиваемые горячие клавиши.
 
 ## Об использовании ИИ
 
@@ -136,6 +144,12 @@ Android просит доступ ко всем файлам, потому чт�
 например справки, а также для написания части кода. Архитектура и планирование делались без них.
 Если для вас это важно, есть и другие хорошие программы для той же задачи, например
 [vLabeler](https://github.com/sdercolin/vlabeler) и [SLabeler](https://m-lo7.itch.io/slabeler).
+
+## Благодарности
+
+Отдельная благодарность **HHS_kt** ([YouTube](https://www.youtube.com/@HHS_kt), [Telegram](https://t.me/hhs_kt_666)),
+**Gitreti** и **XHR0ME** ([X](https://x.com/ExChroma), [Telegram](https://t.me/xhr0m1),
+[YouTube](https://www.youtube.com/@chr0ma313)).
 
 ## Лицензия
 

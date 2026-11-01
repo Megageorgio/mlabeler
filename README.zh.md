@@ -96,17 +96,29 @@ Android 会请求访问所有文件，因为标注文件会写入所打开文件
 ./gradlew :core:jvmTest :app:desktopTest
 ```
 
-## 致谢
+## 桌面替代工具与共有功能
 
-特别感谢 **HHS_kt**（[YouTube](https://www.youtube.com/@HHS_kt)、[Telegram](https://t.me/hhs_kt_666)）、
-**Gitreti** 和 **XHR0ME**（[X](https://x.com/ExChroma)、[Telegram](https://t.me/xhr0m1)、
-[YouTube](https://www.youtube.com/@chr0ma313)）。
+在 Windows、macOS 或 Linux 上工作时，我推荐 **vLabeler** 和 **SLabeler**。
+目前我认为它们是比 mLabeler 更稳定的选择。
+
+mLabeler 的一些功能也可以在这些项目中找到：
+
+- **[vLabeler](https://github.com/sdercolin/vlabeler)** — 编辑 `.lab` 和 UTAU `oto.ini`，
+  编辑多个条目及处理多个文件、自定义键盘和鼠标操作、完成标记、星标与标签、批量编辑插件及自定义脚本。
+- **[SLabeler](https://m-lo7.itch.io/slabeler)** — 带音素编辑的波形和频谱图、可绘制音高的钢琴卷帘，
+  基于词典的音素分组、音符拆分与合并（slur cutting）、音频切分、DiffSinger 数据集导出及自定义快捷键。
 
 ## 关于 AI 工具的使用
 
 本项目的部分工作使用了 AI 工具，主要用于界面翻译和帮助等文字的起草，也用于编写部分代码。
 架构设计和规划均未使用 AI。如果您介意这一点，也有其他优秀的同类工具可供选择，例如
 [vLabeler](https://github.com/sdercolin/vlabeler) 和 [SLabeler](https://m-lo7.itch.io/slabeler)。
+
+## 致谢
+
+特别感谢 **HHS_kt**（[YouTube](https://www.youtube.com/@HHS_kt)、[Telegram](https://t.me/hhs_kt_666)）、
+**Gitreti** 和 **XHR0ME**（[X](https://x.com/ExChroma)、[Telegram](https://t.me/xhr0m1)、
+[YouTube](https://www.youtube.com/@chr0ma313)）。
 
 ## 许可证
 

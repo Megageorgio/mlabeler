@@ -122,11 +122,19 @@ For development: JDK 17 or newer.
 ./gradlew :core:jvmTest :app:desktopTest
 ```
 
-## Acknowledgements
+## Desktop alternatives and shared features
 
-Special thanks to **HHS_kt** ([YouTube](https://www.youtube.com/@HHS_kt), [Telegram](https://t.me/hhs_kt_666)),
-**Gitreti** and **XHR0ME** ([X](https://x.com/ExChroma), [Telegram](https://t.me/xhr0m1),
-[YouTube](https://www.youtube.com/@chr0ma313)).
+For desktop work on Windows, macOS or Linux, I recommend **vLabeler** and **SLabeler**.
+I currently consider them more stable choices than mLabeler.
+
+Several features in mLabeler are also available in these projects:
+
+- **[vLabeler](https://github.com/sdercolin/vlabeler)** — `.lab` and UTAU `oto.ini` editing,
+  editing multiple entries and working with multiple files, configurable keyboard and mouse controls,
+  done/star marks and tags, batch-edit plugins and custom scripts.
+- **[SLabeler](https://m-lo7.itch.io/slabeler)** — waveform and spectrogram views with phoneme editing,
+  a piano roll with pitch drawing, dictionary-based phoneme grouping, splitting and merging notes (slur cutting),
+  audio segmentation, DiffSinger dataset export and configurable keyboard shortcuts.
 
 ## A note on AI tools
 
@@ -134,6 +142,12 @@ AI tools were used for a part of the work: mainly for the interface translations
 the help, and also for writing part of the code. The architecture and planning were done without them.
 If this matters to you, there are other good tools for the same job, for example
 [vLabeler](https://github.com/sdercolin/vlabeler) and [SLabeler](https://m-lo7.itch.io/slabeler).
+
+## Acknowledgements
+
+Special thanks to **HHS_kt** ([YouTube](https://www.youtube.com/@HHS_kt), [Telegram](https://t.me/hhs_kt_666)),
+**Gitreti** and **XHR0ME** ([X](https://x.com/ExChroma), [Telegram](https://t.me/xhr0m1),
+[YouTube](https://www.youtube.com/@chr0ma313)).
 
 ## License
 
