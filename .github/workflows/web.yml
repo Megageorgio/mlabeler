@@ -2,6 +2,7 @@ name: Web deployment archive
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

@@ -126,8 +126,9 @@ For development: JDK 17 or newer.
 ./gradlew :core:jvmTest :app:desktopTest
 ```
 
-The browser edition has a separate manual **Web deployment archive** workflow. It builds a static
-website ZIP with the adaptive editor and local MCFL inference; see [web deployment](docs/WEB.md)
+The **build** workflow also builds the browser edition and includes its static website ZIP in releases.
+A separate manual **Web deployment archive** workflow builds just the web edition with the adaptive
+editor and local MCFL inference; see [web deployment](docs/WEB.md)
 for building, hosting and browser limitations.
 
 ## Desktop alternatives and shared features

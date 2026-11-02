@@ -96,8 +96,9 @@ Android 会请求访问所有文件，因为标注文件会写入所打开文件
 ./gradlew :core:jvmTest :app:desktopTest
 ```
 
-浏览器版使用单独的手动工作流 **Web deployment archive**，生成包含自适应编辑器和本地 MCFL
-推理的网站 ZIP。构建、部署和浏览器限制请参阅 [Web 版说明](docs/WEB.md)。
+**build** 工作流也会构建浏览器版，并将网站 ZIP 添加到发布版本中。
+单独的手动工作流 **Web deployment archive** 仅构建网页版，其中包含自适应编辑器和本地 MCFL
+推理。构建、部署和浏览器限制请参阅 [Web 版说明](docs/WEB.md)。
 
 ## 桌面替代工具与共有功能
 

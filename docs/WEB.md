@@ -7,9 +7,11 @@ npm ci --prefix web
 ./gradlew :app:webArchive -Pdistribution=web
 ```
 
-The manual **Web deployment archive** GitHub Action builds and tests the same archive.
-It does not publish a GitHub release or deploy a website. Download the `mLabeler-web`
-artifact and extract the ZIP inside it. Locally, the archive is at
+The **build** GitHub Action builds and tests the web edition alongside the native apps.
+Tagged releases include `mLabeler-<version>-web.zip` in addition to the native downloads.
+The separate manual **Web deployment archive** workflow builds only the web edition;
+it does not publish a GitHub release or deploy a website. Download the `mLabeler-web`
+Actions artifact and extract the ZIP inside it. Locally, the archive is at
 `app/build/outputs/web/mLabeler-<version>-web.zip`.
 
 Upload its **contents** to an HTTPS directory, for example `msan.pw/mlabeler/web/`.

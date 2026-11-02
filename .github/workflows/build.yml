@@ -8,6 +8,10 @@ on:
   workflow_dispatch:
 
 jobs:
+  web:
+    uses: ./.github/workflows/web.yml
+    permissions: { contents: read }
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -175,12 +179,13 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [test, android, desktop, windows-portable, linux-portable, ios, ios-ipa]
+    needs: [test, android, desktop, windows-portable, linux-portable, ios, ios-ipa, web]
     runs-on: ubuntu-latest
     permissions: { contents: write }
     steps:
       - uses: actions/download-artifact@v4
-        with: { path: dist }
+        # Include installers and the web ZIP, but not browser test reports.
+        with: { path: dist, pattern: 'mLabeler-*' }
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/**/*
