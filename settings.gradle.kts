@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 }
 
 include(":core", ":app")
+include(":web-worker")

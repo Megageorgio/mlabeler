@@ -163,8 +163,10 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
     val lab = tb.labels
     val big = tb.big
     @Composable
-    fun B(icon: ImageVector, label: L, cmd: Command?, hint: String = cmd?.title?.invoke() ?: label(), enabled: Boolean = cmd?.enabled?.invoke(ed) ?: true, active: Boolean = false, onClick: () -> Unit = { ed.finishEditing(); cmd?.run(ed, app) }) =
+    fun B(icon: ImageVector, label: L, cmd: Command?, hint: String = cmd?.title?.invoke() ?: label(), enabled: Boolean = cmd?.enabled?.invoke(ed) ?: true, active: Boolean = false, onClick: () -> Unit = { ed.finishEditing(); cmd?.run(ed, app) }) {
+        if (cmd?.available == false) return
         ToolBtn(icon, label(), hint, cmd?.keyLabel ?: "", enabled, active, lab, big, onClick)
+    }
 
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         if (tb.scaleButton ?: Platform.isMobile) Group { ScaleTool(app, s.scale, lab, big) }
@@ -205,7 +207,7 @@ fun ToolbarGroupsRow(app: AppState, ed: EditorState) {
                     B(Icons.soundEdit, ToolLabels.sound, Commands.soundMode, active = ed.soundMode)
                 }
             }
-            ToolbarGroups.AUTO -> Group {
+            ToolbarGroups.AUTO -> if (ed.mode == Mode.Oto || mlabeler.app.AppInfo.TOOLKIT_ENABLED) Group {
                 if (ed.mode == Mode.Oto) B(Icons.magic, ToolLabels.autoOto, Commands.autoOto)
                 else B(Icons.magic, ToolLabels.autolabel, Commands.autolabel)
             }

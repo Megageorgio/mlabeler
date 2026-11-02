@@ -8,3 +8,10 @@ local.properties
 iosApp/*.xcodeproj
 iosApp/build/
 xcuserdata/
+node_modules/
+web/playwright-report/
+web/test-results/
+__pycache__/
+*.py[cod]
+hs_err_pid*.log
+replay_pid*.log

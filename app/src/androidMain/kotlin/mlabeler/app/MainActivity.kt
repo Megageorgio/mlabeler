@@ -6,6 +6,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 
 class MainActivity : ComponentActivity() {
+    private val documentLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        DocumentPicker.complete(result.data.takeIf { result.resultCode == RESULT_OK })
+    }
     private var micCallback: ((Boolean) -> Unit)? = null
     private val micLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { ok ->
         micCallback?.invoke(ok)
@@ -16,6 +19,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AndroidContext.init(applicationContext)
         AndroidContext.activity = this
+        DocumentPicker.launch = { documentLauncher.launch(it) }
         // a crash leaves its report for the next start
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         if (previous !is CrashHandler) Thread.setDefaultUncaughtExceptionHandler(CrashHandler(previous))
@@ -29,7 +33,11 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (AndroidContext.activity === this) AndroidContext.activity = null
+        if (AndroidContext.activity === this) {
+            AndroidContext.activity = null
+            DocumentPicker.launch = null
+            DocumentPicker.complete(null)
+        }
         super.onDestroy()
     }
 }

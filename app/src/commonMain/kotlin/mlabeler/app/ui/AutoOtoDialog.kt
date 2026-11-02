@@ -134,9 +134,9 @@ fun AutoOtoDialog(app: AppState) {
             SectionTitle(methodT())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Chip(builtIn(), !useAligner) { useAligner = false }
-                Chip(aligner(), useAligner) { useAligner = true }
+                if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) Chip(aligner(), useAligner) { useAligner = true }
             }
-            Text(methodAbout(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+            if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) Text(methodAbout(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
             if (useAligner) {
                 Column(Modifier.padding(vertical = 8.dp)) { ToolkitStatus(app) }
                 when {

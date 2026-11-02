@@ -12,6 +12,7 @@ import java.net.URL
  * a file with another checksum is thrown away: damaged on the way, or not the file the release published.
  */
 internal suspend fun downloadFile(url: String, to: File, sha256: String? = null, progress: (Float) -> Unit) = withContext(Dispatchers.IO) {
+    check(!AppInfo.PLAY_STORE) { "Application downloads are unavailable in this build" }
     to.parentFile?.mkdirs()
     val part = File(to.path + ".part")
     val c = URL(url).openConnection() as HttpURLConnection

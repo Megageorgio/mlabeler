@@ -72,12 +72,10 @@ fun EditorState.quickLabel(language: String) {
     toolkitJob = scope.launch {
         try {
             beginToolkitWork(QuickLabel.working())
-            val m = QuickLabel.model() ?: throw IllegalStateException(QuickLabel.noModel())
             val part = withContext(Dispatchers.Default) { Dataset.cutAudio(a, from, to, 0) }
             val segs = withContext(Dispatchers.Default) {
                 val threads = Platform.cores.coerceIn(1, 8)
-                if (align) m.align(part, language, known.map { pt!!.texts[it].trim() }, threads, settings.toolkit.markUnsure) { p -> toolkitProgress = p }
-                else m.label(part, language, threads = threads, confidence = settings.toolkit.markUnsure) { p -> toolkitProgress = p }
+                inferBuiltin(part, language, if (align) known.map { pt!!.texts[it].trim() } else emptyList(), threads, settings.toolkit.markUnsure) { p -> toolkitProgress = p }
             }
             val tier = IntervalTier.fromIntervals("phones", segs.map { Triple(from + it.start, from + it.end, it.label) }, from + part.duration,
                 segs.map { it.confidence }.takeIf { c -> c.any { it != null } })

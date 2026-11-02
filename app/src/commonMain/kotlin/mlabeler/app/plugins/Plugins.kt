@@ -1,8 +1,5 @@
 package mlabeler.app.plugins
 
-import com.dokar.quickjs.QuickJs
-import com.dokar.quickjs.binding.function
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -193,22 +190,22 @@ object Plugins {
      */
     suspend fun run(plugin: Plugin, params: Map<String, JsonElement>, doc: LabelDoc?, entries: List<OtoEntry>?, fileName: String, duration: Double,
                     ctx: PluginContext? = null): PluginResult {
-        val js = QuickJs.create(Dispatchers.Default)
+        val js = PluginRuntime()
         val written = mutableListOf<String>()
         try {
             val folder = ctx?.folder
             if (folder != null) {
-                js.function("readText") { args ->
-                    val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: return@function null
+                js.stringFunction("readText") { args ->
+                    val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: return@stringFunction null
                     runCatching { mlabeler.core.io.decodeGuess(PlatformFs.read(p), args.getOrNull(1)?.toString() ?: "UTF-8").first }.getOrNull()
                 }
-                js.function("exists") { args -> inside(folder, args.getOrNull(0)?.toString() ?: "")?.let { PlatformFs.exists(it) } ?: false }
-                js.function("listFiles") { args ->
-                    val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: return@function "[]"
+                js.booleanFunction("exists") { args -> inside(folder, args.getOrNull(0)?.toString() ?: "")?.let { PlatformFs.exists(it) } ?: false }
+                js.stringFunction("__listFiles") { args ->
+                    val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: return@stringFunction "[]"
                     val list = runCatching { PlatformFs.list(p) }.getOrDefault(emptyList()).map { Paths.name(it) }.filter { !it.startsWith(".") }.sorted()
                     JsonArray(list.map { JsonPrimitive(it) }).toString()
                 }
-                js.function("writeText") { args ->
+                js.booleanFunction("writeText") { args ->
                     val p = inside(folder, args.getOrNull(0)?.toString() ?: "") ?: throw IllegalArgumentException("writeText: only files inside the folder")
                     if (Paths.name(p).startsWith(".")) throw IllegalArgumentException("writeText: not a hidden file")
                     if (PlatformFs.exists(p)) ctx.backup(p)
@@ -221,7 +218,7 @@ object Plugins {
                 append("var __logs = [];\n")
                 append("function log() { __logs.push(Array.prototype.map.call(arguments, function (a) { return typeof a === 'string' ? a : JSON.stringify(a); }).join(' ')); }\n")
                 append("var console = { log: log, warn: log, error: log };\n")
-                if (folder != null) append("var __list = listFiles; listFiles = function (d) { return JSON.parse(__list(d || '')); };\n")
+                if (folder != null) append("function listFiles(d) { return JSON.parse(__listFiles(d || '')); }\n")
                 append("var params = ").append(lit(JsonObject(params))).append(";\n")
                 append("var labels = ").append(if (doc != null) lit(docToJson(doc)) else "null").append(";\n")
                 val noteTier = doc?.tiers?.firstOrNull { it is mlabeler.core.model.NoteTier } as? mlabeler.core.model.NoteTier
@@ -246,7 +243,7 @@ object Plugins {
                 append("(function () {\n").append(plugin.code).append("\n})();\n")
                 append("JSON.stringify({ labels: labels, notes: notes, entries: entries, marks: marks, report: report, play: play, logs: __logs });\n")
             }
-            val out: String = js.evaluate(code, plugin.info.name + ".js", false)
+            val out = js.evaluate(code, plugin.info.name + ".js")
             val r = json.parseToJsonElement(out).jsonObject
             var newDoc = r["labels"]?.takeIf { it !is JsonNull && doc != null }?.let { docFromJson(it, doc!!, duration) }
             val noteIndex = doc?.tiers?.indexOfFirst { it is mlabeler.core.model.NoteTier } ?: -1

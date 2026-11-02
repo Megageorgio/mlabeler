@@ -26,7 +26,7 @@ import mlabeler.app.theme.T
 /** One tip: a less obvious feature or setting, what it does and what it is good for. {command-id} shows its key. */
 private class Tip(val title: L, val text: L)
 
-private val tips = listOf(
+private val allTips = listOf(
     Tip(L("Every command in one list", "Все команды в одном списке"),
         L("{commands} opens the list of all commands with search. Type a part of the name and press Enter: it is quicker than looking through menus, and every command shows its key next to it, so the list also teaches the shortcuts.",
             "{commands} открывает список всех команд с поиском. Наберите часть названия и нажмите Enter: так быстрее, чем искать в меню, а рядом с каждой командой видна её клавиша, поэтому по списку можно запомнить и сочетания клавиш.")),
@@ -130,6 +130,12 @@ private val tips = listOf(
         L("The program reads and writes .lab, Praat .TextGrid, Audacity labels, DiffSinger .ds and transcriptions.csv and UTAU oto.ini, and imports vLabeler projects (.lbp). A file is saved back in the format it came in.",
             "Программа читает и записывает .lab, .TextGrid из Praat, метки Audacity, .ds и transcriptions.csv DiffSinger и oto.ini UTAU, а также импортирует проекты vLabeler (.lbp). Файл сохраняется обратно в том формате, в котором был.")),
 )
+
+private val tips get() = if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) allTips else allTips.filter {
+    val text = (it.title.en + " " + it.text.en).lowercase()
+    "toolkit" !in text && "{resynth-" !in text &&
+        "in the autolabel window" !in text && "in the autolabel" !in text && "settings → autolabel" !in text
+}
 
 private val tipOfDay = L("Tip of the day", "Совет дня")
 private val showAtStart = L("Show tips at start", "Показывать советы при запуске")

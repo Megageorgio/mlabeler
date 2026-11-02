@@ -101,8 +101,11 @@ class Command(
     val title: L,
     val defaultKeys: List<Chord>,
     val enabled: (EditorState) -> Boolean = { true },
-    val run: (EditorState, AppState) -> Unit,
+    action: (EditorState, AppState) -> Unit,
 ) {
+    val available: Boolean get() = (mlabeler.app.AppInfo.TOOLKIT_ENABLED || id !in toolkitCommandIds) &&
+        (mlabeler.app.AppInfo.PLUGINS_ENABLED || (id != "plugins" && !id.startsWith("plugin-slot")))
+    val run: (EditorState, AppState) -> Unit = { editor, app -> if (available) action(editor, app) }
     val keys: List<Chord> get() = Keymap.overrides[id] ?: defaultKeys
     val keyLabel: String get() = keys.firstOrNull()?.label() ?: ""
     /** Null: works in every mode. */
@@ -110,6 +113,9 @@ class Command(
         private set
     fun only(m: Mode) = also { mode = m }
 }
+
+private val toolkitCommandIds = setOf("autolabel", "compare-models", "phonemes-from-words", "model-words",
+    "oto-note", "resynth-world", "resynth-nsf", "resynth-save")
 
 object Commands {
     val togglePlay = Command("play", S.play, listOf(Chord(Key.Spacebar))) { e, _ -> e.togglePlay() }
@@ -173,7 +179,9 @@ object Commands {
     val normalize = Command("normalize", L("Normalise the level", "Нормализовать громкость"), emptyList()) { e, _ -> e.cleanup.normalize(e.range ?: e.selectedSpan()) }
     val palette = Command("commands", S.commands, listOf(ch('K', ctrl = true))) { _, a -> a.showCommands = true }
     val settings = Command("settings", S.settings, listOf(Chord(Key.Comma, ctrl = true))) { _, a -> a.showSettings = true }
-    val openFolder = Command("open", S.openFolder, listOf(ch('O', ctrl = true))) { _, a -> a.leaveFolderThen { a.closeFolder() } }
+    val openFolder = Command("open", S.openFolder, listOf(ch('O', ctrl = true))) { _, a ->
+        if (mlabeler.app.AppInfo.WEB) mlabeler.app.openBrowserImport() else a.leaveFolderThen { a.closeFolder() }
+    }
 
     private fun otoSet(id: String, title: L, key: Char, m: OtoMarker) =
         Command(id, title, listOf(ch(key))) { e, _ -> e.oto.setMarker(m, e.editTime()) }.only(Mode.Oto)
@@ -319,7 +327,7 @@ object Commands {
         nudgeLeft, nudgeRight, nudgeLeftBig, nudgeRightBig, prevBound, nextBound, prevInterval, nextInterval, tierUp, tierDown,
         prevFile, nextFile, zoomIn, zoomOut, zoomFit, zoomSel, home, end, done, star, files, inspector, wave, spectrogram, pitchLane, powerLane, formants, trimSilence, normalize, gain, segments, resynthWorld, resynthNsf, resynthSave,
         palette, settings, openFolder,
-    )
+    ).filter { it.available }
 
     fun find(e: KeyEvent, mode: Mode): Command? = all.firstOrNull { c -> (c.mode == null || c.mode == mode) && c.keys.any { it.matches(e) } }
 

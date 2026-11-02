@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171a20">
+  <meta name="referrer" content="no-referrer">
+  <title>mLabeler</title>
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="web.css">
+</head>
+<body>
+  <header id="web-toolbar" hidden>
+    <nav aria-label="Project">
+      <button id="import-files" type="button"></button>
+      <button id="import-folder" type="button"></button>
+      <button id="export" type="button"></button>
+      <span id="storage-status" role="status" aria-live="polite"></span>
+    </nav>
+    <p id="local-hint"></p>
+  </header>
+  <main id="app"></main>
+  <div id="loading" role="status"><strong>mLabeler</strong><p id="loading-text"></p></div>
+  <div id="notice" role="alert" hidden><span></span><button id="dismiss" type="button">×</button></div>
+  <input id="file-input" type="file" multiple hidden>
+  <input id="folder-input" type="file" webkitdirectory multiple hidden>
+  <script src="web-bridge.js" defer></script>
+</body>
+</html>

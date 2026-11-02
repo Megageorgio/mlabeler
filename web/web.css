@@ -1,0 +1,22 @@
+:root { --bg: #16181c; --panel: #1d2026; --panel-alt: #252932; --border: #323743; --text: #e6e8ec; --muted: #8c93a1; --accent: #a6cf82; --on-accent: #15240c; --warn: #f2c46d; --radius: 8px; --border-width: 1px; --scale: 1; --font: Arial, sans-serif; color-scheme: dark; font-family: var(--font); background: var(--bg); color: var(--text); }
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { height: 100dvh; display: flex; flex-direction: column; padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+[hidden] { display: none !important; }
+#web-toolbar { flex: 0 0 auto; padding: max(6px, env(safe-area-inset-top)) 10px 6px; background: var(--panel); border-bottom: var(--border-width) solid var(--border); }
+nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+button { min-height: calc(32px * var(--scale)); border: var(--border-width) solid var(--border); border-radius: var(--radius); background: var(--panel); color: inherit; padding: calc(6px * var(--scale)) calc(12px * var(--scale)); font: inherit; font-size: calc(13px * var(--scale)); cursor: pointer; }
+button:hover { background: var(--panel-alt); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: wait; }
+#export { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+#export:hover { filter: brightness(.95); }
+#storage-status, #local-hint { color: var(--muted); font-size: calc(12px * var(--scale)); }
+#storage-status { margin-inline-start: auto; }
+#local-hint { margin: 5px 0 0; line-height: 1.4; }
+#app { flex: 1 1 0; min-height: 0; position: relative; overflow: hidden; }
+#loading { position: fixed; inset: 0; display: grid; place-content: center; text-align: center; padding: 24px; background: var(--bg); }
+#notice { position: fixed; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; right: 12px; max-width: 720px; margin: auto; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: var(--border-width) solid var(--warn); border-radius: var(--radius); background: var(--panel); z-index: 100; font-size: calc(14px * var(--scale)); }
+#notice span { flex: 1; overflow-wrap: anywhere; }
+#notice button { background: transparent; border: 0; font-size: 20px; }
+@media (max-width: 600px) { button { min-height: max(44px, calc(32px * var(--scale))); padding: 8px; } #storage-status { width: 100%; margin: 0; } #local-hint { font-size: calc(11px * var(--scale)); } }

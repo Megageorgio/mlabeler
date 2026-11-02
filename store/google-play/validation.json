@@ -1,0 +1,127 @@
+{
+  "texts": {
+    "listing/en-US/title.txt": {
+      "characters": 8,
+      "limit": 30
+    },
+    "listing/en-US/short-description.txt": {
+      "characters": 62,
+      "limit": 80
+    },
+    "listing/en-US/full-description.txt": {
+      "characters": 2332,
+      "limit": 4000
+    },
+    "listing/en-US/release-notes.txt": {
+      "characters": 249,
+      "limit": 500
+    },
+    "listing/ru-RU/title.txt": {
+      "characters": 8,
+      "limit": 30
+    },
+    "listing/ru-RU/short-description.txt": {
+      "characters": 66,
+      "limit": 80
+    },
+    "listing/ru-RU/full-description.txt": {
+      "characters": 2368,
+      "limit": 4000
+    },
+    "listing/ru-RU/release-notes.txt": {
+      "characters": 274,
+      "limit": 500
+    }
+  },
+  "images": {
+    "assets/feature-graphic-en-US.png": {
+      "width": 1024,
+      "height": 500,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 70558,
+      "sha256": "13ee861844cbe66474066a8557a4ed045aa334e635519491f4e866f0721e06eb"
+    },
+    "assets/feature-graphic-ru-RU.png": {
+      "width": 1024,
+      "height": 500,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 70424,
+      "sha256": "cdfe03fa0e282bba964699d561fc88ff8c075c9cd55100311efb027dad925a08"
+    },
+    "assets/icon-512.png": {
+      "width": 512,
+      "height": 512,
+      "bitDepth": 8,
+      "colourType": 6,
+      "bytes": 21258,
+      "sha256": "ccd47a5fe3b716a3803abb7932f3ea94c184549cfd267c05a456b08c5c614e56"
+    },
+    "assets/screenshots/en-US/01-phoneme-editor.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 1451687,
+      "sha256": "10bfa4dc44ccc16e018031a4988eaa616f51201c0d813817ac7878c9cd7c3132"
+    },
+    "assets/screenshots/en-US/02-phoneme-details.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 1028751,
+      "sha256": "89bc9497f923e4dce977c6c4bed0c1e0d06b10081caecb92d50742fb8a75f831"
+    },
+    "assets/screenshots/en-US/03-pitch-and-spectrogram.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 1562196,
+      "sha256": "f8edd1bfa604b08772588aa594c3b6a34079dd783ded6d6eeac5a4c50a6e0293"
+    },
+    "assets/screenshots/en-US/04-light-theme.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 70222,
+      "sha256": "99ccf59665bf8710555a1b552ffcd3eac81c4a6025e586e854882ebd4f6fe80a"
+    },
+    "assets/screenshots/ru-RU/01-phoneme-editor.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 1408529,
+      "sha256": "7824492994175723d7dfe7eaa50d3c4af65a1046891f69b343b2240c55db03b3"
+    },
+    "assets/screenshots/ru-RU/02-phoneme-details.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 70610,
+      "sha256": "55a315d2e4d730c30ee0da315c94cc67e102227ac518bba0083ea48ff0e3010c"
+    },
+    "assets/screenshots/ru-RU/03-pitch-and-spectrogram.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 70610,
+      "sha256": "55a315d2e4d730c30ee0da315c94cc67e102227ac518bba0083ea48ff0e3010c"
+    },
+    "assets/screenshots/ru-RU/04-light-theme.png": {
+      "width": 1920,
+      "height": 1080,
+      "bitDepth": 8,
+      "colourType": 2,
+      "bytes": 71315,
+      "sha256": "df39058365dd92de871db9019c9c67ed16d4924783c8cce311d46fc76083d41d"
+    }
+  },
+  "publicPrivacyPolicyPublished": false
+}

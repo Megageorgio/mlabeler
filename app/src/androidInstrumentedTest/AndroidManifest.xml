@@ -1,0 +1,13 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Test APK only. The target app exercises the real ContentResolver/SAF API against this provider. -->
+        <provider android:name="mlabeler.app.TestDocumentsProvider"
+            android:authorities="pw.msan.mlabeler.saf.tests" android:exported="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS"
+            android:grantUriPermissions="true">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+    </application>
+</manifest>

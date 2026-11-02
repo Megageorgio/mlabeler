@@ -73,18 +73,20 @@ fun StartScreen(app: AppState) {
             Spacer(Modifier.height(28.dp))
             if (app.openingFolder) Text(mlabeler.app.i18n.L("Opening folder…", "Открытие папки…")(), color = c.muted)
             val open = {
-                if (Platform.hasNativeFolderPicker) {
+                if (mlabeler.app.AppInfo.WEB) {
+                    mlabeler.app.openBrowserImport()
+                } else if (Platform.hasNativeFolderPicker) {
                     app.pickFolder(S.openFolder()) { app.openFolder(it) }
                 } else {
                     browsing = true
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Btn(S.openFolder() + "…", primary = true, icon = Icons.folder) { open() }
                 Btn(mlabeler.app.recorder.recordTitle(), icon = Icons.circle) { app.pickFolder(mlabeler.app.recorder.recordTitle()) { app.openRecorder(it) } }
                 Btn(mlabeler.app.recorder.karaokeTitle(), icon = Icons.play) { app.pickFolder(mlabeler.app.recorder.karaokeTitle()) { app.openKaraoke(it) } }
             }
-            Text(S.openFolderHint(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp).widthIn(max = 520.dp))
+            Text(if (mlabeler.app.AppInfo.WEB) webImportHint() else S.openFolderHint(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp).widthIn(max = 520.dp))
             Spacer(Modifier.height(32.dp))
             SectionTitle(S.recent())
             if (app.settings.recent.isEmpty()) {

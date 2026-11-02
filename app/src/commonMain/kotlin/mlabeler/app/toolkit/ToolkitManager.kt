@@ -74,6 +74,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
 
     /** Asks the toolkit whether it answers. A slow answer from an older check never overrides a newer one. */
     suspend fun check(): Boolean {
+        if (!mlabeler.app.AppInfo.TOOLKIT_ENABLED) return false
         val seq = ++checkSeq
         if (status != Status.Starting && status != Status.Installing && status != Status.Ready) status = Status.Checking
         return try {
@@ -311,7 +312,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
         val id = clientId
         clientId = null
         runCatching {
-            kotlinx.coroutines.runBlocking {
+            finishToolkit {
                 kotlinx.coroutines.withTimeoutOrNull(3000) {
                     val left = id?.let { c.detach(it) }
                     val h = runCatching { c.health().jsonObject }.getOrNull()
@@ -337,7 +338,7 @@ class ToolkitManager(private val app: AppState, private val scope: CoroutineScop
             restartedItself = false
             val c = client()
             // the app may be closing: ask briefly
-            runCatching { kotlinx.coroutines.runBlocking { kotlinx.coroutines.withTimeoutOrNull(1500) { c.shutdown() } } }
+            runCatching { finishToolkit { kotlinx.coroutines.withTimeoutOrNull(1500) { c.shutdown() } } }
         }
         LocalToolkit.stop()
         ownProcess = false

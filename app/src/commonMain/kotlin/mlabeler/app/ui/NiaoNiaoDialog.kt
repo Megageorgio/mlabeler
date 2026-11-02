@@ -100,6 +100,7 @@ fun NiaoNiaoDialog(app: AppState, ed: EditorState) {
             }
             Text(autoHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
 
+            if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) {
             SectionTitle(toneTitleT())
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Chip(toneOwnT(), !common) { common = false }
@@ -113,6 +114,7 @@ fun NiaoNiaoDialog(app: AppState, ed: EditorState) {
                 }
             }
             Text(toneHintT(), color = c.muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+            }
 
             SectionTitle(checkTitleT())
             Btn(checkBtnT(), enabled = files.isNotEmpty()) { report = ed.niaoCheck(files) }

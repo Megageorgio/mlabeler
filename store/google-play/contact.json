@@ -1,0 +1,12 @@
+{
+  "appName": "mLabeler",
+  "packageName": "pw.msan.mlabeler",
+  "supportEmail": "m@msan.pw",
+  "website": "https://github.com/Megageorgio/mlabeler",
+  "issueTracker": "https://github.com/Megageorgio/mlabeler/issues",
+  "appType": "App",
+  "suggestedCategory": "Music & Audio",
+  "defaultListingLanguage": "en-US",
+  "additionalPreparedLanguage": "ru-RU",
+  "privacyPolicyPublicUrl": null
+}

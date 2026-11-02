@@ -29,7 +29,7 @@ expect object Platform {
     fun pickFolderNative(title: String, start: String? = null): String?
     val hasNativeFolderPicker: Boolean
     /** Blocking system dialog for one file ([extensions] without dots; empty = any); null when cancelled or not available. */
-    fun pickFileNative(title: String, extensions: List<String> = emptyList(), start: String? = null): String?
+    suspend fun pickFileNative(title: String, extensions: List<String> = emptyList(), start: String? = null): String?
     /** Decodes audio formats other than WAV; null if not supported here. */
     fun decodeAudio(path: String): Audio?
     fun openInFileManager(path: String)
@@ -86,3 +86,6 @@ expect fun formatDateTime(epochMs: Long): String
 
 /** A file that comes with the program (app/builtin/[path]), null when this build has none. */
 expect fun builtinAsset(path: String): ByteArray?
+
+/** Web edition's project importer; native editions use their folder picker. */
+expect fun openBrowserImport()

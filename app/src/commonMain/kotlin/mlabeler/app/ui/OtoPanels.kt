@@ -263,6 +263,7 @@ private val noteTwoT = L("Two in a row", "Две подряд")
 /** An oto entry sung on a note through the toolkit ([playOtoNote]) and how. */
 @Composable
 private fun OtoNoteSection(ed: EditorState) {
+    if (!mlabeler.app.AppInfo.TOOLKIT_ENABLED) return
     val c = T.c
     val app = ed.app
     val n = app.settings.otoNote

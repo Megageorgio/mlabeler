@@ -10,10 +10,11 @@ actual object SelfUpdate {
     private val readyFile get() = File(dir, "ready")
     private fun apk(tag: String) = File(dir, "$tag.apk")
 
-    actual val supported: Boolean = true
-    actual fun canUse(download: String?): Boolean = download?.lowercase()?.endsWith(".apk") == true
+    actual val supported: Boolean = AppInfo.SELF_UPDATES_ENABLED
+    actual fun canUse(download: String?): Boolean = supported && download?.lowercase()?.endsWith(".apk") == true
 
     actual suspend fun prepare(download: String, tag: String, sha256: String?, progress: (Float) -> Unit) {
+        check(supported) { "Updates are delivered by Google Play" }
         discard()
         downloadFile(download, apk(tag), sha256, progress)
         readyFile.writeText(tag)
@@ -26,6 +27,7 @@ actual object SelfUpdate {
     actual val installsOnClose: Boolean = false
 
     actual fun install(restart: Boolean): String? {
+        if (!supported) return "Updates are delivered by Google Play"
         val tag = prepared() ?: return "nothing to install"
         val ctx = AndroidContext.activity ?: AndroidContext.context
         return runCatching {

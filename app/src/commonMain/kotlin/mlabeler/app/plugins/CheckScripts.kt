@@ -1,7 +1,5 @@
 package mlabeler.app.plugins
 
-import com.dokar.quickjs.QuickJs
-import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
@@ -29,7 +27,7 @@ object CheckScripts {
     fun appDir(): String = Paths.join(Platform.dataDir(), "checks")
     fun folderDir(root: String): String = Paths.join(Paths.join(root, ".mlabeler"), "checks")
 
-    fun load(root: String?): List<Script> = listOfNotNull(appDir(), root?.let { folderDir(it) }).flatMap { d ->
+    fun load(root: String?): List<Script> = if (!mlabeler.app.AppInfo.PLUGINS_ENABLED) emptyList() else listOfNotNull(appDir(), root?.let { folderDir(it) }).flatMap { d ->
         runCatching { PlatformFs.list(d) }.getOrDefault(emptyList()).filter { Paths.ext(it).equals("js", true) }.sorted().mapNotNull { p ->
             runCatching { Script(Paths.stem(p), p, PlatformFs.read(p).decodeToString()) }.getOrNull()
         }
@@ -67,7 +65,7 @@ if (file.duration > MAX_LENGTH && labels.length > 0) warn(0, 0, "the recording i
         fun tierIndex(v: String): Int? = v.toIntOrNull()?.let { n -> tiers.getOrNull(n)?.index }
             ?: tiers.firstOrNull { it.value.let { t -> (t as IntervalTier).name == v } }?.index
         val out = ArrayList<Problem>()
-        val js = QuickJs.create(Dispatchers.Default)
+        val js = PluginRuntime()
         try {
             val labels = Plugins.docToJson(doc).toString()
             val file = buildJsonObject { put("name", fileName); put("duration", duration) }.toString()
@@ -79,7 +77,7 @@ if (file.duration > MAX_LENGTH && labels.length > 0) warn(0, 0, "the recording i
                     append("var labels = ").append(labels).append(";\nvar file = ").append(file).append(";\n")
                     append("(function () {\n").append(s.code).append("\n})();\nJSON.stringify(__p);\n")
                 }
-                val res = runCatching { js.evaluate<String>(code, s.name + ".js", false) }
+                val res = runCatching { js.evaluate(code, s.name + ".js") }
                 res.onFailure { e ->
                     val first = tiers.firstOrNull()?.index ?: return@onFailure
                     out += Problem(Problem.Kind.Script, IntervalRef(first, 0), Severity.Error, "${s.name}: ${e.message ?: e}")

@@ -316,6 +316,9 @@ fun HelpDialog(app: AppState) {
             if (words.isNotEmpty() && shown.isEmpty()) Text(helpNothing(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 10.dp))
             Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 for ((ti, n, item) in shown) {
+                    if (!mlabeler.app.AppInfo.TOOLKIT_ENABLED && item.lines.none { "{quick-label}" in it.en } && item.lines.any {
+                        "toolkit" in it.en.lowercase() || "autolabel" in it.en.lowercase() || "{resynth-" in it.en
+                    }) continue
                     if (item.touch != null && item.touch != mobile) continue
                     val key = "$ti/$n"
                     val expanded = key in open || words.isNotEmpty()

@@ -1,0 +1,10 @@
+import {build} from 'esbuild';
+import {cp, mkdir} from 'node:fs/promises';
+const outdir = '../app/build/web-shell';
+await mkdir(outdir, {recursive: true});
+await build({entryPoints: ['bridge.mjs'], outfile: `${outdir}/web-bridge.js`, bundle: true, minify: true, platform: 'browser', format: 'iife', target: ['chrome119', 'firefox120', 'safari18.2'], define: {global: 'globalThis'}});
+for (const f of ['index.html', 'web.css', 'recorder-worklet.js']) await cp(f, `${outdir}/${f}`);
+await mkdir(`${outdir}/inference`, {recursive: true});
+await cp('inference-bootstrap.js', `${outdir}/inference/inference-bootstrap.js`);
+await cp('../art/icon.png', `${outdir}/icon.png`);
+await cp('fonts', `${outdir}/fonts`, {recursive: true});

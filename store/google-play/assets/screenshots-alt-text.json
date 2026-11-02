@@ -1,0 +1,14 @@
+{
+  "en-US": {
+    "01-phoneme-editor.png": "Singing audio around the middle of a recording, with waveform, spectrogram, pitch contour and aligned phoneme labels.",
+    "02-phoneme-details.png": "A selected phoneme with its start, end and duration displayed beside the waveform and spectrogram.",
+    "03-pitch-and-spectrogram.png": "A spectrogram and a separate piano-style pitch lane showing the recorded singing pitch above the phoneme labels.",
+    "04-light-theme.png": "The audio annotation editor in the light theme, displaying the same recording and phoneme boundaries."
+  },
+  "ru-RU": {
+    "01-phoneme-editor.png": "Участок ближе к середине вокальной записи: волновая форма, спектрограмма, контур высоты и фонемная разметка.",
+    "02-phoneme-details.png": "Выбранная фонема, её начало, конец и длительность рядом с волновой формой и спектрограммой.",
+    "03-pitch-and-spectrogram.png": "Спектрограмма и отдельная дорожка высоты с клавиатурой над фонемной разметкой.",
+    "04-light-theme.png": "Редактор разметки в светлой теме с той же записью и границами фонем."
+  }
+}

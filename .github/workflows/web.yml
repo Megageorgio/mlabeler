@@ -1,0 +1,43 @@
+name: Web deployment archive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci --prefix web
+      - run: npm test --prefix web
+      - name: Build static website and ZIP
+        run: ./gradlew :app:webArchive -Pdistribution=web
+      - name: Install browser engines
+        working-directory: web
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Check desktop and phone layouts, editing, storage, audio and local inference
+        run: npm run test:browsers --prefix web
+      - name: Browser test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-test-results
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload deployment archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: mLabeler-web
+          path: app/build/outputs/web/*.zip
+          if-no-files-found: error
+          retention-days: 30

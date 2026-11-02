@@ -6,9 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -55,7 +53,13 @@ object AndroidContext {
 
     fun init(c: Context) {
         context = c
+        if (AppInfo.PLAY_STORE) {
+            documents = DocumentFileSystem(c)
+            mlabeler.core.io.JvmFileSystems.documents = documents
+        }
     }
+
+    internal var documents: DocumentFileSystem? = null
 
     /** The running activity (for orientation and full screen). */
     var activity: android.app.Activity? = null
@@ -77,6 +81,7 @@ actual object Platform {
     actual fun homeDir(): String = Environment.getExternalStorageDirectory().path
 
     actual fun places(): List<Pair<String, String>> {
+        if (AppInfo.PLAY_STORE) return AndroidContext.documents?.places().orEmpty()
         val root = Environment.getExternalStorageDirectory()
         val list = mutableListOf("Internal" to root.path)
         for (n in listOf(Environment.DIRECTORY_DOWNLOADS, Environment.DIRECTORY_MUSIC, Environment.DIRECTORY_DOCUMENTS)) {
@@ -91,9 +96,28 @@ actual object Platform {
         return list
     }
 
-    actual val hasNativeFolderPicker: Boolean = false
-    actual fun pickFolderNative(title: String, start: String?): String? = null
-    actual fun pickFileNative(title: String, extensions: List<String>, start: String?): String? = null
+    actual val hasNativeFolderPicker: Boolean = AppInfo.PLAY_STORE
+    actual fun pickFolderNative(title: String, start: String?): String? {
+        if (!AppInfo.PLAY_STORE) return null
+        val documents = checkNotNull(AndroidContext.documents)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+            documents.initialUri(start)?.let { putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, it) }
+        }
+        return DocumentPicker.pick(intent)?.let { documents.accept(it, directory = true) }
+    }
+    actual suspend fun pickFileNative(title: String, extensions: List<String>, start: String?): String? {
+        if (!AppInfo.PLAY_STORE) return null
+        val documents = checkNotNull(AndroidContext.documents)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            documents.initialUri(start)?.let { putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, it) }
+        }
+        return DocumentPicker.pick(intent)?.let { documents.accept(it, directory = false) }
+    }
 
     actual fun decodeAudio(path: String): Audio? = MediaDecoder.decode(path)
 
@@ -137,75 +161,13 @@ actual fun ImageBitmap.readyToDraw(): ImageBitmap = apply { prepareToDraw() }
 actual val resizeHorizontalIcon: PointerIcon = PointerIcon.Hand
 
 actual class AudioOut actual constructor() {
-    @Volatile private var track: AudioTrack? = null
-    @Volatile private var thread: Thread? = null
-    @Volatile private var stopFlag = false
-    @Volatile private var start = 0
-    @Volatile private var length = 0
-    @Volatile private var loopMode = false
-    /** Guards the track: the player thread releases it while the interface may still be asking for the position. */
-    private val lock = Any()
-
-    actual fun play(audio: Audio, from: Int, to: Int, loop: Boolean) {
-        stop()
-        val minBuf = AudioTrack.getMinBufferSize(audio.sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        val t = AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-            .setAudioFormat(AudioFormat.Builder().setSampleRate(audio.sampleRate).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-            .setBufferSizeInBytes(maxOf(minBuf, 4096))
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
-        track = t
-        start = from
-        length = to - from
-        loopMode = loop
-        stopFlag = false
-        t.play()
-        thread = Thread {
-            val buf = ShortArray(2048)
-            var written = 0L
-            try {
-                do {
-                    var pos = from
-                    while (pos < to && !stopFlag) {
-                        val n = minOf(to - pos, buf.size)
-                        for (i in 0 until n) buf[i] = (audio.samples[pos + i].coerceIn(-1f, 1f) * 32767).toInt().toShort()
-                        t.write(buf, 0, n)
-                        written += n
-                        pos += n
-                    }
-                } while (loop && !stopFlag)
-                // wait until the written audio has been played
-                while (!stopFlag && (runCatching { t.playbackHeadPosition.toLong() and 0xFFFFFFFFL }.getOrNull() ?: written) < written) Thread.sleep(10)
-            } catch (_: Exception) {
-            } finally {
-                synchronized(lock) {
-                    if (track === t) track = null
-                    runCatching { t.stop(); t.release() }
-                }
-            }
-        }.apply { isDaemon = true; start() }
+    private val player = AndroidAudioPlayer(::AndroidPlaybackTrack) { error ->
+        android.util.Log.w("mLabeler", "Audio playback failed", error)
     }
-
-    actual fun stop() {
-        stopFlag = true
-        synchronized(lock) { track?.let { runCatching { it.pause(); it.flush() } } }
-        thread?.join(300)
-        thread = null
-        synchronized(lock) { track = null }
-    }
-
-    actual val isPlaying: Boolean get() = track != null
-
-    actual fun position(): Int = synchronized(lock) {
-        val t = track ?: return -1
-        if (length <= 0) return -1
-        // a track released a moment ago answers with an error: it is simply no longer playing
-        val played = runCatching { t.playbackHeadPosition.toLong() and 0xFFFFFFFFL }.getOrNull() ?: return -1
-        val p = if (loopMode) (played % length).toInt() else minOf(played, length.toLong()).toInt()
-        return start + p
-    }
-
+    actual fun play(audio: Audio, from: Int, to: Int, loop: Boolean) = player.play(audio, from, to, loop)
+    actual fun stop() = player.stop()
+    actual val isPlaying: Boolean get() = player.isPlaying
+    actual fun position(): Int = player.position()
     actual fun release() = stop()
 }
 
@@ -217,6 +179,7 @@ private fun hasAccess(context: Context): Boolean = if (Build.VERSION.SDK_INT >= 
 
 @Composable
 actual fun StorageAccess(content: @Composable () -> Unit) {
+    if (AppInfo.PLAY_STORE) return content()
     val context = AndroidContext.context
     var granted by remember { mutableStateOf(hasAccess(context)) }
     val owner = LocalLifecycleOwner.current
@@ -251,7 +214,9 @@ private object MediaDecoder {
     fun decode(path: String): Audio? {
         val ex = MediaExtractor()
         try {
-            ex.setDataSource(path)
+            if (mlabeler.core.io.JvmFileSystems.isDocumentPath(path)) {
+                ex.setDataSource(AndroidContext.context, checkNotNull(AndroidContext.documents).uri(path), null)
+            } else ex.setDataSource(path)
             val track = (0 until ex.trackCount).firstOrNull { ex.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true } ?: return null
             ex.selectTrack(track)
             val format = ex.getTrackFormat(track)

@@ -370,8 +370,9 @@ private val collapseAllT = L("Collapse all", "Свернуть все")
 @Composable
 fun SettingsDialog(app: AppState) {
     val c = T.c
+    val sections = Section.entries.filter { it != Section.Toolkit || mlabeler.app.AppInfo.TOOLKIT_ENABLED }
     var section by remember {
-        mutableStateOf(Section.entries.firstOrNull { it.name.equals(app.settingsPage, ignoreCase = true) } ?: Section.General)
+        mutableStateOf(sections.firstOrNull { it.name.equals(app.settingsPage, ignoreCase = true) } ?: Section.General)
     }
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { app.settingsPage = "" } }
     var query by remember { mutableStateOf("") }
@@ -403,7 +404,8 @@ fun SettingsDialog(app: AppState) {
                 Column(Modifier.fillMaxWidth().heightIn(max = minOf(800.dp, maxHeight)).scrollWithHint().padding(horizontal = 20.dp, vertical = 10.dp)) {
                     if (found.isEmpty()) Text(S.nothingFound(), color = c.muted, fontSize = 13.sp)
                     for (e in found) {
-                        val sec = Section.entries.firstOrNull { it.name == e.section } ?: continue
+                        val sec = sections.firstOrNull { it.name == e.section } ?: continue
+                        if (!mlabeler.app.AppInfo.SELF_UPDATES_ENABLED && e.title.en in setOf(UpdateTitles.checkOnStart.en, UpdateTitles.autoInstall.en)) continue
                         Column(Modifier.fillMaxWidth().clickable { section = sec; focusTitle = e.title(); query = "" }.padding(vertical = 6.dp)) {
                             Text(sectionTitle(sec) + " · " + e.title(), color = c.text, fontSize = 13.sp)
                             Text(e.hint(), color = c.muted, fontSize = 12.sp)
@@ -416,14 +418,14 @@ fun SettingsDialog(app: AppState) {
                     Row(
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) { for (s in Section.entries) Chip(sectionTitle(s), s == section) { section = s; focusTitle = null } }
+                    ) { for (s in sections) Chip(sectionTitle(s), s == section) { section = s; focusTitle = null } }
                     Divider()
                     SettingsPage(app, section, Modifier.fillMaxWidth().weight(1f, fill = false), foldsOpen, setAll)
                 }
             } else {
                 Row(Modifier.fillMaxWidth().height(minOf(800.dp, maxHeight))) {
                     Column(Modifier.width(190.dp).fillMaxHeight().background(c.panelAlt).scrollWithHint().padding(vertical = 8.dp)) {
-                        for (s in Section.entries) {
+                        for (s in sections) {
                             val sel = s == section
                             Text(
                                 sectionTitle(s),
@@ -478,7 +480,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier, fo
                 }
                 Fold(S.files()) {
                     SwitchRow(S.saveOnSwitch(), s.edit.saveOnSwitch) { v -> app.update { it.copy(edit = it.edit.copy(saveOnSwitch = v)) } }
-                    SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
+                    if (!mlabeler.app.AppInfo.WEB) SwitchRow(S.otherAudio(), s.otherAudio) { v -> app.update { it.copy(otherAudio = v) } }
                     ValueSlider(S.autosave(), s.edit.autosaveSeconds.toFloat(), 0f..300f, S.secondsShort(), default = dE.autosaveSeconds.toFloat()) { v -> app.update { it.copy(edit = it.edit.copy(autosaveSeconds = (v / 10).roundToInt() * 10)) } }
                 }
                 Fold(niaoTitleT()) { NiaoSection(app) }
@@ -614,7 +616,7 @@ private fun SettingsPage(app: AppState, section: Section, modifier: Modifier, fo
                         Field(edge, { v -> edge = v; app.update { it.copy(checks = it.checks.copy(edgePause = v.trim())) } }, Modifier.width(160.dp))
                     }
                 }
-                Fold(CheckTitles.scripts()) {
+                if (mlabeler.app.AppInfo.PLUGINS_ENABLED) Fold(CheckTitles.scripts()) {
                     Text(CheckTitles.scriptsHint.format(mlabeler.app.plugins.CheckScripts.appDir(), ".mlabeler/checks"), color = c.muted, fontSize = 12.sp)
                     SwitchRow(CheckTitles.runScripts(), s.checks.scripts) { v -> app.update { it.copy(checks = it.checks.copy(scripts = v)) }; app.editor?.reloadCheckScripts() }
                     val ed = app.editor
@@ -1189,6 +1191,10 @@ private fun AboutPage(app: AppState) {
     Fold(S.about()) {
         Text("mLabeler ${mlabeler.app.AppInfo.VERSION}", color = c.text, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
         Text(S.aboutText(), color = c.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+        if (mlabeler.app.AppInfo.PLAY_STORE) {
+            Text(L("Google Play edition · local processing", "Версия Google Play · локальная обработка")(), color = c.muted, fontSize = 12.sp)
+            link(L("Privacy policy", "Политика конфиденциальности")(), "https://msan.pw/mlabeler/privacy/index.html")
+        }
         mlabeler.app.Platform.portableDir?.let { PortableNote(it) }
         if (mlabeler.app.Platform.legacyWindows) LegacyNote()
     }

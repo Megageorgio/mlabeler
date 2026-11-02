@@ -41,6 +41,10 @@ For **iOS** there is an unsigned `.ipa`. Install it with [AltStore](https://alts
 
 Android asks for access to all files, because label files are written next to the recordings in the opened folders.
 
+A separate offline Google Play edition is built manually with the **Android Play bundle** Actions workflow.
+It uses the system folder picker, keeps local editing and built-in auto-oto, and omits toolkit connections and
+GitHub APK updates. Its AAB is saved as an Actions artifact and is not added to releases. See [Google Play builds](docs/GOOGLE_PLAY.md).
+
 The application identifier is now `pw.msan.mlabeler` on Android, macOS and iOS. On Android this is a separate app
 from the previous `io.github.megageorgio.mlabeler`; settings and permissions do not migrate automatically.
 Recordings and labels in shared folders remain available after granting the new installation file access.
@@ -104,7 +108,7 @@ Recordings and labels in shared folders remain available after granting the new 
 **Interface**
 - Work environments (ready sets of panels, lanes and buttons), themes with full colour editing,
   rebindable keys and mouse buttons, a command list (Ctrl+K), searchable settings and help (F1).
-- Plugins in JavaScript that run on every platform: labels, notes, marks, oto entries, the pitch and the text
+- JavaScript plugins for the desktop and mobile apps: labels, notes, marks, oto entries, the pitch and the text
   files of the folder.
 - An optional sound when long work such as autolabelling ends.
 - Languages: English, Russian, Japanese, Chinese (Simplified), Korean, French, German, Spanish, Portuguese.
@@ -121,6 +125,10 @@ For development: JDK 17 or newer.
 ./gradlew :app:assembleDebug           # Android APK (needs the Android SDK)
 ./gradlew :core:jvmTest :app:desktopTest
 ```
+
+The browser edition has a separate manual **Web deployment archive** workflow. It builds a static
+website ZIP with the adaptive editor and local MCFL inference; see [web deployment](docs/WEB.md)
+for building, hosting and browser limitations.
 
 ## Desktop alternatives and shared features
 

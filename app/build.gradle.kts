@@ -10,6 +10,13 @@ plugins {
 }
 
 val appVersion = project.property("app.version") as String
+// Only the dedicated Play workflow sets this; normal release artifacts retain their existing behaviour.
+val playBuild = providers.gradleProperty("distribution").orNull == "play"
+val webBuild = providers.gradleProperty("distribution").orNull == "web"
+val playVersionCode = providers.gradleProperty("play.versionCode").orNull?.toIntOrNull()
+if (playBuild) require(playVersionCode != null && playVersionCode > versionCodeOf(appVersion) && playVersionCode <= 2_100_000_000) {
+    "A Play build needs -Pplay.versionCode=<unused code greater than ${versionCodeOf(appVersion)}>"
+}
 
 /** Android version code: 0.2.1-beta3 → 200143; a stable release ends in 99, after its alphas (01–39) and betas (40–98). */
 fun versionCodeOf(v: String): Int {
@@ -25,15 +32,22 @@ val generateAppInfo by tasks.registering {
     val out = appInfoDir
     val v = appVersion
     inputs.property("version", v)
+    inputs.property("playBuild", playBuild)
+    inputs.property("webBuild", webBuild)
     outputs.dir(out)
     doLast {
         val f = out.get().file("mlabeler/app/AppInfo.kt").asFile
         f.parentFile.mkdirs()
-        f.writeText("package mlabeler.app\n\nobject AppInfo {\n    const val VERSION = \"$v\"\n}\n")
+        f.writeText("package mlabeler.app\n\nobject AppInfo {\n    const val VERSION = \"$v\"\n    const val PLAY_STORE = $playBuild\n    const val WEB = $webBuild\n    const val PLUGINS_ENABLED = !$webBuild\n    const val TOOLKIT_ENABLED = ${!playBuild && !webBuild}\n    const val SELF_UPDATES_ENABLED = ${!playBuild && !webBuild}\n}\n")
     }
 }
 
 kotlin {
+    wasmJs {
+        outputModuleName.set("mlabeler")
+        browser { commonWebpackConfig { outputFileName = "mlabeler.js" } }
+        binaries.executable()
+    }
     jvm("desktop") { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
     androidTarget { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }
     listOf(iosX64(), iosArm64(), iosSimulatorArm64()).forEach {
@@ -45,9 +59,15 @@ kotlin {
 
     applyDefaultHierarchyTemplate {
         common {
+            group("nativeScript") {
+                withJvm()
+                withAndroidTarget()
+                group("ios")
+            }
             group("skiko") {
                 withJvm()
                 group("ios")
+                withWasmJs()
             }
             group("jvmShared") {
                 withJvm()
@@ -74,9 +94,12 @@ kotlin {
             implementation(compose.ui)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
-            implementation(libs.quickjs)
         }
         commonTest.dependencies { implementation(kotlin("test")) }
+        val nativeScriptMain by getting { dependencies { implementation(libs.quickjs) } }
+        val wasmJsMain by getting {
+            dependencies { implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3") }
+        }
         val desktopMain by getting {
             // files that come with the program (the quick labelling model), also Android assets
             resources.srcDir("builtin")
@@ -104,6 +127,14 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.kotlinx.coroutines.android)
         }
+        val androidUnitTest by getting { dependencies { implementation(kotlin("test-junit")) } }
+        val androidInstrumentedTest by getting {
+            dependencies {
+                implementation(kotlin("test-junit"))
+                implementation("androidx.test:runner:1.6.2")
+                implementation("androidx.test.ext:junit:1.2.1")
+            }
+        }
     }
 }
 
@@ -114,8 +145,9 @@ android {
         applicationId = "pw.msan.mlabeler"
         minSdk = 26
         targetSdk = 36
-        versionCode = versionCodeOf(appVersion)
+        versionCode = if (playBuild) playVersionCode!! else versionCodeOf(appVersion)
         versionName = appVersion
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -127,7 +159,7 @@ android {
     if (keystore != null) signingConfigs.create("release") {
         storeFile = keystore
         storePassword = System.getenv("MLABELER_KEYSTORE_PASSWORD")
-        keyAlias = System.getenv("MLABELER_KEY_ALIAS") ?: "mlabeler"
+        keyAlias = System.getenv("MLABELER_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "mlabeler"
         keyPassword = System.getenv("MLABELER_KEY_PASSWORD") ?: System.getenv("MLABELER_KEYSTORE_PASSWORD")
     }
     buildTypes {
@@ -139,7 +171,21 @@ android {
         }
     }
     sourceSets["main"].assets.srcDir("builtin")
+    sourceSets["androidTest"].java.srcDir("src/androidInstrumentedTest/java")
+    if (playBuild) sourceSets["main"].manifest.srcFile("src/androidPlay/AndroidManifest.xml")
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+}
+
+if (playBuild) {
+    val validatePlayUploadKey = tasks.register("validatePlayUploadKey") {
+        doLast {
+            require(System.getenv("MLABELER_KEYSTORE")?.let { file(it).isFile } == true &&
+                !System.getenv("MLABELER_KEYSTORE_PASSWORD").isNullOrBlank()) {
+                "Play release bundles require the real upload key; debug-key fallback is not allowed"
+            }
+        }
+    }
+    tasks.matching { it.name == "validateSigningRelease" }.configureEach { dependsOn(validatePlayUploadKey) }
 }
 
 compose.desktop {
@@ -175,6 +221,35 @@ compose.desktop {
 // State tests must never read or replace the real user's preferences.
 tasks.withType<Test>().configureEach {
     environment("MLABELER_HOME", layout.buildDirectory.dir("test-home").get().asFile.absolutePath)
+}
+
+// Static deployment only. No release publication, server, account or upload key is needed.
+val webShell by tasks.registering(Exec::class) {
+    workingDir(rootProject.file("web"))
+    commandLine(if (System.getProperty("os.name").startsWith("Windows")) "npm.cmd" else "npm", "run", "build")
+    inputs.files(rootProject.fileTree("web") { exclude("node_modules/**", "test-results/**", "playwright-report/**") })
+    outputs.dir(layout.buildDirectory.dir("web-shell"))
+}
+val webDeployment by tasks.registering(Sync::class) {
+    dependsOn("wasmJsBrowserDistribution", ":web-worker:wasmJsBrowserDistribution", webShell)
+    doFirst { require(webBuild) { "Use -Pdistribution=web to build the web edition" } }
+    into(layout.buildDirectory.dir("web-deploy"))
+    from(layout.buildDirectory.dir("dist/wasmJs/productionExecutable")) { exclude("**/*.map") }
+    from(project(":web-worker").layout.buildDirectory.dir("dist/wasmJs/productionExecutable")) {
+        into("inference"); exclude("**/*.map")
+    }
+    from(layout.buildDirectory.dir("web-shell"))
+    from("builtin") { into(".") }
+    from(rootProject.file("LICENSE"))
+    from(rootProject.file("docs/WEB.md")) { rename { "DEPLOYMENT.md" } }
+}
+tasks.register<Zip>("webArchive") {
+    dependsOn(webDeployment)
+    from(webDeployment)
+    destinationDirectory.set(layout.buildDirectory.dir("outputs/web"))
+    archiveFileName.set("mLabeler-$appVersion-web.zip")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
 }
 
 // Jars for a portable Windows build (JRE + launcher are added by tools/windows-portable.sh).

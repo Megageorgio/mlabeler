@@ -1,0 +1,6 @@
+First internal testing release on Google Play.
+- Audio annotation with waveform, spectrogram and phoneme editing.
+- Built-in automatic labelling.
+- oto.ini editing and automatic oto generation.
+- Recording from a reclist.
+- Interface in 9 languages.

@@ -1,5 +1,7 @@
 package mlabeler.app.recorder
 
+import kotlinx.coroutines.launch
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -204,6 +206,7 @@ private fun PitchLane(k: KaraokeState) {
 @Composable
 fun KaraokeScreen(app: AppState, k: KaraokeState) {
     val c = T.c
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val focus = remember { FocusRequester() }
     var editing by remember { mutableStateOf(false) }
     var pasting by remember { mutableStateOf(false) }
@@ -211,8 +214,18 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
     var options by remember { mutableStateOf(false) }
     LaunchedEffect(k) { kotlinx.coroutines.delay(150); runCatching { focus.requestFocus() } }
     fun addSong() {
-        val picked = if (Platform.hasNativeFolderPicker) Platform.pickFileNative(addSongT(), listOf("wav", "mp3", "flac", "ogg", "m4a", "opus", "aiff")) else null
-        if (picked != null) k.addSong(picked) else if (!Platform.hasNativeFolderPicker) adding = true
+        if (!Platform.hasNativeFolderPicker) { adding = true; return }
+        scope.launch {
+            try {
+                val picked = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    Platform.pickFileNative(addSongT(), listOf("wav", "mp3", "flac", "ogg", "m4a", "opus", "aiff"))
+                }
+                if (picked != null) k.addSong(picked)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                app.message(e.message ?: e.toString(), error = true)
+            }
+        }
     }
     Box(
         Modifier.fillMaxSize().background(c.bg).windowInsetsPadding(mlabeler.app.ui.screenInsets())
@@ -238,7 +251,7 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                     Text(k.song ?: "", color = c.muted, fontSize = 11.sp, maxLines = 1)
                 }
                 if (k.dirty) { Btn(S.save()) { k.save() }; Spacer(Modifier.width(6.dp)) }
-                IconBtn(Icons.settings, optionsT()) { options = true }
+                if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) IconBtn(Icons.settings, optionsT()) { options = true }
                 Btn(addSongT(), icon = Icons.plus) { addSong() }
             }
             Divider()
@@ -267,12 +280,14 @@ fun KaraokeScreen(app: AppState, k: KaraokeState) {
                     for ((v, t) in listOf(0f to "0", 0.15f to "15%", 0.35f to "35%", 1f to "100%")) Chip(t, kotlin.math.abs(k.guideLevel - v) < 0.01f) {
                         k.guideLevel = v; if (k.playing && !k.recording) k.play()
                     }
-                } else Text(separateHint(), color = c.muted, fontSize = 12.sp, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
+                } else if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) Text(separateHint(), color = c.muted, fontSize = 12.sp, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
                 Spacer(Modifier.weight(1f))
+                if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) {
                 Btn(separateT(), enabled = k.busy == null && k.audio != null && !k.recording) { k.separate() }
                 Text(languageT(), color = c.muted, fontSize = 12.sp)
                 Field(k.language, { k.updateLanguage(it) }, Modifier.width(56.dp), placeholder = "ru")
                 Btn(recogniseT(), enabled = k.busy == null && k.audio != null && !k.recording) { k.recognise() }
+                }
             }
             // key, tempo and what to do with a take
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 2.dp),
@@ -397,9 +412,10 @@ private fun Lyrics(k: KaraokeState, modifier: Modifier) {
     if (k.lines.isEmpty()) {
         Box(modifier.padding(24.dp), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(noLines(), color = c.text, fontSize = 14.sp, textAlign = TextAlign.Center)
+                Text(if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) noLines() else L("No lyrics yet. Paste the text or add lines while listening.",
+                    "Текста пока нет. Вставьте его или добавляйте строки при прослушивании.")(), color = c.text, fontSize = 14.sp, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(10.dp))
-                Text(recogniseT() + ": " + recogniseHint(), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
+                if (mlabeler.app.AppInfo.TOOLKIT_ENABLED) Text(recogniseT() + ": " + recogniseHint(), color = c.muted, fontSize = 12.sp, textAlign = TextAlign.Center)
             }
         }
         return

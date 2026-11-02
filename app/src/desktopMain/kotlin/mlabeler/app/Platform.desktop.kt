@@ -52,7 +52,7 @@ actual object Platform {
 
     actual val hasNativeFolderPicker: Boolean = true
 
-    actual fun pickFileNative(title: String, extensions: List<String>, start: String?): String? {
+    actual suspend fun pickFileNative(title: String, extensions: List<String>, start: String?): String? {
         if (!isMac) runCatching { return NativeFolderDialog.pickFile(extensions, start) }
             .onFailure { System.err.println("native file dialog: $it") }
         return AwtFilePicker.pick(title, start, directories = false, extensions = extensions)

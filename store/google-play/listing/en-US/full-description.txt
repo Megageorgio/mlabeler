@@ -1,0 +1,27 @@
+mLabeler is an audio annotation and voicebank editing tool for singers, voicebank creators and singing voice datasets. Open a folder of recordings, work with labels beside the audio, and keep control of your files.
+
+See and edit your recordings
+Explore the waveform, spectrogram, pitch and loudness. Edit phoneme and word boundaries, split or merge intervals, rename labels and work across multiple files. Use checks, filters and completion marks to keep track of a dataset.
+
+Automatic labelling on your device
+Use the built-in quick labelling model to recognise phonemes without a separate toolkit. Refine existing phoneme boundaries locally, then review and correct the result by hand.
+
+Prepare voicebanks
+Edit UTAU oto.ini files and generate automatic oto with a review step before changes are applied. Choose individual additions, replacements and removals, inspect alias conflicts, and undo the result. Work with CV, VCV and CVVC recordings, including VV transitions in CVVC, and save your own generation profiles. Japanese aliases can use kana, romaji or both.
+
+Record and organise
+Record samples from a reclist with a level meter, click track and guide. Edit notes and pitch, make basic audio edits, and compare labels or oto settings. Work with formats including LAB, TextGrid, Audacity labels, DiffSinger data and oto.ini.
+
+Offline Google Play edition
+Editing, recording, built-in quick labelling and automatic oto run on your device. This edition does not connect to mVocalToolkit or provide its server-based alignment, transcription or voice synthesis features. App updates are delivered through Google Play.
+
+Make the workspace yours
+Choose themes, arrange panels and adjust the interface scale for your device. The interface is available in English, Russian, Japanese, Simplified Chinese, Korean, French, German, Spanish and Brazilian Portuguese.
+
+Files and permissions
+mLabeler works with recordings and companion label files in folders you select through Android's system folder picker. It does not request access to all files on your device. Microphone access is used when you record. Your projects stay in the folders you choose; there is no mandatory account or developer-operated cloud storage.
+
+Requires Android 8.0 or newer.
+
+Support: m@msan.pw
+Project and documentation: https://github.com/Megageorgio/mlabeler

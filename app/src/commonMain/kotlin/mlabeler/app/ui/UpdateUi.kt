@@ -62,6 +62,7 @@ private fun label(r: Release) = r.version.let { v ->
 /** Settings → About: the channel, checking at start, a manual check and what is available. */
 @Composable
 fun UpdateSection(app: AppState, switchRow: @Composable (String, Boolean, (Boolean) -> Unit) -> Unit) {
+    if (!mlabeler.app.AppInfo.SELF_UPDATES_ENABLED) return
     val c = T.c
     val u = app.updater
     val s = app.settings.updates
@@ -120,6 +121,7 @@ private fun UpdateProgress(p: Float, what: String) {
 /** Asked at start when a newer version was found (already downloaded where the program installs it itself). */
 @Composable
 fun UpdateOfferDialog(app: AppState) {
+    if (!mlabeler.app.AppInfo.SELF_UPDATES_ENABLED) return
     val r = app.updater.offer ?: return
     val u = app.updater
     val c = T.c

@@ -292,7 +292,8 @@ class KaraokeState(
                 .onFailure { busy = null; app.message(it.message ?: it.toString(), error = true); return@launch }
             // lyrics lying next to it come along
             val lrc = Paths.join(Paths.parent(p), stem(name) + ".lrc")
-            if (fs.exists(lrc) && !fs.exists(lrcPath(name))) runCatching { fs.copy(lrc, lrcPath(name)) }
+            // A single-document grant does not include adjacent lyrics; importing the song still succeeds.
+            runCatching { if (fs.exists(lrc) && !fs.exists(lrcPath(name))) fs.copy(lrc, lrcPath(name)) }
             busy = null
             reloadSongs()
             open(name)

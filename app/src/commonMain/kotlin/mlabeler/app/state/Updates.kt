@@ -87,6 +87,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
     fun canInstall(r: Release): Boolean = mlabeler.app.SelfUpdate.canUse(r.download)
 
     fun checkAtStart() {
+        if (!AppInfo.SELF_UPDATES_ENABLED) return
         // a version downloaded earlier: ready at once, or left over from before the update and removed
         runCatching {
             mlabeler.app.SelfUpdate.prepared()?.let { tag ->
@@ -110,6 +111,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
     fun download(r: Release) { if (progress == null) scope.launch { prepare(r) } }
 
     private suspend fun prepare(r: Release) {
+        if (!AppInfo.SELF_UPDATES_ENABLED) return
         val url = r.download ?: return
         if (progress != null) return
         progress = 0f
@@ -130,6 +132,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
      * Android the system installer opens.
      */
     fun installNow() {
+        if (!AppInfo.SELF_UPDATES_ENABLED) return
         val err = mlabeler.app.SelfUpdate.install(restart = true)
         if (err != null) { installError = err; return }
         if (mlabeler.app.SelfUpdate.installsOnClose) app.requestQuit()
@@ -146,6 +149,7 @@ class Updater(private val app: AppState, private val scope: CoroutineScope) {
     fun checkNow() { scope.launch { check() } }
 
     private suspend fun check(): Release? {
+        if (!AppInfo.SELF_UPDATES_ENABLED) return null
         if (checking) return available
         checking = true
         try {

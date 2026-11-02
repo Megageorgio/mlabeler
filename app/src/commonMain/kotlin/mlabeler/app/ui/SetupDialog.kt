@@ -85,7 +85,7 @@ fun SetupDialog(app: AppState) {
             SetupItem(SetupTitles.size(), SetupTitles.sizeHint()) {
                 for (v in listOf(0.8f, 0.9f, 1f, 1.15f, 1.3f, 1.5f)) Chip("${(v * 100).toInt()}%", kotlin.math.abs(s.scale - v) < 0.01f) { app.update { it.copy(scale = v) } }
             }
-            SetupItem(SetupTitles.updates(), SetupTitles.updatesHint()) {
+            if (mlabeler.app.AppInfo.SELF_UPDATES_ENABLED) SetupItem(SetupTitles.updates(), SetupTitles.updatesHint()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Toggle(s.updates.checkOnStart, { v -> app.update { it.copy(updates = it.updates.copy(checkOnStart = v)) } })
                     Text(UpdateTitles.checkOnStart(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp, end = 12.dp))
@@ -110,7 +110,7 @@ fun SetupDialog(app: AppState) {
                 }
             }
             Platform.portableDir?.let { PortableNote(it) }
-            if (!Platform.isMobile) SetupItem(SetupTitles.toolkit(), SetupTitles.toolkitHint()) {
+            if (!Platform.isMobile && mlabeler.app.AppInfo.TOOLKIT_ENABLED) SetupItem(SetupTitles.toolkit(), SetupTitles.toolkitHint()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Toggle(s.toolkit.autoStart, { v -> app.update { it.copy(toolkit = it.toolkit.copy(autoStart = v)) } })
                     Text(S.toolkitAutoStart(), color = c.text, fontSize = 13.sp, modifier = Modifier.padding(start = 8.dp))

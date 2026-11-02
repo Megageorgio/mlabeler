@@ -7,6 +7,7 @@ import java.net.URL
 
 actual suspend fun httpRequest(method: String, url: String, headers: Map<String, String>, body: ByteArray?, timeoutMs: Int): HttpResponse =
     withContext(Dispatchers.IO) {
+        check(!mlabeler.app.AppInfo.PLAY_STORE) { "Network processing is unavailable in this build" }
         val c = URL(url).openConnection() as HttpURLConnection
         c.requestMethod = method
         c.connectTimeout = 5000

@@ -61,13 +61,26 @@ class MItem(
     val keys: String = "",
     val checked: Boolean? = null,
     val enabled: Boolean = true,
+    val available: Boolean = true,
     val action: () -> Unit,
 ) : MenuEntry
 data object MSep : MenuEntry
 class MSub(val title: String, val entries: List<MenuEntry>) : MenuEntry
 
 private fun item(cmd: Command, ed: EditorState, app: AppState, checked: Boolean? = null, title: String = cmd.title()) =
-    MItem(title, cmd.keyLabel, checked, cmd.enabled(ed)) { cmd.run(ed, app) }
+    MItem(title, cmd.keyLabel, checked, cmd.enabled(ed), available = cmd.available) { cmd.run(ed, app) }
+
+internal fun availableMenuEntries(entries: List<MenuEntry>): List<MenuEntry> = buildList {
+    for (entry in entries) {
+        val visible = when (entry) {
+            is MItem -> entry.takeIf { it.available }
+            is MSub -> availableMenuEntries(entry.entries).takeIf { it.isNotEmpty() }?.let { MSub(entry.title, it) }
+            MSep -> entry.takeIf { isNotEmpty() && last() != MSep }
+        }
+        if (visible != null) add(visible)
+    }
+    if (lastOrNull() == MSep) removeAt(lastIndex)
+}
 
 object MenuTitles {
     val file = L("File", "Файл")
@@ -128,7 +141,8 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
     // long lists are grouped into submenus: the top level keeps what is used all the time
     val file = buildList {
         add(MItem(MenuTitles.openFolder(), Commands.openFolder.keyLabel) {
-            app.pickFolder(S.openFolder()) { app.leaveFolderThen { app.openFolder(it) } }
+            if (mlabeler.app.AppInfo.WEB) mlabeler.app.openBrowserImport()
+            else app.pickFolder(S.openFolder()) { app.leaveFolderThen { app.openFolder(it) } }
         })
         val recent = s.recent.filter { it != ed.workspace.root }.take(12)
         if (recent.isNotEmpty()) add(MSub(MenuTitles.recent(), recent.map { p ->
@@ -323,7 +337,7 @@ fun menus(app: AppState, ed: EditorState): List<Pair<String, List<MenuEntry>>> {
         MenuTitles.go() to go,
         MenuTitles.tools() to tools,
         MenuTitles.help() to help,
-    )
+    ).map { (title, entries) -> title to availableMenuEntries(entries) }
 }
 
 /** Items of a dropdown, with check marks, key hints and submenus (opened by hover or click). */

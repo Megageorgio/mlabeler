@@ -1,0 +1,95 @@
+name: Android Play bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'Unused Google Play versionCode (greater than all previously uploaded codes)'
+        required: true
+        default: '100301'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  play-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PLAY_VERSION_CODE: ${{ inputs.version_code }}
+      KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      MLABELER_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      MLABELER_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Validate inputs and prepare upload key
+        shell: bash
+        run: |
+          if [[ ! "$PLAY_VERSION_CODE" =~ ^[0-9]+$ ]]; then
+            echo '::error::version_code must be a positive integer'
+            exit 1
+          fi
+          if [[ -z "$KEYSTORE_B64" || -z "$MLABELER_KEYSTORE_PASSWORD" ]]; then
+            echo '::error::Configure ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD repository secrets'
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/play-upload.jks"
+          echo "MLABELER_KEYSTORE=$RUNNER_TEMP/play-upload.jks" >> "$GITHUB_ENV"
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Test local editing and distribution restrictions
+        run: >-
+          ./gradlew :core:jvmTest :app:desktopTest
+          --tests mlabeler.app.PlayDistributionTest
+          --tests mlabeler.app.SaveFailureTest
+          --tests mlabeler.app.state.PendingSavesTest
+          -Pdistribution=play -Pplay.versionCode="$PLAY_VERSION_CODE"
+      - name: Build offline Play AAB
+        run: ./gradlew :app:bundleRelease -Pdistribution=play -Pplay.versionCode="$PLAY_VERSION_CODE"
+      - name: Enable emulator acceleration
+        run: sudo chmod 666 /dev/kvm
+      - name: Exercise document access and failed saves on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: ./gradlew :app:connectedDebugAndroidTest -Pdistribution=play -Pplay.versionCode="$PLAY_VERSION_CODE" --max-workers=2
+      - name: Android test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-android-test-reports-${{ inputs.version_code }}
+          path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+      - name: Validate the packaged manifest and signature
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/bundletool.jar" \
+            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
+          echo 'a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  '"$RUNNER_TEMP/bundletool.jar" | sha256sum --check
+          python3 tools/check-play-package.py app/build/outputs/bundle/release/app-release.aab \
+            --bundletool "$RUNNER_TEMP/bundletool.jar" --version-code "$PLAY_VERSION_CODE"
+          jarsigner -verify app/build/outputs/bundle/release/app-release.aab
+          V=$(sed -n 's/^app.version=//p' gradle.properties | tr -d '\r')
+          mkdir -p out
+          cp app/build/outputs/bundle/release/app-release.aab "out/mLabeler-$V-play-$PLAY_VERSION_CODE.aab"
+          sha256sum out/*.aab > out/SHA256SUMS.txt
+      # Deliberately artifacts only: no release upload, tag creation, Play publishing or write permissions.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mLabeler-play-${{ inputs.version_code }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Remove temporary upload key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/play-upload.jks"
