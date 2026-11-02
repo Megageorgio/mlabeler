@@ -14,7 +14,11 @@ async function boot(page) {
   const startupFailure = new Promise((_, reject) => { fail = reject; });
   const onError = error => fail(new Error(`Editor startup failed: ${error.message}`));
   const onConsole = message => {
-    if (message.type() === 'error') fail(new Error(`Editor startup failed: ${message.text()}`));
+    // Driver diagnostics (e.g. unavailable WEBGL_debug_renderer_info) are not fatal.
+    // Kotlin coroutine exceptions are logged rather than emitted as pageerror events.
+    if (message.type() === 'error' && /^kotlin\.[\w.]+(?:Exception|Error):/.test(message.text())) {
+      fail(new Error(`Editor startup failed: ${message.text()}`));
+    }
   };
   page.on('pageerror', onError);
   page.on('console', onConsole);
@@ -240,7 +244,7 @@ test('uses Command shortcuts on macOS', async ({page}, info) => {
   await canvas.click({position:{x:box.width/2,y:box.height-74}});
   await page.getByRole('button',{name:'Rename',exact:true}).first().dispatchEvent('click');
   const input=page.locator('#app input, #app textarea');await expect(input).toBeAttached();
-  await input.fill('edited');await page.keyboard.press('Enter');await expect(input).not.toBeAttached();
+  await input.fill('edited');await input.press('Enter');await expect(input).not.toBeAttached();
   await page.getByRole('button',{name:'Save',exact:true}).first().dispatchEvent('click');
   await expect.poll(()=>page.evaluate(()=>MLabelerWeb.read('/project/test.lab'))).toContain('edited');
   await canvas.focus();await page.keyboard.press('Meta+z');
