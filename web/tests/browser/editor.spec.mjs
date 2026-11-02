@@ -10,9 +10,24 @@ function wav() {
   return b;
 }
 async function boot(page) {
-  await page.goto('./');
-  await expect(page.locator('#web-toolbar')).toBeVisible({timeout:60000});
-  await expect(page.locator('#app canvas')).toBeVisible();
+  let fail;
+  const startupFailure = new Promise((_, reject) => { fail = reject; });
+  const onError = error => fail(new Error(`Editor startup failed: ${error.message}`));
+  const onConsole = message => {
+    if (message.type() === 'error') fail(new Error(`Editor startup failed: ${message.text()}`));
+  };
+  page.on('pageerror', onError);
+  page.on('console', onConsole);
+  try {
+    await Promise.race([startupFailure, (async () => {
+      await page.goto('./');
+      await expect(page.locator('#web-toolbar')).toBeVisible({timeout:60000});
+      await expect(page.locator('#app canvas')).toBeVisible();
+    })()]);
+  } finally {
+    page.off('pageerror', onError);
+    page.off('console', onConsole);
+  }
 }
 
 test('Open folder selects a directory and filters unsupported files without losing project sidecars', async ({page}, info) => {

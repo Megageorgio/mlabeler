@@ -87,6 +87,9 @@ needed. Choose `all` or a single browser/layout. This workflow builds the web ar
 unpacks that exact artifact and tests it with at most two workers. Screenshots and
 traces from failures are available in `web-browser-test-results`. It never runs
 automatically on pushes, pull requests or release tags.
+On Linux CI, Firefox runs with a window under Xvfb and Mesa software rendering:
+the headless runner can refuse WebGL2 before the editor starts. Startup errors are
+reported immediately, and the browser suite has a 15-minute overall timeout.
 
 ```sh
 npm test --prefix web

@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 30
     env:
       WEB_TEST_PROJECT: ${{ inputs.project }}
+      LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,9 +57,9 @@ jobs:
         working-directory: web
         run: |
           if [ "$WEB_TEST_PROJECT" = all ]; then
-            npm run test:browsers -- --workers=2
+            xvfb-run -a npm run test:browsers -- --workers=2
           else
-            npm run test:browsers -- --workers=2 --project="$WEB_TEST_PROJECT"
+            xvfb-run -a npm run test:browsers -- --workers=2 --project="$WEB_TEST_PROJECT"
           fi
       - name: Browser test reports
         if: always()
