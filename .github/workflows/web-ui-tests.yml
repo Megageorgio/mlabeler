@@ -52,6 +52,14 @@ jobs:
             webkit-*) npx playwright install --with-deps webkit ;;
             *) echo 'Unknown browser project'; exit 1 ;;
           esac
+      - name: Start a virtual audio output
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pulseaudio pulseaudio-utils
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=mlabeler_test rate=48000
+          pactl set-default-sink mlabeler_test
+          pactl list short sinks
       - name: Check layouts, editing, storage, audio and local inference
         timeout-minutes: 25
         working-directory: web

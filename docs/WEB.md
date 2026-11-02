@@ -90,6 +90,8 @@ automatically on pushes, pull requests or release tags.
 On Linux CI, Firefox runs with a window under Xvfb and Mesa software rendering:
 the headless runner can refuse WebGL2 before the editor starts. Startup errors are
 reported immediately, and the browser suite has a 15-minute overall timeout.
+PulseAudio with a virtual output sink supplies an audio device for playback tests,
+including a check that the browser's audio clock actually advances.
 
 ```sh
 npm test --prefix web

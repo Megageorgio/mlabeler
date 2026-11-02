@@ -89,6 +89,12 @@ test('browser toolbar follows the editor theme and scale', async ({page}, info) 
   await expect(page.locator('#export')).toHaveCSS('background-color','rgb(78, 138, 44)');
 });
 test('imports WAV and labels, plays, downloads a valid project and restores it', async ({page}, info) => {
+  await page.addInitScript(() => {
+    const NativeAudioContext = window.AudioContext || window.webkitAudioContext;
+    if (NativeAudioContext) window.AudioContext = class extends NativeAudioContext {
+      constructor(...args) { super(...args); window.testAudioContext = this; }
+    };
+  });
   const errors=[]; page.on('pageerror', e=>errors.push(e.message));
   const external=[]; page.on('request', req=>{if(!req.url().startsWith('http://127.0.0.1:4173') && !req.url().startsWith('blob:') && !req.url().startsWith('data:')) external.push(req.url());});
   await boot(page);
@@ -109,6 +115,10 @@ test('imports WAV and labels, plays, downloads a valid project and restores it',
   await page.locator('#app canvas').click({position:{x:100,y:100}});
   if (await page.evaluate(()=>!!(globalThis.AudioContext || globalThis.webkitAudioContext))) {
     await page.evaluate(()=>MLabelerWeb.play(String.fromCharCode(...new Uint8Array(new Float32Array(1600).buffer)),16000,0,1600,false));
+    await expect.poll(()=>page.evaluate(()=>({
+      state: window.testAudioContext?.state,
+      clockAdvanced: window.testAudioContext?.currentTime > 0,
+    })), {message:'Web Audio must have a running clock; Linux CI needs an audio server and output sink'}).toEqual({state:'running',clockAdvanced:true});
     await expect.poll(()=>page.evaluate(()=>MLabelerWeb.playing())).toBe(false);
   } else {
     // Playwright's Windows WebKit omits Web Audio; Linux CI checks the actual API.
