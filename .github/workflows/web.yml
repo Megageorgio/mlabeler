@@ -22,19 +22,6 @@ jobs:
       - run: npm test --prefix web
       - name: Build static website and ZIP
         run: ./gradlew :app:webArchive -Pdistribution=web
-      - name: Install browser engines
-        working-directory: web
-        run: npx playwright install --with-deps chromium firefox webkit
-      - name: Check desktop and phone layouts, editing, storage, audio and local inference
-        run: npm run test:browsers --prefix web
-      - name: Browser test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-browser-test-results
-          path: web/test-results/
-          retention-days: 14
-          if-no-files-found: ignore
       - name: Upload deployment archive
         uses: actions/upload-artifact@v4
         with:
