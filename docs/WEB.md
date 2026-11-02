@@ -8,7 +8,8 @@ npm ci --prefix web
 ```
 
 The **build** GitHub Action builds the web edition alongside the native apps and runs
-fast unit checks. Browser UI tests are separate and do not delay these builds or releases.
+unit checks and browser UI tests. The archive is uploaded as soon as it is built;
+browser tests must also pass before a tagged release is published.
 Tagged releases include `mLabeler-<version>-web.zip` in addition to the native downloads.
 The separate manual **Web deployment archive** workflow builds only the web edition;
 it does not publish a GitHub release or deploy a website. Download the `mLabeler-web`
@@ -82,11 +83,10 @@ from deploying a new website archive and reloading the page.
 
 ## Checks
 
-In Actions, run **Web UI tests (manual)** → **Run workflow** when browser checks are
-needed. Choose `all` or a single browser/layout. This workflow builds the web archive,
-unpacks that exact artifact and tests it with at most two workers. Screenshots and
-traces from failures are available in `web-browser-test-results`. It never runs
-automatically on pushes, pull requests or release tags.
+Browser checks run automatically as part of **build** and the standalone **Web
+deployment archive** workflow, using at most two workers. Screenshots and traces
+from failures are available in `web-browser-test-results`; these reports are not
+included in release downloads. There is no separate UI-test workflow.
 On Linux CI, Firefox runs with a window under Xvfb and Mesa software rendering:
 the headless runner can refuse WebGL2 before the editor starts. Startup errors are
 reported immediately, and the browser suite has a 15-minute overall timeout.
@@ -114,4 +114,4 @@ editing tests work. This resembles the upstream [Windows WebKit screenshot issue
 these screenshots do not verify Safari rendering. Chromium/Edge screenshots were inspected,
 including phonetic labels and interface symbols.
 The local Firefox binary could not start due to a Windows side-by-side/mozglue error;
-Firefox remains a non-skipped project in the optional browser suite. A physical iPhone has not been tested.
+Firefox remains a non-skipped project in the browser suite. A physical iPhone has not been tested.

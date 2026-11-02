@@ -11,6 +11,8 @@ jobs:
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -29,3 +31,26 @@ jobs:
           path: app/build/outputs/web/*.zip
           if-no-files-found: error
           retention-days: 30
+      - name: Install browser engines
+        working-directory: web
+        run: npx playwright install --with-deps chromium firefox webkit
+      - name: Start a virtual audio output
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pulseaudio pulseaudio-utils
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=mlabeler_test rate=48000
+          pactl set-default-sink mlabeler_test
+          pactl list short sinks
+      - name: Check layouts, editing, storage, audio and local inference
+        timeout-minutes: 20
+        working-directory: web
+        run: xvfb-run -a npm run test:browsers -- --workers=2
+      - name: Browser test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-browser-test-results
+          path: web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
