@@ -430,13 +430,13 @@ fun Timeline(ed: EditorState, layout: LayoutSettings, view: ViewSettings, onLayo
                                 }
                                 PointerEventType.Exit -> if (ch.type == PointerType.Mouse) { ed.cursor = null; ed.hoverBound = null; ed.brushAt = null }
                                 PointerEventType.Scroll -> {
-                                    val d = ch.scrollDelta
+                                    val d = e.wheelSteps(ch.scrollDelta)
                                     val mods = e.keyboardModifiers
                                     val gw = geom(this.size, density, layoutState.value, ed.laneTiers())
                                     if (mods.isAltPressed && gw.waveBottom > gw.waveTop && ch.position.y in gw.waveTop..gw.waveBottom) {
                                         // the waveform: Alt+wheel zooms it vertically
                                         val l = layoutState.value
-                                        val f = if (d.y < 0) 1.25f else 0.8f
+                                        val f = if (mlabeler.app.AppInfo.WEB) 1.25f.pow(-d.y) else if (d.y < 0) 1.25f else 0.8f
                                         onLayoutState.value(l.copy(waveGain = (l.waveGain * f).coerceIn(1f, 64f).let { v -> if (abs(v - 1f) < 0.05f) 1f else v }))
                                     } else if (mods.isAltPressed && gw.pitchBottom > gw.pitchTop && ch.position.y in gw.pitchTop..gw.pitchBottom) {
                                         // the piano roll: Alt+wheel moves it up and down, Ctrl+Alt+wheel zooms it

@@ -26,6 +26,7 @@ import mlabeler.app.theme.T
 import mlabeler.core.model.IntervalTier
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.pow
 
 /**
  * The whole recording in a thin strip: its loudness, which parts the phoneme lane names, the problems found, and
@@ -90,9 +91,11 @@ fun MiniMap(ed: EditorState) {
                             PointerEventType.Exit -> over = 0
                             PointerEventType.Move, PointerEventType.Enter -> if (!ch.pressed) over = partAt(ch.position.x, w, edgeDp.toPx())
                             PointerEventType.Scroll -> {
-                                val d = ch.scrollDelta.y.takeIf { it != 0f } ?: ch.scrollDelta.x
+                                val delta = ev.wheelSteps(ch.scrollDelta)
+                                val d = delta.y.takeIf { it != 0f } ?: delta.x
                                 if (ev.keyboardModifiers.isCtrlPressed) {
-                                    ed.zoom(if (d > 0) 1 / 1.25 else 1.25, (ch.position.x / w).toDouble() * ed.duration)
+                                    val factor = if (mlabeler.app.AppInfo.WEB) 1.25.pow(-d.toDouble()) else if (d > 0) 1 / 1.25 else 1.25
+                                    ed.zoom(factor, (ch.position.x / w).toDouble() * ed.duration)
                                 } else ed.scrollBy(d * ed.viewWidthPx * 0.15)
                                 ch.consume()
                             }

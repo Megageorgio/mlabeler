@@ -64,7 +64,7 @@ fun ScrollRow(
                     val ev = awaitPointerEvent(PointerEventPass.Initial)
                     if (ev.type != PointerEventType.Scroll || state.maxValue == 0) continue
                     val ch = ev.changes.firstOrNull() ?: continue
-                    val d = ch.scrollDelta
+                    val d = ev.wheelSteps(ch.scrollDelta)
                     val dx = if (kotlin.math.abs(d.x) > kotlin.math.abs(d.y)) d.x else d.y
                     if (dx == 0f) continue
                     scope.launch { state.scrollBy(dx * 60f) }

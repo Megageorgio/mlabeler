@@ -1,5 +1,7 @@
 package mlabeler.app.recorder
 
+import mlabeler.app.ui.wheelSteps
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -390,7 +392,7 @@ private fun TakeView(rec: RecorderState, modifier: Modifier) {
                     val ev = awaitPointerEvent()
                     if (ev.type != androidx.compose.ui.input.pointer.PointerEventType.Scroll) continue
                     val ch = ev.changes.firstOrNull() ?: continue
-                    val d = ch.scrollDelta
+                    val d = ev.wheelSteps(ch.scrollDelta)
                     val anchor = vStart + ch.position.x / size.width * span()
                     if (ev.keyboardModifiers.isCtrlPressed || ev.keyboardModifiers.isMetaPressed) zoomBy(1.2.pow(d.y.toDouble()), anchor)
                     else if (vSpan > 0.0) {

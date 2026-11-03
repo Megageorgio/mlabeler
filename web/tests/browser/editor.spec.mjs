@@ -2,10 +2,10 @@ import {test, expect} from '@playwright/test';
 import {readFile, mkdir, writeFile} from 'node:fs/promises';
 import {unzipSync, zipSync} from 'fflate';
 
-function wav() {
-  const n = 16000, b = Buffer.alloc(44+n*2);
+function wav(seconds = 1) {
+  const n = 16000 * seconds, b = Buffer.alloc(44+n*2);
   b.write('RIFF'); b.writeUInt32LE(b.length-8,4); b.write('WAVEfmt ',8); b.writeUInt32LE(16,16);
-  b.writeUInt16LE(1,20); b.writeUInt16LE(1,22); b.writeUInt32LE(n,24); b.writeUInt32LE(n*2,28); b.writeUInt16LE(2,32); b.writeUInt16LE(16,34); b.write('data',36); b.writeUInt32LE(n*2,40);
+  b.writeUInt16LE(1,20); b.writeUInt16LE(1,22); b.writeUInt32LE(16000,24); b.writeUInt32LE(32000,28); b.writeUInt16LE(2,32); b.writeUInt16LE(16,34); b.write('data',36); b.writeUInt32LE(n*2,40);
   for(let i=0;i<n;i++) b.writeInt16LE(Math.round(Math.sin(i*2*Math.PI*220/n)*6000),44+i*2);
   return b;
 }
@@ -92,6 +92,60 @@ test('browser toolbar follows the editor theme and scale', async ({page}, info) 
   await page.getByText('Light', {exact:true}).dispatchEvent('click', {bubbles:false});
   await expect(page.locator('#export')).toHaveCSS('background-color','rgb(78, 138, 44)');
 });
+test('wheel scrolling and zoom stay proportional across browser delta modes', async ({page}, info) => {
+  test.skip(info.project.name.includes('phone'), 'Mouse wheel interaction uses the desktop layout');
+  await boot(page);
+  await page.evaluate(() => {
+    const settings = JSON.parse(MLabelerWeb.read('/settings/settings.json'));
+    MLabelerWeb.write('/settings/settings.json', JSON.stringify({
+      ...settings, status: {left: ['cursor'], right: ['zoom']},
+    }));
+  });
+  await page.waitForTimeout(600);
+  await page.reload();
+  await expect(page.locator('#web-toolbar')).toBeVisible();
+  await page.locator('#file-input').setInputFiles([
+    {name: 'long.wav', mimeType: 'audio/wav', buffer: wav(60)},
+    {name: 'long.lab', mimeType: 'text/plain', buffer: Buffer.from('0 600000000 a\n')},
+  ]);
+  const scale = page.getByText(/^Scale: [\d.]+ s$/);
+  await expect(scale).toBeVisible();
+  const secondsOnScreen = async () => Number((await scale.innerText()).match(/[\d.]+/)[0]);
+  const canvas = await page.locator('#app canvas').boundingBox();
+  const point = {x: canvas.x + canvas.width * 0.65, y: canvas.y + canvas.height * 0.5};
+  await page.mouse.move(point.x, point.y);
+  const before = await secondsOnScreen();
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -100);
+  await page.keyboard.up('Control');
+  await expect.poll(secondsOnScreen).toBeLessThan(before);
+  expect(before / await secondsOnScreen()).toBeLessThan(1.3);
+  // Equivalent physical wheel steps can arrive as pixels, lines or pages.
+  for (const [deltaMode, deltaY] of [[0, -100], [1, -3], [2, -1]]) {
+    const previous = await secondsOnScreen();
+    await page.locator('#app canvas').evaluate((canvas, {point, deltaMode, deltaY}) => {
+      canvas.dispatchEvent(new WheelEvent('wheel', {
+        bubbles: true, cancelable: true, clientX: point.x, clientY: point.y,
+        deltaMode, deltaY, ctrlKey: true,
+      }));
+    }, {point, deltaMode, deltaY});
+    await expect.poll(secondsOnScreen).toBeLessThan(previous);
+    expect(previous / await secondsOnScreen()).toBeLessThan(1.3);
+  }
+  const cursor = page.getByText(/^\d+:\d{2}\.\d{3}$/);
+  const time = async () => {
+    const [minutes, seconds] = (await cursor.innerText()).split(':').map(Number);
+    return minutes * 60 + seconds;
+  };
+  await page.mouse.move(point.x + 1, point.y);
+  await expect(cursor).toBeVisible();
+  const start = await time();
+  await page.mouse.wheel(0, 100);
+  await page.mouse.move(point.x + 2, point.y);
+  await expect.poll(time).toBeGreaterThan(start);
+  expect(await time() - start).toBeLessThan(await secondsOnScreen() / 3);
+});
+
 test('imports WAV and labels, plays, downloads a valid project and restores it', async ({page}, info) => {
   await page.addInitScript(() => {
     const NativeAudioContext = window.AudioContext || window.webkitAudioContext;
