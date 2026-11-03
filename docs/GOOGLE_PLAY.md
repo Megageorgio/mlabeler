@@ -9,7 +9,7 @@ The existing `build` workflow and its release APKs are unchanged.
 1. Push the workflow and its supporting changes to the repository's default branch.
 2. Open **Actions → Android Play bundle → Run workflow** and select the desired ref.
 3. Set `version_code` to an unused integer greater than every version code already uploaded to Play Console.
-   The current proposed code for 0.1.2 is `100301`; do not reuse it after uploading that bundle.
+   The current proposed code for 0.1.3 is `100401`; do not reuse it after uploading that bundle.
 4. Download the successful run's **mLabeler-play-CODE** artifact. Upload its `.aab` to the intended Play track yourself.
 
 The workflow requires the existing repository secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`
@@ -52,14 +52,14 @@ copy. A failed save retains pending edits. Use a writable provider with rename s
 With Android SDK and JDK 21 configured:
 
 ```sh
-./gradlew :app:assembleDebug :app:connectedDebugAndroidTest -Pdistribution=play -Pplay.versionCode=100301
-./gradlew :app:bundleRelease -Pdistribution=play -Pplay.versionCode=100301
-python tools/check-play-package.py app/build/outputs/bundle/release/app-release.aab --bundletool /path/to/bundletool.jar --version-code 100301
+./gradlew :app:assembleDebug :app:connectedDebugAndroidTest -Pdistribution=play -Pplay.versionCode=100401
+./gradlew :app:bundleRelease -Pdistribution=play -Pplay.versionCode=100401
+python tools/check-play-package.py app/build/outputs/bundle/release/app-release.aab --bundletool /path/to/bundletool.jar --version-code 100401
 ```
 
 Release signing reads `MLABELER_KEYSTORE`, `MLABELER_KEYSTORE_PASSWORD`, `MLABELER_KEY_ALIAS`, and optional
 `MLABELER_KEY_PASSWORD` from the environment, like the regular release workflow. Do not put passwords in Gradle
-properties or commit keys. In PowerShell quote dotted properties, e.g. `'-Pplay.versionCode=100301'`.
+properties or commit keys. In PowerShell quote dotted properties, e.g. `'-Pplay.versionCode=100401'`.
 
 ## Play Console and listing
 

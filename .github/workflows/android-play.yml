@@ -6,7 +6,7 @@ on:
       version_code:
         description: 'Unused Google Play versionCode (greater than all previously uploaded codes)'
         required: true
-        default: '100301'
+        default: '100401'
         type: string
 
 permissions:

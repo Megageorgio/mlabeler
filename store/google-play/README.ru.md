@@ -1,6 +1,6 @@
 # Комплект для страницы mLabeler в Google Play
 
-Версия приложения: 0.1.2. Контакт поддержки: **m@msan.pw**. Сайт: https://github.com/Megageorgio/mlabeler.
+Версия приложения: 0.1.3. Контакт поддержки: **m@msan.pw**. Сайт: https://github.com/Megageorgio/mlabeler.
 
 ## Что куда загружать
 

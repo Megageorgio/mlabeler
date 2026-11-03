@@ -26,7 +26,7 @@ def build():
 ''' + ''.join(parts) + '''<footer>Скриншоты сняты в Android-приложении на участке около 54-й секунды предоставленной записи en.wav из mnew. Исходные записи не входят в комплект. Полная инструкция: README.ru.md. Ответы для остальных разделов: console-answers.ru.md.</footer></main>
 <script>async function copyField(id,button){const text=document.getElementById(id).innerText;try{await navigator.clipboard.writeText(text);button.textContent='Скопировано'}catch(e){const range=document.createRange();range.selectNodeContents(document.getElementById(id));const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);button.textContent='Текст выделен — Ctrl+C'}setTimeout(()=>button.textContent='Копировать',2200)}</script></html>'''
     (BASE/'START-HERE.html').write_text(document,encoding='utf-8')
-    output=BASE.parents[1]/'app/build/outputs/google-play/mLabeler-0.1.2-google-play-kit.zip'
+    output=BASE.parents[1]/'app/build/outputs/google-play/mLabeler-0.1.3-google-play-kit.zip'
     output.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(output,'w',zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(BASE.rglob('*')):
