@@ -108,9 +108,10 @@ test('wheel scrolling and zoom stay proportional across browser delta modes', as
     {name: 'long.wav', mimeType: 'audio/wav', buffer: wav(60)},
     {name: 'long.lab', mimeType: 'text/plain', buffer: Buffer.from('0 600000000 a\n')},
   ]);
-  const scale = page.getByText(/^Scale: [\d.]+ s$/);
-  await expect(scale).toBeVisible();
-  const secondsOnScreen = async () => Number((await scale.innerText()).match(/[\d.]+/)[0]);
+  // Compose can merge adjacent status texts into one accessibility element.
+  const scale = page.getByText(/Scale: [\d.]+ s$/);
+  await expect(scale).toBeVisible({timeout: 30000});
+  const secondsOnScreen = async () => Number((await scale.innerText()).match(/Scale: ([\d.]+)/)[1]);
   const canvas = await page.locator('#app canvas').boundingBox();
   const point = {x: canvas.x + canvas.width * 0.65, y: canvas.y + canvas.height * 0.5};
   await page.mouse.move(point.x, point.y);
@@ -132,9 +133,9 @@ test('wheel scrolling and zoom stay proportional across browser delta modes', as
     await expect.poll(secondsOnScreen).toBeLessThan(previous);
     expect(previous / await secondsOnScreen()).toBeLessThan(1.3);
   }
-  const cursor = page.getByText(/^\d+:\d{2}\.\d{3}$/);
+  const cursor = page.getByText(/^\d+:\d{2}\.\d{3}(?:\s|$)/).filter({hasNotText: 'Hz'});
   const time = async () => {
-    const [minutes, seconds] = (await cursor.innerText()).split(':').map(Number);
+    const [minutes, seconds] = (await cursor.innerText()).match(/\d+:\d{2}\.\d{3}/)[0].split(':').map(Number);
     return minutes * 60 + seconds;
   };
   await page.mouse.move(point.x + 1, point.y);
